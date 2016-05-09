@@ -1,7 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <sys/mman.h>
 #include <string.h>
+#include <errno.h>
 #include <sys/ioctl.h>
 #include <sys/syscall.h>
 #include <linux/perf_event.h>
@@ -19,6 +21,10 @@ perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
 }
 
 // syscall number: 298
+void read_mmap_thing(void *mmap_address) {
+  struct perf_event_mmap_page pemp;
+  return; 
+}
 
 int
 main(int argc, char **argv)
@@ -53,7 +59,20 @@ main(int argc, char **argv)
    pe.exclude_guest = 1;
    pe.exclude_kernel = 1;
 
-   fd = perf_event_open(&pe, 0, -1, -1, 0);
+   fd = perf_event_open(&pe, -1, 0, -1, 0);
+   // mmap(NULL, 528384, PROT_READ|PROT_WRITE, MAP_SHARED, 4, 0) = 0x7f846af88000
+   if (fd == -1) {
+      fprintf(stderr, "Error opening leader %llx\n", pe.config);
+      fprintf(stderr, "errno: %d\n", errno);
+      exit(EXIT_FAILURE);
+   }
+
+   void * mmap_address = mmap(NULL, (129 * 4096), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+   if (mmap_address == -1) {
+    printf("mmap failed!!!!!!!!: %d\n", errno);
+    exit(1);
+   }
+   read_mmap_thing(mmap_address);
    if (fd == -1) {
       fprintf(stderr, "Error opening leader %llx\n", pe.config);
       exit(EXIT_FAILURE);
@@ -71,3 +90,4 @@ main(int argc, char **argv)
 
    close(fd);
 }
+
