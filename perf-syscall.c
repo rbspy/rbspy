@@ -9,6 +9,42 @@
 #include <linux/perf_event.h>
 #include <asm/unistd.h>
 
+
+#define u64 __u64
+#define u32 __u32
+
+struct perf_record_sample {
+    struct perf_event_header header;
+    u64   ip;         /* if PERF_SAMPLE_IP */
+    u32   pid, tid;   /* if PERF_SAMPLE_TID */
+    u64   time;       /* if PERF_SAMPLE_TIME */
+    u64   addr;       /* if PERF_SAMPLE_ADDR */
+    u64   id;         /* if PERF_SAMPLE_ID */
+    u64   stream_id;  /* if PERF_SAMPLE_STREAM_ID */
+    u32   cpu, res;   /* if PERF_SAMPLE_CPU */
+    u64   period;     /* if PERF_SAMPLE_PERIOD */
+    // struct read_format v;  if PERF_SAMPLE_READ 
+    // u64   nr;          if PERF_SAMPLE_CALLCHAIN 
+    // u64   ips[nr];    /* if PERF_SAMPLE_CALLCHAIN */
+    // u32   size;       /* if PERF_SAMPLE_RAW */
+    // char  data[size]; /* if PERF_SAMPLE_RAW */
+    // u64   bnr;        /* if PERF_SAMPLE_BRANCH_STACK */
+    // struct perf_branch_entry lbr[bnr];
+    //                   /* if PERF_SAMPLE_BRANCH_STACK */
+    // u64   abi;        /* if PERF_SAMPLE_REGS_USER */
+    // u64   regs[weight(mask)];
+    //                   /* if PERF_SAMPLE_REGS_USER */
+    // u64   size;       /* if PERF_SAMPLE_STACK_USER */
+    // char  data[size]; /* if PERF_SAMPLE_STACK_USER */
+    // u64   dyn_size;   /* if PERF_SAMPLE_STACK_USER */
+    // u64   weight;     /* if PERF_SAMPLE_WEIGHT */
+    // u64   data_src;   /* if PERF_SAMPLE_DATA_SRC */
+    // u64   transaction;/* if PERF_SAMPLE_TRANSACTION */
+    // u64   abi;        /* if PERF_SAMPLE_REGS_INTR */
+    // u64   regs[weight(mask)];
+    //                   /* if PERF_SAMPLE_REGS_INTR */
+};
+
 static long
 perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
                int cpu, int group_fd, unsigned long flags)
@@ -21,9 +57,17 @@ perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
 }
 
 // syscall number: 298
+
+void print_perf_data(void *data_start) {
+  struct perf_event_header header;
+  struct perf_record_sample sample;
+}
+
 void read_mmap_thing(void *mmap_address) {
-  struct perf_event_mmap_page pemp;
-  return; 
+  // struct perf_event_mmap_page pemp = (* struct perf_event_mmap_page)) mmap_address;
+  // sleep(0.5);
+  // void * data_start = mmap_address + 4096;
+  // return; 
 }
 
 int
@@ -49,7 +93,7 @@ main(int argc, char **argv)
    pe.config = PERF_COUNT_HW_CPU_CYCLES;
    pe.sample_period = 4000;
    pe.sample_freq = 4000;
-   pe.sample_type = 391; // ??????? what does it meeeeeeeeeeean
+   pe.sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_ADDR | PERF_SAMPLE_ID | PERF_SAMPLE_STREAM_ID | PERF_SAMPLE_CPU; // ??????? what does it meeeeeeeeeeean
    pe.disabled = 1;
    pe.inherit = 1;
    pe.mmap = 1;
@@ -72,7 +116,6 @@ main(int argc, char **argv)
     printf("mmap failed!!!!!!!!: %d\n", errno);
     exit(1);
    }
-   read_mmap_thing(mmap_address);
    if (fd == -1) {
       fprintf(stderr, "Error opening leader %llx\n", pe.config);
       exit(EXIT_FAILURE);
@@ -82,6 +125,7 @@ main(int argc, char **argv)
    ioctl(fd, PERF_EVENT_IOC_ENABLE, 0);
 
    printf("Measuring instruction count for this printf\n");
+   read_mmap_thing(mmap_address);
 
    ioctl(fd, PERF_EVENT_IOC_DISABLE, 0);
    read(fd, &count, sizeof(long long));
