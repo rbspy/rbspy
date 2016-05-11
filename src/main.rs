@@ -3,6 +3,8 @@ extern crate regex;
 use libc::*;
 use std::env;
 use std::os::unix::prelude::*;
+use std::time::Duration;
+use std::thread;
 use std::ffi::{OsString, CStr};
 use std::mem;
 use std::slice;
@@ -75,6 +77,7 @@ fn get_nm_address(pid: pid_t) -> u64 {
 }
 
 fn get_maps_address(pid: pid_t) -> u64 {
+
     let cat_command = Command::new("cat").arg(format!("/proc/{}/maps", pid))
         .stdout(Stdio::piped())
         .stdin(Stdio::null())
@@ -92,26 +95,36 @@ fn get_ruby_current_thread_address(pid: pid_t)->u64 {
     get_nm_address(pid) + get_maps_address(pid)
 }
 
-fn main() {
-    let args: Vec<_> = env::args().collect();
-    let pid: pid_t = args[1].parse().unwrap();
-    let ruby_current_thread_address_location = get_ruby_current_thread_address(pid);
+fn get_cfps<'a>(ruby_current_thread_address_location:u64, pid: pid_t) -> &'a[rb_control_frame_t] {
     let ruby_current_thread_address = unsafe {
         copy_address(ruby_current_thread_address_location as * const u64, pid)
     };
     let thread = unsafe {
         copy_address(ruby_current_thread_address as *const rb_thread_t, pid)
     };
-    let cfps = unsafe {
+    unsafe {
         let result = copy_address_raw(thread.cfp as *mut c_void, 100 * mem::size_of::<ruby_vm::rb_control_frame_t>(), pid);
          slice::from_raw_parts(result.as_ptr() as *const ruby_vm::rb_control_frame_t, 100)
-    };
-    for i in 0..100 {
-        let iseq = get_iseq(&cfps[i], pid);
-        if !cfps[i].pc.is_null() {
-            let label = get_ruby_string(iseq.location.label as VALUE, pid);
-            let path = get_ruby_string(iseq.location.path as VALUE, pid);
-            println!("{:?} : {:?}", path, label);
+    }
+}
+
+fn main() {
+    let args: Vec<_> = env::args().collect();
+    let pid: pid_t = args[1].parse().unwrap();
+    let ruby_current_thread_address_location = get_ruby_current_thread_address(pid);
+
+    loop {
+        let cfps = get_cfps(ruby_current_thread_address_location, pid);
+        println!("--------------------------------");
+        println!("Stack trace:");
+        for i in 0..100 {
+            let iseq = get_iseq(&cfps[i], pid);
+            if !cfps[i].pc.is_null() {
+                let label = get_ruby_string(iseq.location.label as VALUE, pid);
+                let path = get_ruby_string(iseq.location.path as VALUE, pid);
+                println!("{:?} : {:?}", path, label);
+            }
         }
+        thread::sleep(Duration::from_millis(50));
     }
 }
