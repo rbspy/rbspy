@@ -108,11 +108,11 @@ fn main() {
         let result = copy_address_raw(thread.cfp as *mut c_void, 100 * mem::size_of::<ruby_vm::rb_control_frame_t>(), pid);
          slice::from_raw_parts(result.as_ptr() as *const ruby_vm::rb_control_frame_t, 100)
     };
-    for i in 0..50 {
+    for i in 0..100 {
         let iseq = get_iseq(&cfps[i], pid);
         if !cfps[i].pc.is_null() {
-            let label = get_ruby_string(iseq.location.label as VALUE, pid)
-            let path = get_ruby_string(iseq.location.path as VALUE, pid)
+            let label = get_ruby_string(iseq.location.label as VALUE, pid);
+            let path = get_ruby_string(iseq.location.path as VALUE, pid);
             println!("{:?} : {:?}", path, label);
         }
     }
