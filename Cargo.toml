@@ -5,3 +5,4 @@ authors = ["Julia Evans <julia@jvns.ca>"]
 
 [dependencies]
 libc={path="/home/bork/clones/libc"}
+regex = "0.1"

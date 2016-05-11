@@ -1,10 +1,14 @@
 extern crate libc;
+extern crate regex;
 use libc::*;
 use std::env;
 use std::os::unix::prelude::*;
 use std::ffi::{OsString, CStr};
 use std::mem;
 use std::slice;
+use std::process::Command;
+use std::process::Stdio;
+use regex::Regex;
 mod ruby_vm;
 use ruby_vm::{rb_iseq_t, rb_control_frame_t, rb_thread_t, Struct_RString, VALUE};
 
@@ -19,7 +23,7 @@ fn copy_address_raw(addr: *const c_void, length: usize, pid: pid_t) -> Vec<u8> {
         iov_len: length
     };
     unsafe {
-        let ret = process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
+        process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
     }
     copy
 }
@@ -56,10 +60,45 @@ fn get_iseq(cfp: &rb_control_frame_t, pid: pid_t) -> rb_iseq_t {
     }
 }
 
+fn get_nm_address(pid: pid_t) -> u64 {
+    let nm_command = Command::new("nm").arg(format!("/proc/{}/exe", pid))
+        .stdout(Stdio::piped())
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .unwrap_or_else(|e| { panic!("failed to execute process: {}", e) });
+    let nm_output = String::from_utf8(nm_command.stdout).unwrap();
+    let re = Regex::new(r"(\w+) b ruby_current_thread").unwrap();
+    let cap = re.captures(&nm_output).unwrap();
+    let address_str = cap.at(1).unwrap();
+    u64::from_str_radix(address_str, 16).unwrap()
+}
+
+fn get_maps_address(pid: pid_t) -> u64 {
+    let cat_command = Command::new("cat").arg(format!("/proc/{}/maps", pid))
+        .stdout(Stdio::piped())
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .unwrap_or_else(|e| { panic!("failed to execute process: {}", e) });
+    let output = String::from_utf8(cat_command.stdout).unwrap();
+    let re = Regex::new(r"\n(\w+).+?bin/ruby").unwrap();
+    let cap = re.captures(&output).unwrap();
+    let address_str = cap.at(1).unwrap();
+    u64::from_str_radix(address_str, 16).unwrap()
+}
+
+fn get_ruby_current_thread_address(pid: pid_t)->u64 {
+    get_nm_address(pid) + get_maps_address(pid)
+}
+
 fn main() {
     let args: Vec<_> = env::args().collect();
     let pid: pid_t = args[1].parse().unwrap();
     println!("pid is {}!\n", pid);
+    println!("maps:{:x}", get_maps_address(pid));
+    println!("nm: {:x}", get_nm_address(pid));
+    println!("sum: {:x}", get_ruby_current_thread_address(pid));
     let thread = unsafe {
         copy_address(0x7fa684d9b5b0 as *const rb_thread_t, pid)
     };
