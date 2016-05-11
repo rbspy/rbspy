@@ -98,9 +98,12 @@ fn main() {
     println!("pid is {}!\n", pid);
     println!("maps:{:x}", get_maps_address(pid));
     println!("nm: {:x}", get_nm_address(pid));
-    println!("sum: {:x}", get_ruby_current_thread_address(pid));
+    let ruby_current_thread_address_location = get_ruby_current_thread_address(pid);
+    let ruby_current_thread_address = unsafe {
+        copy_address(ruby_current_thread_address_location as * const u64, pid)
+    };
     let thread = unsafe {
-        copy_address(0x7fa684d9b5b0 as *const rb_thread_t, pid)
+        copy_address(ruby_current_thread_address as *const rb_thread_t, pid)
     };
     println!("cfp address: {:?}", thread.cfp);
     let cfps = unsafe {
