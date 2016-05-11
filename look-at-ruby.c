@@ -44,6 +44,7 @@ char* get_ruby_string(VALUE address) {
 
 rb_iseq_t* get_iseq(rb_control_frame_t * cfp) {
     void* iseq_addr = cfp->iseq;
+        printf("%p", iseq_addr);
     return (rb_iseq_t *) copy_address(iseq_addr, sizeof(rb_iseq_t), PID);
 }
 
@@ -52,7 +53,7 @@ int main(int argc, char** argv) {
     pid_t pid = atoi(argv[1]);
     PID = pid;
     printf("reading from PID: %d\n", pid);
-    rb_thread_t* thread = (rb_thread_t *) copy_address((void*) 0x7f929df445b0, sizeof(rb_thread_t), pid);
+    rb_thread_t* thread = (rb_thread_t *) copy_address((void*) 0x7fa684d9b5b0, sizeof(rb_thread_t), pid);
     while(1) {
     void *stack_start =  copy_address(thread->cfp, 1000, pid);
     rb_control_frame_t * cfp = (rb_control_frame_t *) stack_start;
