@@ -26,11 +26,6 @@ void * copy_address(void* addr, int length, pid_t pid) {
     return copy;
 }
 
-// rb_iseq_location_t* get_iseq_location(rb_iseq_t* iseq) {
-//     void* location_addr = (void*) iseq->location;
-//     return (rb_iseq_location_t *) copy_address(location_addr, sizeof(rb_iseq_location_t), PID);
-// }
-
 void breakk() {
 
 }
