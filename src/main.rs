@@ -38,12 +38,11 @@ unsafe fn copy_address<T>(addr: * const T, pid: pid_t) -> T {
 
 fn get_ruby_string(address: VALUE, pid: pid_t) -> Vec<u8> {
     unsafe {
-        let result = copy_address_raw(address as *mut c_void, mem::size_of::<ruby_vm::Struct_RString>(), pid);
-        let mut rstring = result.as_ptr() as *mut Struct_RString;
-        if (*rstring).basic.flags & (1 << 13) != 0 {
-            return copy_address_raw((*(*rstring)._as.heap()).ptr as *const c_void, (*(*rstring)._as.heap()).len as usize, pid);
+        let mut rstring = copy_address(address as *const Struct_RString, pid);
+        if (rstring).basic.flags & (1 << 13) != 0 {
+            return copy_address_raw((*rstring._as.heap()).ptr as *const c_void, (*rstring._as.heap()).len as usize, pid);
         } else {
-            return slice::from_raw_parts((*(*rstring)._as.ary()).as_ptr() as * const u8, 24).to_vec();
+            return slice::from_raw_parts((*rstring._as.ary()).as_ptr() as * const u8, 24).to_vec();
         }
     }
 }
@@ -69,8 +68,8 @@ fn main() {
     for i in 0..15 {
         let iseq = get_iseq(&cfps[i], pid);
         unsafe {
-            libc::puts(get_ruby_string((iseq).location.label as VALUE, pid).as_ptr() as * const c_char);
-            libc::puts(get_ruby_string((iseq).location.path as VALUE, pid).as_ptr() as * const c_char);
+            libc::puts(get_ruby_string(iseq.location.label as VALUE, pid).as_ptr() as * const c_char);
+            libc::puts(get_ruby_string(iseq.location.path as VALUE, pid).as_ptr() as * const c_char);
         }
     }
     println!("{:?}", cfps[1].iseq)
