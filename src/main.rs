@@ -111,8 +111,9 @@ fn main() {
     for i in 0..50 {
         let iseq = get_iseq(&cfps[i], pid);
         if !cfps[i].pc.is_null() {
-            println!("{:?}", get_ruby_string(iseq.location.label as VALUE, pid));
-            println!("{:?}", get_ruby_string(iseq.location.path as VALUE, pid));
+            let label = get_ruby_string(iseq.location.label as VALUE, pid)
+            let path = get_ruby_string(iseq.location.path as VALUE, pid)
+            println!("{:?} : {:?}", path, label);
         }
     }
 }
