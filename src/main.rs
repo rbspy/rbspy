@@ -32,7 +32,8 @@ fn copy_address(addr: *mut c_void, length: usize, pid: pid_t) -> Vec<u8> {
         iov_len: length
     };
     unsafe {
-        process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
+        let ret = process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
+        println!("ret: {}", ret);
     }
     copy
 }
@@ -41,4 +42,6 @@ fn main() {
     let args: Vec<_> = env::args().collect();
     let pid: pid_t = args[1].parse().unwrap();
     println!("pid is {}!\n", pid);
+    let result = copy_address(0x7ffe6b1d17f0 as *mut c_void, 1000, pid);
+    println!("result: {:?}", result)
 }
