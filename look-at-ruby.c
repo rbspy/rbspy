@@ -70,9 +70,12 @@ int main(int argc, char** argv) {
     rb_thread_t* thread = (rb_thread_t *) copy_address((void*) 0x7fc11a1535b0, sizeof(rb_thread_t), pid);
     void *stack_start =  copy_address(thread->stack, thread->stack_size * 8, pid);
     rb_control_frame_t * cfp = ((rb_control_frame_t *) ( ( (VALUE* ) stack_start) + thread->stack_size)) - 2;
+    int i = 0;
     rb_iseq_t * iseq = get_iseq(cfp - 2);
     rb_iseq_location_t iseq_location = iseq->location;
     char* path = get_ruby_string(iseq_location.path);
+    path[35] = 0;
+    printf("%s\n", path);
     // rb_iseq_location_t* iseq_location = get_iseq_location(iseq);
     blah(thread);
 }
