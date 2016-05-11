@@ -59,7 +59,6 @@ char* get_ruby_string(VALUE address) {
 
 rb_iseq_t* get_iseq(rb_control_frame_t * cfp) {
     void* iseq_addr = cfp->iseq;
-    printf("iseq_addr: 0x%x\n", iseq_addr);
     return (rb_iseq_t *) copy_address(iseq_addr, sizeof(rb_iseq_t), PID);
 }
 
@@ -71,22 +70,15 @@ int main(int argc, char** argv) {
     rb_thread_t* thread = (rb_thread_t *) copy_address((void*) 0x7ff85af655b0, sizeof(rb_thread_t), pid);
     void *stack_start =  copy_address(thread->stack, thread->stack_size * 8, pid);
     rb_control_frame_t * cfp = ((rb_control_frame_t *) ( ( (VALUE* ) stack_start) + thread->stack_size)) - 2;
-    printf("stack start: 0x%x\n", thread->stack);
     int i;
     for (i = 0; i < 5; i++) {
         rb_iseq_t * iseq = get_iseq(cfp - i);
         rb_iseq_location_t iseq_location = iseq->location;
-        printf("iseq_location: 0x%x\n", &iseq_location);
-        printf("label: 0x%x\n", iseq_location.label);
         char* label = get_ruby_string(iseq_location.label);
         char* path = get_ruby_string(iseq_location.path);
         if (path != NULL && label != NULL) {
             path[80] = 0;
-            printf("path: %s\n", path);
-        }
-        if (label != NULL) {
-            label[30] = 0;
-            printf("label: %s\n", label);
+            printf("path: %s, label: %s\n", path, label);
         }
     }
     // rb_iseq_location_t* iseq_location = get_iseq_location(iseq);
