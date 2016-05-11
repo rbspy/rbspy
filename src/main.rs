@@ -24,6 +24,9 @@ fn main() {
     let args: Vec<_> = env::args().collect();
     let pid: pid_t = args[1].parse().unwrap();
     println!("pid is {}!\n", pid);
-    let result = copy_address(0x7ffe6b1d17f0 as *mut c_void, 1000, pid);
-    println!("result: {:?}", result)
+    let result = copy_address(0x7fa6841777f0 as *mut c_void, 1000, pid);
+    let thread = unsafe {
+         *(result.as_ptr() as *const ruby_vm::rb_thread_t)
+    };
+    println!("cfp address: {:?}", thread.cfp);
 }
