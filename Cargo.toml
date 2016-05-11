@@ -1,0 +1,7 @@
+[package]
+name = "perf-ruby"
+version = "0.1.0"
+authors = ["Julia Evans <julia@jvns.ca>"]
+
+[dependencies]
+libc={path="/home/bork/clones/libc"}
