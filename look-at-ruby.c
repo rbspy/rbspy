@@ -39,8 +39,9 @@ void * copy_address(void* addr, int length, pid_t pid) {
 int main(int argc, char** argv) {
     pid_t pid = atoi(argv[1]);
     printf("reading from PID: %d\n", pid);
-    rb_thread_t* thread = (rb_thread_t *) copy_address((void*) 0x7f5a046855b0, sizeof(rb_thread_t), pid);
-    rb_control_frame_t * stack = (rb_control_frame_t * ) copy_address(thread->stack, thread->stack_size, pid);
+    rb_thread_t* thread = (rb_thread_t *) copy_address((void*) 0x7fc11a1535b0, sizeof(rb_thread_t), pid);
+    void *stack_start =  copy_address(thread->stack, thread->stack_size * 8, pid);
+    rb_control_frame_t * cfp = ((rb_control_frame_t *) ( ( (VALUE* ) stack_start) + thread->stack_size)) - 2;
     blah(thread);
 
 }
