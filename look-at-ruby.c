@@ -67,18 +67,19 @@ int main(int argc, char** argv) {
     pid_t pid = atoi(argv[1]);
     PID = pid;
     printf("reading from PID: %d\n", pid);
-    rb_thread_t* thread = (rb_thread_t *) copy_address((void*) 0x7ff85af655b0, sizeof(rb_thread_t), pid);
-    void *stack_start =  copy_address(thread->stack, thread->stack_size * 8, pid);
-    rb_control_frame_t * cfp = ((rb_control_frame_t *) ( ( (VALUE* ) stack_start) + thread->stack_size)) - 2;
+    rb_thread_t* thread = (rb_thread_t *) copy_address((void*) 0x7f929df445b0, sizeof(rb_thread_t), pid);
+    void *stack_start =  copy_address(thread->cfp, 1000, pid);
+    rb_control_frame_t * cfp = (rb_control_frame_t *) stack_start;
     int i;
-    for (i = 0; i < 5; i++) {
-        rb_iseq_t * iseq = get_iseq(cfp - i);
+    printf("Stack trace:\n");
+    for (i = 0; i < 15; i++) {
+        rb_iseq_t * iseq = get_iseq(cfp + i);
         rb_iseq_location_t iseq_location = iseq->location;
         char* label = get_ruby_string(iseq_location.label);
         char* path = get_ruby_string(iseq_location.path);
         if (path != NULL && label != NULL) {
             path[80] = 0;
-            printf("path: %s, label: %s\n", path, label);
+            printf("file: %s, method: %s\n", path, label);
         }
     }
     // rb_iseq_location_t* iseq_location = get_iseq_location(iseq);
