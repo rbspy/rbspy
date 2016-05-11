@@ -38,7 +38,7 @@ unsafe fn copy_address<T>(addr: * const T, pid: pid_t) -> T {
         iov_base: addr as *mut c_void,
         iov_len: mem::size_of::<T>()
     };
-    let ret = process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
+    process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
     value
 }
 
@@ -95,7 +95,6 @@ fn get_ruby_current_thread_address(pid: pid_t)->u64 {
 fn main() {
     let args: Vec<_> = env::args().collect();
     let pid: pid_t = args[1].parse().unwrap();
-    println!("pid is {}!\n", pid);
     let ruby_current_thread_address_location = get_ruby_current_thread_address(pid);
     let ruby_current_thread_address = unsafe {
         copy_address(ruby_current_thread_address_location as * const u64, pid)
@@ -103,7 +102,6 @@ fn main() {
     let thread = unsafe {
         copy_address(ruby_current_thread_address as *const rb_thread_t, pid)
     };
-    println!("cfp address: {:?}", thread.cfp);
     let cfps = unsafe {
         let result = copy_address_raw(thread.cfp as *mut c_void, 100 * mem::size_of::<ruby_vm::rb_control_frame_t>(), pid);
          slice::from_raw_parts(result.as_ptr() as *const ruby_vm::rb_control_frame_t, 100)
