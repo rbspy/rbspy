@@ -6,16 +6,6 @@
 
 pid_t PID;
 
-int blah(void* copy) {
-    rb_control_frame_t cft;
-    rb_thread_t th;
-}
-
- int blah2(void* copy) {
-    rb_control_frame_t cft;
-    rb_thread_t th;
-}
-
 void * copy_address(void* addr, int length, pid_t pid) {
     int amount_to_copy = 1000;
     void * copy = malloc(length);
@@ -68,21 +58,22 @@ int main(int argc, char** argv) {
     PID = pid;
     printf("reading from PID: %d\n", pid);
     rb_thread_t* thread = (rb_thread_t *) copy_address((void*) 0x7f929df445b0, sizeof(rb_thread_t), pid);
+    while(1) {
     void *stack_start =  copy_address(thread->cfp, 1000, pid);
     rb_control_frame_t * cfp = (rb_control_frame_t *) stack_start;
     int i;
     printf("Stack trace:\n");
+    printf("--------------------------------------");
     for (i = 0; i < 15; i++) {
         rb_iseq_t * iseq = get_iseq(cfp + i);
         rb_iseq_location_t iseq_location = iseq->location;
         char* label = get_ruby_string(iseq_location.label);
         char* path = get_ruby_string(iseq_location.path);
         if (path != NULL && label != NULL) {
-            path[80] = 0;
             printf("file: %s, method: %s\n", path, label);
         }
     }
+    }
     // rb_iseq_location_t* iseq_location = get_iseq_location(iseq);
-    blah(thread);
 }
 
