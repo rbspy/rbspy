@@ -96,8 +96,6 @@ fn main() {
     let args: Vec<_> = env::args().collect();
     let pid: pid_t = args[1].parse().unwrap();
     println!("pid is {}!\n", pid);
-    println!("maps:{:x}", get_maps_address(pid));
-    println!("nm: {:x}", get_nm_address(pid));
     let ruby_current_thread_address_location = get_ruby_current_thread_address(pid);
     let ruby_current_thread_address = unsafe {
         copy_address(ruby_current_thread_address_location as * const u64, pid)
@@ -110,10 +108,11 @@ fn main() {
         let result = copy_address_raw(thread.cfp as *mut c_void, 100 * mem::size_of::<ruby_vm::rb_control_frame_t>(), pid);
          slice::from_raw_parts(result.as_ptr() as *const ruby_vm::rb_control_frame_t, 100)
     };
-    for i in 0..15 {
+    for i in 0..50 {
         let iseq = get_iseq(&cfps[i], pid);
-        println!("{:?}", get_ruby_string(iseq.location.label as VALUE, pid));
-        println!("{:?}", get_ruby_string(iseq.location.path as VALUE, pid));
+        if !cfps[i].pc.is_null() {
+            println!("{:?}", get_ruby_string(iseq.location.label as VALUE, pid));
+            println!("{:?}", get_ruby_string(iseq.location.path as VALUE, pid));
+        }
     }
-    println!("{:?}", cfps[1].iseq)
 }
