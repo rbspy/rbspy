@@ -12,6 +12,7 @@ use std::process::Command;
 use std::process::Stdio;
 use regex::Regex;
 mod ruby_vm;
+use std::collections::HashMap;
 use ruby_vm::{rb_iseq_t, rb_control_frame_t, rb_thread_t, Struct_RString, VALUE};
 
 fn copy_address_raw(addr: *const c_void, length: usize, pid: pid_t) -> Vec<u8> {
@@ -104,16 +105,29 @@ fn get_cfps<'a>(ruby_current_thread_address_location:u64, pid: pid_t) -> &'a[rb_
     };
     unsafe {
         let result = copy_address_raw(thread.cfp as *mut c_void, 100 * mem::size_of::<ruby_vm::rb_control_frame_t>(), pid);
-         slice::from_raw_parts(result.as_ptr() as *const ruby_vm::rb_control_frame_t, 100)
+        slice::from_raw_parts(result.as_ptr() as *const ruby_vm::rb_control_frame_t, 100)
     }
 }
+
+fn print_hashmap(map: HashMap<&str, u32>) {
+    let mut count_vec: Vec<_> = map.iter().collect();
+    count_vec.sort_by(|a, b| b.1.cmpa.1);
+    for v in count_vec {
+        println!("{:?}: {}", v.0, v.1);
+    }
+}
+
 
 fn main() {
     let args: Vec<_> = env::args().collect();
     let pid: pid_t = args[1].parse().unwrap();
     let ruby_current_thread_address_location = get_ruby_current_thread_address(pid);
 
+    let mut method_stats = HashMap::new();
+    let mut method_own_time_stats = HashMap::new();
+    let mut j = 0;
     loop {
+        j += 1;
         let cfps = get_cfps(ruby_current_thread_address_location, pid);
         println!("--------------------------------");
         println!("Stack trace:");
@@ -122,8 +136,17 @@ fn main() {
             if !cfps[i].pc.is_null() {
                 let label = get_ruby_string(iseq.location.label as VALUE, pid);
                 let path = get_ruby_string(iseq.location.path as VALUE, pid);
-                println!("{:?} : {:?}", path, label);
+                let current_location = format!("{:?} : {:?}", path, label);
+                let counter = method_stats.entry(current_location).or_insert(0);
+                *counter += 1;
+                if (i == 0) {
+                    let counter2 = method_own_time_stats.entry(current_location).or_insert(0);
+                    *counter += 1;
+                }
             }
+        }
+        if j % 100 == 0 {
+            print_hashmap(method_stats);
         }
         thread::sleep(Duration::from_millis(50));
     }
