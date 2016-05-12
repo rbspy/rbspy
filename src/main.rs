@@ -138,7 +138,10 @@ fn update_method_stats(method_stats: &mut HashMap<String, u32>, method_own_time_
         if !cfps[i].pc.is_null() {
             let label = get_ruby_string(iseq.location.label as VALUE, pid);
             let path = get_ruby_string(iseq.location.path as VALUE, pid);
-            let current_location = format!("{:?} : {:?}", path, label).to_string();
+            if (path.to_str().unwrap() == "") {
+                continue;
+            }
+            let current_location = format!("{} : {}", label.to_string_lossy(), path.to_string_lossy()).to_string();
             println!("{}", current_location);
             let counter = method_stats.entry(current_location.clone()).or_insert(0);
             *counter += 1;
