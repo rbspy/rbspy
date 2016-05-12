@@ -109,11 +109,11 @@ fn get_cfps<'a>(ruby_current_thread_address_location:u64, pid: pid_t) -> &'a[rb_
     }
 }
 
-fn print_hashmap(map: HashMap<&str, u32>) {
+fn print_hashmap(map: &HashMap<String, u32>) {
     let mut count_vec: Vec<_> = map.iter().collect();
-    count_vec.sort_by(|a, b| b.1.cmpa.1);
-    for v in count_vec {
-        println!("{:?}: {}", v.0, v.1);
+    count_vec.sort_by(|a, b| b.1.cmp(a.1));
+    for (a, b) in count_vec {
+        println!("{:?}: {}", a, b);
     }
 }
 
@@ -136,17 +136,17 @@ fn main() {
             if !cfps[i].pc.is_null() {
                 let label = get_ruby_string(iseq.location.label as VALUE, pid);
                 let path = get_ruby_string(iseq.location.path as VALUE, pid);
-                let current_location = format!("{:?} : {:?}", path, label);
-                let counter = method_stats.entry(current_location).or_insert(0);
+                let current_location = format!("{:?} : {:?}", path, label).to_string();
+                let counter = method_stats.entry(current_location.clone()).or_insert(0);
                 *counter += 1;
-                if (i == 0) {
+                if i == 0 {
                     let counter2 = method_own_time_stats.entry(current_location).or_insert(0);
                     *counter += 1;
                 }
             }
         }
         if j % 100 == 0 {
-            print_hashmap(method_stats);
+            print_hashmap(&method_stats);
         }
         thread::sleep(Duration::from_millis(50));
     }
