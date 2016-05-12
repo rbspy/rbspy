@@ -1,7 +1,9 @@
 extern crate libc;
 extern crate regex;
+extern crate term;
 use libc::*;
 use std::env;
+use std::path::Path;
 use std::os::unix::prelude::*;
 use std::time::Duration;
 use std::thread;
@@ -11,6 +13,7 @@ use std::slice;
 use std::process::Command;
 use std::process::Stdio;
 use regex::Regex;
+use term::terminfo::TermInfo;
 mod ruby_vm;
 use std::collections::HashMap;
 use ruby_vm::{rb_iseq_t, rb_control_frame_t, rb_thread_t, Struct_RString, VALUE};
@@ -109,11 +112,15 @@ fn get_cfps<'a>(ruby_current_thread_address_location:u64, pid: pid_t) -> &'a[rb_
     }
 }
 
-fn print_hashmap(map: &HashMap<String, u32>) {
-    let mut count_vec: Vec<_> = map.iter().collect();
+fn print_method_stats(method_stats: &HashMap<String, u32>, method_own_time_stats: &HashMap<String, u32>, n_terminal_lines: usize) {
+    let mut count_vec: Vec<_> = method_own_time_stats.iter().collect();
     count_vec.sort_by(|a, b| b.1.cmp(a.1));
-    for (a, b) in count_vec {
-        println!("{:?}: {}", a, b);
+    println!(" {:4} | {:4} | {}", "self", "tot", "method");
+    let self_sum: u32 = method_own_time_stats.values().fold(0, std::ops::Add::add);
+    let total_sum: u32 = *method_stats.values().max().unwrap();
+    for &(method, count) in count_vec.iter().take(n_terminal_lines - 1) {
+        let total_count = method_stats.get(&method[..]).unwrap();
+        println!(" {:.1} | {:.1} | {}", 100.0 * (*count as f32) / (self_sum as f32), 100.0 * (*total_count as f32)  / (total_sum as f32), method);
     }
 }
 
@@ -129,8 +136,6 @@ fn main() {
     loop {
         j += 1;
         let cfps = get_cfps(ruby_current_thread_address_location, pid);
-        println!("--------------------------------");
-        println!("Stack trace:");
         for i in 0..100 {
             let iseq = get_iseq(&cfps[i], pid);
             if !cfps[i].pc.is_null() {
@@ -141,13 +146,16 @@ fn main() {
                 *counter += 1;
                 if i == 0 {
                     let counter2 = method_own_time_stats.entry(current_location).or_insert(0);
-                    *counter += 1;
+                    *counter2 += 1;
                 }
             }
         }
         if j % 100 == 0 {
-            print_hashmap(&method_stats);
+            let n_lines = 30;
+            print!("{}[{}A", 27 as char, n_lines);
+            print!("{}[2J", 27 as char);
+            print_method_stats(&method_stats, &method_own_time_stats, n_lines as usize);
         }
-        thread::sleep(Duration::from_millis(50));
+        thread::sleep(Duration::from_millis(10));
     }
 }
