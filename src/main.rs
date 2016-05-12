@@ -120,7 +120,25 @@ fn print_method_stats(method_stats: &HashMap<String, u32>, method_own_time_stats
     let total_sum: u32 = *method_stats.values().max().unwrap();
     for &(method, count) in count_vec.iter().take(n_terminal_lines - 1) {
         let total_count = method_stats.get(&method[..]).unwrap();
-        println!(" {:.1} | {:.1} | {}", 100.0 * (*count as f32) / (self_sum as f32), 100.0 * (*total_count as f32)  / (total_sum as f32), method);
+        println!(" {:02.1}% | {:02.1}% | {}", 100.0 * (*count as f32) / (self_sum as f32), 100.0 * (*total_count as f32)  / (total_sum as f32), method);
+    }
+}
+
+fn update_method_stats(method_stats: &mut HashMap<String, u32>, method_own_time_stats: &mut HashMap<String, u32>, ruby_current_thread_address_location: u64, pid: pid_t) {
+    let cfps = get_cfps(ruby_current_thread_address_location, pid);
+    for i in 0..100 {
+        let iseq = get_iseq(&cfps[i], pid);
+        if !cfps[i].pc.is_null() {
+            let label = get_ruby_string(iseq.location.label as VALUE, pid);
+            let path = get_ruby_string(iseq.location.path as VALUE, pid);
+            let current_location = format!("{:?} : {:?}", path, label).to_string();
+            let counter = method_stats.entry(current_location.clone()).or_insert(0);
+            *counter += 1;
+            if i == 0 {
+                let counter2 = method_own_time_stats.entry(current_location).or_insert(0);
+                *counter2 += 1;
+            }
+        }
     }
 }
 
@@ -129,27 +147,12 @@ fn main() {
     let args: Vec<_> = env::args().collect();
     let pid: pid_t = args[1].parse().unwrap();
     let ruby_current_thread_address_location = get_ruby_current_thread_address(pid);
-
     let mut method_stats = HashMap::new();
     let mut method_own_time_stats = HashMap::new();
     let mut j = 0;
     loop {
         j += 1;
-        let cfps = get_cfps(ruby_current_thread_address_location, pid);
-        for i in 0..100 {
-            let iseq = get_iseq(&cfps[i], pid);
-            if !cfps[i].pc.is_null() {
-                let label = get_ruby_string(iseq.location.label as VALUE, pid);
-                let path = get_ruby_string(iseq.location.path as VALUE, pid);
-                let current_location = format!("{:?} : {:?}", path, label).to_string();
-                let counter = method_stats.entry(current_location.clone()).or_insert(0);
-                *counter += 1;
-                if i == 0 {
-                    let counter2 = method_own_time_stats.entry(current_location).or_insert(0);
-                    *counter2 += 1;
-                }
-            }
-        }
+        update_method_stats(&mut method_stats, &mut method_own_time_stats, ruby_current_thread_address_location, pid);
         if j % 100 == 0 {
             let n_lines = 30;
             print!("{}[{}A", 27 as char, n_lines);
