@@ -17,6 +17,11 @@ use std::collections::HashMap;
 use ruby_vm::{rb_iseq_t, rb_control_frame_t, rb_thread_t, Struct_RString, VALUE};
 
 fn copy_address_raw(addr: *const c_void, length: usize, pid: pid_t) -> Vec<u8> {
+    if length > 100000 {
+        // something very unusual has happened.
+        // Do not respect requests for huge amounts of memory.
+        return Vec::new();
+    }
     let mut copy = vec![0;length];
     let local_iov = iovec {
         iov_base: copy.as_mut_ptr() as *mut c_void,
