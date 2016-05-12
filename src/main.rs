@@ -139,6 +139,7 @@ fn update_method_stats(method_stats: &mut HashMap<String, u32>, method_own_time_
             let label = get_ruby_string(iseq.location.label as VALUE, pid);
             let path = get_ruby_string(iseq.location.path as VALUE, pid);
             let current_location = format!("{:?} : {:?}", path, label).to_string();
+            println!("{}", current_location);
             let counter = method_stats.entry(current_location.clone()).or_insert(0);
             *counter += 1;
             if i == 0 {
@@ -147,6 +148,7 @@ fn update_method_stats(method_stats: &mut HashMap<String, u32>, method_own_time_
             }
         }
     }
+    println!("{}\n", 1);
 }
 
 
@@ -162,12 +164,8 @@ fn main() {
         update_method_stats(&mut method_stats, &mut method_own_time_stats, ruby_current_thread_address_location, pid);
         if j % 100 == 0 {
             let n_lines = 30;
-            print!("{}[{}A", 27 as char, n_lines);
-            print!("{}[2J", 27 as char);
-            print_method_stats(&method_stats, &method_own_time_stats, n_lines as usize);
             method_stats = HashMap::new();
             method_own_time_stats = HashMap::new();
-
         }
         thread::sleep(Duration::from_millis(10));
     }
