@@ -22,7 +22,11 @@ fn copy_address_raw(addr: *const c_void, length: usize, pid: pid_t) -> Vec<u8> {
         // Do not respect requests for huge amounts of memory.
         return Vec::new();
     }
-    let mut copy = vec![0;length];
+    let mut copy: Vec<u8> = unsafe {
+        let mut vec = Vec::with_capacity(length);
+        vec.set_len(length);
+        vec
+    };
     let local_iov = iovec {
         iov_base: copy.as_mut_ptr() as *mut c_void,
         iov_len: length
