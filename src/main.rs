@@ -3,7 +3,6 @@ extern crate regex;
 extern crate term;
 use libc::*;
 use std::env;
-use std::path::Path;
 use std::os::unix::prelude::*;
 use std::time::Duration;
 use std::thread;
@@ -13,7 +12,6 @@ use std::slice;
 use std::process::Command;
 use std::process::Stdio;
 use regex::Regex;
-use term::terminfo::TermInfo;
 mod ruby_vm;
 use std::collections::HashMap;
 use ruby_vm::{rb_iseq_t, rb_control_frame_t, rb_thread_t, Struct_RString, VALUE};
@@ -158,6 +156,9 @@ fn main() {
             print!("{}[{}A", 27 as char, n_lines);
             print!("{}[2J", 27 as char);
             print_method_stats(&method_stats, &method_own_time_stats, n_lines as usize);
+            method_stats = HashMap::new();
+            method_own_time_stats = HashMap::new();
+
         }
         thread::sleep(Duration::from_millis(10));
     }
