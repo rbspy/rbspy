@@ -1,8 +1,9 @@
 extern crate libc;
 extern crate regex;
 extern crate term;
+extern crate clap;
+use clap::{Arg, App, ArgMatches};
 use libc::*;
-use std::env;
 use std::process;
 use std::os::unix::prelude::*;
 use std::time::Duration;
@@ -16,6 +17,8 @@ use regex::Regex;
 mod ruby_vm;
 use std::collections::HashMap;
 use ruby_vm::{rb_iseq_t, rb_control_frame_t, rb_thread_t, Struct_RString, VALUE};
+
+static mut READ_EVER_SUCCEEDED: bool = false;
 
 fn copy_address_raw(addr: *const c_void, length: usize, pid: pid_t) -> Vec<u8> {
     if length > 100000 {
@@ -38,10 +41,11 @@ fn copy_address_raw(addr: *const c_void, length: usize, pid: pid_t) -> Vec<u8> {
     };
     unsafe {
         let result = process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
-        if result == -1 {
+        if result == -1  && !READ_EVER_SUCCEEDED {
             println!("Failed to read from pid {}. Are you root?", pid);
             process::exit(1);
         }
+        READ_EVER_SUCCEEDED = true;
     }
     copy
 }
@@ -147,7 +151,7 @@ fn get_stack_trace<'a>(ruby_current_thread_address_location: u64, pid: pid_t) ->
         if !cfps[i].pc.is_null() {
             let label = get_ruby_string(iseq.location.label as VALUE, pid);
             let path = get_ruby_string(iseq.location.path as VALUE, pid);
-            if (path.to_str().unwrap() == "") {
+            if path.to_str().unwrap() == "" {
                 continue;
             }
             let current_location = format!("{} : {}", label.to_string_lossy(), path.to_string_lossy()).to_string();
@@ -164,16 +168,38 @@ fn print_stack_trace(trace: &Vec<String>) {
     println!("{}", 1);
 }
 
+fn parse_args() -> ArgMatches<'static> {
+    App::new("ruby-stacktrace")
+      .version("0.1")
+      .about("Sampling profiler for Ruby programs")
+      .arg(Arg::with_name("COMMAND")
+           .help("Subcommand you want to run. Options: top, stackcollapse.\n          top prints a top-like output of what the Ruby process is doing right now\n          stackcollapse prints out output suitable for piping to stackcollapse.pl (https://github.com/brendangregg/FlameGraph)")
+           .required(true)
+           .index(1))
+      .arg(Arg::with_name("PID")
+           .help("PID of the Ruby process you want to profile")
+           .required(true)
+           .index(2))
+      .get_matches()
+}
+
 
 fn main() {
-    let args: Vec<_> = env::args().collect();
-    let pid: pid_t = args[1].parse().unwrap();
+    let matches = parse_args();
+    let pid: pid_t = matches.value_of("PID").unwrap().parse().unwrap();
+    let command = matches.value_of("COMMAND").unwrap();
+    if command.clone() != "top" && command.clone() != "stackcollapse" {
+        println!("COMMAND must be 'top' or 'stackcollapse. Try again!");
+        process::exit(1);
+    }
     let ruby_current_thread_address_location = get_ruby_current_thread_address(pid);
-    let mut j = 0;
     loop {
-        j += 1;
-        let trace = get_stack_trace(ruby_current_thread_address_location, pid);
-        print_stack_trace(&trace);
+        if command == "stackcollapse" {
+            let trace = get_stack_trace(ruby_current_thread_address_location, pid);
+            print_stack_trace(&trace);
+        } else {
+            println!("idk");
+        }
         thread::sleep(Duration::from_millis(10));
     }
 }
