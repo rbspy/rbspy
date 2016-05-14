@@ -64,6 +64,26 @@ unsafe fn copy_address<T>(addr: * const T, pid: pid_t) -> T {
     value
 }
 
+/* These three functions (get_cfps, get_iseq, and get_ruby_string) are the
+ * core of how the program works. They're essentially a straight port of
+ * this gdb script: 
+ * https://gist.github.com/csfrancis/11376304/raw/7a0450d11e64e3bb7c982b7ad2778f3603188c0f/gdb_ruby_backtrace.py
+ * except without using gdb!! 
+ *
+ * `get_iseq` is the simplest method  here -- it's just trying to run (cfp->iseq). But to do that
+ * you need to dereference the `cfp` pointer, and that memory is actually in another process
+ * so we call `copy_address` to copy the memory for that pointer out of
+ * the other process. The other methods do the same thing
+ * except that they're more copmlicated and sometimes call `copy_address_raw`.
+ *
+ * `get_cfps` corresponds to
+ * (* const rb_thread t *(ruby_current_thread_address_location))->cfp
+ * 
+ * `get_ruby_string` is doing ((Struct RString *) address) and then 
+ * trying one of two ways to get the actual Ruby string out depending
+ * on how it's stored
+ */
+
 fn get_ruby_string(address: VALUE, pid: pid_t) -> OsString {
     let vec = unsafe {
         let mut rstring = copy_address(address as *const Struct_RString, pid);
@@ -81,6 +101,20 @@ fn get_iseq(cfp: &rb_control_frame_t, pid: pid_t) -> rb_iseq_t {
         copy_address(cfp.iseq as *const rb_iseq_t, pid)
     }
 }
+
+fn get_cfps<'a>(ruby_current_thread_address_location:u64, pid: pid_t) -> &'a[rb_control_frame_t] {
+    let ruby_current_thread_address = unsafe {
+        copy_address(ruby_current_thread_address_location as * const u64, pid)
+    };
+    let thread = unsafe {
+        copy_address(ruby_current_thread_address as *const rb_thread_t, pid)
+    };
+    unsafe {
+        let result = copy_address_raw(thread.cfp as *mut c_void, 100 * mem::size_of::<ruby_vm::rb_control_frame_t>(), pid);
+        slice::from_raw_parts(result.as_ptr() as *const ruby_vm::rb_control_frame_t, 100)
+    }
+}
+
 
 fn get_nm_address(pid: pid_t) -> u64 {
     let nm_command = Command::new("nm").arg(format!("/proc/{}/exe", pid))
@@ -122,19 +156,6 @@ fn get_ruby_current_thread_address(pid: pid_t)->u64 {
     // this program only works on Linux anyway because of process_vm_readv.
 
     get_nm_address(pid) + get_maps_address(pid)
-}
-
-fn get_cfps<'a>(ruby_current_thread_address_location:u64, pid: pid_t) -> &'a[rb_control_frame_t] {
-    let ruby_current_thread_address = unsafe {
-        copy_address(ruby_current_thread_address_location as * const u64, pid)
-    };
-    let thread = unsafe {
-        copy_address(ruby_current_thread_address as *const rb_thread_t, pid)
-    };
-    unsafe {
-        let result = copy_address_raw(thread.cfp as *mut c_void, 100 * mem::size_of::<ruby_vm::rb_control_frame_t>(), pid);
-        slice::from_raw_parts(result.as_ptr() as *const ruby_vm::rb_control_frame_t, 100)
-    }
 }
 
 fn print_method_stats(method_stats: &HashMap<String, u32>, method_own_time_stats: &HashMap<String, u32>, n_terminal_lines: usize) {
