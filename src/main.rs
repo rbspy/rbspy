@@ -3,6 +3,7 @@ extern crate regex;
 extern crate term;
 use libc::*;
 use std::env;
+use std::process;
 use std::os::unix::prelude::*;
 use std::time::Duration;
 use std::thread;
@@ -82,7 +83,10 @@ fn get_nm_address(pid: pid_t) -> u64 {
         .unwrap_or_else(|e| { panic!("failed to execute process: {}", e) });
     let nm_output = String::from_utf8(nm_command.stdout).unwrap();
     let re = Regex::new(r"(\w+) b ruby_current_thread").unwrap();
-    let cap = re.captures(&nm_output).unwrap();
+    let cap = re.captures(&nm_output).unwrap_or_else(|| {
+        println!("Error: Couldn't find current thread in Ruby process. This is probably because either this isn't a Ruby process or you have a Ruby version compiled with no symbols.");
+        process::exit(1)
+    });
     let address_str = cap.at(1).unwrap();
     u64::from_str_radix(address_str, 16).unwrap()
 }
