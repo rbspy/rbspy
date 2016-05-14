@@ -100,7 +100,6 @@ fn get_nm_address(pid: pid_t) -> u64 {
 }
 
 fn get_maps_address(pid: pid_t) -> u64 {
-
     let cat_command = Command::new("cat").arg(format!("/proc/{}/maps", pid))
         .stdout(Stdio::piped())
         .stdin(Stdio::null())
@@ -115,6 +114,13 @@ fn get_maps_address(pid: pid_t) -> u64 {
 }
 
 fn get_ruby_current_thread_address(pid: pid_t)->u64 {
+    // Get the address of the `ruby_current_thread` global variable. It works
+    // by looking up the address in the Ruby binary's symbol table with `nm
+    // /proc/$pid/exe` and then finding out which address the Ruby binary is
+    // mapped to by looking at `/proc/$pid/maps`. If we add these two
+    // addresses together we get our answers! All this is Linux-specific but
+    // this program only works on Linux anyway because of process_vm_readv.
+
     get_nm_address(pid) + get_maps_address(pid)
 }
 
@@ -132,7 +138,7 @@ fn get_cfps<'a>(ruby_current_thread_address_location:u64, pid: pid_t) -> &'a[rb_
 }
 
 fn print_method_stats(method_stats: &HashMap<String, u32>, method_own_time_stats: &HashMap<String, u32>, n_terminal_lines: usize) {
-    println!("[{}c", 27 as char);
+    println!("[{}c", 27 as char); // clear the screen
     let mut count_vec: Vec<_> = method_own_time_stats.iter().collect();
     count_vec.sort_by(|a, b| b.1.cmp(a.1));
     println!(" {:4} | {:4} | {}", "self", "tot", "method");
@@ -197,6 +203,8 @@ fn main() {
 
 
     if command == "stackcollapse" {
+        // This gets a stack trace and then just prints it out
+        // in a format that Brendan Gregg's stackcollapse.pl script understands
         loop {
             let trace = get_stack_trace(ruby_current_thread_address_location, pid);
             print_stack_trace(&trace);
@@ -204,6 +212,8 @@ fn main() {
         }
     } else {
         // top subcommand!
+        // keeps a running histogram of how often we see every method
+        // and periodically reports 'self' and 'total' time for each method
         let mut method_stats = HashMap::new();
         let mut method_own_time_stats = HashMap::new();
         let mut j = 0;
