@@ -214,7 +214,7 @@ fn main() {
                 let counter = method_stats.entry(item.clone()).or_insert(0);
                 *counter += 1;
             }
-            if true {
+            {
                 let counter2 = method_own_time_stats.entry(trace[0].clone()).or_insert(0);
                 *counter2 += 1;
             }
