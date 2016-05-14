@@ -60,7 +60,12 @@ unsafe fn copy_address<T>(addr: * const T, pid: pid_t) -> T {
         iov_base: addr as *mut c_void,
         iov_len: mem::size_of::<T>()
     };
-    process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
+    let result = process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
+    if result == -1  && !READ_EVER_SUCCEEDED {
+        println!("Failed to read from pid {}. Are you root?", pid);
+        process::exit(1);
+    }
+    READ_EVER_SUCCEEDED = true;
     value
 }
 
@@ -141,7 +146,7 @@ fn get_maps_address(pid: pid_t) -> u64 {
         .output()
         .unwrap_or_else(|e| { panic!("failed to execute process: {}", e) });
     let output = String::from_utf8(cat_command.stdout).unwrap();
-    let re = Regex::new(r"\n(\w+).+?bin/ruby").unwrap();
+    let re = Regex::new(r"^(\w+).+?r-x.+?bin/ruby").unwrap();
     let cap = re.captures(&output).unwrap();
     let address_str = cap.at(1).unwrap();
     u64::from_str_radix(address_str, 16).unwrap()
