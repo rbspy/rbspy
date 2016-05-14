@@ -135,8 +135,9 @@ fn print_method_stats(method_stats: &HashMap<String, u32>, method_own_time_stats
     }
 }
 
-fn update_method_stats(method_stats: &mut HashMap<String, u32>, method_own_time_stats: &mut HashMap<String, u32>, ruby_current_thread_address_location: u64, pid: pid_t) {
+fn get_stack_trace<'a>(ruby_current_thread_address_location: u64, pid: pid_t) -> Vec<String> {
     let cfps = get_cfps(ruby_current_thread_address_location, pid);
+    let mut trace: Vec<String> = Vec::new();
     for i in 0..100 {
         let iseq = get_iseq(&cfps[i], pid);
         if !cfps[i].pc.is_null() {
@@ -146,16 +147,17 @@ fn update_method_stats(method_stats: &mut HashMap<String, u32>, method_own_time_
                 continue;
             }
             let current_location = format!("{} : {}", label.to_string_lossy(), path.to_string_lossy()).to_string();
-            println!("{}", current_location);
-            let counter = method_stats.entry(current_location.clone()).or_insert(0);
-            *counter += 1;
-            if i == 0 {
-                let counter2 = method_own_time_stats.entry(current_location).or_insert(0);
-                *counter2 += 1;
-            }
+            trace.push(current_location);
         }
     }
-    println!("{}\n", 1);
+    trace
+}
+
+fn print_stack_trace(trace: &Vec<String>) {
+    for x in trace {
+        println!("{}", x);
+    }
+    println!("{}", 1);
 }
 
 
@@ -163,17 +165,11 @@ fn main() {
     let args: Vec<_> = env::args().collect();
     let pid: pid_t = args[1].parse().unwrap();
     let ruby_current_thread_address_location = get_ruby_current_thread_address(pid);
-    let mut method_stats = HashMap::new();
-    let mut method_own_time_stats = HashMap::new();
     let mut j = 0;
     loop {
         j += 1;
-        update_method_stats(&mut method_stats, &mut method_own_time_stats, ruby_current_thread_address_location, pid);
-        if j % 100 == 0 {
-            let n_lines = 30;
-            method_stats = HashMap::new();
-            method_own_time_stats = HashMap::new();
-        }
+        let trace = get_stack_trace(ruby_current_thread_address_location, pid);
+        print_stack_trace(&trace);
         thread::sleep(Duration::from_millis(10));
     }
 }
