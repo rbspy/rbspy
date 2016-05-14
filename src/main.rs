@@ -60,7 +60,12 @@ unsafe fn copy_address<T>(addr: * const T, pid: pid_t) -> T {
         iov_base: addr as *mut c_void,
         iov_len: mem::size_of::<T>()
     };
-    process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
+    let result = process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
+    if result == -1  && !READ_EVER_SUCCEEDED {
+        println!("Failed to read from pid {}. Are you root?", pid);
+        process::exit(1);
+    }
+    READ_EVER_SUCCEEDED = true;
     value
 }
 
