@@ -132,6 +132,7 @@ fn get_cfps<'a>(ruby_current_thread_address_location:u64, pid: pid_t) -> &'a[rb_
 }
 
 fn print_method_stats(method_stats: &HashMap<String, u32>, method_own_time_stats: &HashMap<String, u32>, n_terminal_lines: usize) {
+    println!("[{}c", 27 as char);
     let mut count_vec: Vec<_> = method_own_time_stats.iter().collect();
     count_vec.sort_by(|a, b| b.1.cmp(a.1));
     println!(" {:4} | {:4} | {}", "self", "tot", "method");
@@ -193,13 +194,34 @@ fn main() {
         process::exit(1);
     }
     let ruby_current_thread_address_location = get_ruby_current_thread_address(pid);
-    loop {
-        if command == "stackcollapse" {
+
+
+    if command == "stackcollapse" {
+        loop {
             let trace = get_stack_trace(ruby_current_thread_address_location, pid);
             print_stack_trace(&trace);
-        } else {
-            println!("idk");
+            thread::sleep(Duration::from_millis(10));
         }
-        thread::sleep(Duration::from_millis(10));
+    } else {
+        // top subcommand!
+        let mut method_stats = HashMap::new();
+        let mut method_own_time_stats = HashMap::new();
+        let mut j = 0;
+        loop {
+            j += 1;
+            let trace = get_stack_trace(ruby_current_thread_address_location, pid);
+            for item in &trace {
+                let counter = method_stats.entry(item.clone()).or_insert(0);
+                *counter += 1;
+            }
+            if true {
+                let counter2 = method_own_time_stats.entry(trace[0].clone()).or_insert(0);
+                *counter2 += 1;
+            }
+            if j % 100 == 0 {
+                print_method_stats(&method_stats, &method_own_time_stats, 30);
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
     }
 }
