@@ -148,13 +148,13 @@ fn get_maps_address(pid: pid_t) -> u64 {
 }
 
 fn get_ruby_current_thread_address(pid: pid_t)->u64 {
-    // Get the address of the `ruby_current_thread` global variable. It works
-    // by looking up the address in the Ruby binary's symbol table with `nm
-    // /proc/$pid/exe` and then finding out which address the Ruby binary is
-    // mapped to by looking at `/proc/$pid/maps`. If we add these two
-    // addresses together we get our answers! All this is Linux-specific but
-    // this program only works on Linux anyway because of process_vm_readv.
-
+    /* Get the address of the `ruby_current_thread` global variable. It works
+     * by looking up the address in the Ruby binary's symbol table with `nm
+     * /proc/$pid/exe` and then finding out which address the Ruby binary is
+     * mapped to by looking at `/proc/$pid/maps`. If we add these two
+     * addresses together we get our answers! All this is Linux-specific but
+     * this program only works on Linux anyway because of process_vm_readv.
+     */
     get_nm_address(pid) + get_maps_address(pid)
 }
 
