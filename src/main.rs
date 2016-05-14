@@ -146,7 +146,7 @@ fn get_maps_address(pid: pid_t) -> u64 {
         .output()
         .unwrap_or_else(|e| { panic!("failed to execute process: {}", e) });
     let output = String::from_utf8(cat_command.stdout).unwrap();
-    let re = Regex::new(r"\n(\w+).+?bin/ruby").unwrap();
+    let re = Regex::new(r"^(\w+).+?r-x.+?bin/ruby").unwrap();
     let cap = re.captures(&output).unwrap();
     let address_str = cap.at(1).unwrap();
     u64::from_str_radix(address_str, 16).unwrap()
