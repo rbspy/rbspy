@@ -37,7 +37,11 @@ fn copy_address_raw(addr: *const c_void, length: usize, pid: pid_t) -> Vec<u8> {
         iov_len: length
     };
     unsafe {
-        process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
+        let result = process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
+        if result == -1 {
+            println!("Failed to read from pid {}. Are you root?", pid);
+            process::exit(1);
+        }
     }
     copy
 }
