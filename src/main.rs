@@ -1,7 +1,9 @@
 extern crate libc;
 extern crate regex;
 extern crate term;
+
 extern crate clap;
+extern crate byteorder;
 use clap::{Arg, App, ArgMatches};
 use libc::*;
 use std::process;
@@ -13,8 +15,14 @@ use std::mem;
 use std::slice;
 use std::process::Command;
 use std::process::Stdio;
+use std::ptr;
 use regex::Regex;
-mod ruby_vm;
+pub mod ruby_vm;
+pub mod dwarf;
+pub mod dwarf_bindings;
+use byteorder::{NativeEndian, ReadBytesExt};
+use std::io::Cursor;
+use dwarf::{create_lookup_table, get_dwarf_entries, DwarfLookup, Entry};
 use std::collections::HashMap;
 use ruby_vm::{rb_iseq_t, rb_control_frame_t, rb_thread_t, Struct_RString, VALUE};
 
@@ -33,15 +41,15 @@ fn copy_address_raw(addr: *const c_void, length: usize, pid: pid_t) -> Vec<u8> {
     };
     let local_iov = iovec {
         iov_base: copy.as_mut_ptr() as *mut c_void,
-        iov_len: length
+        iov_len: length,
     };
     let remote_iov = iovec {
         iov_base: addr as *mut c_void,
-        iov_len: length
+        iov_len: length,
     };
     unsafe {
         let result = process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
-        if result == -1  && !READ_EVER_SUCCEEDED {
+        if result == -1 && !READ_EVER_SUCCEEDED {
             println!("Failed to read from pid {}. Are you root?", pid);
             process::exit(1);
         }
@@ -50,83 +58,54 @@ fn copy_address_raw(addr: *const c_void, length: usize, pid: pid_t) -> Vec<u8> {
     copy
 }
 
-unsafe fn copy_address<T>(addr: * const T, pid: pid_t) -> T {
+unsafe fn copy_address<T>(addr: *const T, pid: pid_t) -> T {
     let mut value: T = mem::uninitialized();
     let local_iov = iovec {
-        iov_base: &mut value as *mut _ as * mut c_void,
-        iov_len: mem::size_of::<T>()
+        iov_base: &mut value as *mut _ as *mut c_void,
+        iov_len: mem::size_of::<T>(),
     };
     let remote_iov = iovec {
         iov_base: addr as *mut c_void,
-        iov_len: mem::size_of::<T>()
+        iov_len: mem::size_of::<T>(),
     };
     process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
     value
 }
 
-/* These three functions (get_cfps, get_iseq, and get_ruby_string) are the
- * core of how the program works. They're essentially a straight port of
- * this gdb script: 
- * https://gist.github.com/csfrancis/11376304/raw/7a0450d11e64e3bb7c982b7ad2778f3603188c0f/gdb_ruby_backtrace.py
- * except without using gdb!! 
- *
- * `get_iseq` is the simplest method  here -- it's just trying to run (cfp->iseq). But to do that
- * you need to dereference the `cfp` pointer, and that memory is actually in another process
- * so we call `copy_address` to copy the memory for that pointer out of
- * the other process. The other methods do the same thing
- * except that they're more copmlicated and sometimes call `copy_address_raw`.
- *
- * `get_cfps` corresponds to
- * (* const rb_thread t *(ruby_current_thread_address_location))->cfp
- * 
- * `get_ruby_string` is doing ((Struct RString *) address) and then 
- * trying one of two ways to get the actual Ruby string out depending
- * on how it's stored
- */
-
-fn get_ruby_string(address: VALUE, pid: pid_t) -> OsString {
-    let vec = unsafe {
-        let mut rstring = copy_address(address as *const Struct_RString, pid);
-        if (rstring).basic.flags & (1 << 13) != 0 {
-            copy_address_raw((*rstring._as.heap()).ptr as *const c_void, (*rstring._as.heap()).len as usize, pid)
-        } else {
-            CStr::from_ptr((*rstring._as.ary()).as_ptr()).to_bytes().to_vec()
-        }
-    };
-    OsString::from_vec(vec)
-}
-
-fn get_iseq(cfp: &rb_control_frame_t, pid: pid_t) -> rb_iseq_t {
-    unsafe {
-        copy_address(cfp.iseq as *const rb_iseq_t, pid)
-    }
-}
-
-fn get_cfps<'a>(ruby_current_thread_address_location:u64, pid: pid_t) -> &'a[rb_control_frame_t] {
-    let ruby_current_thread_address = unsafe {
-        copy_address(ruby_current_thread_address_location as * const u64, pid)
-    };
-    let thread = unsafe {
-        copy_address(ruby_current_thread_address as *const rb_thread_t, pid)
-    };
-    unsafe {
-        let result = copy_address_raw(thread.cfp as *mut c_void, 100 * mem::size_of::<ruby_vm::rb_control_frame_t>(), pid);
-        slice::from_raw_parts(result.as_ptr() as *const ruby_vm::rb_control_frame_t, 100)
-    }
-}
-
+// These three functions (get_cfps, get_iseq, and get_ruby_string) are the
+// core of how the program works. They're essentially a straight port of
+// this gdb script:
+// https://gist.github.com/csfrancis/11376304/raw/7a0450d11e64e3bb7c982b7ad2778f3603188c0f/gdb_ruby_backtrace.yp
+// except without using gdb!!
+//
+// `get_iseq` is the simplest method  here -- it's just trying to run (cfp->iseq). But to do that
+// you need to dereference the `cfp` pointer, and that memory is actually in another process
+// so we call `copy_address` to copy the memory for that pointer out of
+// the other process. The other methods do the same thing
+// except that they're more copmlicated and sometimes call `copy_address_raw`.
+//
+// `get_cfps` corresponds to
+// (* const rb_thread t *(ruby_current_thread_address_location))->cfp
+//
+// `get_ruby_string` is doing ((Struct RString *) address) and then
+// trying one of two ways to get the actual Ruby string out depending
+// on how it's stored
+//
 
 fn get_nm_address(pid: pid_t) -> u64 {
-    let nm_command = Command::new("nm").arg(format!("/proc/{}/exe", pid))
+    let nm_command = Command::new("nm")
+        .arg(format!("/proc/{}/exe", pid))
         .stdout(Stdio::piped())
         .stdin(Stdio::null())
         .stderr(Stdio::null())
         .output()
-        .unwrap_or_else(|e| { panic!("failed to execute process: {}", e) });
+        .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
     let nm_output = String::from_utf8(nm_command.stdout).unwrap();
     let re = Regex::new(r"(\w+) b ruby_current_thread").unwrap();
     let cap = re.captures(&nm_output).unwrap_or_else(|| {
-        println!("Error: Couldn't find current thread in Ruby process. This is probably because either this isn't a Ruby process or you have a Ruby version compiled with no symbols.");
+        println!("Error: Couldn't find current thread in Ruby process. This is probably because \
+                  either this isn't a Ruby process or you have a Ruby version compiled with no \
+                  symbols.");
         process::exit(1)
     });
     let address_str = cap.at(1).unwrap();
@@ -134,31 +113,34 @@ fn get_nm_address(pid: pid_t) -> u64 {
 }
 
 fn get_maps_address(pid: pid_t) -> u64 {
-    let cat_command = Command::new("cat").arg(format!("/proc/{}/maps", pid))
+    let cat_command = Command::new("cat")
+        .arg(format!("/proc/{}/maps", pid))
         .stdout(Stdio::piped())
         .stdin(Stdio::null())
         .stderr(Stdio::null())
         .output()
-        .unwrap_or_else(|e| { panic!("failed to execute process: {}", e) });
+        .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
     let output = String::from_utf8(cat_command.stdout).unwrap();
-    let re = Regex::new(r"\n(\w+).+?bin/ruby").unwrap();
+    let re = Regex::new(r"(\w+).+xp.+?bin/ruby").unwrap();
     let cap = re.captures(&output).unwrap();
     let address_str = cap.at(1).unwrap();
     u64::from_str_radix(address_str, 16).unwrap()
 }
 
-fn get_ruby_current_thread_address(pid: pid_t)->u64 {
-    /* Get the address of the `ruby_current_thread` global variable. It works
-     * by looking up the address in the Ruby binary's symbol table with `nm
-     * /proc/$pid/exe` and then finding out which address the Ruby binary is
-     * mapped to by looking at `/proc/$pid/maps`. If we add these two
-     * addresses together we get our answers! All this is Linux-specific but
-     * this program only works on Linux anyway because of process_vm_readv.
-     */
+fn get_ruby_current_thread_address(pid: pid_t) -> u64 {
+    // Get the address of the `ruby_current_thread` global variable. It works
+    // by looking up the address in the Ruby binary's symbol table with `nm
+    // /proc/$pid/exe` and then finding out which address the Ruby binary is
+    // mapped to by looking at `/proc/$pid/maps`. If we add these two
+    // addresses together we get our answers! All this is Linux-specific but
+    // this program only works on Linux anyway because of process_vm_readv.
+    //
     get_nm_address(pid) + get_maps_address(pid)
 }
 
-fn print_method_stats(method_stats: &HashMap<String, u32>, method_own_time_stats: &HashMap<String, u32>, n_terminal_lines: usize) {
+fn print_method_stats(method_stats: &HashMap<String, u32>,
+                      method_own_time_stats: &HashMap<String, u32>,
+                      n_terminal_lines: usize) {
     println!("[{}c", 27 as char); // clear the screen
     let mut count_vec: Vec<_> = method_own_time_stats.iter().collect();
     count_vec.sort_by(|a, b| b.1.cmp(a.1));
@@ -167,26 +149,11 @@ fn print_method_stats(method_stats: &HashMap<String, u32>, method_own_time_stats
     let total_sum: u32 = *method_stats.values().max().unwrap();
     for &(method, count) in count_vec.iter().take(n_terminal_lines - 1) {
         let total_count = method_stats.get(&method[..]).unwrap();
-        println!(" {:02.1}% | {:02.1}% | {}", 100.0 * (*count as f32) / (self_sum as f32), 100.0 * (*total_count as f32)  / (total_sum as f32), method);
+        println!(" {:02.1}% | {:02.1}% | {}",
+                 100.0 * (*count as f32) / (self_sum as f32),
+                 100.0 * (*total_count as f32) / (total_sum as f32),
+                 method);
     }
-}
-
-fn get_stack_trace<'a>(ruby_current_thread_address_location: u64, pid: pid_t) -> Vec<String> {
-    let cfps = get_cfps(ruby_current_thread_address_location, pid);
-    let mut trace: Vec<String> = Vec::new();
-    for i in 0..100 {
-        let iseq = get_iseq(&cfps[i], pid);
-        if !cfps[i].pc.is_null() {
-            let label = get_ruby_string(iseq.location.label as VALUE, pid);
-            let path = get_ruby_string(iseq.location.path as VALUE, pid);
-            if path.to_str().unwrap() == "" {
-                continue;
-            }
-            let current_location = format!("{} : {}", label.to_string_lossy(), path.to_string_lossy()).to_string();
-            trace.push(current_location);
-        }
-    }
-    trace
 }
 
 fn print_stack_trace(trace: &Vec<String>) {
@@ -198,19 +165,174 @@ fn print_stack_trace(trace: &Vec<String>) {
 
 fn parse_args() -> ArgMatches<'static> {
     App::new("ruby-stacktrace")
-      .version("0.1")
-      .about("Sampling profiler for Ruby programs")
-      .arg(Arg::with_name("COMMAND")
-           .help("Subcommand you want to run. Options: top, stackcollapse.\n          top prints a top-like output of what the Ruby process is doing right now\n          stackcollapse prints out output suitable for piping to stackcollapse.pl (https://github.com/brendangregg/FlameGraph)")
-           .required(true)
-           .index(1))
-      .arg(Arg::with_name("PID")
-           .help("PID of the Ruby process you want to profile")
-           .required(true)
-           .index(2))
-      .get_matches()
+        .version("0.1")
+        .about("Sampling profiler for Ruby programs")
+        .arg(Arg::with_name("COMMAND")
+            .help("Subcommand you want to run. Options: top, stackcollapse.\n          top \
+                   prints a top-like output of what the Ruby process is doing right now\n          \
+                   stackcollapse prints out output suitable for piping to stackcollapse.pl \
+                   (https://github.com/brendangregg/FlameGraph)")
+            .required(true)
+            .index(1))
+        .arg(Arg::with_name("PID")
+            .help("PID of the Ruby process you want to profile")
+            .required(true)
+            .index(2))
+        .get_matches()
 }
 
+
+fn get_size<'a>(lookup_table: &'a DwarfLookup<'a>, entry: &'a Entry<'a>) -> Option<usize> {
+    let mut current_entry: &Entry<'a> = entry;
+    while current_entry.size == 0 {
+        match current_entry.type_id {
+            None => return None,
+            Some(id) =>  {
+                match lookup_table.lookup_entry(current_entry) {
+                    None => return None,
+                    Some(entry) => {
+                        current_entry = entry;
+                    }
+                }
+            }
+        }
+    }
+    return Some(current_entry.size);
+}
+
+unsafe fn copy_address_dynamic<'a>(
+        addr: *const c_void, lookup_table: &'a DwarfLookup<'a>,
+        pid: pid_t, struct_name: &str) -> HashMap<&'a str, Vec<u8>> {
+    let dwarf_type = lookup_table.lookup_thing(struct_name).unwrap();
+    let size = round_to_word_size(dwarf_type.size) + 100; // todo: is a hack
+    let bytes = copy_address_raw(addr as *mut c_void, size, pid);
+    map_bytes_to_struct(&bytes, lookup_table, struct_name)
+}
+
+fn round_to_word_size(size: usize) -> usize {
+    if size % 8 == 0 {
+        size
+    } else {
+        (size / 8 + 1) * 8
+    }
+}
+
+fn map_bytes_to_struct2<'a>(
+        bytes: &Vec<u8>,
+        lookup_table: &'a DwarfLookup<'a>,
+        dwarf_type: &'a Entry<'a>) -> HashMap<&'a str, Vec<u8>> {
+    let mut struct_map = HashMap::new();
+    let mut offset = 0;
+    for entry in dwarf_type.children.iter() {
+        match get_size(&lookup_table, entry) {
+            None => break,
+            Some(size) => {
+                let name = entry.name.unwrap();
+                let b = bytes[offset..offset+size].to_vec();
+                struct_map.insert(name, b.to_vec());
+                offset = offset + round_to_word_size(size);
+            }
+        }
+    }
+    struct_map
+
+}
+
+fn map_bytes_to_struct<'a>(
+        bytes: &Vec<u8>,
+        lookup_table: &'a DwarfLookup<'a>,
+        struct_name: &str) -> HashMap<&'a str, Vec<u8>> {
+    let dwarf_type = lookup_table.lookup_thing(struct_name).unwrap();
+    map_bytes_to_struct2(bytes, lookup_table, dwarf_type)
+}
+
+fn read_pointer_address(vec: &Vec<u8>) -> u64 {
+    let mut rdr = Cursor::new(vec);
+    rdr.read_u64::<NativeEndian>().unwrap()
+}
+
+fn get_child<'a>(entry: &'a Entry<'a>, name: &'a str) -> Option<&'a Entry<'a>>{
+    for child in &entry.children {
+        if child.name == Some(name) {
+            return Some(child);
+        }
+    }
+    None
+}
+
+fn get_ruby_string2<'a>(addr: u64, pid: pid_t, lookup_table: &DwarfLookup<'a>) -> OsString {
+     let vec = unsafe {
+        let rstring = copy_address_dynamic(addr as *const c_void, lookup_table, pid, "RString");
+        let basic =  map_bytes_to_struct(&rstring["basic"], lookup_table, "RBasic");
+        let is_array = (read_pointer_address(&basic["flags"]) & 1 << 13) == 0;
+        if is_array  {
+           // println!("it's an array!!!!");
+           CStr::from_ptr(rstring["as"].as_ptr() as *const i8).to_bytes().to_vec()
+        } else {
+            let entry = lookup_table.lookup_thing("RString").unwrap();
+                // println!("entry: {:?}", entry);
+            let as_type = get_child(&entry, "as").unwrap();
+            let blah = lookup_table.lookup_entry(as_type).unwrap();
+            // println!("blah: {:?}", blah);
+            let heap_type = get_child(&blah, "heap").unwrap();
+            let blah2 = lookup_table.lookup_entry(heap_type).unwrap();
+            let hashmap = map_bytes_to_struct2(&rstring["as"], lookup_table, blah2);
+            copy_address_raw(
+                read_pointer_address(&hashmap["ptr"]) as *const c_void,
+                read_pointer_address(&hashmap["len"]) as usize,
+                pid)
+        }
+    };
+    OsString::from_vec(vec)   
+}
+
+
+unsafe fn get_label_and_path<'a, 'b>(cfp_bytes: &Vec<u8>, pid: pid_t, lookup_table: &DwarfLookup<'a>) -> Option<(OsString, OsString)> {
+    let blah2 = map_bytes_to_struct(&cfp_bytes, &lookup_table, "rb_control_frame_struct");
+    // println!("{:?}", blah2);
+    let iseq_address = read_pointer_address(&blah2["iseq"]);
+    let blah3 = copy_address_dynamic(iseq_address as *const c_void, &lookup_table, pid, "rb_iseq_struct");
+    let location = map_bytes_to_struct(&blah3["location"], &lookup_table, "rb_iseq_location_struct");
+    let label_address = read_pointer_address(&location["label"]);
+    let path_address = read_pointer_address(&location["path"]);
+    let label = get_ruby_string2(label_address, pid, lookup_table);
+    let path = get_ruby_string2(path_address, pid, lookup_table);
+    if path.to_string_lossy() == "" {
+        return None;
+    }
+    Some((label, path))
+}
+
+unsafe fn get_cfps<'a>(ruby_current_thread_address_location: u64, pid: pid_t, lookup_table: &DwarfLookup<'a>) -> (Vec<u8>, usize) {
+    let ruby_current_thread_address: u64 = read_pointer_address(&copy_address_raw(ruby_current_thread_address_location as *const c_void, 8, pid));
+    let blah = copy_address_dynamic(ruby_current_thread_address as *const c_void, &lookup_table, pid, "rb_thread_struct");
+    let cfp_address = read_pointer_address(&blah["cfp"]);
+    let cfp_struct = lookup_table.lookup_thing("rb_control_frame_struct").unwrap();
+    let cfp_size = cfp_struct.size;
+    (copy_address_raw(cfp_address as *const c_void, cfp_size * 100, pid), cfp_size)
+}
+
+fn get_stack_trace<'a>(ruby_current_thread_address_location: u64, pid: pid_t, lookup_table: &DwarfLookup<'a>) -> Vec<String> {
+    unsafe {
+
+    let (cfp_bytes, cfp_size) = get_cfps(ruby_current_thread_address_location, pid, lookup_table);
+    let mut trace: Vec<String> = Vec::new();
+    for i in 0..100 {
+        match get_label_and_path(&cfp_bytes[(cfp_size*i)..].to_vec(), pid, lookup_table) {
+            None => continue,
+            Some((label, path)) => {
+                let current_location = 
+                    format!("{} : {}", label.to_string_lossy(), path.to_string_lossy()).to_string();
+                trace.push(current_location);
+                if label.to_str().unwrap() == "<main>" {
+                    break;
+                }
+            }
+        }
+    }
+    trace
+    }
+}
 
 fn main() {
     let matches = parse_args();
@@ -220,14 +342,16 @@ fn main() {
         println!("COMMAND must be 'top' or 'stackcollapse. Try again!");
         process::exit(1);
     }
-    let ruby_current_thread_address_location = get_ruby_current_thread_address(pid);
 
+    let entries = get_dwarf_entries(pid as usize);
+    let lookup_table = create_lookup_table(&entries);
+    let ruby_current_thread_address_location: u64 = get_ruby_current_thread_address(pid);
 
     if command == "stackcollapse" {
         // This gets a stack trace and then just prints it out
         // in a format that Brendan Gregg's stackcollapse.pl script understands
         loop {
-            let trace = get_stack_trace(ruby_current_thread_address_location, pid);
+            let trace = get_stack_trace(ruby_current_thread_address_location, pid, &lookup_table);
             print_stack_trace(&trace);
             thread::sleep(Duration::from_millis(10));
         }
@@ -240,7 +364,7 @@ fn main() {
         let mut j = 0;
         loop {
             j += 1;
-            let trace = get_stack_trace(ruby_current_thread_address_location, pid);
+            let trace = get_stack_trace(ruby_current_thread_address_location, pid, &lookup_table);
             for item in &trace {
                 let counter = method_stats.entry(item.clone()).or_insert(0);
                 *counter += 1;

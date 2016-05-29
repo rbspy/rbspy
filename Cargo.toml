@@ -3,8 +3,15 @@ name = "ruby-stacktrace"
 version = "0.1.0"
 authors = ["Julia Evans <julia@jvns.ca>"]
 
+[lib]
+name = "dwarf_bindings"
+# dylib, rlib, staticlib
+crate-type = ["staticlib"]
+
 [dependencies]
 libc={path="/home/bork/clones/libc"}
 regex = "0.1"
 term = "0.2"
 clap = "2"
+byteorder = "0.5"
+rand = "0.3"
