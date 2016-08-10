@@ -11,11 +11,8 @@ use std::os::unix::prelude::*;
 use std::time::Duration;
 use std::thread;
 use std::ffi::{OsString, CStr};
-use std::mem;
-use std::slice;
 use std::process::Command;
 use std::process::Stdio;
-use std::ptr;
 use regex::Regex;
 pub mod dwarf;
 pub mod dwarf_bindings;
@@ -54,20 +51,6 @@ fn copy_address_raw(addr: *const c_void, length: usize, pid: pid_t) -> Vec<u8> {
         READ_EVER_SUCCEEDED = true;
     }
     copy
-}
-
-unsafe fn copy_address<T>(addr: *const T, pid: pid_t) -> T {
-    let mut value: T = mem::uninitialized();
-    let local_iov = iovec {
-        iov_base: &mut value as *mut _ as *mut c_void,
-        iov_len: mem::size_of::<T>(),
-    };
-    let remote_iov = iovec {
-        iov_base: addr as *mut c_void,
-        iov_len: mem::size_of::<T>(),
-    };
-    process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
-    value
 }
 
 // These three functions (get_cfps, get_iseq, and get_ruby_string) are the
@@ -183,15 +166,10 @@ fn parse_args() -> ArgMatches<'static> {
 fn get_size<'a>(lookup_table: &'a DwarfLookup<'a>, entry: &'a Entry<'a>) -> Option<usize> {
     let mut current_entry: &Entry<'a> = entry;
     while current_entry.size == 0 {
-        match current_entry.type_id {
+        match lookup_table.lookup_entry(current_entry) {
             None => return None,
-            Some(id) =>  {
-                match lookup_table.lookup_entry(current_entry) {
-                    None => return None,
-                    Some(entry) => {
-                        current_entry = entry;
-                    }
-                }
+            Some(entry) => {
+                current_entry = entry;
             }
         }
     }

@@ -1,4 +1,5 @@
-#![warn(unused_parens)]
+#![allow(dead_code)]
+#![allow(non_snake_case)]
 
 extern crate rand;
 
@@ -11,21 +12,11 @@ use std::os::raw::c_uint;
 use std::slice::from_raw_parts;
 use dwarf_bindings::*;
 use std::ptr;
-use std::ffi::CString;
 use std::ffi::CStr;
 
 fn dwarf_error() -> *mut *mut Struct_Dwarf_Error_s {
     let mut x: Dwarf_Error = ptr::null::<Struct_Dwarf_Error_s>() as Dwarf_Error;
     &mut x as *mut *mut Struct_Dwarf_Error_s
-}
-
-fn indent(level: u32) {
-    let mut i = 0;
-    while i < level {
-        i = i + 1;
-        print!("  ");
-
-    }
 }
 
 fn my_dwarf_get_FORM_name(tag: c_uint) -> *const c_char {
@@ -140,8 +131,7 @@ fn my_dwarf_next_cu_header(dbg: Dwarf_Debug) -> Option<DwarfHeader> {
     let mut error: Dwarf_Error = ptr::null::<Struct_Dwarf_Error_s>() as Dwarf_Error;
 
     unsafe {
-        let mut res = DW_DLV_ERROR;
-        res = dwarf_next_cu_header(dbg,
+        let res = dwarf_next_cu_header(dbg,
                                    &mut cu_header_length,
                                    &mut version_stamp as *mut Dwarf_Half,
                                    &mut abbrev_offset as *mut Dwarf_Unsigned,
@@ -238,7 +228,6 @@ fn my_dwarf_formstring(attr: Dwarf_Attribute) -> Option<*mut c_char> {
     unsafe {
         let res = dwarf_formstring(attr, &mut name as *mut *mut c_char, dwarf_error());
         if res == DW_DLV_ERROR {
-            return None;
             panic!("Error in formstring: {}", res);
         }
         if res == DW_DLV_NO_ENTRY {
@@ -375,7 +364,7 @@ fn my_dwarf_siblings(dbg: Dwarf_Debug, node: Dwarf_Die) -> Vec<Dwarf_Die> {
     let mut siblings: Vec<Dwarf_Die> = Vec::new();
     let mut cur_die = node;
     siblings.push(node);
-    while true {
+    loop {
         match my_dwarf_sibling_of(dbg, cur_die) {
             Some(v) => { 
                 siblings.push(v);
@@ -504,11 +493,9 @@ pub fn create_lookup_table<'a,'b>(root_entries: &'a Vec<Entry<'b>>) -> DwarfLook
 
 fn get_all_entries<'a>(dbg: Dwarf_Debug) -> Vec<Entry<'a>> {
     let mut root_entries = vec![];
-    let mut group_id: u32 = 0;
-    while true {
-        group_id = rand::random::<u32>();
+    loop {
+        let group_id = rand::random::<u32>();
         let no_die: Dwarf_Die = ptr::null::<Struct_Dwarf_Die_s>() as Dwarf_Die;
-        let mut cu_die: Dwarf_Die = ptr::null::<Struct_Dwarf_Die_s>() as Dwarf_Die;
         match my_dwarf_next_cu_header(dbg) {
             None => break,
             _ => {},
@@ -546,7 +533,7 @@ pub fn get_dwarf_entries<'a>(pid: usize) -> Vec<Entry<'a>> {
     let error_ptr = dwarf_error();
     let errarg: Dwarf_Ptr = ptr::null::<c_void> as *mut c_void;
     let file = match File::open(format!("/proc/{}/exe", pid)) {
-        Err(why) => panic!("couldn't open file sryyyy"),
+        Err(_) => panic!("couldn't open file sryyyy"),
         Ok(file) => file,
     };
     let fd = file.as_raw_fd() as ::std::os::raw::c_int;
