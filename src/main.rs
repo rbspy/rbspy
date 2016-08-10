@@ -373,6 +373,8 @@ fn main() {
             }
             if j % 100 == 0 {
                 print_method_stats(&method_stats, &method_own_time_stats, 30);
+                method_stats = HashMap::new();
+                method_own_time_stats = HashMap::new();
             }
             thread::sleep(Duration::from_millis(10));
         }
