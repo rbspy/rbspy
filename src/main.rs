@@ -17,14 +17,12 @@ use std::process::Command;
 use std::process::Stdio;
 use std::ptr;
 use regex::Regex;
-pub mod ruby_vm;
 pub mod dwarf;
 pub mod dwarf_bindings;
 use byteorder::{NativeEndian, ReadBytesExt};
 use std::io::Cursor;
 use dwarf::{create_lookup_table, get_dwarf_entries, DwarfLookup, Entry};
 use std::collections::HashMap;
-use ruby_vm::{rb_iseq_t, rb_control_frame_t, rb_thread_t, Struct_RString, VALUE};
 
 static mut READ_EVER_SUCCEEDED: bool = false;
 
