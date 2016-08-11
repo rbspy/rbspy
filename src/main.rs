@@ -180,17 +180,9 @@ unsafe fn copy_address_dynamic<'a>(
         addr: *const c_void, lookup_table: &'a DwarfLookup<'a>,
         pid: pid_t, struct_name: &str) -> HashMap<&'a str, Vec<u8>> {
     let dwarf_type = lookup_table.lookup_thing(struct_name).unwrap();
-    let size = round_to_word_size(dwarf_type.size) + 100; // todo: is a hack
+    let size = dwarf_type.size + 200; // todo: is a hack
     let bytes = copy_address_raw(addr as *mut c_void, size, pid);
     map_bytes_to_struct(&bytes, lookup_table, struct_name)
-}
-
-fn round_to_word_size(size: usize) -> usize {
-    if size % 8 == 0 {
-        size
-    } else {
-        (size / 8 + 1) * 8
-    }
 }
 
 fn map_bytes_to_struct2<'a>(
@@ -198,15 +190,14 @@ fn map_bytes_to_struct2<'a>(
         lookup_table: &'a DwarfLookup<'a>,
         dwarf_type: &'a Entry<'a>) -> HashMap<&'a str, Vec<u8>> {
     let mut struct_map = HashMap::new();
-    let mut offset = 0;
     for entry in dwarf_type.children.iter() {
         match get_size(&lookup_table, entry) {
             None => break,
             Some(size) => {
                 let name = entry.name.unwrap();
-                let b = bytes[offset..offset+size].to_vec();
+                let offset = entry.offset.unwrap() as usize;
+                let b = bytes[offset..offset + size].to_vec();
                 struct_map.insert(name, b.to_vec());
-                offset = offset + round_to_word_size(size);
             }
         }
     }
