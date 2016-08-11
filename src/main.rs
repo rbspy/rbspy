@@ -219,6 +219,7 @@ fn map_bytes_to_struct<'a>(
         lookup_table: &'a DwarfLookup<'a>,
         struct_name: &str) -> HashMap<&'a str, Vec<u8>> {
     let dwarf_type = lookup_table.lookup_thing(struct_name).unwrap();
+    // println!("dwarf_type: {:#?}", dwarf_type);
     map_bytes_to_struct2(bytes, lookup_table, dwarf_type)
 }
 
@@ -242,7 +243,8 @@ fn get_ruby_string2<'a>(addr: u64, pid: pid_t, lookup_table: &DwarfLookup<'a>) -
         let basic =  map_bytes_to_struct(&rstring["basic"], lookup_table, "RBasic");
         let is_array = (read_pointer_address(&basic["flags"]) & 1 << 13) == 0;
         if is_array  {
-           // println!("it's an array!!!!");
+           println!("it's an array!!!!");
+           println!("rstring {:#?}", rstring);
            CStr::from_ptr(rstring["as"].as_ptr() as *const i8).to_bytes().to_vec()
         } else {
             let entry = lookup_table.lookup_thing("RString").unwrap();
@@ -268,7 +270,15 @@ unsafe fn get_label_and_path<'a, 'b>(cfp_bytes: &Vec<u8>, pid: pid_t, lookup_tab
     // println!("{:?}", blah2);
     let iseq_address = read_pointer_address(&blah2["iseq"]);
     let blah3 = copy_address_dynamic(iseq_address as *const c_void, &lookup_table, pid, "rb_iseq_struct");
-    let location = map_bytes_to_struct(&blah3["location"], &lookup_table, "rb_iseq_location_struct");
+    let location = if blah3.contains_key("location") {
+        map_bytes_to_struct(&blah3["location"], &lookup_table, "rb_iseq_location_struct")
+    } else if blah3.contains_key("body") {
+    let body = read_pointer_address(&blah3["body"]);
+    let blah4 = copy_address_dynamic(body as *const c_void, &lookup_table, pid, "rb_iseq_constant_body");
+        map_bytes_to_struct(&blah4["location"], &lookup_table, "rb_iseq_location_struct")
+    } else {
+        panic!("DON'T KNOW WHERE LOCATION IS");
+    };
     let label_address = read_pointer_address(&location["label"]);
     let path_address = read_pointer_address(&location["path"]);
     let label = get_ruby_string2(label_address, pid, lookup_table);
@@ -276,6 +286,8 @@ unsafe fn get_label_and_path<'a, 'b>(cfp_bytes: &Vec<u8>, pid: pid_t, lookup_tab
     if path.to_string_lossy() == "" {
         return None;
     }
+    println!("label_address: {}, path_address: {}", label_address, path_address);
+    println!("location hash: {:#?}", location);
     Some((label, path))
 }
 
@@ -300,7 +312,7 @@ fn get_stack_trace<'a>(ruby_current_thread_address_location: u64, pid: pid_t, lo
                 let current_location = 
                     format!("{} : {}", label.to_string_lossy(), path.to_string_lossy()).to_string();
                 trace.push(current_location);
-                if label.to_str().unwrap() == "<main>" {
+                if label.to_string_lossy() == "<main>" {
                     break;
                 }
             }
