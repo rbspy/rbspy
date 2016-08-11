@@ -378,6 +378,24 @@ fn my_dwarf_siblings(dbg: Dwarf_Debug, node: Dwarf_Die) -> Vec<Dwarf_Die> {
 }
 
 
+fn my_dwarf_loclist(attr: Dwarf_Attribute) -> Vec<Dwarf_Locdesc> {
+    let mut vec: Vec<Dwarf_Locdesc> = Vec::new();
+    let mut loclist = ptr::null::<Dwarf_Locdesc>() as *mut Dwarf_Locdesc;
+    let mut length: Dwarf_Signed = 0;
+    unsafe {
+        let res = dwarf_loclist(attr, &mut loclist as *mut *mut Dwarf_Locdesc,
+            &mut length as *mut Dwarf_Signed, dwarf_error());
+        let slice = from_raw_parts(loclist, length as usize);
+        vec.extend_from_slice(slice);
+        match res {
+            DW_DLV_NO_ENTRY => return vec!(),
+            DW_DLV_OK => return vec,
+            _ => panic!("Error in dwarf_attrlist"),
+        }
+    }
+}
+
+
 fn get_node_type(die: Dwarf_Die) -> Option<usize> {
     unsafe {
         let attributes = my_dwarf_attrlist(die);
@@ -406,6 +424,45 @@ fn get_node_name(die: Dwarf_Die) -> Option<*mut c_char> {
     }
 }
 
+fn get_attr_offset(attr: Dwarf_Attribute) -> Option<Dwarf_Unsigned> {
+    let form: Dwarf_Half = my_dwarf_whatform(attr);
+    if form == DW_FORM_data1 || form == DW_FORM_data2 || 
+       form == DW_FORM_data2 || form == DW_FORM_data4 || 
+       form == DW_FORM_data8 || form == DW_FORM_udata {
+        Some(my_dwarf_formudata(attr))
+    } else if form == DW_FORM_sdata {
+        let soffset = my_dwarf_formsdata(attr);
+        if soffset < 0 {
+             panic!("unsupported negative offset\n");
+        }
+        Some(soffset as Dwarf_Unsigned)
+    }  else {
+        let loclist = my_dwarf_loclist(attr);
+        if loclist.len() != 1  || loclist[0].ld_cents != 1 {
+            return None;
+        }
+        let loc = unsafe {*(loclist[0].ld_s) };
+        if loc.lr_atom != DW_OP_plus_uconst {
+            return None;
+        }
+        Some(loc.lr_number)
+    }
+}
+
+fn get_node_offset(die: Dwarf_Die) -> Option<Dwarf_Unsigned> {
+    unsafe {
+        let attributes = my_dwarf_attrlist(die);
+        for attr in attributes {
+            let whatattr = my_dwarf_whatattr(attr) as c_uint;
+            let at_name = CStr::from_ptr(my_dwarf_get_AT_name(whatattr));
+            if at_name.to_str().unwrap() == "DW_AT_data_member_location" {
+                return get_attr_offset(attr);
+            } 
+        }
+        None
+    }
+}
+
 fn index_dwarf_data(dbg: Dwarf_Debug, die: Dwarf_Die, group_id: u32) -> Entry<'static> {
     let mut children: Vec<Entry> = Vec::new();
     match my_dwarf_child(die) {
@@ -423,6 +480,7 @@ fn index_dwarf_data(dbg: Dwarf_Debug, die: Dwarf_Die, group_id: u32) -> Entry<'s
         Some(s) => unsafe { Some(CStr::from_ptr(s).to_str().unwrap()) } ,
         None => None
     };
+    let offset = get_node_offset(die);
     Entry {
         children: children,
         id: my_dwarf_die_CU_offset(die) as usize,
@@ -430,6 +488,7 @@ fn index_dwarf_data(dbg: Dwarf_Debug, die: Dwarf_Die, group_id: u32) -> Entry<'s
         size: my_dwarf_bytesize(die) as usize,
         tagname: tagname,
         name: name,
+        offset: offset,
         group_id: group_id,
     }
 }
@@ -443,6 +502,7 @@ pub struct Entry<'a> {
     pub name: Option<&'a str>,
     pub tagname: &'a str,
     pub group_id: u32,
+    pub offset: Option<Dwarf_Unsigned>
 }
 
 pub struct DwarfLookup<'a> {
