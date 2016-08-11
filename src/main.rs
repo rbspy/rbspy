@@ -234,8 +234,8 @@ fn get_ruby_string2<'a>(addr: u64, pid: pid_t, lookup_table: &DwarfLookup<'a>) -
         let basic =  map_bytes_to_struct(&rstring["basic"], lookup_table, "RBasic");
         let is_array = (read_pointer_address(&basic["flags"]) & 1 << 13) == 0;
         if is_array  {
-           println!("it's an array!!!!");
-           println!("rstring {:#?}", rstring);
+           // println!("it's an array!!!!");
+           // println!("rstring {:#?}", rstring);
            CStr::from_ptr(rstring["as"].as_ptr() as *const i8).to_bytes().to_vec()
         } else {
             let entry = lookup_table.lookup_thing("RString").unwrap();
@@ -277,8 +277,8 @@ unsafe fn get_label_and_path<'a, 'b>(cfp_bytes: &Vec<u8>, pid: pid_t, lookup_tab
     if path.to_string_lossy() == "" {
         return None;
     }
-    println!("label_address: {}, path_address: {}", label_address, path_address);
-    println!("location hash: {:#?}", location);
+    // println!("label_address: {}, path_address: {}", label_address, path_address);
+    // println!("location hash: {:#?}", location);
     Some((label, path))
 }
 
