@@ -9,7 +9,7 @@ name = "dwarf_bindings"
 crate-type = ["staticlib"]
 
 [dependencies]
-libc={path="/home/bork/clones/libc"}
+libc = "0.2.15"
 regex = "0.1"
 term = "0.2"
 clap = "2"
