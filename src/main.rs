@@ -1,6 +1,7 @@
 extern crate libc;
 extern crate regex;
 extern crate term;
+extern crate gimli;
 
 extern crate clap;
 extern crate byteorder;
@@ -15,7 +16,6 @@ use std::process::Command;
 use std::process::Stdio;
 use regex::Regex;
 pub mod dwarf;
-pub mod dwarf_bindings;
 use byteorder::{NativeEndian, ReadBytesExt};
 use std::io::Cursor;
 use dwarf::{create_lookup_table, get_dwarf_entries, DwarfLookup, Entry};
@@ -163,9 +163,9 @@ fn parse_args() -> ArgMatches<'static> {
 }
 
 
-fn get_size<'a>(lookup_table: &'a DwarfLookup<'a>, entry: &'a Entry<'a>) -> Option<usize> {
-    let mut current_entry: &Entry<'a> = entry;
-    while current_entry.size == 0 {
+fn get_size(lookup_table: &DwarfLookup, entry: &Entry) -> Option<usize> {
+    let mut current_entry: &Entry = entry;
+    while current_entry.byte_size == None {
         match lookup_table.lookup_entry(current_entry) {
             None => return None,
             Some(entry) => {
@@ -173,28 +173,29 @@ fn get_size<'a>(lookup_table: &'a DwarfLookup<'a>, entry: &'a Entry<'a>) -> Opti
             }
         }
     }
-    return Some(current_entry.size);
+    return current_entry.byte_size
 }
 
 unsafe fn copy_address_dynamic<'a>(
-        addr: *const c_void, lookup_table: &'a DwarfLookup<'a>,
-        pid: pid_t, struct_name: &str) -> HashMap<&'a str, Vec<u8>> {
+        addr: *const c_void, lookup_table: &DwarfLookup,
+        pid: pid_t, struct_name: &str) -> HashMap<String, Vec<u8>> {
     let dwarf_type = lookup_table.lookup_thing(struct_name).unwrap();
-    let size = dwarf_type.size + 200; // todo: is a hack
+    let size = dwarf_type.byte_size.unwrap() + 200; // todo: is a hack
     let bytes = copy_address_raw(addr as *mut c_void, size, pid);
     map_bytes_to_struct(&bytes, lookup_table, struct_name)
 }
 
 fn map_bytes_to_struct2<'a>(
         bytes: &Vec<u8>,
-        lookup_table: &'a DwarfLookup<'a>,
-        dwarf_type: &'a Entry<'a>) -> HashMap<&'a str, Vec<u8>> {
+        lookup_table: &DwarfLookup,
+        dwarf_type: &Entry) -> HashMap<String, Vec<u8>> {
+    // println!("{:#?}", dwarf_type);
     let mut struct_map = HashMap::new();
     for entry in dwarf_type.children.iter() {
         match get_size(&lookup_table, entry) {
             None => break,
             Some(size) => {
-                let name = entry.name.unwrap();
+                let name = entry.name.clone().unwrap_or("unknownnnn".to_string());
                 let offset = entry.offset.unwrap() as usize;
                 let b = bytes[offset..offset + size].to_vec();
                 struct_map.insert(name, b.to_vec());
@@ -207,8 +208,8 @@ fn map_bytes_to_struct2<'a>(
 
 fn map_bytes_to_struct<'a>(
         bytes: &Vec<u8>,
-        lookup_table: &'a DwarfLookup<'a>,
-        struct_name: &str) -> HashMap<&'a str, Vec<u8>> {
+        lookup_table: &DwarfLookup,
+        struct_name: &str) -> HashMap<String, Vec<u8>> {
     let dwarf_type = lookup_table.lookup_thing(struct_name).unwrap();
     // println!("dwarf_type: {:#?}", dwarf_type);
     map_bytes_to_struct2(bytes, lookup_table, dwarf_type)
@@ -219,16 +220,16 @@ fn read_pointer_address(vec: &Vec<u8>) -> u64 {
     rdr.read_u64::<NativeEndian>().unwrap()
 }
 
-fn get_child<'a>(entry: &'a Entry<'a>, name: &'a str) -> Option<&'a Entry<'a>>{
+fn get_child<'a>(entry: &'a Entry, name: &'a str) -> Option<&'a Entry>{
     for child in &entry.children {
-        if child.name == Some(name) {
+        if child.name == Some(name.to_string()) {
             return Some(child);
         }
     }
     None
 }
 
-fn get_ruby_string2<'a>(addr: u64, pid: pid_t, lookup_table: &DwarfLookup<'a>) -> OsString {
+fn get_ruby_string2(addr: u64, pid: pid_t, lookup_table: &DwarfLookup) -> OsString {
      let vec = unsafe {
         let rstring = copy_address_dynamic(addr as *const c_void, lookup_table, pid, "RString");
         let basic =  map_bytes_to_struct(&rstring["basic"], lookup_table, "RBasic");
@@ -256,7 +257,7 @@ fn get_ruby_string2<'a>(addr: u64, pid: pid_t, lookup_table: &DwarfLookup<'a>) -
 }
 
 
-unsafe fn get_label_and_path<'a, 'b>(cfp_bytes: &Vec<u8>, pid: pid_t, lookup_table: &DwarfLookup<'a>) -> Option<(OsString, OsString)> {
+unsafe fn get_label_and_path(cfp_bytes: &Vec<u8>, pid: pid_t, lookup_table: &DwarfLookup) -> Option<(OsString, OsString)> {
     let blah2 = map_bytes_to_struct(&cfp_bytes, &lookup_table, "rb_control_frame_struct");
     // println!("{:?}", blah2);
     let iseq_address = read_pointer_address(&blah2["iseq"]);
@@ -282,16 +283,17 @@ unsafe fn get_label_and_path<'a, 'b>(cfp_bytes: &Vec<u8>, pid: pid_t, lookup_tab
     Some((label, path))
 }
 
-unsafe fn get_cfps<'a>(ruby_current_thread_address_location: u64, pid: pid_t, lookup_table: &DwarfLookup<'a>) -> (Vec<u8>, usize) {
+unsafe fn get_cfps(ruby_current_thread_address_location: u64, pid: pid_t, lookup_table: &DwarfLookup) -> (Vec<u8>, usize) {
     let ruby_current_thread_address: u64 = read_pointer_address(&copy_address_raw(ruby_current_thread_address_location as *const c_void, 8, pid));
     let blah = copy_address_dynamic(ruby_current_thread_address as *const c_void, &lookup_table, pid, "rb_thread_struct");
+    // println!("{:?}", blah);
     let cfp_address = read_pointer_address(&blah["cfp"]);
     let cfp_struct = lookup_table.lookup_thing("rb_control_frame_struct").unwrap();
-    let cfp_size = cfp_struct.size;
+    let cfp_size = cfp_struct.byte_size.unwrap();
     (copy_address_raw(cfp_address as *const c_void, cfp_size * 100, pid), cfp_size)
 }
 
-fn get_stack_trace<'a>(ruby_current_thread_address_location: u64, pid: pid_t, lookup_table: &DwarfLookup<'a>) -> Vec<String> {
+fn get_stack_trace(ruby_current_thread_address_location: u64, pid: pid_t, lookup_table: &DwarfLookup) -> Vec<String> {
     unsafe {
 
     let (cfp_bytes, cfp_size) = get_cfps(ruby_current_thread_address_location, pid, lookup_table);
