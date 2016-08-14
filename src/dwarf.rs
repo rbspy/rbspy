@@ -83,15 +83,22 @@ where Endian: gimli::Endianity
 {
     let mut attrs = die.attrs();
     while let Some(attr) = attrs.next().expect("Should parse attribute OK") {
-        match attr.name() {
-            gimli::DW_AT_data_member_location => {
-                if let gimli::AttributeValue::Block(o) = attr.value() {
-                    return Some(leb128::read::unsigned(&mut &o[1..]).expect("couldn't parse leb") as usize)
+       match attr.name() {
+          gimli::DW_AT_data_member_location => {
+             match attr.value() {
+
+                gimli::AttributeValue::Block(o) => {
+                   return Some(leb128::read::unsigned(&mut &o[1..]).expect("couldn't parse leb") as usize);
                 }
-            },
-            _ => continue,
-        }
-    } 
+                gimli::AttributeValue::Data(o) => {
+                   return Some(read_pointer_address(&o));
+                }
+                _ => panic!("unexpected location value type"),
+             }
+          }
+          _ => continue,
+       }
+    }
     None
 }
 

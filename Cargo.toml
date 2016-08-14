@@ -11,5 +11,5 @@ clap = "2"
 byteorder = "0.5"
 leb128 = "0.2.1"
 rand = "0.3"
-gimli={path="/home/bork/clones/gimli"}
+gimli={git="https://github.com/fitzgen/gimli.git"}
 elf = "0.0.9"
