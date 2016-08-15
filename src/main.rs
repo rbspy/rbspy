@@ -304,7 +304,7 @@ unsafe fn get_cfps(ruby_current_thread_address_location: u64, pid: pid_t, lookup
     let blah = copy_address_dynamic(ruby_current_thread_address as *const c_void, &lookup_table, pid, &types.rb_thread_struct);
     // println!("{:?}", blah);
     let cfp_address = read_pointer_address(&blah["cfp"]);
-    let cfp_struct = lookup_table.lookup_thing("rb_control_frame_struct").unwrap();
+    let ref cfp_struct = types.rb_control_frame_struct;
     let cfp_size = cfp_struct.byte_size.unwrap();
     (copy_address_raw(cfp_address as *const c_void, cfp_size * 100, pid), cfp_size)
 }
