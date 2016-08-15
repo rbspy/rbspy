@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(non_snake_case)]
-
 extern crate rand;
 extern crate leb128;
 

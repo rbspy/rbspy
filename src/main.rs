@@ -319,7 +319,7 @@ fn main() {
     let matches = parse_args();
     let pid: pid_t = matches.value_of("PID").unwrap().parse().unwrap();
     let command = matches.value_of("COMMAND").unwrap();
-    if command.clone() != "top" && command.clone() != "stackcollapse" {
+    if command.clone() != "top" && command.clone() != "stackcollapse" && command.clone() != "parse" {
         println!("COMMAND must be 'top' or 'stackcollapse. Try again!");
         process::exit(1);
     }
@@ -328,7 +328,9 @@ fn main() {
     let lookup_table = create_lookup_table(&entries);
     let ruby_current_thread_address_location: u64 = get_ruby_current_thread_address(pid);
 
-    if command == "stackcollapse" {
+    if command == "parse" {
+        return;
+    } else if command == "stackcollapse" {
         // This gets a stack trace and then just prints it out
         // in a format that Brendan Gregg's stackcollapse.pl script understands
         loop {
