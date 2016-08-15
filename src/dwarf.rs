@@ -1,10 +1,16 @@
 extern crate rand;
 extern crate leb128;
+extern crate fnv;
 
 use gimli;
+use std::hash::BuildHasherDefault;
+use fnv::FnvHasher;
 use byteorder::{NativeEndian, ReadBytesExt};
 use std::collections::HashMap;
 use std::io::Cursor;
+
+type HashMapFnv<K, V> = HashMap<K, V, BuildHasherDefault<FnvHasher>>;
+
 
 fn get_attr_name<Endian>(die: &gimli::DebuggingInformationEntry<Endian>, debug_str: gimli::DebugStr<Endian>) -> Option<String>
 where Endian: gimli::Endianity 
@@ -133,8 +139,8 @@ pub struct Entry {
 
 
 pub struct DwarfLookup<'a> {
-    lookup_table: HashMap<(usize, u32), &'a Entry>, 
-    name_lookup: HashMap<String, (usize, u32)>,
+    lookup_table: HashMapFnv<(usize, u32), &'a Entry>, 
+    name_lookup: HashMapFnv<String, (usize, u32)>,
 }
 
 impl<'a> DwarfLookup<'a> {
@@ -161,8 +167,8 @@ impl<'a> DwarfLookup<'a> {
 
 
 pub fn create_lookup_table(root_entries: &Vec<Entry>) -> DwarfLookup {
-    let mut lookup_table = HashMap::new();
-    let mut name_lookup = HashMap::new();
+    let mut lookup_table = HashMapFnv::default();
+    let mut name_lookup = HashMapFnv::default();
     for root_entry in root_entries.iter() {
         index_entry(&mut lookup_table, root_entry);
         index_name(&mut name_lookup, root_entry);
@@ -251,14 +257,14 @@ fn get_all_entries<Endian>(file: obj::File)  -> Vec<Entry>
     root_entries
 }
 
-fn index_entry<'a>(lookup_table: &mut HashMap<(usize, u32), &'a Entry>, entry: &'a Entry) {
+fn index_entry<'a>(lookup_table: &mut HashMapFnv<(usize, u32), &'a Entry>, entry: &'a Entry) {
     lookup_table.insert((entry.id, entry.group_id), entry);
     for child in entry.children.iter() {
         index_entry(lookup_table, child);
     }
 }
 
-fn index_name(name_lookup: &mut HashMap<String, (usize, u32)>, entry: &Entry) {
+fn index_name(name_lookup: &mut HashMapFnv<String, (usize, u32)>, entry: &Entry) {
     let name2 = entry.name.clone();
     if let Some(name) = name2 {
        if !name_lookup.contains_key(&name) {

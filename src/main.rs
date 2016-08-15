@@ -2,6 +2,7 @@ extern crate libc;
 extern crate regex;
 extern crate term;
 extern crate gimli;
+extern crate fnv;
 
 extern crate clap;
 extern crate byteorder;
@@ -197,7 +198,7 @@ fn map_bytes_to_struct<'a>(
                 let name = entry.name.clone().unwrap_or("unknownnnn".to_string());
                 let offset = entry.offset.unwrap() as usize;
                 let b = bytes[offset..offset + size].to_vec();
-                struct_map.insert(name, b.to_vec());
+                struct_map.insert(name, b);
             }
         }
     }
