@@ -1,6 +1,4 @@
 *.o
-perf-syscall
-write-syscall
-look-at-rubytarget
 Cargo.lock
 target
+*.rb
