@@ -328,3 +328,35 @@ mod obj {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Entry, create_lookup_table};
+    use gimli;
+
+    static DEBUG_INFO: &'static [u8] = include_bytes!("../testdata/debug_info");
+    static DEBUG_ABBREV: &'static [u8] = include_bytes!("../testdata/debug_abbrev");
+    static DEBUG_STR: &'static [u8] = include_bytes!("../testdata/debug_str");
+
+    fn get_all_entries() -> Vec<Entry> {
+        super::get_all_entries::<gimli::LittleEndian>(DEBUG_INFO, DEBUG_ABBREV, DEBUG_STR)
+    }
+
+    #[test]
+    fn test_get_all_entries() {
+        let entries = get_all_entries();
+        assert!(!entries.is_empty());
+    }
+
+    #[test]
+    fn test_dwarf_lookup() {
+        let entries = get_all_entries();
+
+        let dwarf_lookup = create_lookup_table(&entries);
+
+        let rb_thread_struct = dwarf_lookup.lookup_thing("rb_thread_struct");
+        assert!(rb_thread_struct.is_some());
+
+        assert!(rb_thread_struct.unwrap().children.iter().any(|e| e.name == Some("stack_size".to_string())));
+    }
+}
