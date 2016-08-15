@@ -2,3 +2,4 @@
 Cargo.lock
 target
 *.rb
+.ruby-version
