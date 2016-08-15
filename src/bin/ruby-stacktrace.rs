@@ -1,11 +1,9 @@
-extern crate libc;
 extern crate regex;
-extern crate term;
-extern crate gimli;
-extern crate fnv;
-
-extern crate clap;
+extern crate libc;
+extern crate ruby_stacktrace;
 extern crate byteorder;
+extern crate clap;
+
 use clap::{Arg, App, ArgMatches};
 use libc::*;
 use std::process;
@@ -16,11 +14,11 @@ use std::ffi::{OsString, CStr};
 use std::process::Command;
 use std::process::Stdio;
 use regex::Regex;
-pub mod dwarf;
 use byteorder::{NativeEndian, ReadBytesExt};
 use std::io::Cursor;
-use dwarf::{create_lookup_table, get_dwarf_entries, DwarfLookup, Entry};
 use std::collections::HashMap;
+
+use ruby_stacktrace::dwarf::{create_lookup_table, get_dwarf_entries, DwarfLookup, Entry};
 
 static mut READ_EVER_SUCCEEDED: bool = false;
 

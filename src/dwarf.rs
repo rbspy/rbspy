@@ -1,7 +1,5 @@
-extern crate rand;
-extern crate leb128;
-extern crate fnv;
-
+use leb128;
+use rand;
 use gimli;
 use std::hash::BuildHasherDefault;
 use fnv::FnvHasher;
@@ -230,7 +228,7 @@ fn make_into_tree(vec: &[(isize, Entry)]) -> Entry {
 }
 
 
-fn get_all_entries<Endian>(debug_info: &[u8],
+pub fn get_all_entries<Endian>(debug_info: &[u8],
                            debug_abbrev: &[u8],
                            debug_str: &[u8]) -> Vec<Entry>
     where Endian: gimli::Endianity
