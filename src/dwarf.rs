@@ -230,29 +230,27 @@ fn make_into_tree(vec: &[(isize, Entry)]) -> Entry {
 }
 
 
-fn get_all_entries<Endian>(file: obj::File)  -> Vec<Entry>
+fn get_all_entries<Endian>(debug_info: &[u8],
+                           debug_abbrev: &[u8],
+                           debug_str: &[u8]) -> Vec<Entry>
     where Endian: gimli::Endianity
 {
-    let debug_abbrev = obj::get_section(&file, ".debug_abbrev")
-        .expect("Does not have .debug_abbrev section");
-    let debug_str = obj::get_section(&file, ".debug_str")
-        .expect("Does not have .debug_str section");
-    let debug_str = gimli::DebugStr::<Endian>::new(debug_str);
+    let debug_info = gimli::DebugInfo::<Endian>::new(&debug_info);
     let debug_abbrev = gimli::DebugAbbrev::<Endian>::new(debug_abbrev);
-    let mut root_entries = vec![];
-    if let Some(debug_info) = obj::get_section(&file, ".debug_info") {
-        let debug_info = gimli::DebugInfo::<Endian>::new(&debug_info);
-        for unit in debug_info.units() {
-            let group_id = rand::random::<u32>();
-            let unit = unit.expect("Should parse the unit OK");
+    let debug_str = gimli::DebugStr::<Endian>::new(debug_str);
 
-            let abbrevs = unit.abbreviations(debug_abbrev)
-                .expect("Error parsing abbreviations");
-            let vec = get_entry_list(unit.entries(&abbrevs), group_id, debug_str);
-            let entry = make_into_tree(vec.as_slice());
-            // println!("{:#?}", entry);
-            root_entries.push(entry);
-        }
+    let mut root_entries = vec![];
+
+    for unit in debug_info.units() {
+       let group_id = rand::random::<u32>();
+       let unit = unit.expect("Should parse the unit OK");
+
+       let abbrevs = unit.abbreviations(debug_abbrev)
+          .expect("Error parsing abbreviations");
+       let vec = get_entry_list(unit.entries(&abbrevs), group_id, debug_str);
+       let entry = make_into_tree(vec.as_slice());
+       // println!("{:#?}", entry);
+       root_entries.push(entry);
     }
     root_entries
 }
@@ -280,10 +278,18 @@ fn index_name(name_lookup: &mut HashMapFnv<String, (usize, u32)>, entry: &Entry)
 pub fn get_dwarf_entries(pid: usize) -> Vec<Entry> {
     let file_path = format!("/proc/{}/exe", pid);
     let file = obj::open(&file_path);
+
+    let debug_info = obj::get_section(&file, ".debug_info")
+        .expect("Does not have .debug_info section");
+    let debug_abbrev = obj::get_section(&file, ".debug_abbrev")
+        .expect("Does not have .debug_abbrev section");
+    let debug_str = obj::get_section(&file, ".debug_str")
+        .expect("Does not have .debug_str section");
+
     if obj::is_little_endian(&file) {
-        get_all_entries::<gimli::LittleEndian>(file)
+        get_all_entries::<gimli::LittleEndian>(debug_info, debug_abbrev, debug_str)
     } else {
-        get_all_entries::<gimli::BigEndian>(file)
+        get_all_entries::<gimli::BigEndian>(debug_info, debug_abbrev, debug_str)
     }
 }
 
