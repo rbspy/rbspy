@@ -1,8 +1,11 @@
+#[macro_use] extern crate log;
+
 extern crate regex;
 extern crate libc;
 extern crate ruby_stacktrace;
 extern crate byteorder;
 extern crate clap;
+extern crate env_logger;
 
 use clap::{Arg, App, ArgMatches};
 use libc::*;
@@ -89,7 +92,9 @@ fn get_nm_address(pid: pid_t) -> u64 {
         process::exit(1)
     });
     let address_str = cap.at(1).unwrap();
-    u64::from_str_radix(address_str, 16).unwrap()
+    let addr = u64::from_str_radix(address_str, 16).unwrap();
+    debug!("get_nm_address: {:x}", addr);
+    addr
 }
 
 fn get_maps_address(pid: pid_t) -> u64 {
@@ -104,7 +109,9 @@ fn get_maps_address(pid: pid_t) -> u64 {
     let re = Regex::new(r"(\w+).+xp.+?bin/ruby").unwrap();
     let cap = re.captures(&output).unwrap();
     let address_str = cap.at(1).unwrap();
-    u64::from_str_radix(address_str, 16).unwrap()
+    let addr = u64::from_str_radix(address_str, 16).unwrap();
+    debug!("get_maps_address: {:x}", addr);
+    addr
 }
 
 fn get_ruby_current_thread_address(pid: pid_t) -> u64 {
@@ -115,7 +122,9 @@ fn get_ruby_current_thread_address(pid: pid_t) -> u64 {
     // addresses together we get our answers! All this is Linux-specific but
     // this program only works on Linux anyway because of process_vm_readv.
     //
-    get_nm_address(pid) + get_maps_address(pid)
+    let addr = get_nm_address(pid) + get_maps_address(pid);
+    debug!("get_ruby_current_thread_address: {:x}", addr);
+    addr
 }
 
 fn print_method_stats(method_stats: &HashMap<String, u32>,
@@ -331,6 +340,8 @@ fn get_stack_trace(ruby_current_thread_address_location: u64, pid: pid_t, lookup
 }
 
 fn main() {
+    env_logger::init().unwrap();
+
     let matches = parse_args();
     let pid: pid_t = matches.value_of("PID").unwrap().parse().unwrap();
     let command = matches.value_of("COMMAND").unwrap();

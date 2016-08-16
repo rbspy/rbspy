@@ -14,3 +14,5 @@ rand = "0.3"
 fnv = "1.0.3"
 gimli={git="https://github.com/fitzgen/gimli.git"}
 elf = "0.0.9"
+log = "0.3.6"
+env_logger = "0.3.4"
