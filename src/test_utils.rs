@@ -1,12 +1,30 @@
 #![cfg(test)]
 
 extern crate elf;
+extern crate flate2;
 
-use std::io;
+use std::fs::File;
+use std::io::{self, Cursor, Read};
+
+use self::flate2::read::GzDecoder;
 
 use libc;
 
 use CopyAddress;
+
+
+const COREDUMP_FILE: &'static str = concat!(env!("CARGO_MANIFEST_DIR"),
+                                            "/testdata/ruby-coredump.14341.gz");
+
+lazy_static! {
+    pub static ref COREDUMP: CoreDump = {
+        let file = File::open(COREDUMP_FILE).unwrap();
+        let mut buf = vec![];
+        GzDecoder::new(file).unwrap().read_to_end(&mut buf).unwrap();
+
+        CoreDump::from(elf::File::open_stream(&mut Cursor::new(buf)).unwrap())
+    };
+}
 
 /// Allows testing offline with a core dump of a Ruby process.
 pub struct CoreDump {
@@ -40,15 +58,10 @@ impl CopyAddress for CoreDump {
 #[cfg(test)]
 mod tests {
     extern crate byteorder;
-    extern crate elf;
-    extern crate flate2;
 
-    use std::fs::File;
-    use std::io::{Cursor, Read};
     use std::mem;
 
     use byteorder::{ReadBytesExt, LittleEndian};
-    use self::flate2::read::GzDecoder;
 
     use CopyAddress;
 
@@ -58,19 +71,11 @@ mod tests {
     const RUBY_CURRENT_THREAD_ADDR: usize = 0x55f35c094040;
     const RUBY_CURRENT_THREAD_VAL: usize = 0x55f35cb765c0;
 
-    const COREDUMP_FILE: &'static str = concat!(env!("CARGO_MANIFEST_DIR"),
-                                                "/testdata/ruby-coredump.14341.gz");
-
     #[test]
     fn test_get_ruby_current_thread() {
-        let file = File::open(COREDUMP_FILE).unwrap();
-        let mut buf = vec![];
-        GzDecoder::new(file).unwrap().read_to_end(&mut buf).unwrap();
-
-        let coredump = CoreDump::from(elf::File::open_stream(&mut Cursor::new(buf)).unwrap());
 
         let mut buf = vec![0u8; mem::size_of::<usize>()];
-        coredump.copy_address(RUBY_CURRENT_THREAD_ADDR, &mut buf).unwrap();
+        COREDUMP.copy_address(RUBY_CURRENT_THREAD_ADDR, &mut buf).unwrap();
         assert_eq!(RUBY_CURRENT_THREAD_VAL,
                    buf.as_slice().read_u64::<LittleEndian>().unwrap() as usize);
     }
