@@ -28,6 +28,8 @@ use dwarf::{DwarfLookup, Entry};
 
 static mut READ_EVER_SUCCEEDED: bool = false;
 
+#[cfg(test)]
+pub mod test_utils;
 
 pub trait CopyAddress {
     fn copy_address(&self, addr: usize, buf: &mut [u8]) -> io::Result<()>;
