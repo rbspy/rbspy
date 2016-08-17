@@ -201,6 +201,8 @@ fn parse_args() -> ArgMatches<'static> {
 }
 
 
+// Some field types are typedef DIEs, which have no size information. This traverses through
+// typedefs in an attempt to find the type DIE of the actual type, which does have a size.
 fn get_size(lookup_table: &DwarfLookup, entry: &Entry) -> Option<usize> {
     let mut current_entry: &Entry = entry;
     while current_entry.byte_size == None {
