@@ -331,10 +331,7 @@ mod obj {
 mod tests {
     use super::{Entry, create_lookup_table};
     use gimli;
-
-    static DEBUG_INFO: &'static [u8] = include_bytes!("../testdata/debug_info");
-    static DEBUG_ABBREV: &'static [u8] = include_bytes!("../testdata/debug_abbrev");
-    static DEBUG_STR: &'static [u8] = include_bytes!("../testdata/debug_str");
+    use test_utils::data::{DEBUG_INFO, DEBUG_ABBREV, DEBUG_STR};
 
     fn get_all_entries() -> Vec<Entry> {
         super::get_all_entries::<gimli::LittleEndian>(DEBUG_INFO, DEBUG_ABBREV, DEBUG_STR)
