@@ -18,40 +18,70 @@ use std::process::Command;
 use std::process::Stdio;
 use regex::Regex;
 use byteorder::{NativeEndian, ReadBytesExt};
-use std::io::Cursor;
+use std::io::{self, Cursor};
 use std::collections::HashMap;
 
 use ruby_stacktrace::dwarf::{create_lookup_table, get_dwarf_entries, DwarfLookup, Entry};
 
 static mut READ_EVER_SUCCEEDED: bool = false;
 
-fn copy_address_raw(addr: *const c_void, length: usize, pid: pid_t) -> Vec<u8> {
+
+trait CopyAddress {
+    fn copy_address(&self, addr: usize, buf: &mut [u8]) -> io::Result<()>;
+}
+
+struct Process {
+    pid: pid_t,
+}
+
+impl Process {
+    fn new(pid: pid_t) -> Process {
+        Process {
+            pid: pid,
+        }
+    }
+}
+
+impl CopyAddress for Process {
+    fn copy_address(&self, addr: usize, buf: &mut [u8]) -> io::Result<()> {
+        let local_iov = iovec {
+            iov_base: buf.as_mut_ptr() as *mut c_void,
+            iov_len: buf.len(),
+        };
+        let remote_iov = iovec {
+            iov_base: addr as *mut c_void,
+            iov_len: buf.len(),
+        };
+        unsafe {
+            let result = process_vm_readv(self.pid, &local_iov, 1, &remote_iov, 1, 0);
+            if result == -1 {
+                if !READ_EVER_SUCCEEDED {
+                    println!("Failed to read from pid {}. Are you root?", self.pid);
+                    process::exit(1);
+                } else {
+                    return Err(io::Error::last_os_error());
+                }
+            }
+            READ_EVER_SUCCEEDED = true;
+        }
+        Ok(())
+    }
+}
+
+fn copy_address_raw<T>(addr: *const c_void, length: usize, source: &T) -> Vec<u8>
+    where T: CopyAddress
+{
     if length > 100000 {
         // something very unusual has happened.
         // Do not respect requests for huge amounts of memory.
         return Vec::new();
     }
-    let mut copy: Vec<u8> = unsafe {
-        let mut vec = Vec::with_capacity(length);
-        vec.set_len(length);
-        vec
-    };
-    let local_iov = iovec {
-        iov_base: copy.as_mut_ptr() as *mut c_void,
-        iov_len: length,
-    };
-    let remote_iov = iovec {
-        iov_base: addr as *mut c_void,
-        iov_len: length,
-    };
-    unsafe {
-        let result = process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
-        if result == -1 && !READ_EVER_SUCCEEDED {
-            println!("Failed to read from pid {}. Are you root?", pid);
-            process::exit(1);
-        }
-        READ_EVER_SUCCEEDED = true;
+    let mut copy = vec![0; length];
+
+    if source.copy_address(addr as usize, &mut copy).is_err() {
+        warn!("copy_address failed for {:p}", addr);
     }
+
     copy
 }
 
@@ -184,11 +214,13 @@ fn get_size(lookup_table: &DwarfLookup, entry: &Entry) -> Option<usize> {
     return current_entry.byte_size
 }
 
-unsafe fn copy_address_dynamic<'a>(
+unsafe fn copy_address_dynamic<'a, T>(
         addr: *const c_void, lookup_table: &DwarfLookup,
-        pid: pid_t, dwarf_type: &Entry) -> HashMap<String, Vec<u8>> {
+        source: &T, dwarf_type: &Entry) -> HashMap<String, Vec<u8>>
+    where T: CopyAddress
+{
     let size = dwarf_type.byte_size.unwrap() + 200; // todo: is a hack
-    let bytes = copy_address_raw(addr as *mut c_void, size, pid);
+    let bytes = copy_address_raw(addr as *mut c_void, size, source);
     map_bytes_to_struct(&bytes, lookup_table, dwarf_type)
 }
 
@@ -227,9 +259,11 @@ fn get_child<'a>(entry: &'a Entry, name: &'a str) -> Option<&'a Entry>{
     None
 }
 
-fn get_ruby_string2(addr: u64, pid: pid_t, lookup_table: &DwarfLookup, types: &DwarfTypes) -> OsString {
+fn get_ruby_string2<T>(addr: u64, source: &T, lookup_table: &DwarfLookup, types: &DwarfTypes) -> OsString
+    where T: CopyAddress
+{
      let vec = unsafe {
-        let rstring = copy_address_dynamic(addr as *const c_void, lookup_table, pid, &types.rstring);
+        let rstring = copy_address_dynamic(addr as *const c_void, lookup_table, source, &types.rstring);
         let basic =  map_bytes_to_struct(&rstring["basic"], lookup_table, &types.rbasic);
         let is_array = (read_pointer_address(&basic["flags"]) & 1 << 13) == 0;
         if is_array  {
@@ -248,7 +282,7 @@ fn get_ruby_string2(addr: u64, pid: pid_t, lookup_table: &DwarfLookup, types: &D
             copy_address_raw(
                 read_pointer_address(&hashmap["ptr"]) as *const c_void,
                 read_pointer_address(&hashmap["len"]) as usize,
-                pid)
+                source)
         }
     };
     OsString::from_vec(vec)   
@@ -276,18 +310,20 @@ fn get_types(lookup_table: &DwarfLookup) -> DwarfTypes {
     }
 }
 
-unsafe fn get_label_and_path(cfp_bytes: &Vec<u8>, pid: pid_t, lookup_table: &DwarfLookup, types: &DwarfTypes) -> Option<(OsString, OsString)> {
+unsafe fn get_label_and_path<T>(cfp_bytes: &Vec<u8>, source: &T, lookup_table: &DwarfLookup, types: &DwarfTypes) -> Option<(OsString, OsString)>
+    where T: CopyAddress
+{
     let blah2 = map_bytes_to_struct(&cfp_bytes, &lookup_table, &types.rb_control_frame_struct);
     // println!("{:?}", blah2);
     let iseq_address = read_pointer_address(&blah2["iseq"]);
-    let blah3 = copy_address_dynamic(iseq_address as *const c_void, &lookup_table, pid, &types.rb_iseq_struct);
+    let blah3 = copy_address_dynamic(iseq_address as *const c_void, &lookup_table, source, &types.rb_iseq_struct);
     let location = if blah3.contains_key("location") {
         map_bytes_to_struct(&blah3["location"], &lookup_table, &types.rb_iseq_location_struct)
     } else if blah3.contains_key("body") {
         let body = read_pointer_address(&blah3["body"]);
         match types.rb_iseq_constant_body {
             Some(ref constant_body_type) => {
-                let blah4 = copy_address_dynamic(body as *const c_void, &lookup_table, pid, &constant_body_type);
+                let blah4 = copy_address_dynamic(body as *const c_void, &lookup_table, source, &constant_body_type);
                 map_bytes_to_struct(&blah4["location"], &lookup_table, &types.rb_iseq_location_struct)
             }
             None => panic!("rb_iseq_constant_body shouldn't be missing"),
@@ -297,8 +333,8 @@ unsafe fn get_label_and_path(cfp_bytes: &Vec<u8>, pid: pid_t, lookup_table: &Dwa
     };
     let label_address = read_pointer_address(&location["label"]);
     let path_address = read_pointer_address(&location["path"]);
-    let label = get_ruby_string2(label_address, pid, lookup_table, types);
-    let path = get_ruby_string2(path_address, pid, lookup_table, types);
+    let label = get_ruby_string2(label_address, source, lookup_table, types);
+    let path = get_ruby_string2(path_address, source, lookup_table, types);
     if path.to_string_lossy() == "" {
         return None;
     }
@@ -307,23 +343,27 @@ unsafe fn get_label_and_path(cfp_bytes: &Vec<u8>, pid: pid_t, lookup_table: &Dwa
     Some((label, path))
 }
 
-unsafe fn get_cfps(ruby_current_thread_address_location: u64, pid: pid_t, lookup_table: &DwarfLookup, types: &DwarfTypes) -> (Vec<u8>, usize) {
-    let ruby_current_thread_address: u64 = read_pointer_address(&copy_address_raw(ruby_current_thread_address_location as *const c_void, 8, pid));
-    let blah = copy_address_dynamic(ruby_current_thread_address as *const c_void, &lookup_table, pid, &types.rb_thread_struct);
+unsafe fn get_cfps<T>(ruby_current_thread_address_location: u64, source: &T, lookup_table: &DwarfLookup, types: &DwarfTypes) -> (Vec<u8>, usize)
+    where T: CopyAddress
+{
+    let ruby_current_thread_address: u64 = read_pointer_address(&copy_address_raw(ruby_current_thread_address_location as *const c_void, 8, source));
+    let blah = copy_address_dynamic(ruby_current_thread_address as *const c_void, &lookup_table, source, &types.rb_thread_struct);
     // println!("{:?}", blah);
     let cfp_address = read_pointer_address(&blah["cfp"]);
     let ref cfp_struct = types.rb_control_frame_struct;
     let cfp_size = cfp_struct.byte_size.unwrap();
-    (copy_address_raw(cfp_address as *const c_void, cfp_size * 100, pid), cfp_size)
+    (copy_address_raw(cfp_address as *const c_void, cfp_size * 100, source), cfp_size)
 }
 
-fn get_stack_trace(ruby_current_thread_address_location: u64, pid: pid_t, lookup_table: &DwarfLookup, types: &DwarfTypes) -> Vec<String> {
+fn get_stack_trace<T>(ruby_current_thread_address_location: u64, source: &T, lookup_table: &DwarfLookup, types: &DwarfTypes) -> Vec<String>
+    where T: CopyAddress
+{
     unsafe {
 
-    let (cfp_bytes, cfp_size) = get_cfps(ruby_current_thread_address_location, pid, lookup_table, types);
+    let (cfp_bytes, cfp_size) = get_cfps(ruby_current_thread_address_location, source, lookup_table, types);
     let mut trace: Vec<String> = Vec::new();
     for i in 0..100 {
-        match get_label_and_path(&cfp_bytes[(cfp_size*i)..].to_vec(), pid, lookup_table, types) {
+        match get_label_and_path(&cfp_bytes[(cfp_size*i)..].to_vec(), source, lookup_table, types) {
             None => continue,
             Some((label, path)) => {
                 let current_location = 
@@ -345,6 +385,7 @@ fn main() {
     let matches = parse_args();
     let pid: pid_t = matches.value_of("PID").unwrap().parse().unwrap();
     let command = matches.value_of("COMMAND").unwrap();
+    let source = Process::new(pid);
     if command.clone() != "top" && command.clone() != "stackcollapse" && command.clone() != "parse" {
         println!("COMMAND must be 'top' or 'stackcollapse. Try again!");
         process::exit(1);
@@ -363,7 +404,7 @@ fn main() {
         // This gets a stack trace and then just prints it out
         // in a format that Brendan Gregg's stackcollapse.pl script understands
         loop {
-            let trace = get_stack_trace(ruby_current_thread_address_location, pid, &lookup_table, &types);
+            let trace = get_stack_trace(ruby_current_thread_address_location, &source, &lookup_table, &types);
             print_stack_trace(&trace);
             thread::sleep(Duration::from_millis(10));
         }
@@ -376,7 +417,7 @@ fn main() {
         let mut j = 0;
         loop {
             j += 1;
-            let trace = get_stack_trace(ruby_current_thread_address_location, pid, &lookup_table, &types);
+            let trace = get_stack_trace(ruby_current_thread_address_location, &source, &lookup_table, &types);
             for item in &trace {
                 let counter = method_stats.entry(item.clone()).or_insert(0);
                 *counter += 1;
