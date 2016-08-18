@@ -210,9 +210,13 @@ unsafe fn copy_address_dynamic<'a, T>(
         source: &T, dwarf_type: &Entry) -> HashMap<String, Vec<u8>>
     where T: CopyAddress
 {
+    trace!("copy_address_dynamic {:p} {:?}", addr, dwarf_type.name);
     let size = dwarf_type.byte_size.unwrap() + 200; // todo: is a hack
     let bytes = copy_address_raw(addr as *mut c_void, size, source);
-    map_bytes_to_struct(&bytes, lookup_table, dwarf_type)
+    let ret = map_bytes_to_struct(&bytes, lookup_table, dwarf_type);
+
+    trace!("copy_address_dynamic return: {:?}", ret);
+    ret
 }
 
 fn map_bytes_to_struct<'a>(
