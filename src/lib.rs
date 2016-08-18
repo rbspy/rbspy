@@ -1,3 +1,4 @@
+#![cfg_attr(rustc_nightly, feature(test))]
 #[macro_use] extern crate log;
 
 #[cfg(test)]
@@ -447,5 +448,27 @@ mod tests {
                                           &TYPES);
         assert_eq!(stack_trace.len(), 6);
         assert!(stack_trace[0].starts_with("aaaaaaaaa"));
+    }
+
+    #[cfg(rustc_nightly)]
+    mod benches {
+        extern crate test;
+
+        use test_utils::data::{COREDUMP, RUBY_CURRENT_THREAD_ADDR};
+        use super::{LOOKUP, TYPES};
+
+        use get_stack_trace;
+
+        use self::test::Bencher;
+
+        #[bench]
+        fn bench_get_stack_trace(b: &mut Bencher) {
+            b.iter(|| {
+                let stack_trace = get_stack_trace(RUBY_CURRENT_THREAD_ADDR as u64,
+                                                  &*COREDUMP,
+                                                  &LOOKUP,
+                                                  &TYPES);
+            });
+        }
     }
 }
