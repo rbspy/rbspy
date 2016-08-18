@@ -343,6 +343,14 @@ unsafe fn get_label_and_path<T>(cfp_bytes: &Vec<u8>, source: &T, lookup_table: &
     ret
 }
 
+// Ruby stack grows down, starting at
+//   ruby_current_thread->stack + ruby_current_thread->stack_size - 1 * sizeof(rb_control_frame_t)
+// I don't know what the -1 is about. Also note that the stack_size is *not* in bytes! stack is a
+// VALUE*, and so stack_size is in units of sizeof(VALUE).
+//
+// The base of the call stack is therefore at
+//   stack + stack_size * sizeof(VALUE) - sizeof(rb_control_frame_t)
+// (with everything in bytes).
 unsafe fn get_cfps<T>(ruby_current_thread_address_location: u64, source: &T, lookup_table: &DwarfLookup, types: &DwarfTypes) -> (Vec<u8>, usize)
     where T: CopyAddress
 {
@@ -352,7 +360,18 @@ unsafe fn get_cfps<T>(ruby_current_thread_address_location: u64, source: &T, loo
     let cfp_address = read_pointer_address(&blah["cfp"]);
     let ref cfp_struct = types.rb_control_frame_struct;
     let cfp_size = cfp_struct.byte_size.unwrap();
-    (copy_address_raw(cfp_address as *const c_void, cfp_size * 100, source), cfp_size)
+
+    let stack = read_pointer_address(&blah["stack"]) as usize;
+    let stack_size = read_pointer_address(&blah["stack_size"]) as usize;
+    let value_size = get_size(lookup_table, lookup_table.lookup_thing("VALUE").unwrap()).unwrap();
+
+    let stack_base = stack + (stack_size) * value_size;
+    let stack_base = stack_base - 1 * cfp_size;
+
+    let ret = (copy_address_raw(cfp_address as *const c_void, stack_base - cfp_address as usize, source), cfp_size);
+
+    trace!("get_cfps ret ([{} bytes], {})", ret.0.len(), ret.1);
+    ret
 }
 
 pub fn get_stack_trace<T>(ruby_current_thread_address_location: u64, source: &T, lookup_table: &DwarfLookup, types: &DwarfTypes) -> Vec<String>
@@ -362,16 +381,13 @@ pub fn get_stack_trace<T>(ruby_current_thread_address_location: u64, source: &T,
 
     let (cfp_bytes, cfp_size) = get_cfps(ruby_current_thread_address_location, source, lookup_table, types);
     let mut trace: Vec<String> = Vec::new();
-    for i in 0..100 {
-        match get_label_and_path(&cfp_bytes[(cfp_size*i)..].to_vec(), source, lookup_table, types) {
+    for i in 0..cfp_bytes.len() / cfp_size {
+        match get_label_and_path(&cfp_bytes[(cfp_size*i)..cfp_size * (i+1)].to_vec(), source, lookup_table, types) {
             None => continue,
             Some((label, path)) => {
                 let current_location =
                     format!("{} : {}", label.to_string_lossy(), path.to_string_lossy()).to_string();
                 trace.push(current_location);
-                if label.to_string_lossy() == "<main>" {
-                    break;
-                }
             }
         }
     }
@@ -385,7 +401,8 @@ mod tests {
     extern crate env_logger;
     use gimli::LittleEndian;
 
-    use test_utils::data::{DEBUG_INFO, DEBUG_ABBREV, DEBUG_STR};
+    use test_utils::data::{COREDUMP, DEBUG_INFO, DEBUG_ABBREV,
+                           DEBUG_STR, RUBY_CURRENT_THREAD_ADDR};
     use dwarf::{DwarfLookup, Entry, get_all_entries, create_lookup_table};
 
     use super::{DwarfTypes, get_types, get_stack_trace};
@@ -418,5 +435,17 @@ mod tests {
         assert_eq!(types.rb_iseq_location_struct.name.unwrap(), "rb_iseq_location_struct");
         assert_eq!(types.rb_iseq_struct.name.unwrap(), "rb_iseq_struct");
         assert_eq!(types.rb_control_frame_struct.name.unwrap(), "rb_control_frame_struct");
+    }
+
+    #[test]
+    fn test_get_stack_trace() {
+        let _ = env_logger::init();
+
+        let stack_trace = get_stack_trace(RUBY_CURRENT_THREAD_ADDR as u64,
+                                          &*COREDUMP,
+                                          &LOOKUP,
+                                          &TYPES);
+        assert_eq!(stack_trace.len(), 6);
+        assert!(stack_trace[0].starts_with("aaaaaaaaa"));
     }
 }
