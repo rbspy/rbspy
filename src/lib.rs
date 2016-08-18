@@ -369,3 +369,45 @@ pub fn get_stack_trace<T>(ruby_current_thread_address_location: u64, source: &T,
     trace
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    extern crate env_logger;
+    use gimli::LittleEndian;
+
+    use test_utils::data::{DEBUG_INFO, DEBUG_ABBREV, DEBUG_STR};
+    use dwarf::{DwarfLookup, Entry, get_all_entries, create_lookup_table};
+
+    use super::{DwarfTypes, get_types, get_stack_trace};
+    
+    lazy_static! {
+        static ref ENTRIES: Vec<Entry> = {
+            get_all_entries::<LittleEndian>(DEBUG_INFO, DEBUG_ABBREV, DEBUG_STR)
+        };
+
+        static ref LOOKUP: DwarfLookup<'static> = {
+            create_lookup_table(&ENTRIES)
+        };
+
+        static ref TYPES: DwarfTypes = {
+            get_types(&LOOKUP)
+        };
+    }
+
+    #[test]
+    fn test_get_types() {
+        let _ = env_logger::init();
+
+        let types = get_types(&LOOKUP);
+
+        assert_eq!(types.rbasic.name.unwrap(), "RBasic");
+        assert_eq!(types.rstring.name.unwrap(), "RString");
+        assert_eq!(types.rb_thread_struct.name.unwrap(), "rb_thread_struct");
+        assert_eq!(types.rb_iseq_constant_body.unwrap().name.unwrap(),
+                   "rb_iseq_constant_body");
+        assert_eq!(types.rb_iseq_location_struct.name.unwrap(), "rb_iseq_location_struct");
+        assert_eq!(types.rb_iseq_struct.name.unwrap(), "rb_iseq_struct");
+        assert_eq!(types.rb_control_frame_struct.name.unwrap(), "rb_control_frame_struct");
+    }
+}

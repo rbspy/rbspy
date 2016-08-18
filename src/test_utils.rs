@@ -25,6 +25,8 @@ pub mod data {
     pub static DEBUG_ABBREV: &'static [u8] = include_bytes!("../testdata/debug_abbrev");
     pub static DEBUG_STR: &'static [u8] = include_bytes!("../testdata/debug_str");
 
+    pub const RUBY_CURRENT_THREAD_ADDR: usize = 0x55f35c094040;
+
     const COREDUMP_FILE: &'static str = concat!(env!("CARGO_MANIFEST_DIR"),
                                                 "/testdata/ruby-coredump.14341.gz");
 
