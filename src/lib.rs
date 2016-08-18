@@ -308,6 +308,7 @@ pub fn get_types(lookup_table: &DwarfLookup) -> DwarfTypes {
 unsafe fn get_label_and_path<T>(cfp_bytes: &Vec<u8>, source: &T, lookup_table: &DwarfLookup, types: &DwarfTypes) -> Option<(OsString, OsString)>
     where T: CopyAddress
 {
+    trace!("get_label_and_path {:?}", cfp_bytes);
     let blah2 = map_bytes_to_struct(&cfp_bytes, &lookup_table, &types.rb_control_frame_struct);
     // println!("{:?}", blah2);
     let iseq_address = read_pointer_address(&blah2["iseq"]);
@@ -331,11 +332,15 @@ unsafe fn get_label_and_path<T>(cfp_bytes: &Vec<u8>, source: &T, lookup_table: &
     let label = get_ruby_string2(label_address, source, lookup_table, types);
     let path = get_ruby_string2(path_address, source, lookup_table, types);
     if path.to_string_lossy() == "" {
+        trace!("get_label_and_path ret None");
         return None;
     }
     // println!("label_address: {}, path_address: {}", label_address, path_address);
     // println!("location hash: {:#?}", location);
-    Some((label, path))
+    let ret = Some((label, path));
+
+    trace!("get_label_and_path ret {:?}", ret);
+    ret
 }
 
 unsafe fn get_cfps<T>(ruby_current_thread_address_location: u64, source: &T, lookup_table: &DwarfLookup, types: &DwarfTypes) -> (Vec<u8>, usize)
