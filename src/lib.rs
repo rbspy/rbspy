@@ -32,7 +32,6 @@ use dwarf::{DwarfLookup, Entry};
 
 static mut READ_EVER_SUCCEEDED: bool = false;
 
-#[cfg(test)]
 pub mod test_utils;
 
 pub trait CopyAddress {

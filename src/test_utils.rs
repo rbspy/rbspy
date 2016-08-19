@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 extern crate elf;
 
 use std::io;
@@ -10,6 +8,7 @@ use CopyAddress;
 
 
 // Data for use in tests and benchmarks :-)
+#[cfg(test)]
 pub mod data {
     extern crate elf;
     extern crate flate2;
