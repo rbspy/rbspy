@@ -461,13 +461,16 @@ mod tests {
 
         use self::test::Bencher;
 
+        // At 5defba5:
+        // test tests::benches::bench_get_stack_trace ... bench:      86,612 ns/iter (+/- 17,621)
+
         #[bench]
         fn bench_get_stack_trace(b: &mut Bencher) {
             b.iter(|| {
-                let stack_trace = get_stack_trace(RUBY_CURRENT_THREAD_ADDR as u64,
-                                                  &*COREDUMP,
-                                                  &LOOKUP,
-                                                  &TYPES);
+                let _ = get_stack_trace(RUBY_CURRENT_THREAD_ADDR as u64,
+                                        &*COREDUMP,
+                                        &LOOKUP,
+                                        &TYPES);
             });
         }
     }
