@@ -183,7 +183,7 @@ pub fn print_method_stats(method_stats: &HashMap<String, u32>,
     }
 }
 
-pub fn print_stack_trace(trace: &Vec<String>) {
+pub fn print_stack_trace(trace: &[String]) {
     for x in trace {
         println!("{}", x);
     }
@@ -220,7 +220,7 @@ unsafe fn copy_address_dynamic<'a, T>(
 }
 
 fn map_bytes_to_struct<'a>(
-        bytes: &Vec<u8>,
+        bytes: &[u8],
         lookup_table: &DwarfLookup,
         dwarf_type: &Entry) -> HashMap<String, Vec<u8>> {
     // println!("{:#?}", dwarf_type);
@@ -240,7 +240,7 @@ fn map_bytes_to_struct<'a>(
 
 }
 
-fn read_pointer_address(vec: &Vec<u8>) -> u64 {
+fn read_pointer_address(vec: &[u8]) -> u64 {
     let mut rdr = Cursor::new(vec);
     rdr.read_u64::<NativeEndian>().unwrap()
 }
@@ -305,7 +305,7 @@ pub fn get_types(lookup_table: &DwarfLookup) -> DwarfTypes {
     }
 }
 
-unsafe fn get_label_and_path<T>(cfp_bytes: &Vec<u8>, source: &T, lookup_table: &DwarfLookup, types: &DwarfTypes) -> Option<(OsString, OsString)>
+unsafe fn get_label_and_path<T>(cfp_bytes: &[u8], source: &T, lookup_table: &DwarfLookup, types: &DwarfTypes) -> Option<(OsString, OsString)>
     where T: CopyAddress
 {
     trace!("get_label_and_path {:?}", cfp_bytes);
