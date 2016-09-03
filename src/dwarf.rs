@@ -410,7 +410,6 @@ mod obj {
             if !name.ends_with(".o") {
                 continue
             }
-            println!("Reading entries from '{}'", name);
 
             let file_entries = get_entries_from_file(buf);
             entries.extend(file_entries);
@@ -445,7 +444,7 @@ mod obj {
         let path = guess_ruby_path(pid);
 
         if path.extension().unwrap() == "a" {
-            println!("Using archive '{}'", path.to_str().unwrap());
+            debug!("Using archive '{}'", path.to_str().unwrap());
             get_archive_entries(path)
         } else {
             let file = open(path);
