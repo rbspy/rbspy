@@ -146,8 +146,9 @@ pub fn copy_address_raw<T>(addr: *const c_void, length: usize, source: &T) -> Ve
     }
     let mut copy = vec![0; length];
 
-    if source.copy_address(addr as usize, &mut copy).is_err() {
-        warn!("copy_address failed for {:p}", addr);
+    let res = source.copy_address(addr as usize, &mut copy);
+    if res.is_err() {
+        warn!("copy_address failed for {:p}: {:?}", addr, res.unwrap_err());
     }
 
     copy
