@@ -1,13 +1,23 @@
-### ruby-stacktrace
+# ruby-stacktrace
 
 Have you ever wanted to know what your Ruby program is doing?
 `ruby-stacktrace` can tell you! Maybe.
 
 **this is alpha, Linux-only software**. It will very likely crash. If it
-crashes, the rest of your system should be fine (it shouldn't crash your
-Ruby)
+crashes, the rest of your system should probably be fine (it shouldn't
+crash your Ruby). But I wouldn't totally swear that.
 
-### How to use it
+## Requirements
+
+1. Linux (It uses a Linux-only system call)
+2. A recent release of `ruby-stacktrace` (download from [here](https://github.com/jvns/ruby-stacktrace/releases))
+3. A Ruby version compiled with debugging symbols (check by running
+   `file` on your Ruby binary)
+
+I've tested this succesfully on Ruby versions 2.1.6 and 2.2.3. No
+promises though.
+
+## How to use it
 
 1. Download recent release of `ruby-stacktrace` (download from [here](https://github.com/jvns/ruby-stacktrace/releases))
 1. Find the PID of the Ruby process you want to investigate (like 7723)
@@ -22,17 +32,18 @@ If it crashes, you can file an issue and attach the Ruby binary for the
 process it couldn't spy on. I have approximately no time to fix issues,
 so I will probably not fix the bug. Pull requests are very welcome!
 
-### Requirements
+## Generating flamegraphs
 
-1. Linux (It uses a Linux-only system call)
-2. A recent release of `ruby-stacktrace` (download from [here](https://github.com/jvns/ruby-stacktrace/releases))
-3. A Ruby version compiled with debugging symbols (check by running
-   `file` on your Ruby binary)
+You can use this tool to generate flamegraphs for a running Ruby
+process. 
 
-I've tested this succesfully on Ruby versions 2.1.6 and 2.2.3. No
-promises though.
+1. Get the [FlameGraph repository](https://github.com/brendangregg/FlameGraph) and add it to your PATH
+1. Run `sudo ./ruby-stacktrace stackcollapse $PID > stacks` until you
+   get bored of collecting data
+1. run `stackcollapse.pl < stacks | flamegraph.pl > output.svg`
+1. Open output.svg! You should get a beautiful graph
 
-### Developing ruby-stacktrace
+## Developing ruby-stacktrace
 
 
 1. Install cargo from [crates.io](https://crates.io/)
@@ -42,7 +53,7 @@ promises though.
 
 The build artifacts will end up in `target/release`
 
-### Authors
+## Authors
 
 (in alphabetical order)
 
