@@ -22,7 +22,7 @@ promises though. It works on my computer and at least 2 other computers.
 1. Download recent release of `ruby-stacktrace` (download from [here](https://github.com/jvns/ruby-stacktrace/releases))
 1. Find the PID of the Ruby process you want to investigate (like 7723)
 1. run `sudo ./ruby-stacktrace top 7723`
-1. It'll either work (and tell you which functions are being the most)
+1. It'll either work (and tell you which functions are being called the most)
    or crash
 1. I would not run this on a production system today, but I don't know
    of any specific reason you shouldn't (other than that it's sketchy
