@@ -43,6 +43,12 @@ process.
 1. run `stackcollapse.pl < stacks | flamegraph.pl > output.svg`
 1. Open output.svg! You should get a beautiful graph
 
+<a href="http://jvns.ca/images/sampling.png"><img src="http://jvns.ca/images/sampling.png"></a>
+
+## How it works
+
+I wrote a blog post about the internals at [How to spy on a Ruby process](http://jvns.ca/blog/2016/06/12/a-weird-system-call-process-vm-readv/)
+
 ## Developing ruby-stacktrace
 
 
