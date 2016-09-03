@@ -176,8 +176,9 @@ pub fn copy_address_raw<T>(addr: *const c_void, length: usize, source: &T) -> Ve
 //
 
 fn get_nm_address(pid: pid_t) -> u64 {
+    let exe = dwarf::get_executable_path(pid as usize).unwrap();
     let nm_command = Command::new("nm")
-        .arg(format!("/proc/{}/exe", pid))
+        .arg(exe)
         .stdout(Stdio::piped())
         .stdin(Stdio::null())
         .stderr(Stdio::piped())

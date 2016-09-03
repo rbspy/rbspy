@@ -7,7 +7,7 @@ use byteorder::{NativeEndian, ReadBytesExt};
 use std::collections::HashMap;
 use std::io::Cursor;
 
-pub use self::obj::get_dwarf_entries;
+pub use self::obj::{get_executable_path, get_dwarf_entries};
 
 type HashMapFnv<K, V> = HashMap<K, V, BuildHasherDefault<FnvHasher>>;
 
@@ -278,13 +278,17 @@ mod obj {
     extern crate elf;
     use gimli;
 
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
     use super::Entry;
     use super::get_all_entries;
 
     /// The parsed object file type.
     type File = elf::File;
+
+    pub fn get_executable_path(pid: usize) -> Result<PathBuf, String> {
+        Ok(PathBuf::from(format!("/proc/{}/exe", pid)))
+    }
 
     pub fn get_dwarf_entries(pid: usize) -> Vec<Entry> {
         let file_path = format!("/proc/{}/exe", pid);
@@ -366,8 +370,7 @@ mod obj {
     /// executable binary. However there's often a `libruby-static.a` nearby
     /// in the file system that *does* have DWARF info in it.
     fn guess_ruby_path(pid: usize) -> PathBuf {
-        let exec_path = libproc::libproc::proc_pid::pidpath(pid as i32).expect("Could not look up path for PID");
-        let exec_path = PathBuf::from(&exec_path);
+        let exec_path = get_executable_path(pid).expect("Could not look up path for PID");
 
         let static_path = exec_path.join("../../lib/libruby-static.a").canonicalize()
             .expect("Could not guess libruby-static.a path");
@@ -382,7 +385,7 @@ mod obj {
     /// Scans a static archive (`.a` file in the semi-standard `ar` format)
     /// for `.o` object files. It then reads all the entries from each of
     /// those files.
-    pub fn get_archive_entries<P>(path: P) -> Vec<Entry>
+    fn get_archive_entries<P>(path: P) -> Vec<Entry>
         where P: AsRef<Path>
     {
         let builder = reader::Builder::new();
@@ -418,18 +421,6 @@ mod obj {
         entries
     }
 
-    pub fn get_dwarf_entries(pid: usize) -> Vec<Entry> {
-        let path = guess_ruby_path(pid);
-
-        if path.extension().unwrap() == "a" {
-            println!("Using archive '{}'", path.to_str().unwrap());
-            get_archive_entries(path)
-        } else {
-            let file = open(path);
-            get_entries_from_file(file)
-        }
-    }
-
     fn get_entries_from_file(file: Vec<u8>) -> Vec<Entry> {
         let file = object::File::parse(&file);
 
@@ -444,6 +435,23 @@ mod obj {
             get_all_entries::<gimli::LittleEndian>(debug_info, debug_abbrev, debug_str)
         } else {
             get_all_entries::<gimli::BigEndian>(debug_info, debug_abbrev, debug_str)
+        }
+    }
+
+    pub fn get_executable_path(pid: usize) -> Result<PathBuf, String> {
+        libproc::libproc::proc_pid::pidpath(pid as i32)
+            .map(|path| PathBuf::from(&path))
+    }
+
+    pub fn get_dwarf_entries(pid: usize) -> Vec<Entry> {
+        let path = guess_ruby_path(pid);
+
+        if path.extension().unwrap() == "a" {
+            println!("Using archive '{}'", path.to_str().unwrap());
+            get_archive_entries(path)
+        } else {
+            let file = open(path);
+            get_entries_from_file(file)
         }
     }
 }
