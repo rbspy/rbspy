@@ -203,6 +203,7 @@ fn get_nm_address(pid: pid_t) -> u64 {
     addr
 }
 
+#[cfg(target_os="linux")]
 fn get_maps_address(pid: pid_t) -> u64 {
     let cat_command = Command::new("cat")
         .arg(format!("/proc/{}/maps", pid))
@@ -218,6 +219,37 @@ fn get_maps_address(pid: pid_t) -> u64 {
     let output = String::from_utf8(cat_command.stdout).unwrap();
     let re = Regex::new(r"(\w+).+xp.+?bin/ruby").unwrap();
     let cap = re.captures(&output).unwrap();
+    let address_str = cap.at(1).unwrap();
+    let addr = u64::from_str_radix(address_str, 16).unwrap();
+    debug!("get_maps_address: {:x}", addr);
+    addr
+}
+
+use std::iter::Iterator;
+
+#[cfg(target_os="macos")]
+fn get_maps_address(pid: pid_t) -> u64 {
+    let vmmap_command = Command::new("vmmap")
+        .arg(format!("{}", pid))
+        .stdout(Stdio::piped())
+        .stdin(Stdio::null())
+        .stderr(Stdio::piped())
+        .output()
+        .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
+    if !vmmap_command.status.success() {
+        panic!("failed to execute process: {}", String::from_utf8(vmmap_command.stderr).unwrap())
+    }
+
+    let output = String::from_utf8(vmmap_command.stdout).unwrap();
+
+    let lines: Vec<&str> = output.split("\n")
+        .filter(|line| line.contains("bin/ruby"))
+        .filter(|line| line.contains("__TEXT"))
+        .collect();
+    let line = lines.first().expect("No `__TEXT` line found for `bin/ruby` in vmmap output");
+
+    let re = Regex::new(r"([0-9a-f]+)").unwrap();
+    let cap = re.captures(&line).unwrap();
     let address_str = cap.at(1).unwrap();
     let addr = u64::from_str_radix(address_str, 16).unwrap();
     debug!("get_maps_address: {:x}", addr);
