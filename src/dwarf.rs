@@ -11,7 +11,7 @@ type HashMapFnv<K, V> = HashMap<K, V, BuildHasherDefault<FnvHasher>>;
 
 
 fn get_attr_name<Endian>(die: &gimli::DebuggingInformationEntry<Endian>, debug_str: gimli::DebugStr<Endian>) -> Option<String>
-where Endian: gimli::Endianity 
+where Endian: gimli::Endianity
 {
     let mut attrs = die.attrs();
     while let Some(attr) = attrs.next().expect("Should parse attribute OK") {
@@ -35,7 +35,7 @@ where Endian: gimli::Endianity
             },
             _ => continue,
         }
-    } 
+    }
     None
 }
 
@@ -45,7 +45,7 @@ fn read_pointer_address(vec: &[u8]) -> usize {
 }
 
 fn get_attr_byte_size<Endian>(die: &gimli::DebuggingInformationEntry<Endian>) -> Option<usize>
-where Endian: gimli::Endianity 
+where Endian: gimli::Endianity
 {
     let mut attrs = die.attrs();
     while let Some(attr) = attrs.next().expect("Should parse attribute OK") {
@@ -57,12 +57,12 @@ where Endian: gimli::Endianity
             },
             _ => continue,
         }
-    } 
+    }
     None
 }
 
 fn get_attr_type<Endian>(die: &gimli::DebuggingInformationEntry<Endian>) -> Option<usize>
-where Endian: gimli::Endianity 
+where Endian: gimli::Endianity
 {
     let mut attrs = die.attrs();
     while let Some(attr) = attrs.next().expect("Should parse attribute OK") {
@@ -74,13 +74,13 @@ where Endian: gimli::Endianity
             },
             _ => continue,
         }
-    } 
+    }
     None
 }
 
 
 fn get_data_member_location<Endian>(die: &gimli::DebuggingInformationEntry<Endian>) -> Option<usize>
-where Endian: gimli::Endianity 
+where Endian: gimli::Endianity
 {
     let mut attrs = die.attrs();
     while let Some(attr) = attrs.next().expect("Should parse attribute OK") {
@@ -105,7 +105,7 @@ where Endian: gimli::Endianity
 
 fn get_entry_list<Endian>(mut entries: gimli::EntriesCursor<Endian>, group_id: u32, debug_str: gimli::DebugStr<Endian>) -> Vec<(isize, Entry)>
     where Endian: gimli::Endianity
-{ 
+{
     let mut vec: Vec<(isize, Entry)> = Vec::new();
     while let Some((delta_depth, die)) = entries.next_dfs().expect("Should parse next dfs") {
         let entry = Entry {
@@ -137,7 +137,7 @@ pub struct Entry {
 
 
 pub struct DwarfLookup<'a> {
-    lookup_table: HashMapFnv<(usize, u32), &'a Entry>, 
+    lookup_table: HashMapFnv<(usize, u32), &'a Entry>,
     name_lookup: HashMapFnv<String, (usize, u32)>,
 }
 
