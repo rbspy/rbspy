@@ -29,8 +29,10 @@ promises though. It works on my computer and at least 2 other computers.
    alpha software)
 
 If it crashes, you can file an issue and attach the Ruby binary for the
-process it couldn't spy on. I have approximately no time to fix issues,
-so I will probably not fix the bug. Pull requests are very welcome!
+process it couldn't spy on. I will read all the issues and help if I
+can! Especially if it's just that something in this README is explained
+poorly. I have approximately no time to fix issues, so I will probably
+not fix the bug. Pull requests are very welcome!
 
 ## Generating flamegraphs
 
