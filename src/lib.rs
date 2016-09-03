@@ -96,21 +96,24 @@ mod platform {
     use self::mach::vm_types::{mach_vm_address_t, mach_vm_size_t};
     use self::mach::message::{mach_msg_type_number_t};
     use std::io;
+    use std::ptr;
+    use std::slice;
 
     use super::{CopyAddress, Process};
 
-    #[allow(non_camel_case_types)]
-    type vm_map_t = mach_port_t;
+    #[allow(non_camel_case_types)] type vm_map_t = mach_port_t;
+    #[allow(non_camel_case_types)] type vm_address_t = mach_vm_address_t;
+    #[allow(non_camel_case_types)] type vm_size_t = mach_vm_size_t;
 
     extern "C" {
-        fn vm_read(target_task: vm_map_t, address: mach_vm_address_t, size: mach_vm_size_t, data: *mut u8, data_size: *mut mach_msg_type_number_t) -> kern_return_t;
+        fn vm_read(target_task: vm_map_t, address: vm_address_t, size: vm_size_t, data: &*mut u8, data_size: *mut mach_msg_type_number_t) -> kern_return_t;
     }
 
-    fn task_for_pid(addr: libc::c_int) -> io::Result<mach_port_name_t> {
+    fn task_for_pid(pid: libc::c_int) -> io::Result<mach_port_name_t> {
         let mut task: mach_port_name_t = MACH_PORT_NULL;
 
         unsafe {
-            let result = mach::traps::task_for_pid(mach::traps::mach_task_self(), addr as libc::c_int, &mut task);
+            let result = mach::traps::task_for_pid(mach::traps::mach_task_self(), pid, &mut task);
             if result != KERN_SUCCESS {
                 return Err(io::Error::last_os_error())
             }
@@ -124,14 +127,31 @@ mod platform {
             let task = task_for_pid(self.pid);
             if task.is_err() { return task.map(|_| ()) }
 
-            unsafe {
-                let mut read: mach_msg_type_number_t = 0;
+            let page_addr      = (addr as i64 & (-4096)) as mach_vm_address_t;
+	        let last_page_addr = ((addr as i64 + buf.len() as i64 + 4095) & (-4096)) as mach_vm_address_t;
+            let page_size      = last_page_addr as usize - page_addr as usize;
 
-                let result = vm_read(task.unwrap(), addr as u64, buf.len() as u64, buf.as_mut_ptr(), &mut read);
-                if result != KERN_SUCCESS {
-                    return Err(io::Error::last_os_error())
-                }
+            let read_ptr: *mut u8 = ptr::null_mut();
+            let mut read_len: mach_msg_type_number_t = 0;
+
+            let result = unsafe {
+                vm_read(task.unwrap(), page_addr as u64, page_size as vm_size_t, &read_ptr, &mut read_len)
+            };
+
+            if result != KERN_SUCCESS {
+                // panic!("({}) {:?}", result, io::Error::last_os_error());
+                return Err(io::Error::last_os_error())
             }
+
+            if read_len != page_size as u32 {
+                panic!("Mismatched read sizes for `vm_read` (expected {}, got {})", page_size, read_len)
+            }
+
+            let read_buf = unsafe { slice::from_raw_parts(read_ptr, read_len as usize) };
+
+            let offset = addr - page_addr as usize;
+            let len = buf.len();
+            buf.copy_from_slice(&read_buf[offset..(offset + len)]);
 
             Ok(())
         }
@@ -141,6 +161,8 @@ mod platform {
 pub fn copy_address_raw<T>(addr: *const c_void, length: usize, source: &T) -> Vec<u8>
     where T: CopyAddress
 {
+    debug!("copy_address_raw: addr: {:x}", addr as usize);
+
     if length > 100000 {
         // something very unusual has happened.
         // Do not respect requests for huge amounts of memory.
@@ -256,6 +278,7 @@ fn get_maps_address(pid: pid_t) -> u64 {
     addr
 }
 
+#[cfg(target_os="linux")]
 pub fn get_ruby_current_thread_address(pid: pid_t) -> u64 {
     // Get the address of the `ruby_current_thread` global variable. It works
     // by looking up the address in the Ruby binary's symbol table with `nm
@@ -265,6 +288,16 @@ pub fn get_ruby_current_thread_address(pid: pid_t) -> u64 {
     // this program only works on Linux anyway because of process_vm_readv.
     //
     let addr = get_nm_address(pid) + get_maps_address(pid);
+    debug!("get_ruby_current_thread_address: {:x}", addr);
+    addr
+}
+
+#[cfg(target_os="macos")]
+pub fn get_ruby_current_thread_address(pid: pid_t) -> u64 {
+    // TODO: Make this actually look up the `__mh_execute_header` base
+    //   address in the binary via `nm`.
+    let base_address = 0x100000000;
+    let addr = get_nm_address(pid) + (get_maps_address(pid) - base_address);
     debug!("get_ruby_current_thread_address: {:x}", addr);
     addr
 }
