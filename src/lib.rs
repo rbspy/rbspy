@@ -30,8 +30,6 @@ use std::collections::HashMap;
 
 use dwarf::{DwarfLookup, Entry};
 
-static mut READ_EVER_SUCCEEDED: bool = false;
-
 #[cfg(test)]
 pub mod test_utils;
 
@@ -56,6 +54,8 @@ mod platform {
     use std::io;
 
     use super::{CopyAddress, Process};
+
+    static mut READ_EVER_SUCCEEDED: bool = false;
 
     impl CopyAddress for Process {
         fn copy_address(&self, addr: usize, buf: &mut [u8]) -> io::Result<()> {
@@ -91,17 +91,20 @@ mod platform {
 
     use self::mach::kern_return::{kern_return_t, KERN_SUCCESS};
     use self::mach::port::{mach_port_t, mach_port_name_t, MACH_PORT_NULL};
-    use self::mach::types::task_t;
-    use self::mach::vm_types::{mach_vm_address_t, mach_vm_size_t, vm_map_address_t};
+    use self::mach::vm_types::{mach_vm_address_t, mach_vm_size_t};
     use self::mach::message::{mach_msg_type_number_t};
     use std::io;
-    use std::ptr;
 
     use super::{CopyAddress, Process};
 
+    #[allow(non_camel_case_types)]
     type vm_map_t = mach_port_t;
 
-    fn safe_task_for_pid(addr: libc::c_int) -> io::Result<mach_port_name_t> {
+    extern "C" {
+        fn vm_read(target_task: vm_map_t, address: mach_vm_address_t, size: mach_vm_size_t, data: *mut u8, data_size: *mut mach_msg_type_number_t) -> kern_return_t;
+    }
+
+    fn task_for_pid(addr: libc::c_int) -> io::Result<mach_port_name_t> {
         let mut task: mach_port_name_t = MACH_PORT_NULL;
 
         unsafe {
@@ -114,19 +117,15 @@ mod platform {
         Ok(task)
     }
 
-    extern "C" {
-        pub fn vm_read(target_task: vm_map_t, address: mach_vm_address_t, size: mach_vm_size_t, data: *mut [u8], data_size: *mut mach_msg_type_number_t) -> kern_return_t;
-    }
-
     impl CopyAddress for Process {
         fn copy_address(&self, addr: usize, buf: &mut [u8]) -> io::Result<()> {
-            let task = safe_task_for_pid(self.pid);
+            let task = task_for_pid(self.pid);
             if task.is_err() { return task.map(|_| ()) }
 
             unsafe {
                 let mut read: mach_msg_type_number_t = 0;
 
-                let result = vm_read(task.unwrap(), addr as u64, buf.len() as u64, buf, &mut read);
+                let result = vm_read(task.unwrap(), addr as u64, buf.len() as u64, buf.as_mut_ptr(), &mut read);
                 if result != KERN_SUCCESS {
                     return Err(io::Error::last_os_error())
                 }
@@ -136,8 +135,6 @@ mod platform {
         }
     }
 }
-
-use platform::*;
 
 pub fn copy_address_raw<T>(addr: *const c_void, length: usize, source: &T) -> Vec<u8>
     where T: CopyAddress
