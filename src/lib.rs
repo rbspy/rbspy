@@ -407,7 +407,7 @@ mod tests {
     use dwarf::{DwarfLookup, Entry, get_all_entries, create_lookup_table};
 
     use super::{DwarfTypes, get_types, get_stack_trace};
-    
+
     lazy_static! {
         static ref ENTRIES: Vec<Entry> = {
             get_all_entries::<LittleEndian>(DEBUG_INFO, DEBUG_ABBREV, DEBUG_STR)
