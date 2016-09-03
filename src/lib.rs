@@ -187,7 +187,7 @@ fn get_nm_address(pid: pid_t) -> u64 {
     }
 
     let nm_output = String::from_utf8(nm_command.stdout).unwrap();
-    let re = Regex::new(r"(\w+) b ruby_current_thread").unwrap();
+    let re = Regex::new(r"(\w+) [bs] _?ruby_current_thread").unwrap();
     let cap = re.captures(&nm_output).unwrap_or_else(|| {
         println!("Error: Couldn't find current thread in Ruby process. This is probably because \
                   either this isn't a Ruby process or you have a Ruby version compiled with no \
