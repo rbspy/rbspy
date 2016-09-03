@@ -338,7 +338,7 @@ mod obj {
     use self::object::Object;
     use std::fs;
     use std::io::Read;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
     use super::{Entry, get_all_entries};
 
@@ -353,8 +353,28 @@ mod obj {
         buf
     }
 
+    /// The plain Ruby binary location on Mac OS is normally a slim Mach-O
+    /// executable binary. However there's often a `libruby-static.a` nearby
+    /// in the file system that *does* have DWARF info in it.
+    fn guess_ruby_path(pid: usize) -> PathBuf {
+        let exec_path = libproc::libproc::proc_pid::pidpath(pid as i32).expect("Could not look up path for PID");
+        let exec_path = PathBuf::from(&exec_path);
+
+        let static_path = exec_path.join("../../lib/libruby-static.a").canonicalize()
+            .expect("Could not guess libruby-static.a path");
+
+        println!("{:?}", static_path);
+
+        if static_path.exists() {
+            static_path
+        } else {
+            exec_path
+        }
+    }
+
     pub fn get_dwarf_entries(pid: usize) -> Vec<Entry> {
-        let path = libproc::libproc::proc_pid::pidpath(pid as i32).expect("Could not look up path for PID");
+        let path = guess_ruby_path(pid);
+
         let file = open(path);
         let file = object::File::parse(&file);
 
