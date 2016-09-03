@@ -178,9 +178,13 @@ fn get_nm_address(pid: pid_t) -> u64 {
         .arg(format!("/proc/{}/exe", pid))
         .stdout(Stdio::piped())
         .stdin(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .output()
         .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
+    if !nm_command.status.success() {
+        panic!("failed to execute process: {}", String::from_utf8(nm_command.stderr).unwrap())
+    }
+
     let nm_output = String::from_utf8(nm_command.stdout).unwrap();
     let re = Regex::new(r"(\w+) b ruby_current_thread").unwrap();
     let cap = re.captures(&nm_output).unwrap_or_else(|| {
@@ -200,9 +204,13 @@ fn get_maps_address(pid: pid_t) -> u64 {
         .arg(format!("/proc/{}/maps", pid))
         .stdout(Stdio::piped())
         .stdin(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .output()
         .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
+    if !cat_command.status.success() {
+        panic!("failed to execute process: {}", String::from_utf8(cat_command.stderr).unwrap())
+    }
+
     let output = String::from_utf8(cat_command.stdout).unwrap();
     let re = Regex::new(r"(\w+).+xp.+?bin/ruby").unwrap();
     let cap = re.captures(&output).unwrap();
