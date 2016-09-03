@@ -10,12 +10,12 @@ crash your Ruby). But I wouldn't totally swear that.
 ## Requirements
 
 1. Linux (It uses a Linux-only system call)
-2. A recent release of `ruby-stacktrace` (download from [here](https://github.com/jvns/ruby-stacktrace/releases))
+2. The most recent pre-release of `ruby-stacktrace` (download from [here](https://github.com/jvns/ruby-stacktrace/releases))
 3. A Ruby version compiled with debugging symbols (check by running
    `file` on your Ruby binary)
 
 I've tested this succesfully on Ruby versions 2.1.6 and 2.2.3. No
-promises though.
+promises though. It works on my computer and at least 2 other computers.
 
 ## How to use it
 
