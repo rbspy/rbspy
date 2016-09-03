@@ -291,8 +291,6 @@ pub fn get_dwarf_entries(pid: usize) -> Vec<Entry> {
     }
 }
 
-
-#[cfg(target_os="linux")]
 mod obj {
     extern crate elf;
     use std::path::Path;
