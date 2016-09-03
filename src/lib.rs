@@ -30,8 +30,6 @@ use std::collections::HashMap;
 
 use dwarf::{DwarfLookup, Entry};
 
-static mut READ_EVER_SUCCEEDED: bool = false;
-
 pub mod test_utils;
 
 pub trait CopyAddress {
@@ -50,29 +48,93 @@ impl Process {
     }
 }
 
-impl CopyAddress for Process {
-    fn copy_address(&self, addr: usize, buf: &mut [u8]) -> io::Result<()> {
-        let local_iov = iovec {
-            iov_base: buf.as_mut_ptr() as *mut c_void,
-            iov_len: buf.len(),
-        };
-        let remote_iov = iovec {
-            iov_base: addr as *mut c_void,
-            iov_len: buf.len(),
-        };
+#[cfg(target_os="linux")]
+mod platform {
+    use std::io;
+    use std::process;
+
+    use libc::{c_void, iovec, process_vm_readv};
+
+    use super::{CopyAddress, Process};
+
+    static mut READ_EVER_SUCCEEDED: bool = false;
+
+    impl CopyAddress for Process {
+        fn copy_address(&self, addr: usize, buf: &mut [u8]) -> io::Result<()> {
+            let local_iov = iovec {
+                iov_base: buf.as_mut_ptr() as *mut c_void,
+                iov_len: buf.len(),
+            };
+            let remote_iov = iovec {
+                iov_base: addr as *mut c_void,
+                iov_len: buf.len(),
+            };
+            unsafe {
+                let result = process_vm_readv(self.pid, &local_iov, 1, &remote_iov, 1, 0);
+                if result == -1 {
+                    if !READ_EVER_SUCCEEDED {
+                        println!("Failed to read from pid {}. Are you root?", self.pid);
+                        process::exit(1);
+                    } else {
+                        return Err(io::Error::last_os_error());
+                    }
+                }
+                READ_EVER_SUCCEEDED = true;
+            }
+            Ok(())
+        }
+    }
+}
+
+#[cfg(target_os="macos")]
+mod platform {
+    extern crate libc;
+    extern crate mach;
+
+    use self::mach::kern_return::{kern_return_t, KERN_SUCCESS};
+    use self::mach::port::{mach_port_t, mach_port_name_t, MACH_PORT_NULL};
+    use self::mach::vm_types::{mach_vm_address_t, mach_vm_size_t};
+    use self::mach::message::{mach_msg_type_number_t};
+    use std::io;
+
+    use super::{CopyAddress, Process};
+
+    #[allow(non_camel_case_types)]
+    type vm_map_t = mach_port_t;
+
+    extern "C" {
+        fn vm_read(target_task: vm_map_t, address: mach_vm_address_t, size: mach_vm_size_t, data: *mut u8, data_size: *mut mach_msg_type_number_t) -> kern_return_t;
+    }
+
+    fn task_for_pid(addr: libc::c_int) -> io::Result<mach_port_name_t> {
+        let mut task: mach_port_name_t = MACH_PORT_NULL;
+
         unsafe {
-            let result = process_vm_readv(self.pid, &local_iov, 1, &remote_iov, 1, 0);
-            if result == -1 {
-                if !READ_EVER_SUCCEEDED {
-                    println!("Failed to read from pid {}. Are you root?", self.pid);
-                    process::exit(1);
-                } else {
-                    return Err(io::Error::last_os_error());
+            let result = mach::traps::task_for_pid(mach::traps::mach_task_self(), addr as libc::c_int, &mut task);
+            if result != KERN_SUCCESS {
+                return Err(io::Error::last_os_error())
+            }
+        }
+
+        Ok(task)
+    }
+
+    impl CopyAddress for Process {
+        fn copy_address(&self, addr: usize, buf: &mut [u8]) -> io::Result<()> {
+            let task = task_for_pid(self.pid);
+            if task.is_err() { return task.map(|_| ()) }
+
+            unsafe {
+                let mut read: mach_msg_type_number_t = 0;
+
+                let result = vm_read(task.unwrap(), addr as u64, buf.len() as u64, buf.as_mut_ptr(), &mut read);
+                if result != KERN_SUCCESS {
+                    return Err(io::Error::last_os_error())
                 }
             }
-            READ_EVER_SUCCEEDED = true;
+
+            Ok(())
         }
-        Ok(())
     }
 }
 
