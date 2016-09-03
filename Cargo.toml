@@ -18,6 +18,7 @@ gimli={git="https://github.com/fitzgen/gimli.git"}
 elf = "0.0.9"
 log = "0.3.6"
 env_logger = "0.3.4"
+mach = "0.0.5"
 
 [dev-dependencies]
 flate2 = "0.2.14"
