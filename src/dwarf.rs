@@ -7,8 +7,9 @@ use byteorder::{NativeEndian, ReadBytesExt};
 use std::collections::HashMap;
 use std::io::Cursor;
 
-type HashMapFnv<K, V> = HashMap<K, V, BuildHasherDefault<FnvHasher>>;
+pub use self::obj::get_dwarf_entries;
 
+type HashMapFnv<K, V> = HashMap<K, V, BuildHasherDefault<FnvHasher>>;
 
 fn get_attr_name<Endian>(die: &gimli::DebuggingInformationEntry<Endian>, debug_str: gimli::DebugStr<Endian>) -> Option<String>
 where Endian: gimli::Endianity
@@ -272,34 +273,39 @@ fn index_name(name_lookup: &mut HashMapFnv<String, (usize, u32)>, entry: &Entry)
     }
 }
 
-
-pub fn get_dwarf_entries(pid: usize) -> Vec<Entry> {
-    let file_path = format!("/proc/{}/exe", pid);
-    let file = obj::open(&file_path);
-
-    let debug_info = obj::get_section(&file, ".debug_info")
-        .expect("Does not have .debug_info section");
-    let debug_abbrev = obj::get_section(&file, ".debug_abbrev")
-        .expect("Does not have .debug_abbrev section");
-    let debug_str = obj::get_section(&file, ".debug_str")
-        .expect("Does not have .debug_str section");
-
-    if obj::is_little_endian(&file) {
-        get_all_entries::<gimli::LittleEndian>(debug_info, debug_abbrev, debug_str)
-    } else {
-        get_all_entries::<gimli::BigEndian>(debug_info, debug_abbrev, debug_str)
-    }
-}
-
+#[cfg(target_os="linux")]
 mod obj {
     extern crate elf;
+    use gimli;
+
     use std::path::Path;
 
+    use super::Entry;
+    use super::get_all_entries;
+
     /// The parsed object file type.
-    pub type File = elf::File;
+    type File = elf::File;
+
+    pub fn get_dwarf_entries(pid: usize) -> Vec<Entry> {
+        let file_path = format!("/proc/{}/exe", pid);
+        let file = open(&file_path);
+
+        let debug_info = get_section(&file, ".debug_info")
+            .expect("Does not have .debug_info section");
+        let debug_abbrev = get_section(&file, ".debug_abbrev")
+            .expect("Does not have .debug_abbrev section");
+        let debug_str = get_section(&file, ".debug_str")
+            .expect("Does not have .debug_str section");
+
+        if is_little_endian(&file) {
+            get_all_entries::<gimli::LittleEndian>(debug_info, debug_abbrev, debug_str)
+        } else {
+            get_all_entries::<gimli::BigEndian>(debug_info, debug_abbrev, debug_str)
+        }
+    }
 
     /// Open and parse the object file at the given path.
-    pub fn open<P>(path: P) -> File
+    fn open<P>(path: P) -> File
         where P: AsRef<Path>
     {
         let path = path.as_ref();
@@ -308,7 +314,7 @@ mod obj {
 
     /// Get the contents of the section named `section_name`, if such
     /// a section exists.
-    pub fn get_section<'a>(file: &'a File, section_name: &str) -> Option<&'a [u8]> {
+    fn get_section<'a>(file: &'a File, section_name: &str) -> Option<&'a [u8]> {
         file.sections
             .iter()
             .find(|s| s.shdr.name == section_name)
@@ -316,11 +322,55 @@ mod obj {
     }
 
     /// Return true if the file is little endian, false if it is big endian.
-    pub fn is_little_endian(file: &File) -> bool {
+    fn is_little_endian(file: &File) -> bool {
         match file.ehdr.data {
             elf::types::ELFDATA2LSB => true,
             elf::types::ELFDATA2MSB => false,
             otherwise => panic!("Unknown endianity: {}", otherwise),
+        }
+    }
+}
+
+#[cfg(target_os="macos")]
+mod obj {
+    extern crate gimli;
+    extern crate libproc;
+    extern crate object;
+
+    use self::object::Object;
+    use std::fs;
+    use std::io::Read;
+    use std::path::Path;
+
+    use super::{Entry, get_all_entries};
+
+    type File = Vec<u8>;
+
+    fn open<P>(path: P) -> File
+        where P: AsRef<Path>
+    {
+        let mut file = fs::File::open(path).expect("Could not open file");
+        let mut buf = Vec::new();
+        file.read_to_end(&mut buf).expect("Could not read file");
+        buf
+    }
+
+    pub fn get_dwarf_entries(pid: usize) -> Vec<Entry> {
+        let path = libproc::libproc::proc_pid::pidpath(pid as i32).expect("Could not look up path for PID");
+        let file = open(path);
+        let file = object::File::parse(&file);
+
+        let debug_info = file.get_section(".debug_info")
+            .expect("Does not have .debug_info section");
+        let debug_abbrev = file.get_section(".debug_abbrev")
+            .expect("Does not have .debug_abbrev section");
+        let debug_str = file.get_section(".debug_str")
+            .expect("Does not have .debug_str section");
+
+        if file.is_little_endian() {
+            get_all_entries::<gimli::LittleEndian>(debug_info, debug_abbrev, debug_str)
+        } else {
+            get_all_entries::<gimli::BigEndian>(debug_info, debug_abbrev, debug_str)
         }
     }
 }
