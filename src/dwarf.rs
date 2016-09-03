@@ -332,10 +332,17 @@ mod obj {
 #[cfg(target_os="macos")]
 mod obj {
     extern crate gimli;
+    extern crate libarchive;
+    extern crate libarchive3_sys;
+    extern crate libc;
     extern crate libproc;
     extern crate object;
 
     use self::object::Object;
+    use self::libarchive::archive::{Entry as ArchiveEntry, Handle, ReadFormat};
+    use self::libarchive::reader::{self, Reader};
+    use self::libarchive3_sys::ffi;
+    use std::ffi::CStr;
     use std::fs;
     use std::io::Read;
     use std::path::{Path, PathBuf};
@@ -363,8 +370,6 @@ mod obj {
         let static_path = exec_path.join("../../lib/libruby-static.a").canonicalize()
             .expect("Could not guess libruby-static.a path");
 
-        println!("{:?}", static_path);
-
         if static_path.exists() {
             static_path
         } else {
@@ -372,10 +377,58 @@ mod obj {
         }
     }
 
+    /// Scans a static archive (`.a` file in the semi-standard `ar` format)
+    /// for `.o` object files. It then reads all the entries from each of
+    /// those files.
+    pub fn get_archive_entries<P>(path: P) -> Vec<Entry>
+        where P: AsRef<Path>
+    {
+        let builder = reader::Builder::new();
+        builder.support_format(ReadFormat::Ar).expect("Builder could not support `ar` format");
+
+        let mut reader = builder.open_file(path).expect("Could not read archive file");
+        let handle = unsafe { reader.handle() };
+
+        let mut entries: Vec<Entry> = vec![];
+
+        while let Some(header) = reader.next_header() {
+            let header_handle = unsafe { header.entry() };
+
+            let size = unsafe { ffi::archive_entry_size(header_handle) } as usize;
+            let mut buf: Vec<u8> = vec![0; size];
+
+            let read = unsafe { ffi::archive_read_data(handle, buf.as_mut_ptr() as *mut libc::c_void, size) };
+            assert!(size == (read as usize), "Could not fully read entry data");
+
+            let name = unsafe {
+                CStr::from_ptr(ffi::archive_entry_pathname(header_handle))
+            }.to_string_lossy().into_owned();
+
+            if !name.ends_with(".o") {
+                continue
+            }
+            println!("Reading entries from '{}'", name);
+
+            let file_entries = get_entries_from_file(buf);
+            entries.extend(file_entries);
+        }
+
+        entries
+    }
+
     pub fn get_dwarf_entries(pid: usize) -> Vec<Entry> {
         let path = guess_ruby_path(pid);
 
-        let file = open(path);
+        if path.extension().unwrap() == "a" {
+            println!("Using archive '{}'", path.to_str().unwrap());
+            get_archive_entries(path)
+        } else {
+            let file = open(path);
+            get_entries_from_file(file)
+        }
+    }
+
+    fn get_entries_from_file(file: Vec<u8>) -> Vec<Entry> {
         let file = object::File::parse(&file);
 
         let debug_info = file.get_section(".debug_info")
