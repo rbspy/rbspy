@@ -41,9 +41,10 @@ process.
 1. Run `sudo ./ruby-stacktrace stackcollapse $PID > stacks` until you
    get bored of collecting data
 1. run `stackcollapse.pl < stacks | flamegraph.pl > output.svg`
-1. Open output.svg! You should get a beautiful graph
+1. Open output.svg! You should get a beautiful graph like this: (click
+   to enlarge)
 
-<a href="http://jvns.ca/images/sampling.png"><img src="http://jvns.ca/images/sampling.png"></a>
+<a href="http://jvns.ca/images/sampling.png"><img src="http://jvns.ca/images/sampling.png" width="400px"></a>
 
 ## How it works
 
