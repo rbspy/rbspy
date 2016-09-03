@@ -52,6 +52,7 @@ I wrote a blog post about the internals at [How to spy on a Ruby process](http:/
 
 ## Developing ruby-stacktrace
 
+It's written in Rust.
 
 1. Install cargo from [crates.io](https://crates.io/)
 1. `cargo build` to build
