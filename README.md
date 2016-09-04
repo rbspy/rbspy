@@ -1,3 +1,5 @@
+<img src="https://travis-ci.org/jvns/ruby-stacktrace.svg">
+
 # ruby-stacktrace
 
 Have you ever wanted to know what your Ruby program is doing?
