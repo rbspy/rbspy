@@ -30,8 +30,6 @@ use std::collections::HashMap;
 
 use dwarf::{DwarfLookup, Entry};
 
-static mut READ_EVER_SUCCEEDED: bool = false;
-
 #[cfg(test)]
 pub mod test_utils;
 
@@ -51,35 +49,118 @@ impl Process {
     }
 }
 
-impl CopyAddress for Process {
-    fn copy_address(&self, addr: usize, buf: &mut [u8]) -> io::Result<()> {
-        let local_iov = iovec {
-            iov_base: buf.as_mut_ptr() as *mut c_void,
-            iov_len: buf.len(),
-        };
-        let remote_iov = iovec {
-            iov_base: addr as *mut c_void,
-            iov_len: buf.len(),
-        };
-        unsafe {
-            let result = process_vm_readv(self.pid, &local_iov, 1, &remote_iov, 1, 0);
-            if result == -1 {
-                if !READ_EVER_SUCCEEDED {
-                    println!("Failed to read from pid {}. Are you root?", self.pid);
-                    process::exit(1);
-                } else {
-                    return Err(io::Error::last_os_error());
+#[cfg(target_os="linux")]
+mod platform {
+    use std::io;
+
+    use super::{CopyAddress, Process};
+
+    static mut READ_EVER_SUCCEEDED: bool = false;
+
+    impl CopyAddress for Process {
+        fn copy_address(&self, addr: usize, buf: &mut [u8]) -> io::Result<()> {
+            let local_iov = iovec {
+                iov_base: buf.as_mut_ptr() as *mut c_void,
+                iov_len: buf.len(),
+            };
+            let remote_iov = iovec {
+                iov_base: addr as *mut c_void,
+                iov_len: buf.len(),
+            };
+            unsafe {
+                let result = process_vm_readv(self.pid, &local_iov, 1, &remote_iov, 1, 0);
+                if result == -1 {
+                    if !READ_EVER_SUCCEEDED {
+                        println!("Failed to read from pid {}. Are you root?", self.pid);
+                        process::exit(1);
+                    } else {
+                        return Err(io::Error::last_os_error());
+                    }
                 }
+                READ_EVER_SUCCEEDED = true;
             }
-            READ_EVER_SUCCEEDED = true;
+            Ok(())
         }
-        Ok(())
+    }
+}
+
+#[cfg(target_os="macos")]
+mod platform {
+    extern crate libc;
+    extern crate mach;
+
+    use self::mach::kern_return::{kern_return_t, KERN_SUCCESS};
+    use self::mach::port::{mach_port_t, mach_port_name_t, MACH_PORT_NULL};
+    use self::mach::vm_types::{mach_vm_address_t, mach_vm_size_t};
+    use self::mach::message::{mach_msg_type_number_t};
+    use std::io;
+    use std::ptr;
+    use std::slice;
+
+    use super::{CopyAddress, Process};
+
+    #[allow(non_camel_case_types)] type vm_map_t = mach_port_t;
+    #[allow(non_camel_case_types)] type vm_address_t = mach_vm_address_t;
+    #[allow(non_camel_case_types)] type vm_size_t = mach_vm_size_t;
+
+    extern "C" {
+        fn vm_read(target_task: vm_map_t, address: vm_address_t, size: vm_size_t, data: &*mut u8, data_size: *mut mach_msg_type_number_t) -> kern_return_t;
+    }
+
+    fn task_for_pid(pid: libc::c_int) -> io::Result<mach_port_name_t> {
+        let mut task: mach_port_name_t = MACH_PORT_NULL;
+
+        unsafe {
+            let result = mach::traps::task_for_pid(mach::traps::mach_task_self(), pid, &mut task);
+            if result != KERN_SUCCESS {
+                return Err(io::Error::last_os_error())
+            }
+        }
+
+        Ok(task)
+    }
+
+    impl CopyAddress for Process {
+        fn copy_address(&self, addr: usize, buf: &mut [u8]) -> io::Result<()> {
+            let task = task_for_pid(self.pid);
+            if task.is_err() { return task.map(|_| ()) }
+
+            let page_addr      = (addr as i64 & (-4096)) as mach_vm_address_t;
+	        let last_page_addr = ((addr as i64 + buf.len() as i64 + 4095) & (-4096)) as mach_vm_address_t;
+            let page_size      = last_page_addr as usize - page_addr as usize;
+
+            let read_ptr: *mut u8 = ptr::null_mut();
+            let mut read_len: mach_msg_type_number_t = 0;
+
+            let result = unsafe {
+                vm_read(task.unwrap(), page_addr as u64, page_size as vm_size_t, &read_ptr, &mut read_len)
+            };
+
+            if result != KERN_SUCCESS {
+                // panic!("({}) {:?}", result, io::Error::last_os_error());
+                return Err(io::Error::last_os_error())
+            }
+
+            if read_len != page_size as u32 {
+                panic!("Mismatched read sizes for `vm_read` (expected {}, got {})", page_size, read_len)
+            }
+
+            let read_buf = unsafe { slice::from_raw_parts(read_ptr, read_len as usize) };
+
+            let offset = addr - page_addr as usize;
+            let len = buf.len();
+            buf.copy_from_slice(&read_buf[offset..(offset + len)]);
+
+            Ok(())
+        }
     }
 }
 
 pub fn copy_address_raw<T>(addr: *const c_void, length: usize, source: &T) -> Vec<u8>
     where T: CopyAddress
 {
+    debug!("copy_address_raw: addr: {:x}", addr as usize);
+
     if length > 100000 {
         // something very unusual has happened.
         // Do not respect requests for huge amounts of memory.
@@ -87,8 +168,9 @@ pub fn copy_address_raw<T>(addr: *const c_void, length: usize, source: &T) -> Ve
     }
     let mut copy = vec![0; length];
 
-    if source.copy_address(addr as usize, &mut copy).is_err() {
-        warn!("copy_address failed for {:p}", addr);
+    let res = source.copy_address(addr as usize, &mut copy);
+    if res.is_err() {
+        warn!("copy_address failed for {:p}: {:?}", addr, res.unwrap_err());
     }
 
     copy
@@ -115,15 +197,20 @@ pub fn copy_address_raw<T>(addr: *const c_void, length: usize, source: &T) -> Ve
 //
 
 fn get_nm_address(pid: pid_t) -> u64 {
+    let exe = dwarf::get_executable_path(pid as usize).unwrap();
     let nm_command = Command::new("nm")
-        .arg(format!("/proc/{}/exe", pid))
+        .arg(exe)
         .stdout(Stdio::piped())
         .stdin(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .output()
         .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
+    if !nm_command.status.success() {
+        panic!("failed to execute process: {}", String::from_utf8(nm_command.stderr).unwrap())
+    }
+
     let nm_output = String::from_utf8(nm_command.stdout).unwrap();
-    let re = Regex::new(r"(\w+) b ruby_current_thread").unwrap();
+    let re = Regex::new(r"(\w+) [bs] _?ruby_current_thread").unwrap();
     let cap = re.captures(&nm_output).unwrap_or_else(|| {
         println!("Error: Couldn't find current thread in Ruby process. This is probably because \
                   either this isn't a Ruby process or you have a Ruby version compiled with no \
@@ -136,14 +223,19 @@ fn get_nm_address(pid: pid_t) -> u64 {
     addr
 }
 
+#[cfg(target_os="linux")]
 fn get_maps_address(pid: pid_t) -> u64 {
     let cat_command = Command::new("cat")
         .arg(format!("/proc/{}/maps", pid))
         .stdout(Stdio::piped())
         .stdin(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .output()
         .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
+    if !cat_command.status.success() {
+        panic!("failed to execute process: {}", String::from_utf8(cat_command.stderr).unwrap())
+    }
+
     let output = String::from_utf8(cat_command.stdout).unwrap();
     let re = Regex::new(r"(\w+).+xp.+?bin/ruby").unwrap();
     let cap = re.captures(&output).unwrap();
@@ -153,6 +245,38 @@ fn get_maps_address(pid: pid_t) -> u64 {
     addr
 }
 
+use std::iter::Iterator;
+
+#[cfg(target_os="macos")]
+fn get_maps_address(pid: pid_t) -> u64 {
+    let vmmap_command = Command::new("vmmap")
+        .arg(format!("{}", pid))
+        .stdout(Stdio::piped())
+        .stdin(Stdio::null())
+        .stderr(Stdio::piped())
+        .output()
+        .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
+    if !vmmap_command.status.success() {
+        panic!("failed to execute process: {}", String::from_utf8(vmmap_command.stderr).unwrap())
+    }
+
+    let output = String::from_utf8(vmmap_command.stdout).unwrap();
+
+    let lines: Vec<&str> = output.split("\n")
+        .filter(|line| line.contains("bin/ruby"))
+        .filter(|line| line.contains("__TEXT"))
+        .collect();
+    let line = lines.first().expect("No `__TEXT` line found for `bin/ruby` in vmmap output");
+
+    let re = Regex::new(r"([0-9a-f]+)").unwrap();
+    let cap = re.captures(&line).unwrap();
+    let address_str = cap.at(1).unwrap();
+    let addr = u64::from_str_radix(address_str, 16).unwrap();
+    debug!("get_maps_address: {:x}", addr);
+    addr
+}
+
+#[cfg(target_os="linux")]
 pub fn get_ruby_current_thread_address(pid: pid_t) -> u64 {
     // Get the address of the `ruby_current_thread` global variable. It works
     // by looking up the address in the Ruby binary's symbol table with `nm
@@ -162,6 +286,16 @@ pub fn get_ruby_current_thread_address(pid: pid_t) -> u64 {
     // this program only works on Linux anyway because of process_vm_readv.
     //
     let addr = get_nm_address(pid) + get_maps_address(pid);
+    debug!("get_ruby_current_thread_address: {:x}", addr);
+    addr
+}
+
+#[cfg(target_os="macos")]
+pub fn get_ruby_current_thread_address(pid: pid_t) -> u64 {
+    // TODO: Make this actually look up the `__mh_execute_header` base
+    //   address in the binary via `nm`.
+    let base_address = 0x100000000;
+    let addr = get_nm_address(pid) + (get_maps_address(pid) - base_address);
     debug!("get_ruby_current_thread_address: {:x}", addr);
     addr
 }
@@ -407,7 +541,7 @@ mod tests {
     use dwarf::{DwarfLookup, Entry, get_all_entries, create_lookup_table};
 
     use super::{DwarfTypes, get_types, get_stack_trace};
-    
+
     lazy_static! {
         static ref ENTRIES: Vec<Entry> = {
             get_all_entries::<LittleEndian>(DEBUG_INFO, DEBUG_ABBREV, DEBUG_STR)
