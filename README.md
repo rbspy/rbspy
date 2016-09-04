@@ -1,4 +1,4 @@
-<img src="https://travis-ci.org/jvns/ruby-stacktrace.svg">
+<a href="https://travis-ci.org/jvns/ruby-stacktrace"><img src="https://travis-ci.org/jvns/ruby-stacktrace.svg"></a>
 
 # ruby-stacktrace
 
