@@ -7,11 +7,12 @@ use byteorder::{NativeEndian, ReadBytesExt};
 use std::collections::HashMap;
 use std::io::Cursor;
 
+pub use self::obj::{get_executable_path, get_dwarf_entries};
+
 type HashMapFnv<K, V> = HashMap<K, V, BuildHasherDefault<FnvHasher>>;
 
-
 fn get_attr_name<Endian>(die: &gimli::DebuggingInformationEntry<Endian>, debug_str: gimli::DebugStr<Endian>) -> Option<String>
-where Endian: gimli::Endianity 
+where Endian: gimli::Endianity
 {
     let mut attrs = die.attrs();
     while let Some(attr) = attrs.next().expect("Should parse attribute OK") {
@@ -35,7 +36,7 @@ where Endian: gimli::Endianity
             },
             _ => continue,
         }
-    } 
+    }
     None
 }
 
@@ -45,7 +46,7 @@ fn read_pointer_address(vec: &[u8]) -> usize {
 }
 
 fn get_attr_byte_size<Endian>(die: &gimli::DebuggingInformationEntry<Endian>) -> Option<usize>
-where Endian: gimli::Endianity 
+where Endian: gimli::Endianity
 {
     let mut attrs = die.attrs();
     while let Some(attr) = attrs.next().expect("Should parse attribute OK") {
@@ -57,12 +58,12 @@ where Endian: gimli::Endianity
             },
             _ => continue,
         }
-    } 
+    }
     None
 }
 
 fn get_attr_type<Endian>(die: &gimli::DebuggingInformationEntry<Endian>) -> Option<usize>
-where Endian: gimli::Endianity 
+where Endian: gimli::Endianity
 {
     let mut attrs = die.attrs();
     while let Some(attr) = attrs.next().expect("Should parse attribute OK") {
@@ -74,13 +75,13 @@ where Endian: gimli::Endianity
             },
             _ => continue,
         }
-    } 
+    }
     None
 }
 
 
 fn get_data_member_location<Endian>(die: &gimli::DebuggingInformationEntry<Endian>) -> Option<usize>
-where Endian: gimli::Endianity 
+where Endian: gimli::Endianity
 {
     let mut attrs = die.attrs();
     while let Some(attr) = attrs.next().expect("Should parse attribute OK") {
@@ -105,7 +106,7 @@ where Endian: gimli::Endianity
 
 fn get_entry_list<Endian>(mut entries: gimli::EntriesCursor<Endian>, group_id: u32, debug_str: gimli::DebugStr<Endian>) -> Vec<(isize, Entry)>
     where Endian: gimli::Endianity
-{ 
+{
     let mut vec: Vec<(isize, Entry)> = Vec::new();
     while let Some((delta_depth, die)) = entries.next_dfs().expect("Should parse next dfs") {
         let entry = Entry {
@@ -137,7 +138,7 @@ pub struct Entry {
 
 
 pub struct DwarfLookup<'a> {
-    lookup_table: HashMapFnv<(usize, u32), &'a Entry>, 
+    lookup_table: HashMapFnv<(usize, u32), &'a Entry>,
     name_lookup: HashMapFnv<String, (usize, u32)>,
 }
 
@@ -272,36 +273,43 @@ fn index_name(name_lookup: &mut HashMapFnv<String, (usize, u32)>, entry: &Entry)
     }
 }
 
-
-pub fn get_dwarf_entries(pid: usize) -> Vec<Entry> {
-    let file_path = format!("/proc/{}/exe", pid);
-    let file = obj::open(&file_path);
-
-    let debug_info = obj::get_section(&file, ".debug_info")
-        .expect("Does not have .debug_info section");
-    let debug_abbrev = obj::get_section(&file, ".debug_abbrev")
-        .expect("Does not have .debug_abbrev section");
-    let debug_str = obj::get_section(&file, ".debug_str")
-        .expect("Does not have .debug_str section");
-
-    if obj::is_little_endian(&file) {
-        get_all_entries::<gimli::LittleEndian>(debug_info, debug_abbrev, debug_str)
-    } else {
-        get_all_entries::<gimli::BigEndian>(debug_info, debug_abbrev, debug_str)
-    }
-}
-
-
 #[cfg(target_os="linux")]
 mod obj {
     extern crate elf;
-    use std::path::Path;
+    use gimli;
+
+    use std::path::{Path, PathBuf};
+
+    use super::Entry;
+    use super::get_all_entries;
 
     /// The parsed object file type.
-    pub type File = elf::File;
+    type File = elf::File;
+
+    pub fn get_executable_path(pid: usize) -> Result<PathBuf, String> {
+        Ok(PathBuf::from(format!("/proc/{}/exe", pid)))
+    }
+
+    pub fn get_dwarf_entries(pid: usize) -> Vec<Entry> {
+        let file_path = format!("/proc/{}/exe", pid);
+        let file = open(&file_path);
+
+        let debug_info = get_section(&file, ".debug_info")
+            .expect("Does not have .debug_info section");
+        let debug_abbrev = get_section(&file, ".debug_abbrev")
+            .expect("Does not have .debug_abbrev section");
+        let debug_str = get_section(&file, ".debug_str")
+            .expect("Does not have .debug_str section");
+
+        if is_little_endian(&file) {
+            get_all_entries::<gimli::LittleEndian>(debug_info, debug_abbrev, debug_str)
+        } else {
+            get_all_entries::<gimli::BigEndian>(debug_info, debug_abbrev, debug_str)
+        }
+    }
 
     /// Open and parse the object file at the given path.
-    pub fn open<P>(path: P) -> File
+    fn open<P>(path: P) -> File
         where P: AsRef<Path>
     {
         let path = path.as_ref();
@@ -310,7 +318,7 @@ mod obj {
 
     /// Get the contents of the section named `section_name`, if such
     /// a section exists.
-    pub fn get_section<'a>(file: &'a File, section_name: &str) -> Option<&'a [u8]> {
+    fn get_section<'a>(file: &'a File, section_name: &str) -> Option<&'a [u8]> {
         file.sections
             .iter()
             .find(|s| s.shdr.name == section_name)
@@ -318,11 +326,131 @@ mod obj {
     }
 
     /// Return true if the file is little endian, false if it is big endian.
-    pub fn is_little_endian(file: &File) -> bool {
+    fn is_little_endian(file: &File) -> bool {
         match file.ehdr.data {
             elf::types::ELFDATA2LSB => true,
             elf::types::ELFDATA2MSB => false,
             otherwise => panic!("Unknown endianity: {}", otherwise),
+        }
+    }
+}
+
+#[cfg(target_os="macos")]
+mod obj {
+    extern crate gimli;
+    extern crate libarchive;
+    extern crate libarchive3_sys;
+    extern crate libc;
+    extern crate libproc;
+    extern crate object;
+
+    use self::object::Object;
+    use self::libarchive::archive::{Entry as ArchiveEntry, Handle, ReadFormat};
+    use self::libarchive::reader::{self, Reader};
+    use self::libarchive3_sys::ffi;
+    use std::ffi::CStr;
+    use std::fs;
+    use std::io::Read;
+    use std::path::{Path, PathBuf};
+
+    use super::{Entry, get_all_entries};
+
+    type File = Vec<u8>;
+
+    fn open<P>(path: P) -> File
+        where P: AsRef<Path>
+    {
+        let mut file = fs::File::open(path).expect("Could not open file");
+        let mut buf = Vec::new();
+        file.read_to_end(&mut buf).expect("Could not read file");
+        buf
+    }
+
+    /// The plain Ruby binary location on Mac OS is normally a slim Mach-O
+    /// executable binary. However there's often a `libruby-static.a` nearby
+    /// in the file system that *does* have DWARF info in it.
+    fn guess_ruby_path(pid: usize) -> PathBuf {
+        let exec_path = get_executable_path(pid).expect("Could not look up path for PID");
+
+        let static_path = exec_path.join("../../lib/libruby-static.a").canonicalize()
+            .expect("Could not guess libruby-static.a path");
+
+        if static_path.exists() {
+            static_path
+        } else {
+            exec_path
+        }
+    }
+
+    /// Scans a static archive (`.a` file in the semi-standard `ar` format)
+    /// for `.o` object files. It then reads all the entries from each of
+    /// those files.
+    fn get_archive_entries<P>(path: P) -> Vec<Entry>
+        where P: AsRef<Path>
+    {
+        let builder = reader::Builder::new();
+        builder.support_format(ReadFormat::Ar).expect("Builder could not support `ar` format");
+
+        let mut reader = builder.open_file(path).expect("Could not read archive file");
+        let handle = unsafe { reader.handle() };
+
+        let mut entries: Vec<Entry> = vec![];
+
+        while let Some(header) = reader.next_header() {
+            let header_handle = unsafe { header.entry() };
+
+            let size = unsafe { ffi::archive_entry_size(header_handle) } as usize;
+            let mut buf: Vec<u8> = vec![0; size];
+
+            let read = unsafe { ffi::archive_read_data(handle, buf.as_mut_ptr() as *mut libc::c_void, size) };
+            assert!(size == (read as usize), "Could not fully read entry data");
+
+            let name = unsafe {
+                CStr::from_ptr(ffi::archive_entry_pathname(header_handle))
+            }.to_string_lossy().into_owned();
+
+            if !name.ends_with(".o") {
+                continue
+            }
+
+            let file_entries = get_entries_from_file(buf);
+            entries.extend(file_entries);
+        }
+
+        entries
+    }
+
+    fn get_entries_from_file(file: Vec<u8>) -> Vec<Entry> {
+        let file = object::File::parse(&file);
+
+        let debug_info = file.get_section(".debug_info")
+            .expect("Does not have .debug_info section");
+        let debug_abbrev = file.get_section(".debug_abbrev")
+            .expect("Does not have .debug_abbrev section");
+        let debug_str = file.get_section(".debug_str")
+            .expect("Does not have .debug_str section");
+
+        if file.is_little_endian() {
+            get_all_entries::<gimli::LittleEndian>(debug_info, debug_abbrev, debug_str)
+        } else {
+            get_all_entries::<gimli::BigEndian>(debug_info, debug_abbrev, debug_str)
+        }
+    }
+
+    pub fn get_executable_path(pid: usize) -> Result<PathBuf, String> {
+        libproc::libproc::proc_pid::pidpath(pid as i32)
+            .map(|path| PathBuf::from(&path))
+    }
+
+    pub fn get_dwarf_entries(pid: usize) -> Vec<Entry> {
+        let path = guess_ruby_path(pid);
+
+        if path.extension().unwrap() == "a" {
+            debug!("Using archive '{}'", path.to_str().unwrap());
+            get_archive_entries(path)
+        } else {
+            let file = open(path);
+            get_entries_from_file(file)
         }
     }
 }
