@@ -6,9 +6,5 @@ rust:
 matrix:
   allow_failures:
     - rust: nightly
-addons:
-  apt:
-    packages:
-      - libarchive-dev
 notifications:
   email: false
