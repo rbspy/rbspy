@@ -145,6 +145,9 @@ mod platform {
         ((x + VM_PAGE_MASK) & !VM_PAGE_MASK)
     }
 
+    /// Read multiple pages from a task/process's memory. Address arguments
+    /// *must* be page-aligned or else bad things will happen. For
+    /// page-alignment try `mach_vm_trunc_page` and `mach_vm_round_page`.
     fn read_aligned(task: mach_port_name_t, start_addr: mach_vm_address_t, end_addr: mach_vm_address_t) -> io::Result<Vec<u8>> {
         debug!("read_aligned: start_addr: {:x}", start_addr);
         debug!("read_aligned: end_addr: {:x}", end_addr);
