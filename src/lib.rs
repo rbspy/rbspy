@@ -106,14 +106,14 @@ mod platform {
     #[allow(non_camel_case_types)] type vm_size_t = mach_vm_size_t;
 
     extern "C" {
-        /// Xnu system call to read the memory of a process.
+        /// XNU system call to read the memory of a process.
         ///
         /// Source of the `vm_read` function is at:
         ///   https://github.com/opensource-apple/xnu/blob/27ffc00/osfmk/vm/vm_user.c#L533-L549
         fn vm_read(target_task: vm_map_t, address: vm_address_t, size: vm_size_t, data: &*mut u8, data_size: *mut mach_msg_type_number_t) -> kern_return_t;
     }
 
-    /// Xnu/BSD function to gets the task port for the process identifier by
+    /// XNU/BSD function to gets the task port for the process identified by
     /// its PID.
     ///
     /// Source is at:
@@ -184,7 +184,7 @@ mod platform {
     }
 
     impl CopyAddress for Process {
-        /// Uses the Xnu `vm_read` function to copy a region of the process'
+        /// Uses the XNU `vm_read` function to copy a region of the process'
         /// memory, specified by `addr`, into `buf`.
         fn copy_address(&self, addr: usize, buf: &mut [u8]) -> io::Result<()> {
             let task = task_for_pid(self.pid);
