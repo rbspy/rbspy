@@ -181,7 +181,7 @@ pub fn copy_address_raw<T>(addr: *const c_void, length: usize, source: &T) -> Ve
 // These three functions (get_cfps, get_iseq, and get_ruby_string) are the
 // core of how the program works. They're essentially a straight port of
 // this gdb script:
-// https://gist.github.com/csfrancis/11376304/raw/7a0450d11e64e3bb7c982b7ad2778f3603188c0f/gdb_ruby_backtrace.yp
+// https://gist.github.com/csfrancis/11376304/raw/7a0450d11e64e3bb7c982b7ad2778f3603188c0f/gdb_ruby_backtrace.py
 // except without using gdb!!
 //
 // `get_iseq` is the simplest method  here -- it's just trying to run (cfp->iseq). But to do that
