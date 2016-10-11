@@ -93,7 +93,7 @@ mod platform {
 
     use self::mach::kern_return::{kern_return_t, KERN_SUCCESS};
     use self::mach::port::{mach_port_t, mach_port_name_t, MACH_PORT_NULL};
-    use self::mach::vm_types::{mach_vm_address_t, mach_vm_size_t};
+    use self::mach::vm_types::{mach_vm_address_t, mach_vm_offset_t, mach_vm_size_t};
     use self::mach::message::{mach_msg_type_number_t};
     use std::io;
     use std::ptr;
@@ -106,9 +106,18 @@ mod platform {
     #[allow(non_camel_case_types)] type vm_size_t = mach_vm_size_t;
 
     extern "C" {
+        /// XNU system call to read the memory of a process.
+        ///
+        /// Source of the `vm_read` function is at:
+        ///   https://github.com/opensource-apple/xnu/blob/27ffc00/osfmk/vm/vm_user.c#L533-L549
         fn vm_read(target_task: vm_map_t, address: vm_address_t, size: vm_size_t, data: &*mut u8, data_size: *mut mach_msg_type_number_t) -> kern_return_t;
     }
 
+    /// XNU/BSD function to gets the task port for the process identified by
+    /// its PID.
+    ///
+    /// Source is at:
+    ///   https://github.com/opensource-apple/xnu/blob/27ffc00/bsd/vm/vm_unix.c#L618-L633
     fn task_for_pid(pid: libc::c_int) -> io::Result<mach_port_name_t> {
         let mut task: mach_port_name_t = MACH_PORT_NULL;
 
@@ -122,20 +131,39 @@ mod platform {
         Ok(task)
     }
 
-    impl CopyAddress for Process {
-        fn copy_address(&self, addr: usize, buf: &mut [u8]) -> io::Result<()> {
-            let task = task_for_pid(self.pid);
-            if task.is_err() { return task.map(|_| ()) }
+    const VM_PAGE_SIZE: vm_size_t = 4096;
+    const VM_PAGE_MASK: vm_size_t = 4095;
 
-            let page_addr      = (addr as i64 & (-4096)) as mach_vm_address_t;
-	        let last_page_addr = ((addr as i64 + buf.len() as i64 + 4095) & (-4096)) as mach_vm_address_t;
-            let page_size      = last_page_addr as usize - page_addr as usize;
+    /// Adapted from:
+    ///   https://github.com/opensource-apple/xnu/blob/27ffc00/libsyscall/mach/mach/vm_page_size.h#L52-L56
+    fn mach_vm_trunc_page(x: mach_vm_offset_t) -> mach_vm_offset_t {
+        // NOTE: `!` is a bitwise NOT for integers in Rust (like `~` in C)
+        (x & !VM_PAGE_MASK)
+    }
+
+    fn mach_vm_round_page(x: mach_vm_offset_t) -> mach_vm_offset_t {
+        ((x + VM_PAGE_MASK) & !VM_PAGE_MASK)
+    }
+
+    /// Read multiple pages from a task/process's memory. Address arguments
+    /// *must* be page-aligned or else bad things will happen. For
+    /// page-alignment try `mach_vm_trunc_page` and `mach_vm_round_page`.
+    fn read_aligned(task: mach_port_name_t, start_addr: mach_vm_address_t, end_addr: mach_vm_address_t) -> io::Result<Vec<u8>> {
+        debug!("read_aligned: start_addr: {:x}", start_addr);
+        debug!("read_aligned: end_addr: {:x}", end_addr);
+
+        let num_pages = (end_addr - start_addr) / VM_PAGE_SIZE;
+
+        let mut buf: Vec<u8> = vec![];
+
+        for i in 0..num_pages {
+            let page_addr = start_addr + (i * VM_PAGE_SIZE);
 
             let read_ptr: *mut u8 = ptr::null_mut();
             let mut read_len: mach_msg_type_number_t = 0;
 
             let result = unsafe {
-                vm_read(task.unwrap(), page_addr as u64, page_size as vm_size_t, &read_ptr, &mut read_len)
+                vm_read(task, page_addr as u64, VM_PAGE_SIZE as vm_size_t, &read_ptr, &mut read_len)
             };
 
             if result != KERN_SUCCESS {
@@ -143,17 +171,41 @@ mod platform {
                 return Err(io::Error::last_os_error())
             }
 
-            if read_len != page_size as u32 {
-                panic!("Mismatched read sizes for `vm_read` (expected {}, got {})", page_size, read_len)
+            if read_len != VM_PAGE_SIZE as u32 {
+                panic!("Mismatched read sizes for `vm_read` (expected {}, got {})", VM_PAGE_SIZE, read_len)
             }
 
             let read_buf = unsafe { slice::from_raw_parts(read_ptr, read_len as usize) };
 
-            let offset = addr - page_addr as usize;
-            let len = buf.len();
-            buf.copy_from_slice(&read_buf[offset..(offset + len)]);
+            buf.extend_from_slice(read_buf);
+        }
 
-            Ok(())
+        Ok(buf)
+    }
+
+    impl CopyAddress for Process {
+        /// Uses the XNU `vm_read` function to copy a region of the process'
+        /// memory, specified by `addr`, into `buf`.
+        fn copy_address(&self, addr: usize, buf: &mut [u8]) -> io::Result<()> {
+            let task = task_for_pid(self.pid);
+            if task.is_err() { return task.map(|_| ()) }
+
+            let start_addr = mach_vm_trunc_page(addr as mach_vm_offset_t);
+            let end_addr = mach_vm_round_page((addr + buf.len()) as mach_vm_offset_t);
+            let read_buf = read_aligned(task.unwrap(), start_addr, end_addr);
+
+            match read_buf {
+                Err(err) => Err(err),
+                Ok(read_buf) => {
+                    // Get the offset into the page-aligned buffer
+                    let start = addr - start_addr as usize;
+                    let end = start + buf.len();
+
+                    buf.copy_from_slice(&read_buf[start..end]);
+
+                    Ok(())
+                }
+            }
         }
     }
 }
