@@ -3,8 +3,12 @@ rust:
   - stable
   - beta
   - nightly
+os:
+- linux
+- osx
 matrix:
   allow_failures:
     - rust: nightly
+  fast_finish: true  # Don't wait for allowed failures to complete.
 notifications:
   email: false
