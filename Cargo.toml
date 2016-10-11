@@ -3,6 +3,7 @@ name = "ruby-stacktrace"
 version = "0.1.0"
 authors = ["Julia Evans <julia@jvns.ca>"]
 
+license = "MIT"
 build = "build.rs"
 
 [dependencies]
