@@ -11,6 +11,7 @@ extern crate gimli;
 extern crate fnv;
 extern crate rand;
 extern crate leb128;
+extern crate read_process_memory;
 
 extern crate clap;
 extern crate byteorder;
@@ -25,156 +26,23 @@ use std::process::Command;
 use std::process::Stdio;
 use regex::Regex;
 use byteorder::{NativeEndian, ReadBytesExt};
-use std::io::{self, Cursor};
+use std::io::Cursor;
 use std::collections::HashMap;
 
 use dwarf::{DwarfLookup, Entry};
+use read_process_memory::*;
 
 pub mod test_utils;
 
-pub trait CopyAddress {
-    fn copy_address(&self, addr: usize, buf: &mut [u8]) -> io::Result<()>;
-}
-
-pub struct Process {
-    pid: pid_t,
-}
-
-impl Process {
-    pub fn new(pid: pid_t) -> Process {
-        Process {
-            pid: pid,
-        }
-    }
-}
-
-#[cfg(target_os="linux")]
-mod platform {
-    use std::io;
-    use std::process;
-
-    use libc::{c_void, iovec, process_vm_readv};
-
-    use super::{CopyAddress, Process};
-
-    static mut READ_EVER_SUCCEEDED: bool = false;
-
-    impl CopyAddress for Process {
-        fn copy_address(&self, addr: usize, buf: &mut [u8]) -> io::Result<()> {
-            let local_iov = iovec {
-                iov_base: buf.as_mut_ptr() as *mut c_void,
-                iov_len: buf.len(),
-            };
-            let remote_iov = iovec {
-                iov_base: addr as *mut c_void,
-                iov_len: buf.len(),
-            };
-            unsafe {
-                let result = process_vm_readv(self.pid, &local_iov, 1, &remote_iov, 1, 0);
-                if result == -1 {
-                    if !READ_EVER_SUCCEEDED {
-                        println!("Failed to read from pid {}. Are you root?", self.pid);
-                        process::exit(1);
-                    } else {
-                        return Err(io::Error::last_os_error());
-                    }
-                }
-                READ_EVER_SUCCEEDED = true;
-            }
-            Ok(())
-        }
-    }
-}
-
-#[cfg(target_os="macos")]
-mod platform {
-    extern crate libc;
-    extern crate mach;
-
-    use self::mach::kern_return::{kern_return_t, KERN_SUCCESS};
-    use self::mach::port::{mach_port_t, mach_port_name_t, MACH_PORT_NULL};
-    use self::mach::vm_types::{mach_vm_address_t, mach_vm_size_t};
-    use self::mach::message::{mach_msg_type_number_t};
-    use std::io;
-    use std::ptr;
-    use std::slice;
-
-    use super::{CopyAddress, Process};
-
-    #[allow(non_camel_case_types)] type vm_map_t = mach_port_t;
-    #[allow(non_camel_case_types)] type vm_address_t = mach_vm_address_t;
-    #[allow(non_camel_case_types)] type vm_size_t = mach_vm_size_t;
-
-    extern "C" {
-        fn vm_read(target_task: vm_map_t, address: vm_address_t, size: vm_size_t, data: &*mut u8, data_size: *mut mach_msg_type_number_t) -> kern_return_t;
-    }
-
-    fn task_for_pid(pid: libc::c_int) -> io::Result<mach_port_name_t> {
-        let mut task: mach_port_name_t = MACH_PORT_NULL;
-
-        unsafe {
-            let result = mach::traps::task_for_pid(mach::traps::mach_task_self(), pid, &mut task);
-            if result != KERN_SUCCESS {
-                return Err(io::Error::last_os_error())
-            }
-        }
-
-        Ok(task)
-    }
-
-    impl CopyAddress for Process {
-        fn copy_address(&self, addr: usize, buf: &mut [u8]) -> io::Result<()> {
-            let task = task_for_pid(self.pid);
-            if task.is_err() { return task.map(|_| ()) }
-
-            let page_addr      = (addr as i64 & (-4096)) as mach_vm_address_t;
-	        let last_page_addr = ((addr as i64 + buf.len() as i64 + 4095) & (-4096)) as mach_vm_address_t;
-            let page_size      = last_page_addr as usize - page_addr as usize;
-
-            let read_ptr: *mut u8 = ptr::null_mut();
-            let mut read_len: mach_msg_type_number_t = 0;
-
-            let result = unsafe {
-                vm_read(task.unwrap(), page_addr as u64, page_size as vm_size_t, &read_ptr, &mut read_len)
-            };
-
-            if result != KERN_SUCCESS {
-                // panic!("({}) {:?}", result, io::Error::last_os_error());
-                return Err(io::Error::last_os_error())
-            }
-
-            if read_len != page_size as u32 {
-                panic!("Mismatched read sizes for `vm_read` (expected {}, got {})", page_size, read_len)
-            }
-
-            let read_buf = unsafe { slice::from_raw_parts(read_ptr, read_len as usize) };
-
-            let offset = addr - page_addr as usize;
-            let len = buf.len();
-            buf.copy_from_slice(&read_buf[offset..(offset + len)]);
-
-            Ok(())
-        }
-    }
-}
-
-pub fn copy_address_raw<T>(addr: *const c_void, length: usize, source: &T) -> Vec<u8>
+fn copy_address_raw<T>(addr: *const c_void, length: usize, source: &T) -> Vec<u8>
     where T: CopyAddress
 {
     debug!("copy_address_raw: addr: {:x}", addr as usize);
-
-    if length > 100000 {
-        // something very unusual has happened.
-        // Do not respect requests for huge amounts of memory.
-        return Vec::new();
-    }
     let mut copy = vec![0; length];
-
-    let res = source.copy_address(addr as usize, &mut copy);
-    if res.is_err() {
-        warn!("copy_address failed for {:p}: {:?}", addr, res.unwrap_err());
+    match source.copy_address(addr as usize, &mut copy) {
+        Ok(_) => {}
+        Err(e) => warn!("copy_address failed for {:p}: {:?}", addr, e),
     }
-
     copy
 }
 
@@ -342,7 +210,7 @@ fn get_size(lookup_table: &DwarfLookup, entry: &Entry) -> Option<usize> {
     return current_entry.byte_size
 }
 
-unsafe fn copy_address_dynamic<'a, T>(
+fn copy_address_dynamic<'a, T>(
         addr: *const c_void, lookup_table: &DwarfLookup,
         source: &T, dwarf_type: &Entry) -> HashMap<String, Vec<u8>>
     where T: CopyAddress
@@ -394,14 +262,14 @@ fn get_child<'a>(entry: &'a Entry, name: &'a str) -> Option<&'a Entry>{
 fn get_ruby_string2<T>(addr: u64, source: &T, lookup_table: &DwarfLookup, types: &DwarfTypes) -> OsString
     where T: CopyAddress
 {
-     let vec = unsafe {
+     let vec = {
         let rstring = copy_address_dynamic(addr as *const c_void, lookup_table, source, &types.rstring);
         let basic =  map_bytes_to_struct(&rstring["basic"], lookup_table, &types.rbasic);
         let is_array = (read_pointer_address(&basic["flags"]) & 1 << 13) == 0;
-        if is_array  {
+        if is_array {
            // println!("it's an array!!!!");
            // println!("rstring {:#?}", rstring);
-           CStr::from_ptr(rstring["as"].as_ptr() as *const i8).to_bytes().to_vec()
+           unsafe { CStr::from_ptr(rstring["as"].as_ptr() as *const i8) }.to_bytes().to_vec()
         } else {
             let entry = &types.rstring;
                 // println!("entry: {:?}", entry);
@@ -442,7 +310,7 @@ pub fn get_types(lookup_table: &DwarfLookup) -> DwarfTypes {
     }
 }
 
-unsafe fn get_label_and_path<T>(cfp_bytes: &[u8], source: &T, lookup_table: &DwarfLookup, types: &DwarfTypes) -> Option<(OsString, OsString)>
+fn get_label_and_path<T>(cfp_bytes: &[u8], source: &T, lookup_table: &DwarfLookup, types: &DwarfTypes) -> Option<(OsString, OsString)>
     where T: CopyAddress
 {
     trace!("get_label_and_path {:?}", cfp_bytes);
@@ -488,7 +356,7 @@ unsafe fn get_label_and_path<T>(cfp_bytes: &[u8], source: &T, lookup_table: &Dwa
 // The base of the call stack is therefore at
 //   stack + stack_size * sizeof(VALUE) - sizeof(rb_control_frame_t)
 // (with everything in bytes).
-unsafe fn get_cfps<T>(ruby_current_thread_address_location: u64, source: &T, lookup_table: &DwarfLookup, types: &DwarfTypes) -> (Vec<u8>, usize)
+fn get_cfps<T>(ruby_current_thread_address_location: u64, source: &T, lookup_table: &DwarfLookup, types: &DwarfTypes) -> (Vec<u8>, usize)
     where T: CopyAddress
 {
     let ruby_current_thread_address: u64 = read_pointer_address(&copy_address_raw(ruby_current_thread_address_location as *const c_void, 8, source));
@@ -514,8 +382,6 @@ unsafe fn get_cfps<T>(ruby_current_thread_address_location: u64, source: &T, loo
 pub fn get_stack_trace<T>(ruby_current_thread_address_location: u64, source: &T, lookup_table: &DwarfLookup, types: &DwarfTypes) -> Vec<String>
     where T: CopyAddress
 {
-    unsafe {
-
     let (cfp_bytes, cfp_size) = get_cfps(ruby_current_thread_address_location, source, lookup_table, types);
     let mut trace: Vec<String> = Vec::new();
     for i in 0..cfp_bytes.len() / cfp_size {
@@ -529,7 +395,6 @@ pub fn get_stack_trace<T>(ruby_current_thread_address_location: u64, source: &T,
         }
     }
     trace
-    }
 }
 
 
