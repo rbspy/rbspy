@@ -1,10 +1,107 @@
+# Adapted from rust-everwhere:
+#   https://github.com/japaric/rust-everywhere
+#
+# Changes:
+#   - no deb
+#   - no osx, 32-bit or ARM
+#   - darwin commented out for now
+#   - no ARM
+
 language: rust
-rust:
-  - stable
-  - beta
-  - nightly
+cache: cargo
+
+env:
+  global:
+    # This will be part of the release tarball
+    - PROJECT_NAME=ruby-stacktrace
+
+# AFAICT There are a few ways to set up the build jobs. This one is not the DRYest but I feel is the
+# easiest to reason about.
+# NOTE Make *sure* you don't remove a reference (&foo) if you are going to dereference it (*foo)
 matrix:
-  allow_failures:
-    - rust: nightly
+  include:
+    # Stable channel
+    - os: linux
+      rust: stable
+      env: TARGET=x86_64-unknown-linux-gnu
+    - os: linux
+      rust: stable
+      env: TARGET=x86_64-unknown-linux-musl
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages: &musl_packages
+          - musl
+          - musl-dev
+          - musl-tools
+    # Beta channel
+    - os: linux
+      rust: beta
+      env: TARGET=x86_64-unknown-linux-gnu
+    - os: linux
+      rust: beta
+      env: TARGET=x86_64-unknown-linux-musl
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages: *musl_packages
+    # Nightly channel
+    - os: linux
+      rust: nightly
+      env: TARGET=x86_64-unknown-linux-gnu
+    - os: linux
+      rust: nightly
+      env: TARGET=x86_64-unknown-linux-musl
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages: *musl_packages
+
+before_install:
+  - export PATH="$PATH:$HOME/.cargo/bin"
+
+install:
+  - bash ci/install.sh
+
+script:
+  - bash ci/script.sh
+
+before_deploy:
+  - bash ci/before_deploy.sh
+
+deploy:
+  provider: releases
+  # *REALLY* not production ready!
+  prerelease: true
+  # To generate key:
+  # - Go to 'https://github.com/settings/tokens/new' and generate a Token with only the
+  # `public_repo` scope enabled
+  # - Call `travis encrypt $github_token` where $github_token is the token you got in the previous
+  # step and `travis` is the official Travis CI gem (see https://rubygems.org/gems/travis/)
+  # - Enter the "encrypted value" below
+  api_key:
+    secure: lhB9LE4x1eqZKlwyeV6fYdcPCEfN9DFs/gLU1FYKU9hSwmzqIWzBbv2cIPXJkcJ+TKne1D72jNUjIKqfrzGFOwjvVUscoEy66xFD+xNjiC9dEF7SL/eRW9vWn4Z2EF5I6vRtD55foN9lMaWy/jzLlJuoJCMYkgTVc6Pr5FWB7+ANx39HBfLmg/kg8EfYXraJU6qvpaXDfj1c1ec2A0cz0FRnsR0m4l9brYpK2Co7nUDj4+y0tNeNiov3RjtvOXdLMNcany9Bx7tV3kpU9YTBTocYQ+Ht8UwXPCiImEqvNlE7VUp8m96SkpHzyYW8ZLlai/XJPwfySQzE5GJerb2gZLxDn9G2d/Gj4f6B8xXz3M0ls2LsaXLseUC+36M6vp3ASWkVHXPm6INQ4sbWhmACna7uOClbqIXY78z/W/oVSRWimpR7iRDpN9Ugg3/DtYG1t0Nf1d/vtxi8BmXOBuOV+RbqdAPCJuMLRetiWCzLYK0lK1Gcz1WcVJCNxwsL342egALXmmrj/c7FEz6DyL80N2PxkNczm9NRcM8K6FPkzZ/814YM7qfCMHuehdovSGQix6GvOcNGvHum3o7+yfrpy04ylN7m8XMlC9EtR1MuY/cjeSzsQ4cofZC/tL9k6FGX2CinPgzcb/p74hl+6iFwHf8iSZ0cMdv1NRfn9przwPU=
+  file_glob: true
+  file: ${PROJECT_NAME}-${TRAVIS_TAG}-${TARGET}.*
+  # don't delete the artifacts from previous phases
+  skip_cleanup: true
+  # deploy when a new tag is pushed
+  on:
+    # channel to use to produce the release artifacts
+    condition: $TRAVIS_RUST_VERSION = stable
+    tags: true
+
+branches:
+  only:
+    # Pushes and PR to the master branch
+    - master
+    # IMPORTANT Ruby regex to match tags. Required, or travis won't trigger deploys when a new tag
+    # is pushed. This regex matches semantic versions like v1.2.3-rc4+2016.02.22
+    - /^v\d+\.\d+\.\d+.*$/
+
 notifications:
-  email: false
+  email:
+    on_success: never
