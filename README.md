@@ -9,6 +9,8 @@ Have you ever wanted to know what your Ruby program is doing?
 crashes, the rest of your system should probably be fine (it shouldn't
 crash your Ruby). But I wouldn't totally swear that.
 
+If you want something that actually works more reliably, consider using [stackprof](https://github.com/tmm1/stackprof)
+
 ## Requirements
 
 1. Linux (It uses a Linux-only system call)
