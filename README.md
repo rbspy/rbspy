@@ -9,7 +9,10 @@ Have you ever wanted to know what your Ruby program is doing?
 crashes, the rest of your system should probably be fine (it shouldn't
 crash your Ruby). But I wouldn't totally swear that.
 
-If you want something that actually works more reliably, consider using [stackprof](https://github.com/tmm1/stackprof)
+Also there are known problems with the sampling and how it calculates
+statistics about your program. Do not take the results of this program as gospel, especially if your computer is under a lot of CPU load. That said, at least 1 person has found it useful in the past.
+
+If you want something that actually works more reliably and is more mature, consider using [stackprof](https://github.com/tmm1/stackprof)
 
 ## Requirements
 
