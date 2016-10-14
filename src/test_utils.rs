@@ -1,10 +1,11 @@
+extern crate read_process_memory;
 extern crate elf;
 
 use std::io;
 
 use libc;
 
-use CopyAddress;
+use read_process_memory::CopyAddress;
 
 
 // Data for use in tests and benchmarks :-)
@@ -77,7 +78,7 @@ mod tests {
 
     use byteorder::{ReadBytesExt, LittleEndian};
 
-    use CopyAddress;
+    use read_process_memory::CopyAddress;
 
     use super::data::COREDUMP;
 

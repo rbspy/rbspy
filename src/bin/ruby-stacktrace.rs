@@ -6,6 +6,7 @@ extern crate ruby_stacktrace;
 extern crate byteorder;
 extern crate clap;
 extern crate env_logger;
+extern crate read_process_memory;
 
 use clap::{Arg, App, ArgMatches};
 use libc::*;
@@ -13,6 +14,7 @@ use std::process;
 use std::time::Duration;
 use std::thread;
 use std::collections::HashMap;
+use read_process_memory::*;
 
 use ruby_stacktrace::*;
 use ruby_stacktrace::dwarf::{create_lookup_table, get_dwarf_entries};
@@ -42,7 +44,7 @@ fn main() {
     let matches = parse_args();
     let pid: pid_t = matches.value_of("PID").unwrap().parse().unwrap();
     let command = matches.value_of("COMMAND").unwrap();
-    let source = Process::new(pid);
+    let source = pid.try_into_process_handle().unwrap();
     if command.clone() != "top" && command.clone() != "stackcollapse" && command.clone() != "parse" {
         println!("COMMAND must be 'top' or 'stackcollapse. Try again!");
         process::exit(1);
