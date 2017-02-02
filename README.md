@@ -59,6 +59,10 @@ process.
 
 I wrote a blog post about the internals at [How to spy on a Ruby process](http://jvns.ca/blog/2016/06/12/a-weird-system-call-process-vm-readv/)
 
+## Threads?
+
+It's enough to run this once on the PID and it will sample across all threads.
+
 ## Developing ruby-stacktrace
 
 It's written in Rust.
