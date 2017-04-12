@@ -1,4 +1,5 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 
 extern crate regex;
 extern crate libc;
@@ -14,6 +15,7 @@ use std::process;
 use std::time::Duration;
 use std::thread;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use read_process_memory::*;
 
 use ruby_stacktrace::*;
@@ -45,7 +47,8 @@ fn main() {
     let pid: pid_t = matches.value_of("PID").unwrap().parse().unwrap();
     let command = matches.value_of("COMMAND").unwrap();
     let source = pid.try_into_process_handle().unwrap();
-    if command.clone() != "top" && command.clone() != "stackcollapse" && command.clone() != "parse" {
+    if command.clone() != "top" && command.clone() != "stackcollapse" &&
+       command.clone() != "parse" {
         println!("COMMAND must be 'top' or 'stackcollapse. Try again!");
         process::exit(1);
     }
@@ -63,7 +66,10 @@ fn main() {
         // This gets a stack trace and then just prints it out
         // in a format that Brendan Gregg's stackcollapse.pl script understands
         loop {
-            let trace = get_stack_trace(ruby_current_thread_address_location, &source, &lookup_table, &types);
+            let trace = get_stack_trace(ruby_current_thread_address_location,
+                                        &source,
+                                        &lookup_table,
+                                        &types);
             print_stack_trace(&trace);
             thread::sleep(Duration::from_millis(10));
         }
@@ -76,10 +82,19 @@ fn main() {
         let mut j = 0;
         loop {
             j += 1;
-            let trace = get_stack_trace(ruby_current_thread_address_location, &source, &lookup_table, &types);
+            let trace = get_stack_trace(ruby_current_thread_address_location,
+                                        &source,
+                                        &lookup_table,
+                                        &types);
+            // only count each element in the stack trace once
+            // otherwise recursive methods are overcounted
+            let mut seen = HashSet::new();
             for item in &trace {
-                let counter = method_stats.entry(item.clone()).or_insert(0);
-                *counter += 1;
+                if !seen.contains(&item.clone()) {
+                    let counter = method_stats.entry(item.clone()).or_insert(0);
+                    *counter += 1;
+                }
+                seen.insert(item.clone());
             }
             {
                 let counter2 = method_own_time_stats.entry(trace[0].clone()).or_insert(0);
