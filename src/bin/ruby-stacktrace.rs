@@ -19,7 +19,6 @@ use std::collections::HashSet;
 use read_process_memory::*;
 
 use ruby_stacktrace::*;
-use ruby_stacktrace::dwarf::{create_lookup_table, get_dwarf_entries};
 
 fn parse_args() -> ArgMatches<'static> {
     App::new("ruby-stacktrace")
@@ -54,58 +53,16 @@ fn main() {
     }
 
 
-    let entries = get_dwarf_entries(pid as usize);
-    let lookup_table = create_lookup_table(&entries);
-    let types = get_types(&lookup_table);
-
     let ruby_current_thread_address_location: u64 = get_ruby_current_thread_address(pid);
 
-    if command == "parse" {
-        return;
-    } else if command == "stackcollapse" {
+    if command == "stackcollapse" {
         // This gets a stack trace and then just prints it out
         // in a format that Brendan Gregg's stackcollapse.pl script understands
-        loop {
-            let trace = get_stack_trace(ruby_current_thread_address_location,
-                                        &source,
-                                        &lookup_table,
-                                        &types);
-            print_stack_trace(&trace);
-            thread::sleep(Duration::from_millis(10));
-        }
-    } else {
-        // top subcommand!
-        // keeps a running histogram of how often we see every method
-        // and periodically reports 'self' and 'total' time for each method
-        let mut method_stats = HashMap::new();
-        let mut method_own_time_stats = HashMap::new();
-        let mut j = 0;
-        loop {
-            j += 1;
-            let trace = get_stack_trace(ruby_current_thread_address_location,
-                                        &source,
-                                        &lookup_table,
-                                        &types);
-            // only count each element in the stack trace once
-            // otherwise recursive methods are overcounted
-            let mut seen = HashSet::new();
-            for item in &trace {
-                if !seen.contains(&item.clone()) {
-                    let counter = method_stats.entry(item.clone()).or_insert(0);
-                    *counter += 1;
-                }
-                seen.insert(item.clone());
-            }
-            {
-                let counter2 = method_own_time_stats.entry(trace[0].clone()).or_insert(0);
-                *counter2 += 1;
-            }
-            if j % 100 == 0 {
-                print_method_stats(&method_stats, &method_own_time_stats, 30);
-                method_stats = HashMap::new();
-                method_own_time_stats = HashMap::new();
-            }
-            thread::sleep(Duration::from_millis(10));
-        }
+        //loop {
+            get_stack_trace(ruby_current_thread_address_location,
+                                        &source);
+            /// println!("{:?}", trace);
+            thread::sleep(Duration::from_millis(100));
+        //}
     }
 }
