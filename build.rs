@@ -21,6 +21,7 @@ fn main() {
         .whitelisted_type("rb_iseq_struct")
         .whitelisted_type("rb_control_frame_struct")
         .whitelisted_type("rb_thread_struct")
+        .whitelisted_type("RString")
         .whitelisted_type("VALUE")
         .clang_arg("-I/home/bork/.rbenv/versions/2.1.6/include/ruby-2.1.0/")
         .clang_arg("-I/home/bork/.rbenv/versions/2.1.6/include/ruby-2.1.0/x86_64-linux")

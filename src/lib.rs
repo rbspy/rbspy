@@ -18,8 +18,8 @@ pub mod ruby_bindings;
 use libc::*;
 use std::process;
 use std::mem;
-// use std::os::unix::prelude::*;
-// use std::ffi::{OsString, CStr};
+use std::os::unix::prelude::*;
+use std::ffi::{OsString, CStr};
 use std::process::Command;
 use std::process::Stdio;
 use regex::Regex;
@@ -75,7 +75,7 @@ fn get_nm_address(pid: pid_t) -> u64 {
     });
     let address_str = cap.get(1).unwrap().as_str();
     let addr = u64::from_str_radix(address_str, 16).unwrap();
-    println!("get_nm_address: {:x}", addr);
+    debug!("get_nm_address: {:x}", addr);
     addr
 }
 
@@ -97,7 +97,7 @@ fn get_maps_address(pid: pid_t) -> u64 {
     let cap = re.captures(&output).unwrap();
     let address_str = cap.get(1).unwrap().as_str();
     let addr = u64::from_str_radix(address_str, 16).unwrap();
-    println!("get_maps_address: {:x}", addr);
+    debug!("get_maps_address: {:x}", addr);
     addr
 }
 
@@ -141,8 +141,8 @@ pub fn get_ruby_current_thread_address(pid: pid_t) -> u64 {
     // addresses together we get our answers! All this is Linux-specific but
     // this program only works on Linux anyway because of process_vm_readv.
     //
-    println!("{:x}", get_nm_address(pid));
-    println!("{:x}", get_maps_address(pid));
+    debug!("{:x}", get_nm_address(pid));
+    debug!("{:x}", get_maps_address(pid));
     let addr = get_nm_address(pid) + get_maps_address(pid);
     debug!("get_ruby_current_thread_address: {:x}", addr);
     addr
@@ -154,7 +154,7 @@ pub fn get_ruby_current_thread_address(pid: pid_t) -> u64 {
     //   address in the binary via `nm`.
     let base_address = 0x100000000;
     let addr = get_nm_address(pid) + (get_maps_address(pid) - base_address);
-    println!("get_ruby_current_thread_address: {:x}", addr);
+    debug!("get_ruby_current_thread_address: {:x}", addr);
     addr
 }
 
@@ -197,68 +197,49 @@ pub fn print_stack_trace(trace: &[String]) {
 //     None
 // }
 
-//fn get_ruby_string2(addr: u64, source_pid: &ProcessHandle, lookup_table: &DwarfLookup, types: &DwarfTypes) -> OsString
-//{
-//     let vec = {
-//        let rstring = copy_address_dynamic(addr as *const c_void, lookup_table, source_pid, &types.rstring);
-//        let basic =  map_bytes_to_struct(&rstring["basic"], lookup_table, &types.rbasic);
-//        let is_array = (read_pointer_address(&basic["flags"]) & 1 << 13) == 0;
-//        if is_array {
-//           // println!("it's an array!!!!");
-//           // println!("rstring {:#?}", rstring);
-//           unsafe { CStr::from_ptr(rstring["as"].as_ptr() as *const i8) }.to_bytes().to_vec()
-//        } else {
-//            let entry = &types.rstring;
-//                // println!("entry: {:?}", entry);
-//            let as_type = get_child(&entry, "as").unwrap();
-//            let blah = lookup_table.lookup_entry(as_type).unwrap();
-//            // println!("blah: {:?}", blah);
-//            let heap_type = get_child(&blah, "heap").unwrap();
-//            let blah2 = lookup_table.lookup_entry(heap_type).unwrap();
-//            let hashmap = map_bytes_to_struct(&rstring["as"], lookup_table, blah2);
-//            copy_address_raw(
-//                read_pointer_address(&hashmap["ptr"]) as *const c_void,
-//                read_pointer_address(&hashmap["len"]) as usize,
-//                source_pid)
-//        }
-//    };
-//    OsString::from_vec(vec)
-//}
+fn get_ruby_string2(addr: u64, source_pid: &ProcessHandle) -> OsString
+{
+     let vec = {
+        let rstring: RString = copy_struct(addr, source_pid);
+        let basic = rstring.basic;
+        let is_array = basic.flags & 1 << 13 == 0;
+        if is_array {
+            unsafe { CStr::from_ptr(rstring.as_.ary.as_ref().as_ptr() as *const i8) }.to_bytes().to_vec()
+        } else {
+            unsafe {
+                let addr = rstring.as_.heap.as_ref().ptr as u64;
+                let len = rstring.as_.heap.as_ref().len as usize;
+                copy_address_raw(addr as *const c_void, len, source_pid)
+            }
+        }
+    };
+    OsString::from_vec(vec)
+}
 
-//fn get_label_and_path(cfp_bytes: &ruby_bindings::rb_control_frame_struct, source_pid: &ProcessHandle) -> Option<(OsString, OsString)>
-//{
-//    trace!("get_label_and_path {:?}", cfp_bytes);
-//    let iseq_address = cfp_bytes.iseq;
-//    let blah3: ruby_bindings::rb_iseq_struct = copy_struct(iseq_address as *const c_void, source_pid);
-//    let location = if blah3.contains_key("location") {
-//        map_bytes_to_struct(&blah3["location"], &lookup_table, &types.rb_iseq_location_struct)
-//    } else if blah3.contains_key("body") {
-//        let body = read_pointer_address(&blah3["body"]);
-//        match types.rb_iseq_constant_body {
-//            Some(ref constant_body_type) => {
-//                let blah4 = copy_address_dynamic(body as *const c_void, &lookup_table, source_pid, &constant_body_type);
-//                map_bytes_to_struct(&blah4["location"], &lookup_table, &types.rb_iseq_location_struct)
-//            }
-//            None => panic!("rb_iseq_constant_body shouldn't be missing"),
-//        }
-//    } else {
-//        panic!("DON'T KNOW WHERE LOCATION IS");
-//    };
-//    let label_address = read_pointer_address(&location["label"]);
-//    let path_address = read_pointer_address(&location["path"]);
-//    let label = get_ruby_string2(label_address, source_pid, lookup_table, types);
-//    let path = get_ruby_string2(path_address, source_pid, lookup_table, types);
-//    if path.to_string_lossy() == "" {
-//        trace!("get_label_and_path ret None");
-//        return None;
-//    }
-//    // println!("label_address: {}, path_address: {}", label_address, path_address);
-//    // println!("location hash: {:#?}", location);
-//    let ret = Some((label, path));
-//
-//    trace!("get_label_and_path ret {:?}", ret);
-//    ret
-//}
+fn get_label_and_path(cfp: &rb_control_frame_struct, source_pid: &ProcessHandle) // -> Option<(OsString, OsString)>
+{
+    trace!("get_label_and_path {:?}", cfp);
+    let iseq_address = cfp.iseq as u64;
+    let iseq_struct: rb_iseq_struct = copy_struct(iseq_address, source_pid);
+    debug!("{:?}", iseq_struct);
+    let location = iseq_struct.location;
+    let label: OsString = get_ruby_string2(location.label as u64, source_pid);
+    let path: OsString = get_ruby_string2(location.path as u64, source_pid);
+    println!("{:?} - {:?}", label, path);
+
+    // let label = get_ruby_string2(label_address, source_pid, lookup_table, types);
+    // let path = get_ruby_string2(path_address, source_pid, lookup_table, types);
+    // if path.to_string_lossy() == "" {
+    //     trace!("get_label_and_path ret None");
+    //     return None;
+    // }
+    // // println!("label_address: {}, path_address: {}", label_address, path_address);
+    // // println!("location hash: {:#?}", location);
+    // let ret = Some((label, path));
+
+    // trace!("get_label_and_path ret {:?}", ret);
+    // ret
+}
 
 // Ruby stack grows down, starting at
 //   ruby_current_thread->stack + ruby_current_thread->stack_size - 1 * sizeof(rb_control_frame_t)
@@ -268,7 +249,7 @@ pub fn print_stack_trace(trace: &[String]) {
 // The base of the call stack is therefore at
 //   stack + stack_size * sizeof(VALUE) - sizeof(rb_control_frame_t)
 // (with everything in bytes).
- fn get_cfps(thread: &rb_thread_t, source_pid: &ProcessHandle) -> (Vec<rb_control_frame_struct>, usize)
+ fn get_cfps(thread: &rb_thread_t, source_pid: &ProcessHandle) -> Vec<rb_control_frame_struct>
  {
      let cfp_address = thread.cfp as u64;
 
@@ -289,11 +270,10 @@ pub fn print_stack_trace(trace: &[String]) {
          // complete control of the allocation to which `p` points.
          // Put everything back together into a Vec
          mem::forget(ret);
-         Vec::from_raw_parts(p as *mut rb_control_frame_struct, cap / cfp_size, cap)
+         Vec::from_raw_parts(p as *mut rb_control_frame_struct, cap / (cfp_size as usize), cap)
      };
 
- 
-     (rebuilt, 3)
+     rebuilt
  }
 
 fn copy_address_raw(addr: *const c_void, length: usize, source_pid: &ProcessHandle) -> Vec<u8>
@@ -309,22 +289,22 @@ fn copy_address_raw(addr: *const c_void, length: usize, source_pid: &ProcessHand
 
 fn copy_struct<U>(addr: u64, source_pid: &ProcessHandle) -> U {
     let result = copy_address_raw(addr as *const c_void, mem::size_of::<U>(), source_pid);
-    println!("{:?}", result);
+    debug!("{:?}", result);
     let s: U = unsafe { std::ptr::read(result.as_ptr() as *const _) };
     s
 }
 
 pub fn get_stack_trace(ruby_current_thread_address_location: u64, source_pid: &ProcessHandle)//  -> Vec<String>
 {
-    println!("current address location: {:x}", ruby_current_thread_address_location);
+    debug!("current address location: {:x}", ruby_current_thread_address_location);
     let current_thread_addr: u64 = copy_struct(ruby_current_thread_address_location, source_pid);
-    println!("{:x}", current_thread_addr);
+    debug!("{:x}", current_thread_addr);
     let thread: rb_thread_t = copy_struct(current_thread_addr, source_pid);
-    println!("{:?}", thread);
-    let (x, a) = get_cfps(&thread, source_pid);
-    println!("{:?}", x);
-//     let (cfp_bytes, cfp_size) = get_cfps(ruby_current_thread_address_location, source_pid, lookup_table, types);
-//     let mut trace: Vec<String> = Vec::new();
+    debug!("{:?}", thread);
+    let cfps = get_cfps(&thread, source_pid);
+    for cfp in cfps.iter() {
+        get_label_and_path(&cfp, source_pid);
+    }
 //     for i in 0..cfp_bytes.len() / cfp_size {
 //         match get_label_and_path(&cfp_bytes[(cfp_size*i)..cfp_size * (i+1)].to_vec(), source_pid, lookup_table, types) {
 //             None => continue,
