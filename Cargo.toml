@@ -8,7 +8,7 @@ build = "build.rs"
 
 [dependencies]
 libc = "0.2.15"
-regex = "0.1"
+regex = "0.2.3"
 term = "0.2"
 clap = "2"
 byteorder = "0.5"
