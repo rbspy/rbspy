@@ -58,11 +58,11 @@ fn main() {
     if command == "stackcollapse" {
         // This gets a stack trace and then just prints it out
         // in a format that Brendan Gregg's stackcollapse.pl script understands
-        //loop {
-            get_stack_trace(ruby_current_thread_address_location,
+        loop {
+            let trace = get_stack_trace(ruby_current_thread_address_location,
                                         &source);
-            /// println!("{:?}", trace);
+            println!("{:?}", trace);
             thread::sleep(Duration::from_millis(100));
-        //}
+        }
     }
 }

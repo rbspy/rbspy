@@ -183,21 +183,7 @@ pub fn print_stack_trace(trace: &[String]) {
     println!("{}", 1);
 }
 
-// fn read_pointer_address(vec: &[u8]) -> u64 {
-//     let mut rdr = Cursor::new(vec);
-//     rdr.read_u64::<NativeEndian>().unwrap()
-// }
-// 
-// fn get_child<'a>(entry: &'a Entry, name: &'a str) -> Option<&'a Entry>{
-//     for child in &entry.children {
-//         if child.name == Some(name.to_string()) {
-//             return Some(child);
-//         }
-//     }
-//     None
-// }
-
-fn get_ruby_string2(addr: u64, source_pid: &ProcessHandle) -> OsString
+fn get_ruby_string(addr: u64, source_pid: &ProcessHandle) -> OsString
 {
      let vec = {
         let rstring: RString = copy_struct(addr, source_pid);
@@ -216,29 +202,17 @@ fn get_ruby_string2(addr: u64, source_pid: &ProcessHandle) -> OsString
     OsString::from_vec(vec)
 }
 
-fn get_label_and_path(cfp: &rb_control_frame_struct, source_pid: &ProcessHandle) // -> Option<(OsString, OsString)>
+fn get_label_and_path(cfp: &rb_control_frame_struct, source_pid: &ProcessHandle) -> (OsString, OsString)
 {
     trace!("get_label_and_path {:?}", cfp);
     let iseq_address = cfp.iseq as u64;
     let iseq_struct: rb_iseq_struct = copy_struct(iseq_address, source_pid);
     debug!("{:?}", iseq_struct);
     let location = iseq_struct.location;
-    let label: OsString = get_ruby_string2(location.label as u64, source_pid);
-    let path: OsString = get_ruby_string2(location.path as u64, source_pid);
+    let label: OsString = get_ruby_string(location.label as u64, source_pid);
+    let path: OsString = get_ruby_string(location.path as u64, source_pid);
     println!("{:?} - {:?}", label, path);
-
-    // let label = get_ruby_string2(label_address, source_pid, lookup_table, types);
-    // let path = get_ruby_string2(path_address, source_pid, lookup_table, types);
-    // if path.to_string_lossy() == "" {
-    //     trace!("get_label_and_path ret None");
-    //     return None;
-    // }
-    // // println!("label_address: {}, path_address: {}", label_address, path_address);
-    // // println!("location hash: {:#?}", location);
-    // let ret = Some((label, path));
-
-    // trace!("get_label_and_path ret {:?}", ret);
-    // ret
+    (label, path)
 }
 
 // Ruby stack grows down, starting at
@@ -294,26 +268,19 @@ fn copy_struct<U>(addr: u64, source_pid: &ProcessHandle) -> U {
     s
 }
 
-pub fn get_stack_trace(ruby_current_thread_address_location: u64, source_pid: &ProcessHandle)//  -> Vec<String>
+pub fn get_stack_trace(ruby_current_thread_address_location: u64, source_pid: &ProcessHandle) -> Vec<String>
 {
     debug!("current address location: {:x}", ruby_current_thread_address_location);
     let current_thread_addr: u64 = copy_struct(ruby_current_thread_address_location, source_pid);
     debug!("{:x}", current_thread_addr);
     let thread: rb_thread_t = copy_struct(current_thread_addr, source_pid);
     debug!("{:?}", thread);
+    let mut trace = Vec::new();
     let cfps = get_cfps(&thread, source_pid);
     for cfp in cfps.iter() {
-        get_label_and_path(&cfp, source_pid);
+        let (label, path) = get_label_and_path(&cfp, source_pid);
+        let current_location = format!("{} : {}", label.to_string_lossy(), path.to_string_lossy()).to_string();
+        trace.push(current_location);
     }
-//     for i in 0..cfp_bytes.len() / cfp_size {
-//         match get_label_and_path(&cfp_bytes[(cfp_size*i)..cfp_size * (i+1)].to_vec(), source_pid, lookup_table, types) {
-//             None => continue,
-//             Some((label, path)) => {
-//                 let current_location =
-//                     format!("{} : {}", label.to_string_lossy(), path.to_string_lossy()).to_string();
-//                 trace.push(current_location);
-//             }
-//         }
-//     }
-//     trace
+    trace
 }
