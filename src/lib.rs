@@ -40,7 +40,7 @@ pub mod test_utils;
 // except that they're more copmlicated and sometimes call `copy_address_raw`.
 //
 // `get_cfps` corresponds to
-// (* const rb_thread t *(ruby_current_thread_address_location))->cfp
+// (* const rb_thread_t *(ruby_current_thread_address_location))->cfp
 //
 // `get_ruby_string` is doing ((Struct RString *) address) and then
 // trying one of two ways to get the actual Ruby string out depending
