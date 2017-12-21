@@ -1,6 +1,8 @@
+set -eux
 echo "#include </tmp/headers/$1/vm_core.h>" > /tmp/wrapper.h
+OUT=src/bindings/ruby_${1}.rs
 bindgen /tmp/wrapper.h \
-    -o src/bindings/ruby_${1}.rs \
+    -o /tmp/bindings.rs \
     --impl-debug true \
     --no-doc-comments \
     --whitelist-type rb_iseq_constant_body \
@@ -16,4 +18,9 @@ bindgen /tmp/wrapper.h \
     -I/home/bork/scratch/ruby-header-files/general -I/home/bork/scratch/ruby-header-files/$1/ \
     -I/usr/lib/llvm-3.8/lib/clang/3.8.0/include/
 
-rustfmt --force src/bindings/ruby_${1}.rs
+#rustfmt --force src/bindings/ruby_${1}.rs
+
+echo "#![allow(non_upper_case_globals)]" > $OUT
+echo "#![allow(non_camel_case_types)]" >> $OUT
+echo "#![allow(non_snake_case)]" >> $OUT
+cat /tmp/bindings.rs >> $OUT

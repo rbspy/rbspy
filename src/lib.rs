@@ -13,7 +13,7 @@ extern crate read_process_memory;
 extern crate clap;
 
 pub mod dwarf;
-pub mod bindings::ruby_2_1_6;
+pub mod bindings;
 
 use libc::*;
 use std::process;
