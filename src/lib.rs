@@ -193,8 +193,8 @@ fn get_ruby_string(addr: u64, source_pid: &ProcessHandle) -> OsString
             unsafe { CStr::from_ptr(rstring.as_.ary.as_ref().as_ptr() as *const i8) }.to_bytes().to_vec()
         } else {
             unsafe {
-                let addr = rstring.as_.heap.as_ref().ptr as u64;
-                let len = rstring.as_.heap.as_ref().len as usize;
+                let addr = rstring.as_.heap.ptr as u64;
+                let len = rstring.as_.heap.len as usize;
                 copy_address_raw(addr as *const c_void, len, source_pid)
             }
         }
@@ -233,10 +233,10 @@ fn get_label_and_path(cfp: &rb_control_frame_struct, source_pid: &ProcessHandle)
      let cfp_size = mem::size_of::<rb_control_frame_struct>() as u64;
  
      let stack_base = stack + stack_size * value_size - 1 * cfp_size;
+    debug!("cfp addr: {:x}", cfp_address as usize);
      let mut ret = copy_address_raw(cfp_address as *const c_void, (stack_base - cfp_address) as usize, source_pid);
 
      let p = ret.as_mut_ptr();
-     let len = ret.len();
      let cap = ret.capacity();
 
      let rebuilt: Vec<rb_control_frame_struct> = unsafe {

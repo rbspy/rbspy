@@ -31,4 +31,4 @@ lazy_static = "0.2.1"
 
 [build-dependencies]
 rustc_version = "0.1.7"
-bindgen = "0.26.3"
+bindgen = "0.32.1"
