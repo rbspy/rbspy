@@ -17,20 +17,13 @@ pub mod bindings;
 
 use libc::*;
 use std::process;
-use std::mem;
-use std::os::unix::prelude::*;
-use std::ffi::{OsString, CStr};
 use std::process::Command;
 use std::process::Stdio;
 use regex::Regex;
 use std::collections::HashMap;
 
-use bindings::ruby_2_1_6::*;
-use read_process_memory::*;
 
 pub mod test_utils;
-
-
 
 // These three functions (get_cfps, get_iseq, and get_ruby_string) are the
 // core of how the program works. They're essentially a straight port of
@@ -183,104 +176,114 @@ pub fn print_stack_trace(trace: &[String]) {
     println!("{}", 1);
 }
 
-fn get_ruby_string(addr: u64, source_pid: &ProcessHandle) -> OsString
-{
-     let vec = {
-        let rstring: RString = copy_struct(addr, source_pid);
-        let basic = rstring.basic;
-        let is_array = basic.flags & 1 << 13 == 0;
-        if is_array {
-            unsafe { CStr::from_ptr(rstring.as_.ary.as_ref().as_ptr() as *const i8) }.to_bytes().to_vec()
-        } else {
-            unsafe {
-                let addr = rstring.as_.heap.ptr as u64;
-                let len = rstring.as_.heap.len as usize;
-                copy_address_raw(addr as *const c_void, len, source_pid)
-            }
+pub mod stack_trace {
+    use std;
+    use bindings::ruby_2_2_0::*;
+    use libc::*;
+    use read_process_memory::*;
+    use std::ffi::{OsString, CStr};
+    use std::mem;
+    use std::os::unix::prelude::*;
+
+    pub fn get_stack_trace(ruby_current_thread_address_location: u64, source_pid: &ProcessHandle) -> Vec<String>
+    {
+        debug!("current address location: {:x}", ruby_current_thread_address_location);
+        let current_thread_addr: u64 = copy_struct(ruby_current_thread_address_location, source_pid);
+        debug!("{:x}", current_thread_addr);
+        let thread: rb_thread_t = copy_struct(current_thread_addr, source_pid);
+        debug!("{:?}", thread);
+        let mut trace = Vec::new();
+        let cfps = get_cfps(&thread, source_pid);
+        for cfp in cfps.iter() {
+            let (label, path) = get_label_and_path(&cfp, source_pid);
+            let current_location = format!("{} : {}", label.to_string_lossy(), path.to_string_lossy()).to_string();
+            trace.push(current_location);
         }
-    };
-    OsString::from_vec(vec)
-}
-
-fn get_label_and_path(cfp: &rb_control_frame_struct, source_pid: &ProcessHandle) -> (OsString, OsString)
-{
-    trace!("get_label_and_path {:?}", cfp);
-    let iseq_address = cfp.iseq as u64;
-    let iseq_struct: rb_iseq_struct = copy_struct(iseq_address, source_pid);
-    debug!("{:?}", iseq_struct);
-    let location = iseq_struct.location;
-    let label: OsString = get_ruby_string(location.label as u64, source_pid);
-    let path: OsString = get_ruby_string(location.path as u64, source_pid);
-    println!("{:?} - {:?}", label, path);
-    (label, path)
-}
-
-// Ruby stack grows down, starting at
-//   ruby_current_thread->stack + ruby_current_thread->stack_size - 1 * sizeof(rb_control_frame_t)
-// I don't know what the -1 is about. Also note that the stack_size is *not* in bytes! stack is a
-// VALUE*, and so stack_size is in units of sizeof(VALUE).
-//
-// The base of the call stack is therefore at
-//   stack + stack_size * sizeof(VALUE) - sizeof(rb_control_frame_t)
-// (with everything in bytes).
- fn get_cfps(thread: &rb_thread_t, source_pid: &ProcessHandle) -> Vec<rb_control_frame_struct>
- {
-     let cfp_address = thread.cfp as u64;
-
-     let stack = thread.stack as u64;
-     let stack_size = thread.stack_size as u64;
-     let value_size = mem::size_of::<VALUE>() as u64;
-     let cfp_size = mem::size_of::<rb_control_frame_struct>() as u64;
- 
-     let stack_base = stack + stack_size * value_size - 1 * cfp_size;
-    debug!("cfp addr: {:x}", cfp_address as usize);
-     let mut ret = copy_address_raw(cfp_address as *const c_void, (stack_base - cfp_address) as usize, source_pid);
-
-     let p = ret.as_mut_ptr();
-     let cap = ret.capacity();
-
-     let rebuilt: Vec<rb_control_frame_struct> = unsafe {
-         // Cast `v` into the void: no destructor run, so we are in
-         // complete control of the allocation to which `p` points.
-         // Put everything back together into a Vec
-         mem::forget(ret);
-         Vec::from_raw_parts(p as *mut rb_control_frame_struct, cap / (cfp_size as usize), cap)
-     };
-
-     rebuilt
- }
-
-fn copy_address_raw(addr: *const c_void, length: usize, source_pid: &ProcessHandle) -> Vec<u8>
-{
-    debug!("copy_address_raw: addr: {:x}", addr as usize);
-    let mut copy = vec![0; length];
-    match source_pid.copy_address(addr as usize, &mut copy) {
-        Ok(_) => {}
-        Err(e) => warn!("copy_address failed for {:p}: {:?}", addr, e),
+        trace
     }
-    copy
-}
 
-fn copy_struct<U>(addr: u64, source_pid: &ProcessHandle) -> U {
-    let result = copy_address_raw(addr as *const c_void, mem::size_of::<U>(), source_pid);
-    debug!("{:?}", result);
-    let s: U = unsafe { std::ptr::read(result.as_ptr() as *const _) };
-    s
-}
-
-pub fn get_stack_trace(ruby_current_thread_address_location: u64, source_pid: &ProcessHandle) -> Vec<String>
-{
-    debug!("current address location: {:x}", ruby_current_thread_address_location);
-    let current_thread_addr: u64 = copy_struct(ruby_current_thread_address_location, source_pid);
-    debug!("{:x}", current_thread_addr);
-    let thread: rb_thread_t = copy_struct(current_thread_addr, source_pid);
-    debug!("{:?}", thread);
-    let mut trace = Vec::new();
-    let cfps = get_cfps(&thread, source_pid);
-    for cfp in cfps.iter() {
-        let (label, path) = get_label_and_path(&cfp, source_pid);
-        let current_location = format!("{} : {}", label.to_string_lossy(), path.to_string_lossy()).to_string();
-        trace.push(current_location);
+    fn copy_address_raw(addr: *const c_void, length: usize, source_pid: &ProcessHandle) -> Vec<u8>
+    {
+        debug!("copy_address_raw: addr: {:x}", addr as usize);
+        let mut copy = vec![0; length];
+        match source_pid.copy_address(addr as usize, &mut copy) {
+            Ok(_) => {}
+            Err(e) => warn!("copy_address failed for {:p}: {:?}", addr, e),
+        }
+        copy
     }
-    trace
+
+    fn copy_struct<U>(addr: u64, source_pid: &ProcessHandle) -> U {
+        let result = copy_address_raw(addr as *const c_void, mem::size_of::<U>(), source_pid);
+        debug!("{:?}", result);
+        let s: U = unsafe { std::ptr::read(result.as_ptr() as *const _) };
+        s
+    }
+
+    fn get_ruby_string(addr: u64, source_pid: &ProcessHandle) -> OsString
+    {
+        let vec = {
+            let rstring: RString = copy_struct(addr, source_pid);
+            let basic = rstring.basic;
+            let is_array = basic.flags & 1 << 13 == 0;
+            if is_array {
+                unsafe { CStr::from_ptr(rstring.as_.ary.as_ref().as_ptr() as *const i8) }.to_bytes().to_vec()
+            } else {
+                unsafe {
+                    let addr = rstring.as_.heap.ptr as u64;
+                    let len = rstring.as_.heap.len as usize;
+                    copy_address_raw(addr as *const c_void, len, source_pid)
+                }
+            }
+        };
+        OsString::from_vec(vec)
+    }
+
+    fn get_label_and_path(cfp: &rb_control_frame_struct, source_pid: &ProcessHandle) -> (OsString, OsString)
+    {
+        trace!("get_label_and_path {:?}", cfp);
+        let iseq_address = cfp.iseq as u64;
+        let iseq_struct: rb_iseq_struct = copy_struct(iseq_address, source_pid);
+        debug!("{:?}", iseq_struct);
+        let location = iseq_struct.location;
+        let label: OsString = get_ruby_string(location.label as u64, source_pid);
+        let path: OsString = get_ruby_string(location.path as u64, source_pid);
+        println!("{:?} - {:?}", label, path);
+        (label, path)
+    }
+
+    // Ruby stack grows down, starting at
+    //   ruby_current_thread->stack + ruby_current_thread->stack_size - 1 * sizeof(rb_control_frame_t)
+    // I don't know what the -1 is about. Also note that the stack_size is *not* in bytes! stack is a
+    // VALUE*, and so stack_size is in units of sizeof(VALUE).
+    //
+    // The base of the call stack is therefore at
+    //   stack + stack_size * sizeof(VALUE) - sizeof(rb_control_frame_t)
+    // (with everything in bytes).
+    fn get_cfps(thread: &rb_thread_t, source_pid: &ProcessHandle) -> Vec<rb_control_frame_struct>
+    {
+        let cfp_address = thread.cfp as u64;
+
+        let stack = thread.stack as u64;
+        let stack_size = thread.stack_size as u64;
+        let value_size = mem::size_of::<VALUE>() as u64;
+        let cfp_size = mem::size_of::<rb_control_frame_struct>() as u64;
+
+        let stack_base = stack + stack_size * value_size - 1 * cfp_size;
+        debug!("cfp addr: {:x}", cfp_address as usize);
+        let mut ret = copy_address_raw(cfp_address as *const c_void, (stack_base - cfp_address) as usize, source_pid);
+
+        let p = ret.as_mut_ptr();
+        let cap = ret.capacity();
+
+        let rebuilt: Vec<rb_control_frame_struct> = unsafe {
+            // Cast `v` into the void: no destructor run, so we are in
+            // complete control of the allocation to which `p` points.
+            // Put everything back together into a Vec
+            mem::forget(ret);
+            Vec::from_raw_parts(p as *mut rb_control_frame_struct, cap / (cfp_size as usize), cap)
+        };
+
+        rebuilt
+    }
 }
