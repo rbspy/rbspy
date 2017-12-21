@@ -1,8 +1,10 @@
 #![cfg_attr(rustc_nightly, feature(test))]
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 
 #[cfg(test)]
-#[macro_use] extern crate lazy_static;
+#[macro_use]
+extern crate lazy_static;
 
 extern crate libc;
 extern crate regex;
@@ -55,15 +57,20 @@ fn get_nm_address(pid: pid_t) -> u64 {
         .output()
         .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
     if !nm_command.status.success() {
-        panic!("failed to execute process: {}", String::from_utf8(nm_command.stderr).unwrap())
+        panic!(
+            "failed to execute process: {}",
+            String::from_utf8(nm_command.stderr).unwrap()
+        )
     }
 
     let nm_output = String::from_utf8(nm_command.stdout).unwrap();
     let re = Regex::new(r"(\w+) [bs] _?ruby_current_thread").unwrap();
     let cap = re.captures(&nm_output).unwrap_or_else(|| {
-        println!("Error: Couldn't find current thread in Ruby process. This is probably because \
+        println!(
+            "Error: Couldn't find current thread in Ruby process. This is probably because \
                   either this isn't a Ruby process or you have a Ruby version compiled with no \
-                  symbols.");
+                  symbols."
+        );
         process::exit(1)
     });
     let address_str = cap.get(1).unwrap().as_str();
@@ -72,7 +79,7 @@ fn get_nm_address(pid: pid_t) -> u64 {
     addr
 }
 
-#[cfg(target_os="linux")]
+#[cfg(target_os = "linux")]
 fn get_maps_address(pid: pid_t) -> u64 {
     let cat_command = Command::new("cat")
         .arg(format!("/proc/{}/maps", pid))
@@ -82,7 +89,10 @@ fn get_maps_address(pid: pid_t) -> u64 {
         .output()
         .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
     if !cat_command.status.success() {
-        panic!("failed to execute process: {}", String::from_utf8(cat_command.stderr).unwrap())
+        panic!(
+            "failed to execute process: {}",
+            String::from_utf8(cat_command.stderr).unwrap()
+        )
     }
 
     let output = String::from_utf8(cat_command.stdout).unwrap();
@@ -96,7 +106,7 @@ fn get_maps_address(pid: pid_t) -> u64 {
 
 use std::iter::Iterator;
 
-#[cfg(target_os="macos")]
+#[cfg(target_os = "macos")]
 fn get_maps_address(pid: pid_t) -> u64 {
     let vmmap_command = Command::new("vmmap")
         .arg(format!("{}", pid))
@@ -106,16 +116,22 @@ fn get_maps_address(pid: pid_t) -> u64 {
         .output()
         .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
     if !vmmap_command.status.success() {
-        panic!("failed to execute process: {}", String::from_utf8(vmmap_command.stderr).unwrap())
+        panic!(
+            "failed to execute process: {}",
+            String::from_utf8(vmmap_command.stderr).unwrap()
+        )
     }
 
     let output = String::from_utf8(vmmap_command.stdout).unwrap();
 
-    let lines: Vec<&str> = output.split("\n")
+    let lines: Vec<&str> = output
+        .split("\n")
         .filter(|line| line.contains("bin/ruby"))
         .filter(|line| line.contains("__TEXT"))
         .collect();
-    let line = lines.first().expect("No `__TEXT` line found for `bin/ruby` in vmmap output");
+    let line = lines.first().expect(
+        "No `__TEXT` line found for `bin/ruby` in vmmap output",
+    );
 
     let re = Regex::new(r"([0-9a-f]+)").unwrap();
     let cap = re.captures(&line).unwrap();
@@ -125,7 +141,7 @@ fn get_maps_address(pid: pid_t) -> u64 {
     addr
 }
 
-#[cfg(target_os="linux")]
+#[cfg(target_os = "linux")]
 pub fn get_ruby_current_thread_address(pid: pid_t) -> u64 {
     // Get the address of the `ruby_current_thread` global variable. It works
     // by looking up the address in the Ruby binary's symbol table with `nm
@@ -141,7 +157,7 @@ pub fn get_ruby_current_thread_address(pid: pid_t) -> u64 {
     addr
 }
 
-#[cfg(target_os="macos")]
+#[cfg(target_os = "macos")]
 pub fn get_ruby_current_thread_address(pid: pid_t) -> u64 {
     // TODO: Make this actually look up the `__mh_execute_header` base
     //   address in the binary via `nm`.
@@ -151,9 +167,11 @@ pub fn get_ruby_current_thread_address(pid: pid_t) -> u64 {
     addr
 }
 
-pub fn print_method_stats(method_stats: &HashMap<String, u32>,
-                      method_own_time_stats: &HashMap<String, u32>,
-                      n_terminal_lines: usize) {
+pub fn print_method_stats(
+    method_stats: &HashMap<String, u32>,
+    method_own_time_stats: &HashMap<String, u32>,
+    n_terminal_lines: usize,
+) {
     println!("[{}c", 27 as char); // clear the screen
     let mut count_vec: Vec<_> = method_own_time_stats.iter().collect();
     count_vec.sort_by(|a, b| b.1.cmp(a.1));
@@ -162,10 +180,12 @@ pub fn print_method_stats(method_stats: &HashMap<String, u32>,
     let total_sum: u32 = *method_stats.values().max().unwrap();
     for &(method, count) in count_vec.iter().take(n_terminal_lines - 1) {
         let total_count = method_stats.get(&method[..]).unwrap();
-        println!(" {:02.1}% | {:02.1}% | {}",
-                 100.0 * (*count as f32) / (self_sum as f32),
-                 100.0 * (*total_count as f32) / (total_sum as f32),
-                 method);
+        println!(
+            " {:02.1}% | {:02.1}% | {}",
+            100.0 * (*count as f32) / (self_sum as f32),
+            100.0 * (*total_count as f32) / (total_sum as f32),
+            method
+        );
     }
 }
 
@@ -185,10 +205,16 @@ pub mod stack_trace {
     use std::mem;
     use std::os::unix::prelude::*;
 
-    pub fn get_stack_trace(ruby_current_thread_address_location: u64, source_pid: &ProcessHandle) -> Vec<String>
-    {
-        debug!("current address location: {:x}", ruby_current_thread_address_location);
-        let current_thread_addr: u64 = copy_struct(ruby_current_thread_address_location, source_pid);
+    pub fn get_stack_trace(
+        ruby_current_thread_address_location: u64,
+        source_pid: &ProcessHandle,
+    ) -> Vec<String> {
+        debug!(
+            "current address location: {:x}",
+            ruby_current_thread_address_location
+        );
+        let current_thread_addr: u64 =
+            copy_struct(ruby_current_thread_address_location, source_pid);
         debug!("{:x}", current_thread_addr);
         let thread: rb_thread_t = copy_struct(current_thread_addr, source_pid);
         debug!("{:?}", thread);
@@ -196,14 +222,14 @@ pub mod stack_trace {
         let cfps = get_cfps(&thread, source_pid);
         for cfp in cfps.iter() {
             let (label, path) = get_label_and_path(&cfp, source_pid);
-            let current_location = format!("{} : {}", label.to_string_lossy(), path.to_string_lossy()).to_string();
+            let current_location =
+                format!("{} : {}", label.to_string_lossy(), path.to_string_lossy()).to_string();
             trace.push(current_location);
         }
         trace
     }
 
-    fn copy_address_raw(addr: *const c_void, length: usize, source_pid: &ProcessHandle) -> Vec<u8>
-    {
+    fn copy_address_raw(addr: *const c_void, length: usize, source_pid: &ProcessHandle) -> Vec<u8> {
         debug!("copy_address_raw: addr: {:x}", addr as usize);
         let mut copy = vec![0; length];
         match source_pid.copy_address(addr as usize, &mut copy) {
@@ -220,14 +246,15 @@ pub mod stack_trace {
         s
     }
 
-    fn get_ruby_string(addr: u64, source_pid: &ProcessHandle) -> OsString
-    {
+    fn get_ruby_string(addr: u64, source_pid: &ProcessHandle) -> OsString {
         let vec = {
             let rstring: RString = copy_struct(addr, source_pid);
             let basic = rstring.basic;
             let is_array = basic.flags & 1 << 13 == 0;
             if is_array {
-                unsafe { CStr::from_ptr(rstring.as_.ary.as_ref().as_ptr() as *const i8) }.to_bytes().to_vec()
+                unsafe { CStr::from_ptr(rstring.as_.ary.as_ref().as_ptr() as *const i8) }
+                    .to_bytes()
+                    .to_vec()
             } else {
                 unsafe {
                     let addr = rstring.as_.heap.ptr as u64;
@@ -239,8 +266,10 @@ pub mod stack_trace {
         OsString::from_vec(vec)
     }
 
-    fn get_label_and_path(cfp: &rb_control_frame_struct, source_pid: &ProcessHandle) -> (OsString, OsString)
-    {
+    fn get_label_and_path(
+        cfp: &rb_control_frame_struct,
+        source_pid: &ProcessHandle,
+    ) -> (OsString, OsString) {
         trace!("get_label_and_path {:?}", cfp);
         let iseq_address = cfp.iseq as u64;
         let iseq_struct: rb_iseq_struct = copy_struct(iseq_address, source_pid);
@@ -260,8 +289,7 @@ pub mod stack_trace {
     // The base of the call stack is therefore at
     //   stack + stack_size * sizeof(VALUE) - sizeof(rb_control_frame_t)
     // (with everything in bytes).
-    fn get_cfps(thread: &rb_thread_t, source_pid: &ProcessHandle) -> Vec<rb_control_frame_struct>
-    {
+    fn get_cfps(thread: &rb_thread_t, source_pid: &ProcessHandle) -> Vec<rb_control_frame_struct> {
         let cfp_address = thread.cfp as u64;
 
         let stack = thread.stack as u64;
@@ -271,7 +299,11 @@ pub mod stack_trace {
 
         let stack_base = stack + stack_size * value_size - 1 * cfp_size;
         debug!("cfp addr: {:x}", cfp_address as usize);
-        let mut ret = copy_address_raw(cfp_address as *const c_void, (stack_base - cfp_address) as usize, source_pid);
+        let mut ret = copy_address_raw(
+            cfp_address as *const c_void,
+            (stack_base - cfp_address) as usize,
+            source_pid,
+        );
 
         let p = ret.as_mut_ptr();
         let cap = ret.capacity();
@@ -281,7 +313,11 @@ pub mod stack_trace {
             // complete control of the allocation to which `p` points.
             // Put everything back together into a Vec
             mem::forget(ret);
-            Vec::from_raw_parts(p as *mut rb_control_frame_struct, cap / (cfp_size as usize), cap)
+            Vec::from_raw_parts(
+                p as *mut rb_control_frame_struct,
+                cap / (cfp_size as usize),
+                cap,
+            )
         };
 
         rebuilt
