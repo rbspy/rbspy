@@ -13,7 +13,7 @@ extern crate read_process_memory;
 extern crate clap;
 
 pub mod dwarf;
-pub mod ruby_bindings;
+pub mod bindings::ruby_2_1_6;
 
 use libc::*;
 use std::process;
@@ -25,7 +25,7 @@ use std::process::Stdio;
 use regex::Regex;
 use std::collections::HashMap;
 
-use ruby_bindings::ruby_bindings::*;
+use bindings::ruby_2_1_6::*;
 use read_process_memory::*;
 
 pub mod test_utils;
