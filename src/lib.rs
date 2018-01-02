@@ -104,7 +104,7 @@ pub mod address_finder {
 
     pub fn get_api_version(pid: pid_t) -> Result<String, Box<std::error::Error>> {
         let addr = get_api_address(pid)?;
-        let x: [c_char; 15] = copy_struct(addr, pid);
+        let x: [c_char; 15] = copy_struct(addr, pid)?;
         Ok(unsafe {
             std::ffi::CStr::from_ptr(x.as_ptr() as *mut c_char)
                 .to_str()
@@ -241,22 +241,19 @@ mod copy {
     use read_process_memory::*;
     use std::mem;
     use std;
-    pub fn copy_address_raw(addr: *const c_void, length: usize, source_pid: pid_t) -> Vec<u8> {
+    pub fn copy_address_raw(addr: *const c_void, length: usize, source_pid: pid_t) -> Result<Vec<u8>, Box<std::error::Error>> {
         let source = source_pid.try_into_process_handle().unwrap();
         debug!("copy_address_raw: addr: {:x}", addr as usize);
         let mut copy = vec![0; length];
-        match source.copy_address(addr as usize, &mut copy) {
-            Ok(_) => {}
-            Err(e) => warn!("copy_address failed for {:p}: {:?}", addr, e),
-        }
-        copy
+        source.copy_address(addr as usize, &mut copy)?;
+        Ok(copy)
     }
 
-    pub fn copy_struct<U>(addr: u64, source_pid: pid_t) -> U {
-        let result = copy_address_raw(addr as *const c_void, mem::size_of::<U>(), source_pid);
+    pub fn copy_struct<U>(addr: u64, source_pid: pid_t) -> Result<U, Box<std::error::Error>> {
+        let result = copy_address_raw(addr as *const c_void, mem::size_of::<U>(), source_pid)?;
         debug!("{:?}", result);
         let s: U = unsafe { std::ptr::read(result.as_ptr() as *const _) };
-        s
+        Ok(s)
     }
 }
 
@@ -293,24 +290,24 @@ mod $ruby_version {
     pub fn get_stack_trace(
         ruby_current_thread_address_location: u64,
         source_pid: pid_t,
-    ) -> Vec<String> {
+    ) -> Result<Vec<String>, Box<std::error::Error>> {
         debug!(
             "current address location: {:x}",
             ruby_current_thread_address_location
         );
         let current_thread_addr: u64 =
-            copy_struct(ruby_current_thread_address_location, source_pid);
+            copy_struct(ruby_current_thread_address_location, source_pid)?;
         get_stack_trace2(current_thread_addr, source_pid)
     }
 
     pub fn get_stack_trace2(
         current_thread_addr: u64,
-        source_pid: pid_t) -> Vec<String> {
+        source_pid: pid_t) -> Result<Vec<String>, Box<std::error::Error>> {
         debug!("{:x}", current_thread_addr);
-        let thread: rb_thread_t = copy_struct(current_thread_addr, source_pid);
+        let thread: rb_thread_t = copy_struct(current_thread_addr, source_pid)?;
         debug!("{:?}", thread);
         let mut trace = Vec::new();
-        let mut cfps = get_cfps(&thread, source_pid);
+        let mut cfps = get_cfps(&thread, source_pid)?;
         let slice: &[rb_control_frame_struct] = unsafe {
             std::slice::from_raw_parts(
                 cfps.as_mut_ptr() as *mut rb_control_frame_struct,
@@ -318,22 +315,27 @@ mod $ruby_version {
             )
         };
         for cfp in slice.iter() {
-            let (label, path) = get_label_and_path(&cfp, source_pid);
-            if label.to_string_lossy() != "" && path.to_string_lossy() != "" {
-                let current_location =
-                    format!("{} : {}", label.to_string_lossy(), path.to_string_lossy()).to_string();
-                trace.push(current_location);
+            let result  = get_label_and_path(&cfp, source_pid);
+            match result {
+                Ok((label, path)) => {
+                    let current_location =
+                        format!("{} : {}", label.to_string_lossy(), path.to_string_lossy()).to_string();
+                    trace.push(current_location);
+                }
+                Err(_) => {
+                    warn!("failed to get label and path, ignoring");
+                }
             }
         }
-        trace
+        Ok(trace)
     }
 
 
 
 
-    fn get_ruby_string(addr: u64, source_pid: pid_t) -> OsString {
+    fn get_ruby_string(addr: u64, source_pid: pid_t) -> Result<OsString, Box<std::error::Error>> {
         let vec = {
-            let rstring: RString = copy_struct(addr, source_pid);
+            let rstring: RString = copy_struct(addr, source_pid)?;
             let basic = rstring.basic;
             let is_array = basic.flags & 1 << 13 == 0;
             if is_array {
@@ -344,26 +346,27 @@ mod $ruby_version {
                 unsafe {
                     let addr = rstring.as_.heap.ptr as u64;
                     let len = rstring.as_.heap.len as usize;
-                    copy_address_raw(addr as *const c_void, len, source_pid)
+                    copy_address_raw(addr as *const c_void, len, source_pid)?
                 }
             }
         };
-        OsString::from_vec(vec)
+        Ok(OsString::from_vec(vec))
     }
 
     fn get_label_and_path(
         cfp: &rb_control_frame_struct,
         source_pid: pid_t,
-    ) -> (OsString, OsString) {
-        trace!("get_label_and_path {:?}", cfp);
+    ) -> Result<(OsString, OsString), Box<std::error::Error>> {
+        debug!("get_label_and_path {:?}", cfp);
         let iseq_address = cfp.iseq as u64;
-        let iseq_struct: rb_iseq_struct = copy_struct(iseq_address, source_pid);
+        debug!("iseq_address: {:?}", iseq_address);
+        let iseq_struct: rb_iseq_struct = copy_struct(iseq_address, source_pid)?;
         debug!("{:?}", iseq_struct);
         let location = iseq_struct.location;
-        let label: OsString = get_ruby_string(location.label as u64, source_pid);
-        let path: OsString = get_ruby_string(location.path as u64, source_pid);
+        let label: OsString = get_ruby_string(location.label as u64, source_pid)?;
+        let path: OsString = get_ruby_string(location.path as u64, source_pid)?;
         // println!("{:?} - {:?}", label, path);
-        (label, path)
+        Ok((label, path))
     }
 
     // Ruby stack grows down, starting at
@@ -374,7 +377,7 @@ mod $ruby_version {
     // The base of the call stack is therefore at
     //   stack + stack_size * sizeof(VALUE) - sizeof(rb_control_frame_t)
     // (with everything in bytes).
-    fn get_cfps(thread: &rb_thread_t, source_pid: pid_t) -> Vec<u8> {
+    fn get_cfps(thread: &rb_thread_t, source_pid: pid_t) -> Result<Vec<u8>, Box<std::error::Error>> {
         let cfp_address = thread.cfp as u64;
 
         let stack = thread.stack as u64;
@@ -384,11 +387,11 @@ mod $ruby_version {
 
         let stack_base = stack + stack_size * value_size - 1 * cfp_size;
         debug!("cfp addr: {:x}", cfp_address as usize);
-        copy_address_raw(
+        Ok(copy_address_raw(
             cfp_address as *const c_void,
             (stack_base - cfp_address) as usize,
             source_pid,
-        )
+        )?)
     }
 }
 ));
@@ -426,18 +429,18 @@ mod $ruby_version {
     pub fn get_stack_trace(
         ruby_current_thread_address_location: u64,
         source_pid: pid_t,
-    ) -> Vec<String> {
+    ) -> Result<Vec<String>, Box<std::error::Error>> {
         debug!(
             "current address location: {:x}",
             ruby_current_thread_address_location
         );
         let current_thread_addr: u64 =
-            copy_struct(ruby_current_thread_address_location, source_pid);
+            copy_struct(ruby_current_thread_address_location, source_pid)?;
         debug!("{:x}", current_thread_addr);
-        let thread: rb_thread_t = copy_struct(current_thread_addr, source_pid);
+        let thread: rb_thread_t = copy_struct(current_thread_addr, source_pid)?;
         debug!("{:?}", thread);
         let mut trace = Vec::new();
-        let mut cfps = get_cfps(&thread, source_pid);
+        let mut cfps = get_cfps(&thread, source_pid)?;
         let slice: &[rb_control_frame_struct] = unsafe {
             std::slice::from_raw_parts(
                 cfps.as_mut_ptr() as *mut rb_control_frame_struct,
@@ -445,22 +448,27 @@ mod $ruby_version {
             )
         };
         for cfp in slice.iter() {
-            let (label, path) = get_label_and_path(&cfp, source_pid);
-            if label.to_string_lossy() != "" && path.to_string_lossy() != "" {
-                let current_location =
-                    format!("{} : {}", label.to_string_lossy(), path.to_string_lossy()).to_string();
-                trace.push(current_location);
+            let result  = get_label_and_path(&cfp, source_pid);
+            match result {
+                Ok((label, path)) => {
+                    let current_location =
+                        format!("{} : {}", label.to_string_lossy(), path.to_string_lossy()).to_string();
+                    trace.push(current_location);
+                }
+                Err(_) => {
+                    warn!("failed to get label and path, ignoring");
+                }
             }
         }
-        trace
+        Ok(trace)
     }
 
 
 
 
-    fn get_ruby_string(addr: u64, source_pid: pid_t) -> OsString {
+    fn get_ruby_string(addr: u64, source_pid: pid_t) -> Result<OsString, Box<std::error::Error>> {
         let vec = {
-            let rstring: RString = copy_struct(addr, source_pid);
+            let rstring: RString = copy_struct(addr, source_pid)?;
             let basic = rstring.basic;
             let is_array = basic.flags & 1 << 13 == 0;
             if is_array {
@@ -471,28 +479,28 @@ mod $ruby_version {
                 unsafe {
                     let addr = rstring.as_.heap.ptr as u64;
                     let len = rstring.as_.heap.len as usize;
-                    copy_address_raw(addr as *const c_void, len, source_pid)
+                    copy_address_raw(addr as *const c_void, len, source_pid)?
                 }
             }
         };
-        OsString::from_vec(vec)
+        Ok(OsString::from_vec(vec))
     }
 
     fn get_label_and_path(
         cfp: &rb_control_frame_struct,
         source_pid: pid_t,
-    ) -> (OsString, OsString) {
+    ) -> Result<(OsString, OsString), Box<std::error::Error>> {
         trace!("get_label_and_path {:?}", cfp);
         let iseq_address = cfp.iseq as u64;
-        let iseq_struct: rb_iseq_struct = copy_struct(iseq_address, source_pid);
+        let iseq_struct: rb_iseq_struct = copy_struct(iseq_address, source_pid)?;
         debug!("{:?}", iseq_struct);
         let body_address = iseq_struct.body as u64;
-        let body: rb_iseq_constant_body = copy_struct(body_address, source_pid);
+        let body: rb_iseq_constant_body = copy_struct(body_address, source_pid)?;
         let location = body.location;
-        let label: OsString = get_ruby_string(location.label as u64, source_pid);
-        let path: OsString = get_ruby_string(location.path as u64, source_pid);
+        let label: OsString = get_ruby_string(location.label as u64, source_pid)?;
+        let path: OsString = get_ruby_string(location.path as u64, source_pid)?;
         // println!("{:?} - {:?}", label, path);
-        (label, path)
+        Ok((label, path))
     }
 
     // Ruby stack grows down, starting at
@@ -503,7 +511,7 @@ mod $ruby_version {
     // The base of the call stack is therefore at
     //   stack + stack_size * sizeof(VALUE) - sizeof(rb_control_frame_t)
     // (with everything in bytes).
-    fn get_cfps(thread: &rb_thread_t, source_pid: pid_t) -> Vec<u8> {
+    fn get_cfps(thread: &rb_thread_t, source_pid: pid_t) -> Result<Vec<u8>, Box<std::error::Error>> {
         let cfp_address = thread.cfp as u64;
 
         let stack = thread.stack as u64;
@@ -513,11 +521,11 @@ mod $ruby_version {
 
         let stack_base = stack + stack_size * value_size - 1 * cfp_size;
         debug!("cfp addr: {:x}", cfp_address as usize);
-        copy_address_raw(
+        Ok(copy_address_raw(
             cfp_address as *const c_void,
             (stack_base - cfp_address) as usize,
             source_pid,
-        )
+        )?)
     }
 }
 ));
@@ -525,8 +533,9 @@ mod $ruby_version {
 pub mod stack_trace {
     use libc::pid_t;
     use address_finder;
+    use std;
 
-    pub fn get_stack_trace_function(pid: pid_t) -> Box<Fn(u64, pid_t) -> Vec<String>> {
+    pub fn get_stack_trace_function(pid: pid_t) -> Box<Fn(u64, pid_t) -> Result<Vec<String>, Box<std::error::Error>>> {
         let version = address_finder::get_api_version(pid).unwrap();
         println!("version: {}", version);
         let stack_trace_function = match version.as_ref() {

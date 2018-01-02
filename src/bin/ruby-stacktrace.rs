@@ -60,7 +60,10 @@ fn main() {
         // This gets a stack trace and then just prints it out
         // in a format that Brendan Gregg's stackcollapse.pl script understands
         loop {
-            let trace = stack_trace_function(ruby_current_thread_address_location, pid);
+            let trace = stack_trace_function(ruby_current_thread_address_location, pid).unwrap_or_else(|x| {
+                println!("oh no {:?}", x);
+                process::exit(0);
+            });
             user_interface::print_stack_trace(&trace);
             thread::sleep(Duration::from_millis(10));
         }
@@ -73,7 +76,9 @@ fn main() {
         let mut j = 0;
         loop {
             j += 1;
-            let trace = stack_trace_function(ruby_current_thread_address_location, pid);
+            let trace = stack_trace_function(ruby_current_thread_address_location, pid).unwrap_or_else(|_| {
+                process::exit(0);
+            });
             // only count each element in the stack trace once
             // otherwise recursive methods are overcounted
             let mut seen = HashSet::new();
