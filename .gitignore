@@ -1,4 +1,3 @@
 *.o
 target
-*.rb
 .ruby-version
