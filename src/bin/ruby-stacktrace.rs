@@ -16,10 +16,8 @@ use std::time::Duration;
 use std::thread;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use read_process_memory::*;
 
 use ruby_stacktrace::*;
-use ruby_stacktrace::dwarf::{create_lookup_table, get_dwarf_entries};
 
 fn parse_args() -> ArgMatches<'static> {
     App::new("ruby-stacktrace")
@@ -46,31 +44,27 @@ fn main() {
     let matches = parse_args();
     let pid: pid_t = matches.value_of("PID").unwrap().parse().unwrap();
     let command = matches.value_of("COMMAND").unwrap();
-    let source = pid.try_into_process_handle().unwrap();
     if command.clone() != "top" && command.clone() != "stackcollapse" &&
        command.clone() != "parse" {
         println!("COMMAND must be 'top' or 'stackcollapse. Try again!");
         process::exit(1);
     }
 
-
-    let entries = get_dwarf_entries(pid as usize);
-    let lookup_table = create_lookup_table(&entries);
-    let types = get_types(&lookup_table);
-
-    let ruby_current_thread_address_location: u64 = get_ruby_current_thread_address(pid);
+    let ruby_current_thread_address_location: u64 = address_finder::current_thread_address_location(pid).unwrap();
+    let stack_trace_function = stack_trace::get_stack_trace_function(pid);
 
     if command == "parse" {
         return;
     } else if command == "stackcollapse" {
+
         // This gets a stack trace and then just prints it out
         // in a format that Brendan Gregg's stackcollapse.pl script understands
         loop {
-            let trace = get_stack_trace(ruby_current_thread_address_location,
-                                        &source,
-                                        &lookup_table,
-                                        &types);
-            print_stack_trace(&trace);
+            let trace = stack_trace_function(ruby_current_thread_address_location, pid).unwrap_or_else(|x| {
+                println!("oh no {:?}", x);
+                process::exit(0);
+            });
+            user_interface::print_stack_trace(&trace);
             thread::sleep(Duration::from_millis(10));
         }
     } else {
@@ -82,10 +76,9 @@ fn main() {
         let mut j = 0;
         loop {
             j += 1;
-            let trace = get_stack_trace(ruby_current_thread_address_location,
-                                        &source,
-                                        &lookup_table,
-                                        &types);
+            let trace = stack_trace_function(ruby_current_thread_address_location, pid).unwrap_or_else(|_| {
+                process::exit(0);
+            });
             // only count each element in the stack trace once
             // otherwise recursive methods are overcounted
             let mut seen = HashSet::new();
@@ -101,7 +94,7 @@ fn main() {
                 *counter2 += 1;
             }
             if j % 100 == 0 {
-                print_method_stats(&method_stats, &method_own_time_stats, 30);
+                user_interface::print_method_stats(&method_stats, &method_own_time_stats, 30);
                 method_stats = HashMap::new();
                 method_own_time_stats = HashMap::new();
             }

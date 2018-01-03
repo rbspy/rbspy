@@ -1,5 +1,4 @@
 *.o
-Cargo.lock
 target
 *.rb
 .ruby-version

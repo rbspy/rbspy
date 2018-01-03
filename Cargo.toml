@@ -1,22 +1,18 @@
 [package]
 name = "ruby-stacktrace"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Julia Evans <julia@jvns.ca>"]
 
 license = "MIT"
-build = "build.rs"
 
 [dependencies]
 libc = "0.2.15"
-regex = "0.1"
-term = "0.2"
+regex = "0.2.3"
 clap = "2"
 byteorder = "0.5"
-leb128 = "0.2.1"
 rand = "0.3"
 fnv = "1.0.3"
-gimli={git="https://github.com/fitzgen/gimli.git"}
-elf = "0.0.9"
+elf = "0.0.10"
 log = "0.3.6"
 env_logger = "0.3.4"
 read-process-memory = "0.1.0"
@@ -34,3 +30,4 @@ lazy_static = "0.2.1"
 
 [build-dependencies]
 rustc_version = "0.1.7"
+bindgen = "0.32.1"
