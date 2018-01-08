@@ -24,4 +24,3 @@ RUN xargs -L 1 rbenv install < /root/versions.txt
 RUN apt-get install -y --force-yes ruby2.3
 
 ENV PATH /root/.rbenv/shims:$PATH
-ADD ./ /stuff

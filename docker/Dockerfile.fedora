@@ -18,4 +18,3 @@ ADD ./versions.txt /root/versions.txt
 RUN rbenv install 2.3.5
  
 ENV PATH /root/.rbenv/shims:$PATH
-ADD ./ /stuff

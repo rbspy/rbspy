@@ -22,4 +22,3 @@ ADD ./versions.txt /root/versions.txt
 RUN xargs -L 1 rbenv install < /root/versions.txt
  
 ENV PATH /root/.rbenv/shims:$PATH
-ADD . /stuff
