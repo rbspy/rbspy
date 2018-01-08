@@ -18,9 +18,11 @@ pub mod test_utils;
 pub mod user_interface {
     use std;
     use std::collections::HashMap;
-    pub fn print_method_stats(method_stats: &HashMap<String, u32>,
-                              method_own_time_stats: &HashMap<String, u32>,
-                              n_terminal_lines: usize) {
+    pub fn print_method_stats(
+        method_stats: &HashMap<String, u32>,
+        method_own_time_stats: &HashMap<String, u32>,
+        n_terminal_lines: usize,
+    ) {
         println!("[{}c", 27 as char); // clear the screen
         let mut count_vec: Vec<_> = method_own_time_stats.iter().collect();
         count_vec.sort_by(|a, b| b.1.cmp(a.1));
@@ -29,10 +31,12 @@ pub mod user_interface {
         let total_sum: u32 = *method_stats.values().max().unwrap();
         for &(method, count) in count_vec.iter().take(n_terminal_lines - 1) {
             let total_count = method_stats.get(&method[..]).unwrap();
-            println!(" {:02.1}% | {:02.1}% | {}",
-                     100.0 * (*count as f32) / (self_sum as f32),
-                     100.0 * (*total_count as f32) / (total_sum as f32),
-                     method);
+            println!(
+                " {:02.1}% | {:02.1}% | {}",
+                100.0 * (*count as f32) / (self_sum as f32),
+                100.0 * (*total_count as f32) / (total_sum as f32),
+                method
+            );
         }
     }
 
@@ -45,61 +49,116 @@ pub mod user_interface {
 }
 
 pub mod address_finder {
-    use copy::copy_struct;
+    use copy::*;
     use libc::*;
-    use regex::Regex;
-    use std::process::Command;
-    use std::process::Stdio;
+    use std::fs::File;
+    use std::io::Read;
     use std;
+    use bindings;
+    use elf;
+    use read_process_memory::*;
+    use std::mem;
 
-    use self::obj::get_executable_path;
+    fn is_maybe_thread(x: u64, pid: pid_t, heap_map: &MapRange, all_maps: &Vec<MapRange>) -> bool {
+        if !is_heap_addr(x, heap_map) {
+            return false;
+        }
+        let thread = copy_struct(x, pid);
+        if !thread.is_ok() {
+            return false;
+        }
+        // TODO: stop hardcoding ruby 2.3.1 here
+        let thread: bindings::ruby_2_3_1::rb_thread_t = thread.unwrap();
+        debug!("thread addr: {:x}, thread: {:?}", x, thread);
+
+        debug!("{}", is_heap_addr(thread.vmlt_node.next as u64, heap_map));
+        debug!("{}", in_memory_maps(thread.vmlt_node.prev as u64, all_maps));
+        debug!("{}", is_heap_addr(thread.vm as u64, heap_map));
+        debug!("{}", in_memory_maps(thread.cfp as u64, all_maps));
+        debug!("{}", in_memory_maps(thread.stack as u64, all_maps));
+        debug!("{}", in_memory_maps(thread.self_ as u64, all_maps));
+        if !(is_heap_addr(thread.vmlt_node.next as u64, heap_map) &&
+                 in_memory_maps(thread.vmlt_node.prev as u64, all_maps) &&
+                 is_heap_addr(thread.vm as u64, heap_map) &&
+                 in_memory_maps(thread.cfp as u64, all_maps) &&
+                 in_memory_maps(thread.stack as u64, all_maps) &&
+                 in_memory_maps(thread.self_ as u64, all_maps) &&
+                 thread.stack_size < 3000000 && thread.state >= 0)
+        {
+            return false;
+        }
+        let stack = thread.stack as u64;
+        let stack_size = thread.stack_size as u64;
+        let value_size = mem::size_of::<bindings::ruby_2_3_1::VALUE>() as u64;
+        let cfp_size = mem::size_of::<bindings::ruby_2_3_1::rb_control_frame_struct>() as u64;
+
+        let stack_base = stack + stack_size * value_size - 1 * cfp_size;
+        if stack_base < thread.cfp as u64 {
+            return false;
+        }
+
+        return true;
+    }
+
+    #[derive(Debug, Clone)]
+    struct MapRange {
+        range_start: u64,
+        range_end: u64,
+        offset: u64,
+        dev: String,
+        flags: String,
+        inode: u64,
+        pathname: Option<String>,
+    }
+
+    fn get_proc_maps(pid: pid_t) -> Vec<MapRange> {
+        // Parses /proc/PID/maps into a Vec<MapRange>
+        // TODO: factor this out into a crate and make it work on Mac too
+        let maps_file = format!("/proc/{}/maps", pid);
+        let mut file = File::open(maps_file).unwrap();
+        let mut contents = String::new();
+        file.read_to_string(&mut contents);
+        let mut vec: Vec<MapRange> = Vec::new();
+        for line in contents.split("\n") {
+            let mut split = line.split_whitespace();
+            let range = split.next();
+            if range == None {
+                break;
+            }
+            let mut range_split = range.unwrap().split("-");
+            let range_start = range_split.next().unwrap();
+            let range_end = range_split.next().unwrap();
+            let flags = split.next().unwrap();
+            let offset = split.next().unwrap();
+            let dev = split.next().unwrap();
+            let inode = split.next().unwrap();
+
+            vec.push(MapRange {
+                range_start: u64::from_str_radix(range_start, 16).unwrap(),
+                range_end: u64::from_str_radix(range_end, 16).unwrap(),
+                offset: u64::from_str_radix(offset, 16).unwrap(),
+                dev: dev.to_string(),
+                flags: flags.to_string(),
+                inode: u64::from_str_radix(inode, 10).unwrap(),
+                pathname: split.next().map(|x| x.to_string()),
+            });
+        }
+        vec
+    }
+
     #[cfg(target_os = "linux")]
-    mod obj {
-        use std::path::PathBuf;
-
-        pub fn get_executable_path(pid: usize) -> Result<PathBuf, String> {
-            Ok(PathBuf::from(format!("/proc/{}/exe", pid)))
+    fn elf_symbol_value(file_name: &str, symbol_name: &str) -> Result<u64, Box<std::error::Error>> {
+        // TODO: maybe move this to goblin so that it works on OS X & BSD, not just linux
+        let file = elf::File::open_path(file_name).ok().ok_or("parse error")?;
+        let sections = &file.sections;
+        for s in sections {
+            for sym in file.get_symbols(&s).ok().ok_or("parse error")? {
+                if sym.name == symbol_name {
+                    return Ok(sym.value);
+                }
+            }
         }
-    }
-
-    #[cfg(target_os = "macos")]
-    mod obj {
-        extern crate libproc;
-
-        use std::path::PathBuf;
-
-        pub fn get_executable_path(pid: usize) -> Result<PathBuf, String> {
-            libproc::libproc::proc_pid::pidpath(pid as i32).map(|path| PathBuf::from(&path))
-        }
-    }
-
-    fn get_nm_output(pid: pid_t) -> String {
-        let exe = get_executable_path(pid as usize).unwrap();
-        let nm_command = Command::new("nm")
-            .arg(exe)
-            .stdout(Stdio::piped())
-            .stdin(Stdio::null())
-            .stderr(Stdio::piped())
-            .output()
-            .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
-        if !nm_command.status.success() {
-            panic!(
-                "failed to execute process: {}",
-                String::from_utf8(nm_command.stderr).unwrap()
-            )
-        }
-
-        String::from_utf8(nm_command.stdout).unwrap()
-    }
-
-    fn get_api_version_addr(pid: pid_t) -> Result<u64, Box<std::error::Error>> {
-        let nm_output = get_nm_output(pid);
-        let re = Regex::new(r"(\w+) R _?ruby_version")?;
-        let cap = re.captures(&nm_output).ok_or("failed to match regex")?;
-        let address_str = cap.get(1).ok_or("oh no")?.as_str();
-        let addr = u64::from_str_radix(address_str, 16)?;
-        debug!("get_api_version: {:x}", addr);
-        Ok(addr)
+        None.ok_or("No symbol found")?
     }
 
     pub fn get_api_version(pid: pid_t) -> Result<String, Box<std::error::Error>> {
@@ -113,60 +172,120 @@ pub mod address_finder {
         })
     }
 
-    fn get_nm_address(pid: pid_t) -> Result<u64, Box<std::error::Error>> {
-        let nm_output = get_nm_output(pid);
-        let re = Regex::new(r"(\w+) [bs] _?ruby_current_thread")?;
-        let address_str = re.captures(&nm_output)
-            .ok_or("regexp didn't match")?
-            .get(1)
-            .ok_or("regexp didn't match")?
-            .as_str();
-        let addr = u64::from_str_radix(address_str, 16)?;
-        debug!("get_nm_address: {:x}", addr);
-        Ok(addr)
-    }
-
-    fn is_heap_addr(x: u64, heap_start: u64, heap_end: u64) -> bool {
-        x >= heap_start && x <= heap_end
+    #[cfg(target_os = "linux")]
+    fn libruby_map(pid: pid_t) -> Option<MapRange> {
+        let maps = get_proc_maps(pid);
+        maps.iter()
+            .find(|ref m| {
+                m.pathname != None && m.pathname.clone().unwrap().contains("libruby") &&
+                    &m.flags == "r-xp"
+            })
+            .map({
+                |x| x.clone()
+            })
     }
 
     #[cfg(target_os = "linux")]
-    fn get_maps_output(pid: pid_t) -> Result<String, Box<std::error::Error>> {
-        let cat_command = Command::new("cat")
-            .arg(format!("/proc/{}/maps", pid))
-            .stdout(Stdio::piped())
-            .stdin(Stdio::null())
-            .stderr(Stdio::piped())
-            .output()?;
-        if !cat_command.status.success() {
-            None.ok_or("cat command failed")?;
+    fn get_api_address(pid: pid_t) -> Result<u64, Box<std::error::Error>> {
+        // TODO: implement OS X version of this
+        let proc_exe = &format!("/proc/{}/exe", pid);
+        let ruby_version_symbol = "ruby_version";
+        let symbol_value = elf_symbol_value(proc_exe, ruby_version_symbol);
+        if symbol_value.is_ok() {
+            Ok(symbol_value.unwrap() + get_maps_address(pid)?)
+        } else {
+            let map = libruby_map(pid).ok_or("couldn't find libruby map")?;
+            Ok(
+                elf_symbol_value(&map.pathname.unwrap(), ruby_version_symbol)? + map.range_start,
+            )
         }
-        Ok(String::from_utf8(cat_command.stdout)?)
     }
 
     #[cfg(target_os = "linux")]
-    fn get_heap_range(pid: pid_t) -> Result<(u64, u64), Box<std::error::Error>> {
-        let output = get_maps_output(pid)?;
-        let re = Regex::new(r"\n([a-f0-9]+)-([a-f0-9]+).+heap")?;
-        let cap = re.captures(&output).ok_or("Failed to match regular expression")?;
+    pub fn get_bss_section(filename: &str) -> Option<Box<elf::Section>> {
+        let file = elf::File::open_path(filename).unwrap();
+        for s in file.sections {
+            match s.shdr.name.as_ref() {
+                ".bss" => {
+                    return Some(Box::new(s));
+                }
+                _ => {}
+            }
+        }
+        None
+    }
 
-        let start_str = cap.get(1).unwrap().as_str();
-        let start = u64::from_str_radix(start_str, 16).unwrap();
+    pub fn get_thread_address_alt(pid: pid_t) -> Result<u64, Box<std::error::Error>> {
+        let map = &libruby_map(pid).ok_or("couldn't find libruby map")?;
+        let bss_section = get_bss_section(&map.pathname.clone().unwrap()).unwrap();
+        let all_maps = &get_proc_maps(pid);
+        debug!("bss_section header: {:?}", bss_section.shdr);
+        let read_addr = map.range_start + bss_section.shdr.addr;
+        let heap_map = &get_heap_map(pid).ok_or("no heap map")?;
+        debug!("read_addr: {:x}", read_addr);
+        let mut data = copy_address_raw(
+            read_addr as *const c_void,
+            bss_section.shdr.size as usize,
+            pid,
+        )?;
+        debug!("successfully read data");
+        let slice: &[u64] = unsafe {
+            std::slice::from_raw_parts(
+                data.as_mut_ptr() as *mut u64,
+                data.capacity() as usize / std::mem::size_of::<u64>() as usize,
+            )
+        };
 
-        let end_str = cap.get(2).unwrap().as_str();
-        let end = u64::from_str_radix(end_str, 16).unwrap();
-        Ok((start, end))
+        let i = slice
+            .iter()
+            .position({
+                |&x| is_maybe_thread(x, pid, heap_map, all_maps)
+            })
+            .ok_or("didn't find a current thread")?;
+        Ok((i as u64) * (std::mem::size_of::<u64>() as u64) + read_addr)
+    }
+
+    #[cfg(target_os = "linux")]
+    fn get_nm_address(pid: pid_t) -> Result<u64, Box<std::error::Error>> {
+        Ok(elf_symbol_value(
+            &format!("/proc/{}/exe", pid),
+            "ruby_current_thread",
+        )?)
+    }
+
+    fn in_memory_maps(x: u64, maps: &Vec<MapRange>) -> bool {
+        maps.iter().any({
+            |map| is_heap_addr(x, map)
+        })
+    }
+
+    fn is_heap_addr(x: u64, map: &MapRange) -> bool {
+        x >= map.range_start && x <= map.range_end
+    }
+
+    #[cfg(target_os = "linux")]
+    fn get_heap_map(pid: pid_t) -> Option<MapRange> {
+        let maps = get_proc_maps(pid);
+        maps.iter()
+            .find(|ref m| {
+                m.pathname != None && (m.pathname.clone().unwrap() == "[heap]")
+            })
+            .map({
+                |x| x.clone()
+            })
     }
 
     #[cfg(target_os = "linux")]
     fn get_maps_address(pid: pid_t) -> Result<u64, Box<std::error::Error>> {
-        let output = get_maps_output(pid)?;
-        let re = Regex::new(r"(\w+).+xp.+?bin/ruby")?;
-        let cap = re.captures(&output).ok_or("failed to parse regexp")?;
-        let address_str = cap.get(1).unwrap().as_str();
-        let addr = u64::from_str_radix(address_str, 16).unwrap();
-        debug!("get_maps_address: {:x}", addr);
-        Ok(addr)
+        let maps = get_proc_maps(pid);
+        let map = maps.iter()
+            .find(|ref m| {
+                m.pathname != None && m.pathname.clone().unwrap().contains("bin/ruby") &&
+                    &m.flags == "r-xp"
+            })
+            .ok_or("oh no")?;
+        debug!("map: {:?}", map);
+        Ok(map.range_start)
     }
 
     #[cfg(target_os = "macos")]
@@ -206,6 +325,19 @@ pub mod address_finder {
 
     #[cfg(target_os = "linux")]
     pub fn current_thread_address_location(pid: pid_t) -> Result<u64, Box<std::error::Error>> {
+        let try_1 = current_thread_address_location_default(pid);
+        if try_1.is_ok() {
+            Ok(try_1.unwrap())
+        } else {
+            debug!("Trying to find address location another way");
+            Ok(get_thread_address_alt(pid)?)
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn current_thread_address_location_default(
+        pid: pid_t,
+    ) -> Result<u64, Box<std::error::Error>> {
         // Get the address of the `ruby_current_thread` global variable. It works
         // by looking up the address in the Ruby binary's symbol table with `nm
         // /proc/$pid/exe` and then finding out which address the Ruby binary is
@@ -220,10 +352,6 @@ pub mod address_finder {
         Ok(nm_address + maps_address)
     }
 
-    #[cfg(target_os = "linux")]
-    fn get_api_address(pid: pid_t) -> Result<u64, Box<std::error::Error>> {
-        Ok(get_api_version_addr(pid)? + get_maps_address(pid)?)
-    }
 
     #[cfg(target_os = "macos")]
     pub fn current_thread_address_location(pid: pid_t) -> Result<u64, Box<std::error::Error>> {
@@ -241,7 +369,11 @@ mod copy {
     use read_process_memory::*;
     use std::mem;
     use std;
-    pub fn copy_address_raw(addr: *const c_void, length: usize, source_pid: pid_t) -> Result<Vec<u8>, Box<std::error::Error>> {
+    pub fn copy_address_raw(
+        addr: *const c_void,
+        length: usize,
+        source_pid: pid_t,
+    ) -> Result<Vec<u8>, Box<std::error::Error>> {
         let source = source_pid.try_into_process_handle().unwrap();
         debug!("copy_address_raw: addr: {:x}", addr as usize);
         let mut copy = vec![0; length];
@@ -535,7 +667,9 @@ pub mod stack_trace {
     use address_finder;
     use std;
 
-    pub fn get_stack_trace_function(pid: pid_t) -> Box<Fn(u64, pid_t) -> Result<Vec<String>, Box<std::error::Error>>> {
+    pub fn get_stack_trace_function(
+        pid: pid_t,
+    ) -> Box<Fn(u64, pid_t) -> Result<Vec<String>, Box<std::error::Error>>> {
         let version = address_finder::get_api_version(pid).unwrap();
         println!("version: {}", version);
         let stack_trace_function = match version.as_ref() {
