@@ -54,54 +54,44 @@ pub mod address_finder {
     use std::fs::File;
     use std::io::Read;
     use std;
-    use bindings;
     use elf;
-    use read_process_memory::*;
-    use std::mem;
+    use stack_trace;
 
-    fn is_maybe_thread(x: u64, pid: pid_t, heap_map: &MapRange, all_maps: &Vec<MapRange>) -> bool {
-        if !is_heap_addr(x, heap_map) {
-            return false;
-        }
-        let thread = copy_struct(x, pid);
-        if !thread.is_ok() {
-            return false;
-        }
-        // TODO: stop hardcoding ruby 2.3.1 here
-        let thread: bindings::ruby_2_3_1::rb_thread_t = thread.unwrap();
-        debug!("thread addr: {:x}, thread: {:?}", x, thread);
-
-        debug!("{}", is_heap_addr(thread.vmlt_node.next as u64, heap_map));
-        debug!("{}", in_memory_maps(thread.vmlt_node.prev as u64, all_maps));
-        debug!("{}", is_heap_addr(thread.vm as u64, heap_map));
-        debug!("{}", in_memory_maps(thread.cfp as u64, all_maps));
-        debug!("{}", in_memory_maps(thread.stack as u64, all_maps));
-        debug!("{}", in_memory_maps(thread.self_ as u64, all_maps));
-        if !(is_heap_addr(thread.vmlt_node.next as u64, heap_map) &&
-                 in_memory_maps(thread.vmlt_node.prev as u64, all_maps) &&
-                 is_heap_addr(thread.vm as u64, heap_map) &&
-                 in_memory_maps(thread.cfp as u64, all_maps) &&
-                 in_memory_maps(thread.stack as u64, all_maps) &&
-                 in_memory_maps(thread.self_ as u64, all_maps) &&
-                 thread.stack_size < 3000000 && thread.state >= 0)
-        {
-            return false;
-        }
-        let stack = thread.stack as u64;
-        let stack_size = thread.stack_size as u64;
-        let value_size = mem::size_of::<bindings::ruby_2_3_1::VALUE>() as u64;
-        let cfp_size = mem::size_of::<bindings::ruby_2_3_1::rb_control_frame_struct>() as u64;
-
-        let stack_base = stack + stack_size * value_size - 1 * cfp_size;
-        if stack_base < thread.cfp as u64 {
-            return false;
-        }
-
-        return true;
+    // struct to hold everything we know about the program
+    struct ProgramInfo {
+        pid: pid_t,
+        all_maps: Vec<MapRange>,
+        ruby_map: Box<MapRange>,
+        heap_map: Box<MapRange>,
+        libruby_map: Box<Option<MapRange>>,
+        ruby_elf: elf::File,
+        libruby_elf: Option<elf::File>,
     }
 
+    fn get_program_info(pid: pid_t) -> Result<ProgramInfo, Box<std::error::Error>> {
+        let all_maps = get_proc_maps(pid);
+        debug!("all maps: {:?}", all_maps);
+        let ruby_map = Box::new(get_ruby_map(&all_maps)?);
+        let heap_map = Box::new(get_heap_map(&all_maps)?);
+        let ruby_elf = elf::File::open_path(ruby_map.pathname.clone().unwrap()).unwrap();
+        let libruby_map = Box::new(libruby_map(&all_maps));
+        let libruby_elf = (*libruby_map).as_ref().map(|map| {
+            elf::File::open_path(map.pathname.clone().unwrap()).unwrap()
+        });
+        Ok(ProgramInfo {
+            pid: pid,
+            all_maps: all_maps,
+            ruby_map: ruby_map,
+            heap_map: heap_map,
+            libruby_map: libruby_map,
+            ruby_elf: ruby_elf,
+            libruby_elf: libruby_elf,
+        })
+    }
+
+
     #[derive(Debug, Clone)]
-    struct MapRange {
+    pub struct MapRange {
         range_start: u64,
         range_end: u64,
         offset: u64,
@@ -147,13 +137,16 @@ pub mod address_finder {
     }
 
     #[cfg(target_os = "linux")]
-    fn elf_symbol_value(file_name: &str, symbol_name: &str) -> Result<u64, Box<std::error::Error>> {
+    fn elf_symbol_value(
+        elf_file: &elf::File,
+        symbol_name: &str,
+    ) -> Result<u64, Box<std::error::Error>> {
         // TODO: maybe move this to goblin so that it works on OS X & BSD, not just linux
-        let file = elf::File::open_path(file_name).ok().ok_or("parse error")?;
-        let sections = &file.sections;
+        let sections = &elf_file.sections;
         for s in sections {
-            for sym in file.get_symbols(&s).ok().ok_or("parse error")? {
+            for sym in elf_file.get_symbols(&s).ok().ok_or("parse error")? {
                 if sym.name == symbol_name {
+                    debug!("symbol: {}", sym);
                     return Ok(sym.value);
                 }
             }
@@ -172,9 +165,84 @@ pub mod address_finder {
         })
     }
 
+
+
     #[cfg(target_os = "linux")]
-    fn libruby_map(pid: pid_t) -> Option<MapRange> {
-        let maps = get_proc_maps(pid);
+    fn get_api_address(pid: pid_t) -> Result<u64, Box<std::error::Error>> {
+        // TODO: implement OS X version of this
+        let proginfo = &get_program_info(pid)?;
+        let ruby_version_symbol = "ruby_version";
+        let symbol_addr =
+            get_symbol_addr(&proginfo.ruby_map, &proginfo.ruby_elf, ruby_version_symbol);
+        if symbol_addr.is_ok() {
+            Ok(symbol_addr.unwrap())
+        } else {
+            Ok(get_symbol_addr(
+                (*proginfo.libruby_map).as_ref().ok_or("no libruby map")?,
+                proginfo.libruby_elf.as_ref().ok_or("no libruby map")?,
+                ruby_version_symbol,
+            )?)
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn get_bss_section(elf_file: &elf::File) -> Option<elf::types::SectionHeader> {
+        for s in &elf_file.sections {
+            match s.shdr.name.as_ref() {
+                ".bss" => {
+                    return Some(s.shdr.clone());
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
+    fn get_thread_address_alt(proginfo: &ProgramInfo) -> Result<u64, Box<std::error::Error>> {
+        let map = (*proginfo.libruby_map).as_ref().unwrap(); // TODO: don't unwrap
+        let bss_section = get_bss_section(proginfo.libruby_elf.as_ref().unwrap()).unwrap();
+        let load_header = elf_load_header(proginfo.libruby_elf.as_ref().unwrap());
+        debug!("bss_section header: {:?}", bss_section);
+        let read_addr = map.range_start + bss_section.addr - load_header.vaddr;
+
+        debug!("read_addr: {:x}", read_addr);
+        let mut data = copy_address_raw(
+            read_addr as *const c_void,
+            bss_section.size as usize,
+            proginfo.pid,
+        )?;
+        debug!("successfully read data");
+        let slice: &[u64] = unsafe {
+            std::slice::from_raw_parts(
+                data.as_mut_ptr() as *mut u64,
+                data.capacity() as usize / std::mem::size_of::<u64>() as usize,
+            )
+        };
+
+        let is_maybe_thread = stack_trace::is_maybe_thread_function(proginfo.pid);
+
+        let i = slice
+            .iter()
+            .position({
+                |&x| is_maybe_thread(x, proginfo.pid, &proginfo.heap_map, &proginfo.all_maps)
+            })
+            .ok_or("didn't find a current thread")?;
+        Ok((i as u64) * (std::mem::size_of::<u64>() as u64) + read_addr)
+    }
+
+
+    pub fn in_memory_maps(x: u64, maps: &Vec<MapRange>) -> bool {
+        maps.iter().any({
+            |map| is_heap_addr(x, map)
+        })
+    }
+
+    pub fn is_heap_addr(x: u64, map: &MapRange) -> bool {
+        x >= map.range_start && x <= map.range_end
+    }
+
+    #[cfg(target_os = "linux")]
+    fn libruby_map(maps: &Vec<MapRange>) -> Option<MapRange> {
         maps.iter()
             .find(|ref m| {
                 m.pathname != None && m.pathname.clone().unwrap().contains("libruby") &&
@@ -186,106 +254,25 @@ pub mod address_finder {
     }
 
     #[cfg(target_os = "linux")]
-    fn get_api_address(pid: pid_t) -> Result<u64, Box<std::error::Error>> {
-        // TODO: implement OS X version of this
-        let proc_exe = &format!("/proc/{}/exe", pid);
-        let ruby_version_symbol = "ruby_version";
-        let symbol_value = elf_symbol_value(proc_exe, ruby_version_symbol);
-        if symbol_value.is_ok() {
-            Ok(symbol_value.unwrap() + get_maps_address(pid)?)
-        } else {
-            let map = libruby_map(pid).ok_or("couldn't find libruby map")?;
-            Ok(
-                elf_symbol_value(&map.pathname.unwrap(), ruby_version_symbol)? + map.range_start,
-            )
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    pub fn get_bss_section(filename: &str) -> Option<Box<elf::Section>> {
-        let file = elf::File::open_path(filename).unwrap();
-        for s in file.sections {
-            match s.shdr.name.as_ref() {
-                ".bss" => {
-                    return Some(Box::new(s));
-                }
-                _ => {}
-            }
-        }
-        None
-    }
-
-    pub fn get_thread_address_alt(pid: pid_t) -> Result<u64, Box<std::error::Error>> {
-        let map = &libruby_map(pid).ok_or("couldn't find libruby map")?;
-        let bss_section = get_bss_section(&map.pathname.clone().unwrap()).unwrap();
-        let all_maps = &get_proc_maps(pid);
-        debug!("bss_section header: {:?}", bss_section.shdr);
-        let read_addr = map.range_start + bss_section.shdr.addr;
-        let heap_map = &get_heap_map(pid).ok_or("no heap map")?;
-        debug!("read_addr: {:x}", read_addr);
-        let mut data = copy_address_raw(
-            read_addr as *const c_void,
-            bss_section.shdr.size as usize,
-            pid,
-        )?;
-        debug!("successfully read data");
-        let slice: &[u64] = unsafe {
-            std::slice::from_raw_parts(
-                data.as_mut_ptr() as *mut u64,
-                data.capacity() as usize / std::mem::size_of::<u64>() as usize,
-            )
-        };
-
-        let i = slice
-            .iter()
-            .position({
-                |&x| is_maybe_thread(x, pid, heap_map, all_maps)
-            })
-            .ok_or("didn't find a current thread")?;
-        Ok((i as u64) * (std::mem::size_of::<u64>() as u64) + read_addr)
-    }
-
-    #[cfg(target_os = "linux")]
-    fn get_nm_address(pid: pid_t) -> Result<u64, Box<std::error::Error>> {
-        Ok(elf_symbol_value(
-            &format!("/proc/{}/exe", pid),
-            "ruby_current_thread",
-        )?)
-    }
-
-    fn in_memory_maps(x: u64, maps: &Vec<MapRange>) -> bool {
-        maps.iter().any({
-            |map| is_heap_addr(x, map)
-        })
-    }
-
-    fn is_heap_addr(x: u64, map: &MapRange) -> bool {
-        x >= map.range_start && x <= map.range_end
-    }
-
-    #[cfg(target_os = "linux")]
-    fn get_heap_map(pid: pid_t) -> Option<MapRange> {
-        let maps = get_proc_maps(pid);
-        maps.iter()
+    fn get_heap_map(maps: &Vec<MapRange>) -> Result<MapRange, Box<std::error::Error>> {
+        let map = maps.iter()
             .find(|ref m| {
                 m.pathname != None && (m.pathname.clone().unwrap() == "[heap]")
             })
-            .map({
-                |x| x.clone()
-            })
+            .ok_or("couldn't find heap map")?;
+        Ok(map.clone())
     }
 
     #[cfg(target_os = "linux")]
-    fn get_maps_address(pid: pid_t) -> Result<u64, Box<std::error::Error>> {
-        let maps = get_proc_maps(pid);
+    fn get_ruby_map(maps: &Vec<MapRange>) -> Result<MapRange, Box<std::error::Error>> {
         let map = maps.iter()
             .find(|ref m| {
                 m.pathname != None && m.pathname.clone().unwrap().contains("bin/ruby") &&
                     &m.flags == "r-xp"
             })
-            .ok_or("oh no")?;
+            .ok_or("couldn't find ruby map")?;
         debug!("map: {:?}", map);
-        Ok(map.range_start)
+        Ok(map.clone())
     }
 
     #[cfg(target_os = "macos")]
@@ -325,31 +312,48 @@ pub mod address_finder {
 
     #[cfg(target_os = "linux")]
     pub fn current_thread_address_location(pid: pid_t) -> Result<u64, Box<std::error::Error>> {
-        let try_1 = current_thread_address_location_default(pid);
+        let proginfo = &get_program_info(pid)?;
+        let try_1 = current_thread_address_location_default(proginfo);
         if try_1.is_ok() {
             Ok(try_1.unwrap())
         } else {
             debug!("Trying to find address location another way");
-            Ok(get_thread_address_alt(pid)?)
+            Ok(get_thread_address_alt(proginfo)?)
         }
     }
 
     #[cfg(target_os = "linux")]
-    pub fn current_thread_address_location_default(
-        pid: pid_t,
+    fn current_thread_address_location_default(
+        proginfo: &ProgramInfo,
     ) -> Result<u64, Box<std::error::Error>> {
-        // Get the address of the `ruby_current_thread` global variable. It works
-        // by looking up the address in the Ruby binary's symbol table with `nm
-        // /proc/$pid/exe` and then finding out which address the Ruby binary is
-        // mapped to by looking at `/proc/$pid/maps`. If we add these two
-        // addresses together we get our answers! All this is Linux-specific but
-        // this program only works on Linux anyway because of process_vm_readv.
-        //
-        let nm_address = get_nm_address(pid)?;
-        let maps_address = get_maps_address(pid)?;
-        debug!("nm_address: {:x}", nm_address);
-        debug!("maps_address: {:x}", maps_address);
-        Ok(nm_address + maps_address)
+        // TODO: comment this somewhere
+        Ok(get_symbol_addr(
+            &proginfo.ruby_map,
+            &proginfo.ruby_elf,
+            "ruby_current_thread",
+        )?)
+    }
+
+    fn get_symbol_addr(
+        map: &MapRange,
+        elf_file: &elf::File,
+        symbol_name: &str,
+    ) -> Result<u64, Box<std::error::Error>> {
+        let symbol_addr = elf_symbol_value(elf_file, symbol_name)?;
+        let load_header = elf_load_header(elf_file);
+        debug!("load header: {}", load_header);
+        Ok(map.range_start + symbol_addr - load_header.vaddr)
+    }
+
+    fn elf_load_header(elf_file: &elf::File) -> elf::types::ProgramHeader {
+        elf_file
+            .phdrs
+            .iter()
+            .find(|ref ph| {
+                ph.progtype == elf::types::PT_LOAD && (ph.flags.0 & elf::types::PF_X.0) != 0
+            })
+            .unwrap()
+            .clone()
     }
 
 
@@ -389,6 +393,25 @@ mod copy {
     }
 }
 
+macro_rules! ruby_bindings_v_1_9_x(
+($ruby_version:ident) => (
+pub mod $ruby_version {
+    use copy::*;
+    use std;
+    use bindings::$ruby_version::*;
+    use libc::*;
+    use std::ffi::{OsString, CStr};
+    use std::mem;
+    use std::os::unix::prelude::*;
+
+    get_stack_trace_2_0_0!();
+    get_ruby_string_2_0_0!();
+    get_label_and_path_1_9_0!();
+    get_cfps_2_0_0!();
+    is_maybe_thread_1_9_0!();
+}
+));
+
 macro_rules! ruby_bindings(
 ($ruby_version:ident) => (
 mod $ruby_version {
@@ -417,6 +440,7 @@ mod $ruby_version {
     get_ruby_string_2_0_0!();
     get_label_and_path_2_0_0!();
     get_cfps_2_0_0!();
+    is_maybe_thread_1_9_0!();
 }
 ));
 
@@ -435,6 +459,7 @@ mod $ruby_version {
     get_ruby_string_2_0_0!();
     get_label_and_path_2_3_0!();
     get_cfps_2_0_0!();
+    is_maybe_thread_1_9_0!();
 }
 ));
 
@@ -455,10 +480,10 @@ macro_rules! get_stack_trace_2_0_0(
         debug!("{:?}", thread);
         let mut trace = Vec::new();
         let mut cfps = get_cfps(&thread, source_pid)?;
-        let slice: &[rb_control_frame_struct] = unsafe {
+        let slice: &[rb_control_frame_t] = unsafe {
             std::slice::from_raw_parts(
-                cfps.as_mut_ptr() as *mut rb_control_frame_struct,
-                cfps.capacity() as usize / mem::size_of::<rb_control_frame_struct>() as usize,
+                cfps.as_mut_ptr() as *mut rb_control_frame_t,
+                cfps.capacity() as usize / mem::size_of::<rb_control_frame_t>() as usize,
             )
         };
         for cfp in slice.iter() {
@@ -475,6 +500,49 @@ macro_rules! get_stack_trace_2_0_0(
             }
         }
         Ok(trace)
+    }
+));
+
+macro_rules! is_maybe_thread_1_9_0(
+() => (
+    use address_finder::*;
+    pub fn is_maybe_thread(x: u64, pid: pid_t, heap_map: &MapRange, all_maps: &Vec<MapRange>) -> bool {
+        if !is_heap_addr(x, heap_map) {
+            return false;
+        }
+        let thread = copy_struct(x, pid);
+        if !thread.is_ok() {
+            return false;
+        }
+        // TODO: stop hardcoding ruby 2.3.1 here
+        let thread: rb_thread_t = thread.unwrap();
+        debug!("thread addr: {:x}, thread: {:?}", x, thread);
+
+        debug!("{}", is_heap_addr(thread.vm as u64, heap_map));
+        debug!("{}", in_memory_maps(thread.cfp as u64, all_maps));
+        debug!("{}", in_memory_maps(thread.stack as u64, all_maps));
+        debug!("{}", in_memory_maps(thread.self_ as u64, all_maps));
+        if !( //is_heap_addr(thread.vmlt_node.next as u64, heap_map) &&
+                // in_memory_maps(thread.vmlt_node.prev as u64, all_maps) &&
+                 is_heap_addr(thread.vm as u64, heap_map) &&
+                 in_memory_maps(thread.cfp as u64, all_maps) &&
+                 in_memory_maps(thread.stack as u64, all_maps) &&
+                 in_memory_maps(thread.self_ as u64, all_maps) &&
+                 thread.stack_size < 3000000 && thread.state >= 0)
+        {
+            return false;
+        }
+        let stack = thread.stack as u64;
+        let stack_size = thread.stack_size as u64;
+        let value_size = mem::size_of::<VALUE>() as u64;
+        let cfp_size = mem::size_of::<rb_control_frame_t>() as u64;
+
+        let stack_base = stack + stack_size * value_size - 1 * cfp_size;
+        if stack_base < thread.cfp as u64 {
+            return false;
+        }
+
+        return true;
     }
 ));
 
@@ -501,10 +569,26 @@ macro_rules! get_ruby_string_2_0_0(
     }
 ));
 
+macro_rules! get_label_and_path_1_9_0(
+() => (
+    fn get_label_and_path(
+        cfp: &rb_control_frame_t,
+        source_pid: pid_t,
+    ) -> Result<(OsString, OsString), Box<std::error::Error>> {
+        debug!("get_label_and_path {:?}", cfp);
+        let iseq_address = cfp.iseq as u64;
+        debug!("iseq_address: {:?}", iseq_address);
+        let iseq_struct: rb_iseq_struct = copy_struct(iseq_address, source_pid)?;
+        let label: OsString = get_ruby_string(iseq_struct.name as u64, source_pid)?;
+        let path: OsString = get_ruby_string(iseq_struct.filename as u64, source_pid)?;
+        Ok((label, path))
+    }
+));
+
 macro_rules! get_label_and_path_2_0_0(
 () => (
     fn get_label_and_path(
-        cfp: &rb_control_frame_struct,
+        cfp: &rb_control_frame_t,
         source_pid: pid_t,
     ) -> Result<(OsString, OsString), Box<std::error::Error>> {
         debug!("get_label_and_path {:?}", cfp);
@@ -555,7 +639,7 @@ macro_rules! get_cfps_2_0_0(
         let stack = thread.stack as u64;
         let stack_size = thread.stack_size as u64;
         let value_size = mem::size_of::<VALUE>() as u64;
-        let cfp_size = mem::size_of::<rb_control_frame_struct>() as u64;
+        let cfp_size = mem::size_of::<rb_control_frame_t>() as u64;
 
         let stack_base = stack + stack_size * value_size - 1 * cfp_size;
         debug!("cfp addr: {:x}", cfp_address as usize);
@@ -573,12 +657,68 @@ pub mod stack_trace {
     use address_finder;
     use std;
 
+    pub fn is_maybe_thread_function(
+        pid: pid_t,
+    ) -> Box<
+        Fn(u64,
+           pid_t,
+           &address_finder::MapRange,
+           &Vec<address_finder::MapRange>)
+           -> bool,
+    > {
+        let version = address_finder::get_api_version(pid).unwrap();
+        println!("version: {}", version);
+        let function = match version.as_ref() {
+            "1.9.1" => self::ruby_1_9_1_0::is_maybe_thread,
+            "1.9.2" => self::ruby_1_9_2_0::is_maybe_thread,
+            "1.9.3" => self::ruby_1_9_3_0::is_maybe_thread,
+            "2.1.1" => self::ruby_2_1_1::is_maybe_thread,
+            "2.1.2" => self::ruby_2_1_2::is_maybe_thread,
+            "2.1.3" => self::ruby_2_1_3::is_maybe_thread,
+            "2.1.4" => self::ruby_2_1_4::is_maybe_thread,
+            "2.1.5" => self::ruby_2_1_5::is_maybe_thread,
+            "2.1.6" => self::ruby_2_1_6::is_maybe_thread,
+            "2.1.7" => self::ruby_2_1_7::is_maybe_thread,
+            "2.1.8" => self::ruby_2_1_8::is_maybe_thread,
+            "2.1.9" => self::ruby_2_1_9::is_maybe_thread,
+            "2.1.10" => self::ruby_2_1_10::is_maybe_thread,
+            "2.2.0" => self::ruby_2_2_0::is_maybe_thread,
+            "2.2.1" => self::ruby_2_2_1::is_maybe_thread,
+            "2.2.2" => self::ruby_2_2_2::is_maybe_thread,
+            "2.2.3" => self::ruby_2_2_3::is_maybe_thread,
+            "2.2.4" => self::ruby_2_2_4::is_maybe_thread,
+            "2.2.5" => self::ruby_2_2_5::is_maybe_thread,
+            "2.2.6" => self::ruby_2_2_6::is_maybe_thread,
+            "2.2.7" => self::ruby_2_2_7::is_maybe_thread,
+            "2.2.8" => self::ruby_2_2_8::is_maybe_thread,
+            "2.2.9" => self::ruby_2_2_9::is_maybe_thread,
+            "2.3.0" => self::ruby_2_3_0::is_maybe_thread,
+            "2.3.1" => self::ruby_2_3_1::is_maybe_thread,
+            "2.3.2" => self::ruby_2_3_2::is_maybe_thread,
+            "2.3.3" => self::ruby_2_3_3::is_maybe_thread,
+            "2.3.4" => self::ruby_2_3_4::is_maybe_thread,
+            "2.3.5" => self::ruby_2_3_5::is_maybe_thread,
+            "2.3.6" => self::ruby_2_3_6::is_maybe_thread,
+            "2.4.0" => self::ruby_2_4_0::is_maybe_thread,
+            "2.4.1" => self::ruby_2_4_1::is_maybe_thread,
+            "2.4.2" => self::ruby_2_4_2::is_maybe_thread,
+            "2.4.3" => self::ruby_2_4_3::is_maybe_thread,
+            _ => panic!("oh no"),
+        };
+        Box::new(function)
+    }
+
+
+
     pub fn get_stack_trace_function(
         pid: pid_t,
     ) -> Box<Fn(u64, pid_t) -> Result<Vec<String>, Box<std::error::Error>>> {
         let version = address_finder::get_api_version(pid).unwrap();
         println!("version: {}", version);
         let stack_trace_function = match version.as_ref() {
+            "1.9.1" => self::ruby_1_9_1_0::get_stack_trace,
+            "1.9.2" => self::ruby_1_9_2_0::get_stack_trace,
+            "1.9.3" => self::ruby_1_9_3_0::get_stack_trace,
             "2.1.1" => self::ruby_2_1_1::get_stack_trace,
             "2.1.2" => self::ruby_2_1_2::get_stack_trace,
             "2.1.3" => self::ruby_2_1_3::get_stack_trace,
@@ -590,6 +730,7 @@ pub mod stack_trace {
             "2.1.9" => self::ruby_2_1_9::get_stack_trace,
             "2.1.10" => self::ruby_2_1_10::get_stack_trace,
             "2.2.0" => self::ruby_2_2_0::get_stack_trace,
+            "2.2.1" => self::ruby_2_2_1::get_stack_trace,
             "2.2.2" => self::ruby_2_2_2::get_stack_trace,
             "2.2.3" => self::ruby_2_2_3::get_stack_trace,
             "2.2.4" => self::ruby_2_2_4::get_stack_trace,
@@ -615,6 +756,9 @@ pub mod stack_trace {
     }
 
 
+    ruby_bindings_v_1_9_x!(ruby_1_9_1_0);
+    ruby_bindings_v_1_9_x!(ruby_1_9_2_0);
+    ruby_bindings_v_1_9_x!(ruby_1_9_3_0);
     ruby_bindings!(ruby_2_1_1);
     ruby_bindings!(ruby_2_1_2);
     ruby_bindings!(ruby_2_1_3);
