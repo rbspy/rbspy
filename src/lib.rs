@@ -18,9 +18,11 @@ pub mod test_utils;
 pub mod user_interface {
     use std;
     use std::collections::HashMap;
-    pub fn print_method_stats(method_stats: &HashMap<String, u32>,
-                              method_own_time_stats: &HashMap<String, u32>,
-                              n_terminal_lines: usize) {
+    pub fn print_method_stats(
+        method_stats: &HashMap<String, u32>,
+        method_own_time_stats: &HashMap<String, u32>,
+        n_terminal_lines: usize,
+    ) {
         println!("[{}c", 27 as char); // clear the screen
         let mut count_vec: Vec<_> = method_own_time_stats.iter().collect();
         count_vec.sort_by(|a, b| b.1.cmp(a.1));
@@ -29,10 +31,12 @@ pub mod user_interface {
         let total_sum: u32 = *method_stats.values().max().unwrap();
         for &(method, count) in count_vec.iter().take(n_terminal_lines - 1) {
             let total_count = method_stats.get(&method[..]).unwrap();
-            println!(" {:02.1}% | {:02.1}% | {}",
-                     100.0 * (*count as f32) / (self_sum as f32),
-                     100.0 * (*total_count as f32) / (total_sum as f32),
-                     method);
+            println!(
+                " {:02.1}% | {:02.1}% | {}",
+                100.0 * (*count as f32) / (self_sum as f32),
+                100.0 * (*total_count as f32) / (total_sum as f32),
+                method
+            );
         }
     }
 
@@ -241,7 +245,11 @@ mod copy {
     use read_process_memory::*;
     use std::mem;
     use std;
-    pub fn copy_address_raw(addr: *const c_void, length: usize, source_pid: pid_t) -> Result<Vec<u8>, Box<std::error::Error>> {
+    pub fn copy_address_raw(
+        addr: *const c_void,
+        length: usize,
+        source_pid: pid_t,
+    ) -> Result<Vec<u8>, Box<std::error::Error>> {
         let source = source_pid.try_into_process_handle().unwrap();
         debug!("copy_address_raw: addr: {:x}", addr as usize);
         let mut copy = vec![0; length];
@@ -535,7 +543,9 @@ pub mod stack_trace {
     use address_finder;
     use std;
 
-    pub fn get_stack_trace_function(pid: pid_t) -> Box<Fn(u64, pid_t) -> Result<Vec<String>, Box<std::error::Error>>> {
+    pub fn get_stack_trace_function(
+        pid: pid_t,
+    ) -> Box<Fn(u64, pid_t) -> Result<Vec<String>, Box<std::error::Error>>> {
         let version = address_finder::get_api_version(pid).unwrap();
         println!("version: {}", version);
         let stack_trace_function = match version.as_ref() {
