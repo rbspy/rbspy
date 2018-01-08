@@ -392,26 +392,7 @@ mod copy {
 macro_rules! ruby_bindings(
 ($ruby_version:ident) => (
 mod $ruby_version {
-    // These three functions (get_cfps, get_iseq, and get_ruby_string) are the
-    // core of how the program works. They're essentially a straight port of
-    // this gdb script:
-    // https://gist.github.com/csfrancis/11376304/raw/7a0450d11e64e3bb7c982b7ad2778f3603188c0f/gdb_ruby_backtrace.py
-    // except without using gdb!!
-    //
-    // `get_iseq` is the simplest method  here -- it's just trying to run (cfp->iseq). But to do that
-    // you need to dereference the `cfp` pointer, and that memory is actually in another process
-    // so we call `copy_address` to copy the memory for that pointer out of
-    // the other process. The other methods do the same thing
-    // except that they're more copmlicated and sometimes call `copy_address_raw`.
-    //
-    // `get_cfps` corresponds to
-    // (* const rb_thread_t *(ruby_current_thread_address_location))->cfp
-    //
-    // `get_ruby_string` is doing ((Struct RString *) address) and then
-    // trying one of two ways to get the actual Ruby string out depending
-    // on how it's stored
-
-    use copy::{copy_address_raw, copy_struct};
+    use copy::*;
     use std;
     use bindings::$ruby_version::*;
     use libc::*;
@@ -419,6 +400,46 @@ mod $ruby_version {
     use std::mem;
     use std::os::unix::prelude::*;
 
+
+    // These 4 functions are the
+    // core of how the program works. They're essentially a straight port of
+    // this gdb script:
+    // https://gist.github.com/csfrancis/11376304/raw/7a0450d11e64e3bb7c982b7ad2778f3603188c0f/gdb_ruby_backtrace.py
+    // except without using gdb!!
+    //
+    // `get_cfps` corresponds to
+    // (* const rb_thread_t *(ruby_current_thread_address_location))->cfp
+    //
+    // `get_ruby_string` is doing ((Struct RString *) address) and then
+    // trying one of two ways to get the actual Ruby string out depending
+    // on how it's stored
+    get_stack_trace_2_0_0!();
+    get_ruby_string_2_0_0!();
+    get_label_and_path_2_0_0!();
+    get_cfps_2_0_0!();
+}
+));
+
+macro_rules! ruby_bindings_v2(
+($ruby_version:ident) => (
+mod $ruby_version {
+    use copy::*;
+    use std;
+    use bindings::$ruby_version::*;
+    use libc::*;
+    use std::ffi::{OsString, CStr};
+    use std::mem;
+    use std::os::unix::prelude::*;
+
+    get_stack_trace_2_0_0!();
+    get_ruby_string_2_0_0!();
+    get_label_and_path_2_3_0!();
+    get_cfps_2_0_0!();
+}
+));
+
+macro_rules! get_stack_trace_2_0_0(
+() => (
     pub fn get_stack_trace(
         ruby_current_thread_address_location: u64,
         source_pid: pid_t,
@@ -429,12 +450,6 @@ mod $ruby_version {
         );
         let current_thread_addr: u64 =
             copy_struct(ruby_current_thread_address_location, source_pid)?;
-        get_stack_trace2(current_thread_addr, source_pid)
-    }
-
-    pub fn get_stack_trace2(
-        current_thread_addr: u64,
-        source_pid: pid_t) -> Result<Vec<String>, Box<std::error::Error>> {
         debug!("{:x}", current_thread_addr);
         let thread: rb_thread_t = copy_struct(current_thread_addr, source_pid)?;
         debug!("{:?}", thread);
@@ -461,10 +476,10 @@ mod $ruby_version {
         }
         Ok(trace)
     }
+));
 
-
-
-
+macro_rules! get_ruby_string_2_0_0(
+() => (
     fn get_ruby_string(addr: u64, source_pid: pid_t) -> Result<OsString, Box<std::error::Error>> {
         let vec = {
             let rstring: RString = copy_struct(addr, source_pid)?;
@@ -484,7 +499,10 @@ mod $ruby_version {
         };
         Ok(OsString::from_vec(vec))
     }
+));
 
+macro_rules! get_label_and_path_2_0_0(
+() => (
     fn get_label_and_path(
         cfp: &rb_control_frame_struct,
         source_pid: pid_t,
@@ -497,127 +515,12 @@ mod $ruby_version {
         let location = iseq_struct.location;
         let label: OsString = get_ruby_string(location.label as u64, source_pid)?;
         let path: OsString = get_ruby_string(location.path as u64, source_pid)?;
-        // println!("{:?} - {:?}", label, path);
         Ok((label, path))
     }
-
-    // Ruby stack grows down, starting at
-    //   ruby_current_thread->stack + ruby_current_thread->stack_size - 1 * sizeof(rb_control_frame_t)
-    // I don't know what the -1 is about. Also note that the stack_size is *not* in bytes! stack is a
-    // VALUE*, and so stack_size is in units of sizeof(VALUE).
-    //
-    // The base of the call stack is therefore at
-    //   stack + stack_size * sizeof(VALUE) - sizeof(rb_control_frame_t)
-    // (with everything in bytes).
-    fn get_cfps(thread: &rb_thread_t, source_pid: pid_t) -> Result<Vec<u8>, Box<std::error::Error>> {
-        let cfp_address = thread.cfp as u64;
-
-        let stack = thread.stack as u64;
-        let stack_size = thread.stack_size as u64;
-        let value_size = mem::size_of::<VALUE>() as u64;
-        let cfp_size = mem::size_of::<rb_control_frame_struct>() as u64;
-
-        let stack_base = stack + stack_size * value_size - 1 * cfp_size;
-        debug!("cfp addr: {:x}", cfp_address as usize);
-        Ok(copy_address_raw(
-            cfp_address as *const c_void,
-            (stack_base - cfp_address) as usize,
-            source_pid,
-        )?)
-    }
-}
 ));
 
-macro_rules! ruby_bindings_v2(
-($ruby_version:ident) => (
-mod $ruby_version {
-    // These three functions (get_cfps, get_iseq, and get_ruby_string) are the
-    // core of how the program works. They're essentially a straight port of
-    // this gdb script:
-    // https://gist.github.com/csfrancis/11376304/raw/7a0450d11e64e3bb7c982b7ad2778f3603188c0f/gdb_ruby_backtrace.py
-    // except without using gdb!!
-    //
-    // `get_iseq` is the simplest method  here -- it's just trying to run (cfp->iseq). But to do that
-    // you need to dereference the `cfp` pointer, and that memory is actually in another process
-    // so we call `copy_address` to copy the memory for that pointer out of
-    // the other process. The other methods do the same thing
-    // except that they're more copmlicated and sometimes call `copy_address_raw`.
-    //
-    // `get_cfps` corresponds to
-    // (* const rb_thread_t *(ruby_current_thread_address_location))->cfp
-    //
-    // `get_ruby_string` is doing ((Struct RString *) address) and then
-    // trying one of two ways to get the actual Ruby string out depending
-    // on how it's stored
-
-    use std;
-    use bindings::$ruby_version::*;
-    use libc::*;
-    use std::ffi::{OsString, CStr};
-    use std::mem;
-    use std::os::unix::prelude::*;
-    use copy::{copy_address_raw, copy_struct};
-
-    pub fn get_stack_trace(
-        ruby_current_thread_address_location: u64,
-        source_pid: pid_t,
-    ) -> Result<Vec<String>, Box<std::error::Error>> {
-        debug!(
-            "current address location: {:x}",
-            ruby_current_thread_address_location
-        );
-        let current_thread_addr: u64 =
-            copy_struct(ruby_current_thread_address_location, source_pid)?;
-        debug!("{:x}", current_thread_addr);
-        let thread: rb_thread_t = copy_struct(current_thread_addr, source_pid)?;
-        debug!("{:?}", thread);
-        let mut trace = Vec::new();
-        let mut cfps = get_cfps(&thread, source_pid)?;
-        let slice: &[rb_control_frame_struct] = unsafe {
-            std::slice::from_raw_parts(
-                cfps.as_mut_ptr() as *mut rb_control_frame_struct,
-                cfps.capacity() as usize / mem::size_of::<rb_control_frame_struct>() as usize,
-            )
-        };
-        for cfp in slice.iter() {
-            let result  = get_label_and_path(&cfp, source_pid);
-            match result {
-                Ok((label, path)) => {
-                    let current_location =
-                        format!("{} : {}", label.to_string_lossy(), path.to_string_lossy()).to_string();
-                    trace.push(current_location);
-                }
-                Err(_) => {
-                    warn!("failed to get label and path, ignoring");
-                }
-            }
-        }
-        Ok(trace)
-    }
-
-
-
-
-    fn get_ruby_string(addr: u64, source_pid: pid_t) -> Result<OsString, Box<std::error::Error>> {
-        let vec = {
-            let rstring: RString = copy_struct(addr, source_pid)?;
-            let basic = rstring.basic;
-            let is_array = basic.flags & 1 << 13 == 0;
-            if is_array {
-                unsafe { CStr::from_ptr(rstring.as_.ary.as_ref().as_ptr() as *const i8) }
-                    .to_bytes()
-                    .to_vec()
-            } else {
-                unsafe {
-                    let addr = rstring.as_.heap.ptr as u64;
-                    let len = rstring.as_.heap.len as usize;
-                    copy_address_raw(addr as *const c_void, len, source_pid)?
-                }
-            }
-        };
-        Ok(OsString::from_vec(vec))
-    }
-
+macro_rules! get_label_and_path_2_3_0(
+() => (
     fn get_label_and_path(
         cfp: &rb_control_frame_struct,
         source_pid: pid_t,
@@ -634,7 +537,10 @@ mod $ruby_version {
         // println!("{:?} - {:?}", label, path);
         Ok((label, path))
     }
+));
 
+macro_rules! get_cfps_2_0_0(
+() => (
     // Ruby stack grows down, starting at
     //   ruby_current_thread->stack + ruby_current_thread->stack_size - 1 * sizeof(rb_control_frame_t)
     // I don't know what the -1 is about. Also note that the stack_size is *not* in bytes! stack is a
@@ -659,8 +565,8 @@ mod $ruby_version {
             source_pid,
         )?)
     }
-}
 ));
+
 
 pub mod stack_trace {
     use libc::pid_t;
