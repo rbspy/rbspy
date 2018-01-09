@@ -1,3 +1,6 @@
+pub mod ruby_1_9_1_0;
+pub mod ruby_1_9_2_0;
+pub mod ruby_1_9_3_0;
 pub mod ruby_2_1_10;
 pub mod ruby_2_1_1;
 pub mod ruby_2_1_2;
