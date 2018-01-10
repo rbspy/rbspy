@@ -672,7 +672,8 @@ pub mod stack_trace {
             "1.9.1" => self::ruby_1_9_1_0::is_maybe_thread,
             "1.9.2" => self::ruby_1_9_2_0::is_maybe_thread,
             "1.9.3" => self::ruby_1_9_3_0::is_maybe_thread,
-            "2.1.1" => self::ruby_2_1_1::is_maybe_thread,
+            "2.0.0" => self::ruby_2_0_0_0::is_maybe_thread,
+            "2.1.0" => self::ruby_2_1_0::is_maybe_thread,
             "2.1.2" => self::ruby_2_1_2::is_maybe_thread,
             "2.1.3" => self::ruby_2_1_3::is_maybe_thread,
             "2.1.4" => self::ruby_2_1_4::is_maybe_thread,
@@ -719,6 +720,8 @@ pub mod stack_trace {
             "1.9.1" => self::ruby_1_9_1_0::get_stack_trace,
             "1.9.2" => self::ruby_1_9_2_0::get_stack_trace,
             "1.9.3" => self::ruby_1_9_3_0::get_stack_trace,
+            "2.0.0" => self::ruby_2_0_0_0::get_stack_trace,
+            "2.1.0" => self::ruby_2_1_0::get_stack_trace,
             "2.1.1" => self::ruby_2_1_1::get_stack_trace,
             "2.1.2" => self::ruby_2_1_2::get_stack_trace,
             "2.1.3" => self::ruby_2_1_3::get_stack_trace,
@@ -759,6 +762,8 @@ pub mod stack_trace {
     ruby_bindings_v_1_9_x!(ruby_1_9_1_0);
     ruby_bindings_v_1_9_x!(ruby_1_9_2_0);
     ruby_bindings_v_1_9_x!(ruby_1_9_3_0);
+    ruby_bindings!(ruby_2_0_0_0);
+    ruby_bindings!(ruby_2_1_0);
     ruby_bindings!(ruby_2_1_1);
     ruby_bindings!(ruby_2_1_2);
     ruby_bindings!(ruby_2_1_3);
