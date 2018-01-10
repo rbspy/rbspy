@@ -73,23 +73,23 @@ fn test_arg_parsing() {
 }
 
 
-fn get_current_address(pid: pid_t) -> u64 {
+fn get_api_version(pid: pid_t) -> String {
     // this exists because sometimes rbenv takes a while to exec the right Ruby binary.
     // we are dumb right now so we just... wait until it seems to work out.
     let mut i = 0;
     loop {
-        let location = address_finder::current_thread_address_location(pid);
+        let version = address_finder::get_api_version(pid);
         if i > 100 {
             break;
         }
-        if location.is_ok() {
-            return location.unwrap();
+        if version.is_ok() {
+            return version.unwrap();
         }
         // if it doesn't work, sleep for 1ms and try again
         i += 1;
         thread::sleep(Duration::from_millis(1));
     }
-    panic!("Couldn't find ruby_current_thread");
+    panic!("Couldn't find ruby version");
 }
 
 fn main() {
@@ -113,6 +113,9 @@ fn main() {
 
     };
 
+    let version = get_api_version(pid);
+    debug!("version: {}", version);
+
     if command.clone() != "top" && command.clone() != "stackcollapse" &&
         command.clone() != "parse"
     {
@@ -120,8 +123,8 @@ fn main() {
         process::exit(1);
     }
 
-    let ruby_current_thread_address_location: u64 = get_current_address(pid);
-    let stack_trace_function = stack_trace::get_stack_trace_function(pid);
+    let ruby_current_thread_address_location = address_finder::current_thread_address_location(pid, &version).unwrap();
+    let stack_trace_function = stack_trace::get_stack_trace_function(&version);
 
     if command == "parse" {
         return;
