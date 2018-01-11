@@ -10,6 +10,9 @@
 language: rust
 cache: cargo
 
+services:
+  - docker
+
 env:
   global:
     # This will be part of the release tarball
@@ -20,12 +23,12 @@ env:
 # NOTE Make *sure* you don't remove a reference (&foo) if you are going to dereference it (*foo)
 matrix:
   include:
-    # Stable channel
+    # nightly channel
     - os: linux
-      rust: stable
+      rust: nightly
       env: TARGET=x86_64-unknown-linux-gnu
     - os: linux
-      rust: stable
+      rust: nightly
       env: TARGET=x86_64-unknown-linux-musl
       dist: trusty
       sudo: required
@@ -35,30 +38,6 @@ matrix:
           - musl
           - musl-dev
           - musl-tools
-    # Beta channel
-    - os: linux
-      rust: beta
-      env: TARGET=x86_64-unknown-linux-gnu
-    - os: linux
-      rust: beta
-      env: TARGET=x86_64-unknown-linux-musl
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          packages: *musl_packages
-    # Nightly channel
-    - os: linux
-      rust: nightly
-      env: TARGET=x86_64-unknown-linux-gnu
-    - os: linux
-      rust: nightly
-      env: TARGET=x86_64-unknown-linux-musl
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          packages: *musl_packages
 
 before_install:
   - export PATH="$PATH:$HOME/.cargo/bin"
