@@ -1,3 +1,4 @@
+#![feature(duration_from_micros)]
 #[macro_use]
 extern crate log;
 
@@ -8,6 +9,7 @@ extern crate byteorder;
 extern crate clap;
 extern crate env_logger;
 extern crate read_process_memory;
+extern crate time;
 
 use clap::{Arg, App, ArgMatches, AppSettings};
 use libc::*;
@@ -92,6 +94,13 @@ fn get_api_version(pid: pid_t) -> String {
     panic!("Couldn't find ruby version");
 }
 
+fn timestamp() -> u64 {
+    let timespec = time::get_time();
+    // 1459440009.113178
+    let mills: u64 = (timespec.sec as u64 * 1000 * 1000)  as u64 + ((timespec.nsec as u64) / 1000  as u64);
+    mills
+}
+
 fn main() {
     env_logger::init().unwrap();
 
@@ -133,12 +142,14 @@ fn main() {
         // This gets a stack trace and then just prints it out
         // in a format that Brendan Gregg's stackcollapse.pl script understands
         loop {
+            let time_millis = timestamp();
             let trace = stack_trace_function(ruby_current_thread_address_location, pid).unwrap_or_else(|_| {
                 // TODO: check that it's actually just a "process doesn't exist" error otherwise complain
                 process::exit(0);
             });
             user_interface::print_stack_trace(&trace);
-            thread::sleep(Duration::from_millis(10));
+            let time_millis_new = timestamp();
+            thread::sleep(Duration::from_micros(10000 - (time_millis_new - time_millis)));
         }
     } else {
         // top subcommand!
