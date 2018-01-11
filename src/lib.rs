@@ -13,8 +13,6 @@ extern crate read_process_memory;
 
 pub mod bindings;
 
-pub mod test_utils;
-
 pub mod user_interface {
     use std;
     use std::collections::HashMap;
