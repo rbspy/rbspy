@@ -5,9 +5,12 @@ mkdir -p /tmp/headers/$1
 cd ~/clones/ruby
 git checkout v$1
 cp -R include /tmp/headers/$1
-cp -R ccan /tmp/headers/$1
+if [ -e ccan ]
+then
+    cp -R ccan /tmp/headers/$1
+fi
 cp *.h /tmp/headers/$1
-OUT=src/bindings/ruby_${1}.rs
+OUT=ruby-bindings/src/ruby_${1}.rs
 bindgen /tmp/wrapper.h \
     -o /tmp/bindings.rs \
     --impl-debug true \
@@ -20,6 +23,7 @@ bindgen /tmp/wrapper.h \
     --whitelist-type rb_control_frame_struct \
     --whitelist-type rb_thread_struct \
     --whitelist-type rb_execution_context_struct \
+    --whitelist-type iseq_insn_info_entry\
     --whitelist-type RString \
     --whitelist-type RArray \
     --whitelist-type VALUE \

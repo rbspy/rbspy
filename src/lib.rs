@@ -15,30 +15,9 @@ extern crate ruby_bindings as bindings;
 
 pub mod user_interface {
     use std;
-    use std::collections::HashMap;
-    pub fn print_method_stats(
-        method_stats: &HashMap<String, u32>,
-        method_own_time_stats: &HashMap<String, u32>,
-        n_terminal_lines: usize,
-    ) {
-        println!("[{}c", 27 as char); // clear the screen
-        let mut count_vec: Vec<_> = method_own_time_stats.iter().collect();
-        count_vec.sort_by(|a, b| b.1.cmp(a.1));
-        println!(" {:4} | {:4} | {}", "self", "tot", "method");
-        let self_sum: u32 = method_own_time_stats.values().fold(0, std::ops::Add::add);
-        let total_sum: u32 = *method_stats.values().max().unwrap();
-        for &(method, count) in count_vec.iter().take(n_terminal_lines - 1) {
-            let total_count = method_stats.get(&method[..]).unwrap();
-            println!(
-                " {:02.1}% | {:02.1}% | {}",
-                100.0 * (*count as f32) / (self_sum as f32),
-                100.0 * (*total_count as f32) / (total_sum as f32),
-                method
-            );
-        }
-    }
+    use stack_trace;
 
-    pub fn print_stack_trace(trace: &[String]) {
+    pub fn print_stack_trace(trace: &[stack_trace::FunctionCall]) {
         for x in trace {
             println!("{}", x);
         }
@@ -70,7 +49,7 @@ pub mod address_finder {
         RubyVersionMissing,
         #[fail(display = "Couldn't find address of current thread")]
         CurrentThreadNotFound,
-    }
+}
 
     // struct to hold everything we know about the program
     struct ProgramInfo {
@@ -85,22 +64,25 @@ pub mod address_finder {
 
     fn get_program_info(pid: pid_t) -> Result<ProgramInfo, AddressFinderError> {
         let all_maps = get_proc_maps(pid)?;
-        let ruby_map = Box::new(get_ruby_map(&all_maps).ok_or(AddressFinderError::RubyMapNotFound(pid))?);
-        let heap_map = Box::new(get_heap_map(&all_maps).ok_or(AddressFinderError::HeapMapNotFound(pid))?);
+        let ruby_map =
+            Box::new(get_ruby_map(&all_maps).ok_or(AddressFinderError::RubyMapNotFound(pid))?);
+        let heap_map =
+            Box::new(get_heap_map(&all_maps).ok_or(AddressFinderError::HeapMapNotFound(pid))?);
         let ruby_path = &ruby_map
             .pathname
             .clone()
             .expect("ruby map's pathname shouldn't be None");
-        let ruby_elf =
-            elf::File::open_path(ruby_path).map_err(|_| AddressFinderError::ELFFileError(ruby_path.to_string()))?;
+        let ruby_elf = elf::File::open_path(ruby_path)
+            .map_err(|_| AddressFinderError::ELFFileError(ruby_path.to_string()))?;
         let libruby_map = Box::new(libruby_map(&all_maps));
         let libruby_elf = match *libruby_map {
             Some(ref map) => {
                 let path = &map.pathname
                     .clone()
                     .expect("libruby map's pathname shouldn't be None");
-                Some(elf::File::open_path(path).map_err(|_| AddressFinderError::ELFFileError(path.to_string()))?)
-            },
+                Some(elf::File::open_path(path)
+                    .map_err(|_| AddressFinderError::ELFFileError(path.to_string()))?)
+            }
             _ => None,
         };
         Ok(ProgramInfo {
@@ -129,9 +111,11 @@ pub mod address_finder {
         // Parses /proc/PID/maps into a Vec<MapRange>
         // TODO: factor this out into a crate and make it work on Mac too
         let maps_file = format!("/proc/{}/maps", pid);
-        let mut file = File::open(maps_file).map_err(|x| AddressFinderError::ProcMapsError(pid, x))?;
+        let mut file =
+            File::open(maps_file).map_err(|x| AddressFinderError::ProcMapsError(pid, x))?;
         let mut contents = String::new();
-        file.read_to_string(&mut contents).map_err(|x| AddressFinderError::ProcMapsError(pid, x))?;
+        file.read_to_string(&mut contents)
+            .map_err(|x| AddressFinderError::ProcMapsError(pid, x))?;
         let mut vec: Vec<MapRange> = Vec::new();
         for line in contents.split("\n") {
             let mut split = line.split_whitespace();
@@ -295,7 +279,8 @@ pub mod address_finder {
                 } else {
                     return false;
                 }
-            }) .map({ |x| x.clone() })
+            })
+            .map({ |x| x.clone() })
     }
 
     #[cfg(target_os = "linux")]
@@ -307,7 +292,8 @@ pub mod address_finder {
                 } else {
                     false
                 }
-            }).map(|x| x.clone())
+            })
+            .map(|x| x.clone())
     }
 
     #[cfg(target_os = "macos")]
@@ -415,11 +401,10 @@ pub mod copy {
     use read_process_memory::*;
 
     #[derive(Fail, Debug)]
-    pub enum MemoryCopyError{
+    pub enum MemoryCopyError {
         #[fail(display = "Failed to copy memory address {} from PID {}", _0, _1)]
         Io(pid_t, usize, #[cause] std::io::Error),
-        #[fail(display = "Process isn't running")]
-        ProcessEnded,
+        #[fail(display = "Process isn't running")] ProcessEnded,
         #[fail(display = "Tried to read invalid string")]
         InvalidStringError(#[cause] std::string::FromUtf8Error),
     }
@@ -436,7 +421,9 @@ pub mod copy {
         length: usize,
         source_pid: pid_t,
     ) -> Result<Vec<u8>, MemoryCopyError> {
-        let source = source_pid.try_into_process_handle().expect("Failed to convert PID into process handle. This should never happen.");
+        let source = source_pid
+            .try_into_process_handle()
+            .expect("Failed to convert PID into process handle. This should never happen.");
         debug!("copy_address_raw: addr: {:x}", addr as usize);
         let mut copy = vec![0; length];
         source.copy_address(addr as usize, &mut copy).map_err(|x| {
@@ -541,10 +528,12 @@ mod $ruby_version {
 macro_rules! get_stack_trace(
 ($thread_type:ident) => (
 
+    use stack_trace::FunctionCall;
+
     pub fn get_stack_trace(
         ruby_current_thread_address_location: u64,
         source_pid: pid_t,
-    ) -> Result<Vec<String>, MemoryCopyError> {
+    ) -> Result<Vec<FunctionCall>, MemoryCopyError> {
         debug!(
             "current address location: {:x}",
             ruby_current_thread_address_location
@@ -570,10 +559,8 @@ macro_rules! get_stack_trace(
             }
             let iseq_struct: rb_iseq_struct = copy_struct(cfp.iseq as u64, source_pid)?;
             debug!("iseq_struct: {:?}", iseq_struct);
-            let (label, path) = get_label_and_path(&iseq_struct, source_pid)?;
-            let current_location =
-                format!("{} : {}", label, path).to_string();
-            trace.push(current_location);
+            let label_path  = get_label_and_path(&iseq_struct, source_pid)?;
+            trace.push(label_path);
         }
         Ok(trace)
     }
@@ -683,8 +670,12 @@ macro_rules! get_label_and_path_1_9_0(
     fn get_label_and_path(
         iseq_struct: &rb_iseq_struct,
         source_pid: pid_t,
-    ) -> Result<(String, String), MemoryCopyError> {
-        Ok((get_ruby_string(iseq_struct.name as u64, source_pid)?, get_ruby_string(iseq_struct.filename as u64, source_pid)?))
+    ) -> Result<FunctionCall, MemoryCopyError> {
+        Ok(FunctionCall{
+            name: get_ruby_string(iseq_struct.name as u64, source_pid)?,
+            path: get_ruby_string(iseq_struct.filename as u64, source_pid)?,
+            lineno: None,
+        })
     }
 ));
 
@@ -693,8 +684,12 @@ macro_rules! get_label_and_path_2_0_0(
     fn get_label_and_path(
         iseq_struct: &rb_iseq_struct,
         source_pid: pid_t,
-    ) -> Result<(String, String), MemoryCopyError> {
-        Ok((get_ruby_string(iseq_struct.location.label as u64, source_pid)?, get_ruby_string(iseq_struct.location.path as u64, source_pid)?))
+    ) -> Result<FunctionCall, MemoryCopyError> {
+        Ok(FunctionCall{
+            name: get_ruby_string(iseq_struct.location.label as u64, source_pid)?,
+            path: get_ruby_string(iseq_struct.location.path as u64, source_pid)?,
+            lineno: Some(iseq_struct.location.first_lineno as u32),
+        })
     }
 ));
 
@@ -703,9 +698,13 @@ macro_rules! get_label_and_path_2_3_0(
     fn get_label_and_path(
         iseq_struct: &rb_iseq_struct,
         source_pid: pid_t,
-    ) -> Result<(String, String), MemoryCopyError> {
+    ) -> Result<FunctionCall, MemoryCopyError> {
         let body: rb_iseq_constant_body = copy_struct(iseq_struct.body as u64, source_pid)?;
-        Ok((get_ruby_string(body.location.label as u64, source_pid)?, get_ruby_string(body.location.path as u64, source_pid)?))
+        Ok(FunctionCall{
+            name: get_ruby_string(body.location.label as u64, source_pid)?,
+            path: get_ruby_string(body.location.path as u64, source_pid)?,
+            lineno: Some(body.location.first_lineno as u32),
+        })
     }
 ));
 
@@ -714,10 +713,14 @@ macro_rules! get_label_and_path_2_5_0(
     fn get_label_and_path(
         iseq_struct: &rb_iseq_struct,
         source_pid: pid_t,
-    ) -> Result<(String, String), MemoryCopyError> {
+    ) -> Result<FunctionCall, MemoryCopyError> {
         let body: rb_iseq_constant_body = copy_struct(iseq_struct.body as u64, source_pid)?;
         let rstring: RString = copy_struct(body.location.label as u64, source_pid)?;
-        Ok((get_ruby_string(body.location.label as u64, source_pid)?, get_ruby_string_array(body.location.pathobj as u64, rstring.basic.klass as u64, source_pid)?))
+        Ok(FunctionCall{
+            name: get_ruby_string(body.location.label as u64, source_pid)?,
+            path:  get_ruby_string_array(body.location.pathobj as u64, rstring.basic.klass as u64, source_pid)?,
+            lineno: Some(body.location.first_lineno as u32),
+        })
     }
 ));
 
@@ -744,6 +747,22 @@ pub mod stack_trace {
     use libc::pid_t;
     use address_finder;
     use copy;
+    use std::fmt;
+
+    pub struct FunctionCall {
+        name: String,
+        path: String,
+        lineno: Option<u32>,
+    }
+
+    impl fmt::Display for FunctionCall {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            match self.lineno {
+                Some(line) => write!(f, "{} - {} line {}", self.name, self.path, line),
+                None => write!(f, "{} - {}", self.name, self.path),
+            }
+        }
+}
 
     pub fn is_maybe_thread_function(
         version: &str,
@@ -794,7 +813,7 @@ pub mod stack_trace {
 
     pub fn get_stack_trace_function(
         version: &str,
-    ) -> Box<Fn(u64, pid_t) -> Result<Vec<String>, copy::MemoryCopyError>> {
+    ) -> Box<Fn(u64, pid_t) -> Result<Vec<FunctionCall>, copy::MemoryCopyError>> {
         let stack_trace_function = match version {
             "1.9.1" => self::ruby_1_9_1_0::get_stack_trace,
             "1.9.2" => self::ruby_1_9_2_0::get_stack_trace,
