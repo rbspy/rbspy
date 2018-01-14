@@ -42,6 +42,11 @@ fn arg_parser() -> App<'static, 'static> {
         )
         .arg(
             Arg::from_usage(
+                "-f --file=[FILE] 'File to write output to'",
+            ).required(false),
+        )
+        .arg(
+            Arg::from_usage(
                 "-p --pid=[PID] 'PID of the Ruby process you want to profile'",
             ).required_unless("cmd"),
         )
@@ -145,6 +150,10 @@ fn do_main() -> Result<(), Error> {
         address_finder::current_thread_address_location(pid, &version)?;
     let stack_trace_function = stack_trace::get_stack_trace_function(&version);
 
+    let mut output: Box<std::io::Write> = match matches.value_of("file") {
+        Some(filename) => Box::new(std::fs::File::create(filename)?),
+        None => Box::new(std::io::stderr()),
+    };
     if command == "parse" {
         unimplemented!("parse command not implemented");
     } else if command == "stackcollapse" {
@@ -155,7 +164,7 @@ fn do_main() -> Result<(), Error> {
             match trace {
                 Err(copy::MemoryCopyError::ProcessEnded) => return Ok(()),
                 _ => {
-                    user_interface::print_stack_trace(&trace?);
+                    user_interface::print_stack_trace(&mut output, &trace?);
                     thread::sleep(Duration::from_millis(10));
                 }
             }

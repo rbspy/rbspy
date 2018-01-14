@@ -17,11 +17,12 @@ pub mod user_interface {
     use std;
     use stack_trace;
 
-    pub fn print_stack_trace(trace: &[stack_trace::FunctionCall]) {
-        for x in trace {
-            println!("{}", x);
+    pub fn print_stack_trace(output: &mut std::io::Write, trace: &[stack_trace::FunctionCall]) {
+        for x in trace.iter().rev() {
+            write!(output, "{}", x);
+            write!(output, ";");
         }
-        println!("{}", 1);
+        writeln!(output, " {}", 1);
     }
 }
 
@@ -402,9 +403,10 @@ pub mod copy {
 
     #[derive(Fail, Debug)]
     pub enum MemoryCopyError {
-        #[fail(display = "Failed to copy memory address {} from PID {}", _0, _1)]
+        #[fail(display = "Failed to copy memory address {:x} from PID {}", _1, _0)]
         Io(pid_t, usize, #[cause] std::io::Error),
         #[fail(display = "Process isn't running")] ProcessEnded,
+        #[fail(display = "Other")] Other,
         #[fail(display = "Tried to read invalid string")]
         InvalidStringError(#[cause] std::string::FromUtf8Error),
     }
@@ -415,6 +417,20 @@ pub mod copy {
     //     #[fail(display = "Failed to copy memory address {} from PID {}", _0, _1)]
     //     Io(pid_t, usize, #[cause] std::io::Error),
     // }
+
+    pub fn copy_vec<T>(addr: usize, length: usize, source_pid: pid_t) -> Result<Vec<T>, MemoryCopyError> {
+        let mut vec = copy_address_raw(addr, length * std::mem::size_of::<T>(), source_pid)?;
+        let capacity = vec.capacity() as usize / std::mem::size_of::<T>() as usize;
+        let ptr = vec.as_mut_ptr() as *mut T;
+        std::mem::forget(vec);
+        unsafe {
+            Ok(Vec::from_raw_parts(
+                ptr,
+                capacity,
+                capacity,
+            ))
+        }
+    }
 
     pub fn copy_address_raw(
         addr: usize,
@@ -485,6 +501,7 @@ mod $ruby_version {
     get_stack_trace!(rb_thread_struct);
     get_ruby_string!();
     get_cfps!();
+    get_lineno_2_0_0!();
     get_label_and_path_2_0_0!();
     is_stack_base_1_9_0!();
 }
@@ -502,6 +519,7 @@ mod $ruby_version {
     get_stack_trace!(rb_thread_struct);
     get_ruby_string!();
     get_cfps!();
+    get_lineno_2_3_0!();
     get_label_and_path_2_3_0!();
     is_stack_base_1_9_0!();
 }
@@ -519,6 +537,7 @@ mod $ruby_version {
     get_stack_trace!(rb_execution_context_struct);
     get_ruby_string!();
     get_cfps!();
+    get_lineno_2_5_0!();
     get_label_and_path_2_5_0!();
     is_stack_base_2_5_0!();
     get_ruby_string_array_2_5_0!();
@@ -544,23 +563,26 @@ macro_rules! get_stack_trace(
         let thread: $thread_type = copy_struct(current_thread_addr, source_pid)?;
         debug!("thread: {:?}", thread);
         let mut trace = Vec::new();
-        let mut cfps = get_cfps(thread.cfp as u64, stack_base(&thread) as u64, source_pid)?;
-        debug!("got cfps");
-        let slice: &[rb_control_frame_t] = unsafe {
-            std::slice::from_raw_parts(
-                cfps.as_mut_ptr() as *mut rb_control_frame_t,
-                cfps.capacity() as usize / std::mem::size_of::<rb_control_frame_t>() as usize,
-            )
-        };
-        for cfp in slice.iter() {
-            if cfp.iseq as usize == 0 {
+        let cfps = get_cfps(thread.cfp as usize, stack_base(&thread) as u64, source_pid)?;
+        for cfp in cfps.iter() {
+            if cfp.iseq as usize == 0  || cfp.pc as usize == 0 {
                 debug!("huh."); // TODO: fixmeup
                 continue;
             }
             let iseq_struct: rb_iseq_struct = copy_struct(cfp.iseq as u64, source_pid)?;
             debug!("iseq_struct: {:?}", iseq_struct);
-            let label_path  = get_label_and_path(&iseq_struct, source_pid)?;
-            trace.push(label_path);
+            let label_path  = get_label_and_path(&iseq_struct, &cfp, source_pid);
+            match label_path {
+                Ok(call)  => trace.push(call),
+                Err(x) => {
+                    // this is a heuristic: the intent of this is that it skips function calls into C extensions
+                    if trace.len() > 0 {
+                        debug!("guess that one didn't work; skipping");
+                    } else {
+                        return Err(x);
+                    }
+                }
+            }
         }
         Ok(trace)
     }
@@ -669,6 +691,7 @@ macro_rules! get_label_and_path_1_9_0(
 () => (
     fn get_label_and_path(
         iseq_struct: &rb_iseq_struct,
+        cfp: &rb_control_frame_t,
         source_pid: pid_t,
     ) -> Result<FunctionCall, MemoryCopyError> {
         Ok(FunctionCall{
@@ -679,16 +702,115 @@ macro_rules! get_label_and_path_1_9_0(
     }
 ));
 
+macro_rules! get_lineno_2_0_0(
+() => (
+    fn get_lineno(
+        iseq_struct: &rb_iseq_struct,
+        cfp: &rb_control_frame_t,
+        source_pid: pid_t,
+    ) -> Result<u32, MemoryCopyError> {
+        let mut pos = cfp.pc as usize - iseq_struct.iseq_encoded as usize;
+        if pos != 0 {
+            pos -= 1;
+        }
+        let t_size = iseq_struct.line_info_size as usize;
+        if t_size == 0 {
+            Ok(0) //TODO: really?
+        } else if t_size == 1 {
+            let table: [iseq_line_info_entry; 1] = copy_struct(iseq_struct.line_info_table as u64, source_pid)?;
+            Ok(table[0].line_no)
+        } else {
+            let table: Vec<iseq_line_info_entry> = copy_vec(iseq_struct.line_info_table as usize, t_size as usize, source_pid)?;
+            for i in 0..t_size {
+                if pos == table[i].position as usize {
+                    return Ok(table[i].line_no)
+                } else if table[i].position as usize > pos {
+                    return Ok(table[i-1].line_no)
+                }
+            }
+            Ok(table[t_size-1].line_no)
+        }
+    }
+));
+
+macro_rules! get_lineno_2_3_0(
+() => (
+    fn get_lineno(
+        iseq_struct: &rb_iseq_constant_body,
+        cfp: &rb_control_frame_t,
+        source_pid: pid_t,
+    ) -> Result<u32, MemoryCopyError> {
+        if iseq_struct.iseq_encoded as usize > cfp.pc as usize {
+            return Err(MemoryCopyError::Other);
+        }
+        let mut pos = cfp.pc as usize - iseq_struct.iseq_encoded as usize; // TODO: investigate panic here
+        if pos != 0 {
+            pos -= 1;
+        }
+        let t_size = iseq_struct.line_info_size as usize;
+        if t_size == 0 {
+            Ok(0) //TODO: really?
+        } else if t_size == 1 {
+            let table: [iseq_line_info_entry; 1] = copy_struct(iseq_struct.line_info_table as u64, source_pid)?;
+            Ok(table[0].line_no)
+        } else {
+            let table: Vec<iseq_line_info_entry> = copy_vec(iseq_struct.line_info_table as usize, t_size as usize, source_pid)?;
+            for i in 0..t_size {
+                if pos == table[i].position as usize {
+                    return Ok(table[i].line_no)
+                } else if table[i].position as usize > pos {
+                    return Ok(table[i-1].line_no)
+                }
+            }
+            Ok(table[t_size-1].line_no)
+        }
+    }
+));
+
+macro_rules! get_lineno_2_5_0(
+() => (
+    fn get_lineno(
+        iseq_struct: &rb_iseq_constant_body,
+        cfp: &rb_control_frame_t,
+        source_pid: pid_t,
+    ) -> Result<u32, MemoryCopyError> {
+        let mut pos = cfp.pc as usize - iseq_struct.iseq_encoded as usize;
+        if pos != 0 {
+            pos -= 1;
+        }
+        let t_size = iseq_struct.insns_info_size as usize;
+        if t_size == 0 {
+            Ok(0) //TODO: really?
+        } else if t_size == 1 {
+            let table: [iseq_insn_info_entry; 1] = copy_struct(iseq_struct.insns_info as u64, source_pid)?;
+            Ok(table[0].line_no as u32)
+        } else {
+            let table: Vec<iseq_insn_info_entry> = copy_vec(iseq_struct.insns_info as usize, t_size as usize, source_pid)?;
+            for i in 0..t_size {
+                if pos == table[i].position as usize {
+                    return Ok(table[i].line_no as u32)
+                } else if table[i].position as usize > pos {
+                    return Ok(table[i-1].line_no as u32)
+                }
+            }
+            Ok(table[t_size-1].line_no as u32)
+        }
+    }
+));
+
+
+
 macro_rules! get_label_and_path_2_0_0(
 () => (
-    fn get_label_and_path(
+   fn get_label_and_path(
         iseq_struct: &rb_iseq_struct,
+        cfp: &rb_control_frame_t,
         source_pid: pid_t,
     ) -> Result<FunctionCall, MemoryCopyError> {
         Ok(FunctionCall{
             name: get_ruby_string(iseq_struct.location.label as u64, source_pid)?,
             path: get_ruby_string(iseq_struct.location.path as u64, source_pid)?,
-            lineno: Some(iseq_struct.location.first_lineno as u32),
+            lineno: Some(get_lineno(iseq_struct, cfp, source_pid)?),
         })
     }
 ));
@@ -697,13 +819,14 @@ macro_rules! get_label_and_path_2_3_0(
 () => (
     fn get_label_and_path(
         iseq_struct: &rb_iseq_struct,
+        cfp: &rb_control_frame_t,
         source_pid: pid_t,
     ) -> Result<FunctionCall, MemoryCopyError> {
         let body: rb_iseq_constant_body = copy_struct(iseq_struct.body as u64, source_pid)?;
         Ok(FunctionCall{
             name: get_ruby_string(body.location.label as u64, source_pid)?,
             path: get_ruby_string(body.location.path as u64, source_pid)?,
-            lineno: Some(body.location.first_lineno as u32),
+            lineno: Some(get_lineno(&body, cfp, source_pid)?),
         })
     }
 ));
@@ -712,6 +835,7 @@ macro_rules! get_label_and_path_2_5_0(
 () => (
     fn get_label_and_path(
         iseq_struct: &rb_iseq_struct,
+        cfp: &rb_control_frame_t,
         source_pid: pid_t,
     ) -> Result<FunctionCall, MemoryCopyError> {
         let body: rb_iseq_constant_body = copy_struct(iseq_struct.body as u64, source_pid)?;
@@ -719,7 +843,7 @@ macro_rules! get_label_and_path_2_5_0(
         Ok(FunctionCall{
             name: get_ruby_string(body.location.label as u64, source_pid)?,
             path:  get_ruby_string_array(body.location.pathobj as u64, rstring.basic.klass as u64, source_pid)?,
-            lineno: Some(body.location.first_lineno as u32),
+            lineno: Some(get_lineno(&body, cfp, source_pid)?),
         })
     }
 ));
@@ -734,12 +858,8 @@ macro_rules! get_cfps(
     // The base of the call stack is therefore at
     //   stack + stack_size * sizeof(VALUE) - sizeof(rb_control_frame_t)
     // (with everything in bytes).
-    fn get_cfps(cfp_address: u64, stack_base: u64, source_pid: pid_t) -> Result<Vec<u8>, MemoryCopyError> {
-        Ok(copy_address_raw(
-            cfp_address as usize,
-            (stack_base - cfp_address) as usize,
-            source_pid,
-        )?)
+    fn get_cfps(cfp_address: usize, stack_base: u64, source_pid: pid_t) -> Result<Vec<rb_control_frame_t>, MemoryCopyError> {
+        Ok(copy_vec(cfp_address, (stack_base as usize - cfp_address) as usize / std::mem::size_of::<rb_control_frame_t>(), source_pid)?)
     }
 ));
 

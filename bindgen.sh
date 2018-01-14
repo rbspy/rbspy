@@ -1,5 +1,6 @@
 set -eux
 echo "#include </tmp/headers/$1/vm_core.h>" > /tmp/wrapper.h
+echo "#include </tmp/headers/$1/iseq.h>" >> /tmp/wrapper.h
 rm -rf /tmp/headers/$1
 mkdir -p /tmp/headers/$1
 cd ~/clones/ruby
