@@ -5,21 +5,24 @@ authors = ["Julia Evans <julia@jvns.ca>"]
 
 license = "MIT"
 
+[workspace]
+
 [dependencies]
 libc = "0.2.15"
-regex = "0.2.3"
 clap = "2"
-byteorder = "0.5"
-rand = "0.3"
-fnv = "1.0.3"
+# fnv = "1.0.3"
 elf = "0.0.10"
 log = "0.3.6"
 env_logger = "0.3.4"
 read-process-memory = "0.1.0"
 time = "0.1"
+failure = "0.1.1"
+failure_derive = "0.1.1"
+ruby-bindings = { path = "ruby-bindings" }
 
 [target.'cfg(target_os="macos")'.dependencies]
 mach = "0.0.5"
+regex = "0.2.3"
 libproc = "0.1.0"
 object = "0.1.0"
 libarchive = "0.1.1"
@@ -31,4 +34,3 @@ lazy_static = "0.2.1"
 
 [build-dependencies]
 rustc_version = "0.1.7"
-bindgen = "0.32.1"

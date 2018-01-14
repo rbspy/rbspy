@@ -1,0 +1,6 @@
+[package]
+name = "ruby-bindings"
+version = "0.1.0"
+authors = ["Julia Evans <julia@jvns.ca>"]
+
+[dependencies]
