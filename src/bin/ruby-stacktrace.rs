@@ -1,18 +1,20 @@
-#![feature(duration_from_micros)]
 #[macro_use]
 extern crate log;
 
-extern crate regex;
-extern crate libc;
-extern crate ruby_stacktrace;
-extern crate byteorder;
 extern crate clap;
 extern crate env_logger;
+extern crate failure;
+extern crate libc;
 extern crate read_process_memory;
+#[cfg(target_os = "macos")]
+extern crate regex;
+extern crate ruby_stacktrace;
 extern crate time;
 
-use clap::{Arg, App, ArgMatches, AppSettings};
+use clap::{App, AppSettings, Arg, ArgMatches};
 use libc::*;
+use failure::Error;
+use failure::ResultExt;
 use std::process;
 use std::time::Duration;
 use std::thread;
@@ -74,34 +76,43 @@ fn test_arg_parsing() {
     assert!(result.value_of("SUBCOMMAND").unwrap() == "stackcollapse");
 }
 
-
-fn get_api_version(pid: pid_t) -> String {
+fn get_api_version(pid: pid_t) -> Result<String, Error> {
     // this exists because sometimes rbenv takes a while to exec the right Ruby binary.
     // we are dumb right now so we just... wait until it seems to work out.
     let mut i = 0;
     loop {
         let version = address_finder::get_api_version(pid);
-        if i > 100 {
-            break;
-        }
-        if version.is_ok() {
-            return version.unwrap();
+        if i > 100 || version.is_ok() {
+            return Ok(version?);
         }
         // if it doesn't work, sleep for 1ms and try again
         i += 1;
         thread::sleep(Duration::from_millis(1));
     }
-    panic!("Couldn't find ruby version");
 }
 
 fn timestamp() -> u64 {
     let timespec = time::get_time();
-    // 1459440009.113178
-    let mills: u64 = (timespec.sec as u64 * 1000 * 1000)  as u64 + ((timespec.nsec as u64) / 1000  as u64);
+    let mills: u64 =
+        (timespec.sec as u64 * 1000 * 1000) as u64 + ((timespec.nsec as u64) / 1000 as u64);
     mills
 }
 
 fn main() {
+    match do_main() {
+        Err(x) => {
+            println!("Error. Causes: ");
+            for c in x.causes() {
+                println!("- {}", c);
+            }
+            println!("{}", x.backtrace());
+            process::exit(1);
+        }
+        _ => {}
+    }
+}
+
+fn do_main() -> Result<(), Error> {
     env_logger::init().unwrap();
 
     let matches = parse_args();
@@ -119,37 +130,34 @@ fn main() {
                 .id() as pid_t;
             pid
         }
-
     };
 
-    let version = get_api_version(pid);
+    let version = get_api_version(pid).context("Couldn't get API version")?;
     debug!("version: {}", version);
 
-    if command.clone() != "top" && command.clone() != "stackcollapse" &&
-        command.clone() != "parse"
+    if command.clone() != "top" && command.clone() != "stackcollapse" && command.clone() != "parse"
     {
         println!("COMMAND must be 'top' or 'stackcollapse. Try again!");
         process::exit(1);
     }
 
-    let ruby_current_thread_address_location = address_finder::current_thread_address_location(pid, &version).unwrap();
+    let ruby_current_thread_address_location = address_finder::current_thread_address_location(pid, &version)?;
     let stack_trace_function = stack_trace::get_stack_trace_function(&version);
 
     if command == "parse" {
-        return;
+        unimplemented!("parse command not implemented");
     } else if command == "stackcollapse" {
-
         // This gets a stack trace and then just prints it out
         // in a format that Brendan Gregg's stackcollapse.pl script understands
         loop {
-            let time_millis = timestamp();
-            let trace = stack_trace_function(ruby_current_thread_address_location, pid).unwrap_or_else(|_| {
-                // TODO: check that it's actually just a "process doesn't exist" error otherwise complain
-                process::exit(0);
-            });
-            user_interface::print_stack_trace(&trace);
-            let time_millis_new = timestamp();
-            thread::sleep(Duration::from_micros(10000 - (time_millis_new - time_millis)));
+            let trace = stack_trace_function(ruby_current_thread_address_location, pid);
+            match trace {
+                Err(copy::MemoryCopyError::ProcessEnded) => { return Ok(()) },
+                _ => {
+                    user_interface::print_stack_trace(&trace?);
+                    thread::sleep(Duration::from_millis(10));
+                }
+            }
         }
     } else {
         // top subcommand!
@@ -161,7 +169,9 @@ fn main() {
         loop {
             j += 1;
             let trace = stack_trace_function(ruby_current_thread_address_location, pid)
-                .unwrap_or_else(|_| { process::exit(0); });
+                .unwrap_or_else(|_| {
+                    process::exit(0);
+                });
             // only count each element in the stack trace once
             // otherwise recursive methods are overcounted
             let mut seen = HashSet::new();
