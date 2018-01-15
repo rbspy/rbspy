@@ -17,19 +17,7 @@ run_test_suite() {
 }
 
 run_docker_tests() {
-    rm -rf /tmp/artifacts
-    mkdir /tmp/artifacts
-    cp target/$TARGET/debug/ruby-stacktrace /tmp/artifacts
-    cp examples/short_program.rb /tmp/artifacts
-    cp examples/infinite.rb /tmp/artifacts
-    ls
-    ls docker/
-    for distro in ubuntu1404 ubuntu1704 fedora arch2018
-    do
-        docker build -t rb-stacktrace-$distro -f ./docker/Dockerfile.$distro  ./docker/ >> /tmp/output 2>&1
-        echo -n "${distro}... "
-        docker run -v=/tmp/artifacts:/stuff rb-stacktrace-$distro  env RUST_LOG=debug RUST_BACKTRACE=1 /stuff/ruby-stacktrace stackcollapse /usr/bin/ruby /stuff/short_program.rb >> /tmp/output 2>&1
-    done
+    bash $(dirname $0)/docker-tests.sh
 }
 
 main() {
