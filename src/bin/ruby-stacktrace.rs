@@ -10,7 +10,9 @@ extern crate read_process_memory;
 extern crate regex;
 extern crate ruby_stacktrace;
 extern crate time;
+extern crate nix;
 
+use nix::sys::ptrace::*;
 use clap::{App, AppSettings, Arg, ArgMatches};
 use libc::*;
 use failure::Error;
@@ -43,6 +45,11 @@ fn arg_parser() -> App<'static, 'static> {
         .arg(
             Arg::from_usage(
                 "-f --file=[FILE] 'File to write output to'",
+            ).required(false),
+        )
+        .arg(
+            Arg::from_usage(
+                "--pause 'Pause Ruby process before collecting stacktrace'",
             ).required(false),
         )
         .arg(
@@ -117,11 +124,39 @@ fn main() {
     }
 }
 
+struct PtracePid {
+    pid: pid_t,
+    attached: bool,
+}
+
+impl PtracePid {
+    fn attach(&mut self) -> Result<(), Error> {
+        nix::sys::ptrace::ptrace(ptrace::PTRACE_ATTACH, nix::unistd::Pid::from_raw(self.pid), 0 as * mut c_void, 0 as * mut c_void)?;
+        self.attached = true;
+        Ok(())
+    }
+
+    fn detach(&mut self) -> Result<(), Error> {
+        if self.attached {
+            nix::sys::ptrace::ptrace(ptrace::PTRACE_DETACH, nix::unistd::Pid::from_raw(self.pid), 0 as * mut c_void, 0 as * mut c_void)?;
+            self.attached = false;
+        }
+        Ok(())
+    }
+}
+
+impl Drop for PtracePid {
+    fn drop(&mut self) {
+        self.detach().expect("detach failed");
+    }
+}
+
 fn do_main() -> Result<(), Error> {
     env_logger::init().unwrap();
 
     let matches = parse_args();
     let command = matches.value_of("SUBCOMMAND").unwrap();
+    let pause = matches.occurrences_of("pause") == 1;
     let maybe_pid = matches.value_of("pid");
     let pid: pid_t = match maybe_pid {
         Some(x) => x.parse().unwrap(),
@@ -160,14 +195,23 @@ fn do_main() -> Result<(), Error> {
         // This gets a stack trace and then just prints it out
         // in a format that Brendan Gregg's stackcollapse.pl script understands
         loop {
-            let trace = stack_trace_function(ruby_current_thread_address_location, pid);
-            match trace {
-                Err(copy::MemoryCopyError::ProcessEnded) => return Ok(()),
-                _ => {
-                    user_interface::print_stack_trace(&mut output, &trace?);
-                    thread::sleep(Duration::from_millis(10));
+            {
+                let mut ptra = PtracePid{pid: pid, attached: false};
+                if pause {
+                    ptra.attach()?;
+                }
+                let trace = stack_trace_function(ruby_current_thread_address_location, pid);
+                match trace {
+                    Err(copy::MemoryCopyError::ProcessEnded) => return Ok(()),
+                    Ok(x) => {
+                        user_interface::print_stack_trace(&mut output, &x);
+                    }
+                    Err(y) => {
+                        println!("Dropping one stack trace.");
+                    }
                 }
             }
+            thread::sleep(Duration::from_millis(10));
         }
     } else {
         return Ok(())
