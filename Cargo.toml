@@ -9,15 +9,14 @@ license = "MIT"
 
 [dependencies]
 libc = "0.2.15"
-nix = "0.9.0"
+chrono = "0.4"
 clap = "2"
-# fnv = "1.0.3"
 elf = "0.0.10"
 log = "0.3.6"
 env_logger = "0.3.4"
 read-process-memory = "0.1.0"
-time = "0.1"
 failure = "0.1.1"
+
 failure_derive = "0.1.1"
 ruby-bindings = { path = "ruby-bindings" }
 
