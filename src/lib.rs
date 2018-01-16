@@ -4,6 +4,7 @@
 extern crate log;
 
 extern crate elf;
+#[macro_use]
 extern crate failure;
 #[macro_use]
 extern crate failure_derive;
@@ -31,7 +32,7 @@ pub mod user_interface {
     }
 
     pub fn process_info(pid: pid_t) -> Result<ProcessInfo, Error> {
-        let version = get_api_version(pid).context("Couldn't get API version")?;
+        let version = get_api_version(pid).context("Couldn't determine Ruby version")?;
         debug!("version: {}", version);
         Ok(ProcessInfo {
             pid: pid,
@@ -41,6 +42,34 @@ pub mod user_interface {
             )?,
             stack_trace_function: stack_trace::get_stack_trace_function(&version),
         })
+    }
+
+    #[test]
+    fn test_get_nonexistent_process() {
+        let version = get_api_version(10000);
+        match version
+            .unwrap_err()
+            .root_cause()
+            .downcast_ref::<address_finder::AddressFinderError>()
+            .unwrap()
+        {
+            &address_finder::AddressFinderError::NoSuchProcess(10000) => {}
+            _ => assert!(false, "Expected NoSuchProcess error"),
+        }
+    }
+
+    #[test]
+    fn test_get_disallowed_process() {
+        let version = get_api_version(1);
+        match version
+            .unwrap_err()
+            .root_cause()
+            .downcast_ref::<address_finder::AddressFinderError>()
+            .unwrap()
+        {
+            &address_finder::AddressFinderError::PermissionDenied(1) => {}
+            _ => assert!(false, "Expected NoSuchProcess error"),
+        }
     }
 
     fn get_api_version(pid: pid_t) -> Result<String, Error> {
@@ -73,6 +102,10 @@ pub mod address_finder {
     pub enum AddressFinderError {
         #[fail(display = "Failed to open ELF file: {}", _0)]
         ELFFileError(String),
+        #[fail(display = "No process with PID: {}", _0)]
+        NoSuchProcess(pid_t),
+        #[fail(display = "Permission denied when reading from process {}. Try again with sudo?", _0)]
+        PermissionDenied(pid_t),
         #[fail(display = "Couldn't read /proc/{}/maps", _0)]
         ProcMapsError(pid_t, #[cause] std::io::Error),
         #[fail(display = "Ruby map not found for PID {}. Perhaps that process isn't a Ruby program?", _0)]
@@ -145,8 +178,11 @@ pub mod address_finder {
         // Parses /proc/PID/maps into a Vec<MapRange>
         // TODO: factor this out into a crate and make it work on Mac too
         let maps_file = format!("/proc/{}/maps", pid);
-        let mut file =
-            File::open(maps_file).map_err(|x| AddressFinderError::ProcMapsError(pid, x))?;
+        let mut file = File::open(maps_file).map_err(|x| match x.kind() {
+            std::io::ErrorKind::NotFound => AddressFinderError::NoSuchProcess(pid),
+            std::io::ErrorKind::PermissionDenied => AddressFinderError::PermissionDenied(pid),
+            _ => AddressFinderError::ProcMapsError(pid, x),
+        })?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)
             .map_err(|x| AddressFinderError::ProcMapsError(pid, x))?;

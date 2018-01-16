@@ -12,7 +12,7 @@ extern crate ruby_stacktrace;
 extern crate regex;
 
 use chrono::prelude::*;
-use clap::{App, AppSettings, Arg, ArgMatches};
+use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use libc::pid_t;
 use failure::Error;
 use failure::ResultExt;
@@ -23,19 +23,18 @@ fn do_main() -> Result<(), Error> {
     env_logger::init().unwrap();
 
     let matches: ArgMatches<'static> = arg_parser().get_matches();
-    let command = matches.value_of("SUBCOMMAND").unwrap();
-    let maybe_pid = matches.value_of("pid");
-    match command {
-        "snapshot" => {
-            let pid_string = maybe_pid.ok_or(format_err!("PID is required for snapshot option"))?;
+    match matches.subcommand() {
+        ("snapshot", Some(sub_m)) => {
+            let pid_string = sub_m.value_of("pid").expect("Failed to find PID");
             let pid = pid_string
                 .parse()
                 .map_err(|_| format_err!("Invalid PID: {}", pid_string))?;
             Ok(snapshot(pid)?)
         }
-        "record" => {
-            let maybe_cmd = matches.values_of("cmd");
-            let maybe_filename = matches.value_of("file");
+        ("record", Some(sub_m)) => {
+            let maybe_pid = sub_m.value_of("pid");
+            let maybe_cmd = sub_m.values_of("cmd");
+            let maybe_filename = sub_m.value_of("file");
             let pid: pid_t = match maybe_pid {
                 Some(x) => x.parse().map_err(|_| format_err!("Invalid PID: {}", x))?,
                 None => {
@@ -44,10 +43,7 @@ fn do_main() -> Result<(), Error> {
             };
             Ok(record(maybe_filename, pid)?)
         }
-        x => Err(format_err!(
-            "'{}' is not a valid option: try 'snapshot' or 'record'",
-            x
-        )),
+        _ => panic!("not a valid subcommand"),
     }
 }
 
@@ -143,54 +139,46 @@ fn exec_cmd(args: &mut std::iter::Iterator<Item = &str>) -> Result<pid_t, Error>
 }
 
 fn arg_parser() -> App<'static, 'static> {
-    App::new("ruby-stacktrace")
-        .version("0.1")
-        .setting(AppSettings::TrailingVarArg)
+    App::new("rbspy")
         .about("Sampling profiler for Ruby programs")
-        .arg(
-            Arg::with_name("SUBCOMMAND")
-                .help(
-                    "Subcommand you want to run. Options: top, stackcollapse.\n          top \
-                   prints a top-like output of what the Ruby process is doing right now\n          \
-                   stackcollapse prints out output suitable for piping to stackcollapse.pl \
-                   (https://github.com/brendangregg/FlameGraph)",
+        .setting(AppSettings::SubcommandRequired)
+        .subcommand(
+            SubCommand::with_name("snapshot")
+                .about("Snapshot a single stack trace")
+                .arg(
+                    Arg::from_usage("-p --pid=[PID] 'PID of the Ruby process you want to profile'")
+                        .required_unless("cmd"),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("record")
+                .about("Record process")
+                .arg(
+                    Arg::from_usage("-p --pid=[PID] 'PID of the Ruby process you want to profile'")
+                        .required_unless("cmd"),
                 )
-                .required(true)
-                .index(1),
+                .arg(Arg::from_usage("-f --file=[FILE] 'File to write output to'").required(false))
+                .arg(Arg::from_usage("<cmd>... 'commands to run'").required(false)),
         )
-        .arg(
-            Arg::from_usage(
-                "-f --file=[FILE] 'File to write output to'",
-            ).required(false),
-        )
-        .arg(
-            Arg::from_usage(
-                "-p --pid=[PID] 'PID of the Ruby process you want to profile'",
-            ).required_unless("cmd"),
-        )
-        .arg(Arg::from_usage("<cmd>... 'commands to run'").required(
-            false,
-        ))
 }
 
 #[test]
 fn test_arg_parsing() {
     let parser = arg_parser();
     // let result = parser.get_matches_from(vec!("ruby-stacktrace", "stackcollapse", "-p", "1234"));
-    let result = parser.get_matches_from(vec!["ruby-stacktrace", "stackcollapse", "--pid", "1234"]);
+    let result = parser.get_matches_from(vec!["ruby-stacktrace", "record", "--pid", "1234"]);
+    let result = result.subcommand_matches("record").unwrap();
     assert!(result.value_of("pid").unwrap() == "1234");
-    assert!(result.value_of("SUBCOMMAND").unwrap() == "stackcollapse");
 
     let parser = arg_parser();
-    let result = parser.get_matches_from(vec!["ruby-stacktrace", "--pid", "1234", "stackcollapse"]);
+    let result = parser.get_matches_from(vec!["ruby-stacktrace", "snapshot", "--pid", "1234"]);
+    let result = result.subcommand_matches("snapshot").unwrap();
     assert!(result.value_of("pid").unwrap() == "1234");
-    assert!(result.value_of("SUBCOMMAND").unwrap() == "stackcollapse");
 
     let parser = arg_parser();
-    let result =
-        parser.get_matches_from(vec!["ruby-stacktrace", "stackcollapse", "ruby", "blah.rb"]);
+    let result = parser.get_matches_from(vec!["ruby-stacktrace", "record", "ruby", "blah.rb"]);
+    let result = result.subcommand_matches("record").unwrap();
     let mut cmd_values = result.values_of("cmd").unwrap();
     assert!(cmd_values.next().unwrap() == "ruby");
     assert!(cmd_values.next().unwrap() == "blah.rb");
-    assert!(result.value_of("SUBCOMMAND").unwrap() == "stackcollapse");
 }
