@@ -16,13 +16,46 @@ extern crate ruby_bindings as bindings;
 pub mod user_interface {
     use std;
     use stack_trace;
+    use address_finder;
+    use failure::Error;
+    use failure::ResultExt;
+    use libc::pid_t;
+    use std::time::Duration;
+    use copy;
 
-    pub fn print_stack_trace(output: &mut std::io::Write, trace: &[stack_trace::FunctionCall]) {
-        for x in trace.iter().rev() {
-            write!(output, "{}", x);
-            write!(output, ";");
+    pub struct ProcessInfo {
+        pub pid: pid_t,
+        pub current_thread_addr_location: u64,
+        pub stack_trace_function:
+            Box<Fn(u64, pid_t) -> Result<Vec<stack_trace::FunctionCall>, copy::MemoryCopyError>>,
+    }
+
+    pub fn process_info(pid: pid_t) -> Result<ProcessInfo, Error> {
+        let version = get_api_version(pid).context("Couldn't get API version")?;
+        debug!("version: {}", version);
+        Ok(ProcessInfo {
+            pid: pid,
+            current_thread_addr_location: address_finder::current_thread_address_location(
+                pid,
+                &version,
+            )?,
+            stack_trace_function: stack_trace::get_stack_trace_function(&version),
+        })
+    }
+
+    fn get_api_version(pid: pid_t) -> Result<String, Error> {
+        // this exists because sometimes rbenv takes a while to exec the right Ruby binary.
+        // we are dumb right now so we just... wait until it seems to work out.
+        let mut i = 0;
+        loop {
+            let version = address_finder::get_api_version(pid);
+            if i > 100 || version.is_ok() {
+                return Ok(version?);
+            }
+            // if it doesn't work, sleep for 1ms and try again
+            i += 1;
+            std::thread::sleep(Duration::from_millis(1));
         }
-        writeln!(output, " {}", 1);
     }
 }
 
@@ -418,18 +451,16 @@ pub mod copy {
     //     Io(pid_t, usize, #[cause] std::io::Error),
     // }
 
-    pub fn copy_vec<T>(addr: usize, length: usize, source_pid: pid_t) -> Result<Vec<T>, MemoryCopyError> {
+    pub fn copy_vec<T>(
+        addr: usize,
+        length: usize,
+        source_pid: pid_t,
+    ) -> Result<Vec<T>, MemoryCopyError> {
         let mut vec = copy_address_raw(addr, length * std::mem::size_of::<T>(), source_pid)?;
         let capacity = vec.capacity() as usize / std::mem::size_of::<T>() as usize;
         let ptr = vec.as_mut_ptr() as *mut T;
         std::mem::forget(vec);
-        unsafe {
-            Ok(Vec::from_raw_parts(
-                ptr,
-                capacity,
-                capacity,
-            ))
-        }
+        unsafe { Ok(Vec::from_raw_parts(ptr, capacity, capacity)) }
     }
 
     pub fn copy_address_raw(
@@ -798,8 +829,6 @@ macro_rules! get_lineno_2_5_0(
     }
 ));
 
-
-
 macro_rules! get_label_and_path_2_0_0(
 () => (
    fn get_label_and_path(
@@ -882,7 +911,7 @@ pub mod stack_trace {
                 None => write!(f, "{} - {}", self.name, self.path),
             }
         }
-}
+    }
 
     pub fn is_maybe_thread_function(
         version: &str,

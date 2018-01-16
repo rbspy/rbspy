@@ -19,7 +19,7 @@ for distro in ubuntu1404 ubuntu1704 fedora arch2018
 do
    docker build -t rb-stacktrace-$distro -f ./docker/Dockerfile.$distro  ./docker/ >> /tmp/output 2>&1
    echo -n "${distro}... "
-   docker run -v=/tmp/artifacts:/stuff rb-stacktrace-$distro /stuff/ruby-stacktrace stackcollapse /usr/bin/ruby /stuff/short_program.rb
+   docker run -v=/tmp/artifacts:/stuff rb-stacktrace-$distro /stuff/ruby-stacktrace record /usr/bin/ruby /stuff/short_program.rb
 done
 
 echo "=================="
@@ -33,5 +33,5 @@ docker run -v=/tmp/artifacts:/stuff -t jvns/rbspy-ci:ubuntu1604 ls /root/.rbenv/
 for version in 2.1.0 2.1.1 2.1.2 2.1.3 2.1.4 2.1.5 2.1.6 2.1.7 2.1.8 2.1.9 2.1.10 2.2.0 2.2.1 2.2.2 2.2.3 2.2.4 2.2.5 2.2.6 2.2.7 2.2.8 2.2.9 2.3.0 2.3.1 2.3.2 2.3.3 2.3.4 2.3.5 2.3.6 2.4.0 2.4.1 2.4.2 2.4.3 2.5.0 1.9.3-p551
 do
    echo -n "${version}... "
-   docker run -v=/tmp/artifacts:/stuff -t jvns/rbspy-ci:ubuntu1604 /stuff/ruby-stacktrace stackcollapse --file /dev/null  /root/.rbenv/versions/$version/bin/ruby /stuff/short_program.rb
+   docker run -v=/tmp/artifacts:/stuff -t jvns/rbspy-ci:ubuntu1604 /stuff/ruby-stacktrace record --file /dev/null  /root/.rbenv/versions/$version/bin/ruby /stuff/short_program.rb
 done
