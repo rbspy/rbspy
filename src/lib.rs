@@ -24,6 +24,8 @@ pub mod user_interface {
     use std::time::Duration;
     use copy;
 
+    // holds all the information needed to run record() and snapshot()
+    // all this could probably go in a closure or something.
     pub struct ProcessInfo {
         pub pid: pid_t,
         pub current_thread_addr_location: u64,
