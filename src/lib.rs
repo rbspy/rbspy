@@ -78,7 +78,30 @@ pub mod user_interface {
         let mut i = 0;
         loop {
             let version = address_finder::get_api_version(pid);
-            if i > 100 || version.is_ok() {
+            let mut ret = false;
+            match &version {
+                &Err(ref err) => {
+                    match err.root_cause()
+                        .downcast_ref::<address_finder::AddressFinderError>()
+                    {
+                        Some(&address_finder::AddressFinderError::PermissionDenied(_)) => {
+                            ret = true;
+                        }
+                        Some(&address_finder::AddressFinderError::NoSuchProcess(_)) => {
+                            ret = true;
+                        }
+                        _ => {}
+                    }
+                    match err.root_cause().downcast_ref::<copy::MemoryCopyError>() {
+                        Some(&copy::MemoryCopyError::PermissionDenied(_)) => {
+                            ret = true;
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+            if i > 100 || version.is_ok() || ret {
                 return Ok(version?);
             }
             // if it doesn't work, sleep for 1ms and try again
@@ -472,6 +495,9 @@ pub mod copy {
 
     #[derive(Fail, Debug)]
     pub enum MemoryCopyError {
+        #[fail(display = "Permission denied when reading from process {}. Try again with sudo?",
+               _0)]
+        PermissionDenied(pid_t),
         #[fail(display = "Failed to copy memory address {:x} from PID {}", _1, _0)]
         Io(pid_t, usize, #[cause] std::io::Error),
         #[fail(display = "Process isn't running")] ProcessEnded,
@@ -509,13 +535,15 @@ pub mod copy {
             .expect("Failed to convert PID into process handle. This should never happen.");
         debug!("copy_address_raw: addr: {:x}", addr as usize);
         let mut copy = vec![0; length];
-        source.copy_address(addr as usize, &mut copy).map_err(|x| {
-            if x.raw_os_error() == Some(3) {
-                MemoryCopyError::ProcessEnded
-            } else {
-                MemoryCopyError::Io(source_pid, addr, x)
-            }
-        })?;
+        source
+            .copy_address(addr as usize, &mut copy)
+            .map_err(|x| match x.kind() {
+                std::io::ErrorKind::NotFound => MemoryCopyError::ProcessEnded,
+                std::io::ErrorKind::PermissionDenied => {
+                    MemoryCopyError::PermissionDenied(source_pid)
+                }
+                _ => MemoryCopyError::Io(source_pid, addr, x),
+            })?;
         Ok(copy)
     }
 
