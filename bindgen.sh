@@ -35,7 +35,7 @@ bindgen /tmp/wrapper.h \
 
 #rustfmt --force src/bindings/ruby_${1}.rs
 
-cd ~/work/ruby-stacktrace
+cd ~/work/rbspy
 
 echo "#![allow(non_upper_case_globals)]" > $OUT
 echo "#![allow(non_camel_case_types)]" >> $OUT

@@ -16,7 +16,7 @@ services:
 env:
   global:
     # This will be part of the release tarball
-    - PROJECT_NAME=ruby-stacktrace
+    - PROJECT_NAME=rbspy
 
 # AFAICT There are a few ways to set up the build jobs. This one is not the DRYest but I feel is the
 # easiest to reason about.

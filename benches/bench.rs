@@ -1,14 +1,14 @@
 #![feature(test)]
 
 extern crate test;
-extern crate ruby_stacktrace;
+extern crate rbspy;
 extern crate gimli;
 extern crate elf;
 
 use test::Bencher;
 use gimli::LittleEndian;
 
-use ruby_stacktrace::dwarf::{get_all_entries, create_lookup_table};
+use rbspy::dwarf::{get_all_entries, create_lookup_table};
 
 static DEBUG_INFO: &'static [u8] = include_bytes!("../testdata/debug_info");
 static DEBUG_ABBREV: &'static [u8] = include_bytes!("../testdata/debug_abbrev");

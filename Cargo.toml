@@ -1,5 +1,5 @@
 [package]
-name = "ruby-stacktrace"
+name = "rbspy"
 version = "0.1.1"
 authors = ["Julia Evans <julia@jvns.ca>"]
 

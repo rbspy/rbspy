@@ -6,7 +6,7 @@ extern crate env_logger;
 #[macro_use]
 extern crate failure;
 extern crate libc;
-extern crate ruby_stacktrace;
+extern crate rbspy;
 
 #[cfg(target_os = "macos")]
 extern crate regex;
@@ -17,7 +17,7 @@ use libc::pid_t;
 use failure::Error;
 use failure::ResultExt;
 
-use ruby_stacktrace::*;
+use rbspy::*;
 
 fn do_main() -> Result<(), Error> {
     env_logger::init().unwrap();
@@ -165,18 +165,18 @@ fn arg_parser() -> App<'static, 'static> {
 #[test]
 fn test_arg_parsing() {
     let parser = arg_parser();
-    // let result = parser.get_matches_from(vec!("ruby-stacktrace", "stackcollapse", "-p", "1234"));
-    let result = parser.get_matches_from(vec!["ruby-stacktrace", "record", "--pid", "1234"]);
+    // let result = parser.get_matches_from(vec!("rbspy", "stackcollapse", "-p", "1234"));
+    let result = parser.get_matches_from(vec!["rbspy", "record", "--pid", "1234"]);
     let result = result.subcommand_matches("record").unwrap();
     assert!(result.value_of("pid").unwrap() == "1234");
 
     let parser = arg_parser();
-    let result = parser.get_matches_from(vec!["ruby-stacktrace", "snapshot", "--pid", "1234"]);
+    let result = parser.get_matches_from(vec!["rbspy", "snapshot", "--pid", "1234"]);
     let result = result.subcommand_matches("snapshot").unwrap();
     assert!(result.value_of("pid").unwrap() == "1234");
 
     let parser = arg_parser();
-    let result = parser.get_matches_from(vec!["ruby-stacktrace", "record", "ruby", "blah.rb"]);
+    let result = parser.get_matches_from(vec!["rbspy", "record", "ruby", "blah.rb"]);
     let result = result.subcommand_matches("record").unwrap();
     let mut cmd_values = result.values_of("cmd").unwrap();
     assert!(cmd_values.next().unwrap() == "ruby");

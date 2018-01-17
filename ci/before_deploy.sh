@@ -15,7 +15,7 @@ mk_tarball() {
     local out_dir=$(pwd)
 
     # Copy binary to staging dir
-    cp target/$TARGET/release/ruby-stacktrace $td
+    cp target/$TARGET/release/rbspy $td
 
     pushd $td
 

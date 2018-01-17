@@ -13,7 +13,7 @@ run_test_suite() {
     cargo test --target $TARGET
 
     # sanity check the file type
-    file target/$TARGET/debug/ruby-stacktrace
+    file target/$TARGET/debug/rbspy
 }
 
 run_docker_tests() {
