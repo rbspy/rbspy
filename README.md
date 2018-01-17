@@ -1,4 +1,4 @@
-<a href="https://travis-ci.org/jvns/ruby-stacktrace"><img src="https://travis-ci.org/jvns/ruby-stacktrace.svg"></a>
+<a href="https://travis-ci.org/rbspy/rbspy"><img src="https://travis-ci.org/rbspy/rbspy.svg"></a>
 
 # rbspy
 
@@ -15,7 +15,7 @@ Only works on Linux (though Mac support is planned)
 
 ## How to get rbspy
 
-1. Download recent release of `rbspy` (download from [the github releases page](https://github.com/jvns/ruby-stacktrace/releases))
+1. Download recent release of `rbspy` (download from [the github releases page](https://github.com/rbspy/rbspy/releases))
 2. Unpack it
 3. Move the `rbspy` binary to `/usr/local/bin`
 
