@@ -309,6 +309,8 @@ pub mod address_finder {
     }
 
     fn get_thread_address_alt(proginfo: &ProgramInfo, version: &str) -> Result<u64, Error> {
+        // Used when there's no symbol table. Looks through the .bss and uses a heuristic (found in
+        // `is_maybe_thread`) to find the address of the current thread.
         let map = (*proginfo.libruby_map).as_ref().expect(
             "No libruby map: symbols are stripped so we expected to have one. Please report this!",
         );
@@ -440,6 +442,7 @@ pub mod address_finder {
 
     #[cfg(target_os = "linux")]
     fn current_thread_address_location_default(
+        // uses the symbol table to get the address of the current thread
         proginfo: &ProgramInfo,
         version: &str,
     ) -> Option<u64> {
