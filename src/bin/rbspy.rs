@@ -15,7 +15,6 @@ use chrono::prelude::*;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use libc::pid_t;
 use failure::Error;
-use failure::ResultExt;
 
 use rbspy::*;
 
@@ -64,41 +63,73 @@ fn main() {
 fn record(filename: Option<&str>, pid: pid_t) -> Result<(), Error> {
     // This gets a stack trace and then just prints it out
     // in a format that Brendan Gregg's stackcollapse.pl script understands
-    let process_info = user_interface::process_info(pid)?;
+    let stack_trace_getter = address_finder::stack_trace_getter(pid)?;
     let mut output = open_record_output(filename)?;
-    let ruby_current_thread_address_location = process_info.current_thread_addr_location as usize;
-    let stack_trace_function = process_info.stack_trace_function;
+    let mut errors = 0;
+    let mut successes = 0;
+    let mut quit = false;
     loop {
-        let trace = stack_trace_function(ruby_current_thread_address_location, process_info.pid);
+        let trace = stack_trace_getter.get();
         match trace {
             Err(copy::MemoryCopyError::ProcessEnded) => return Ok(()),
-            Ok(ok_trace) => {
+            Ok(ref ok_trace) => {
+                successes += 1;
                 for t in ok_trace.iter().rev() {
                     write!(output, "{}", t)?;
                     write!(output, ";")?;
                 }
                 writeln!(output, " {}", 1)?;
             }
-            Err(_) => {
-                println!("Dropping one stack trace.");
+            Err(ref x) => {
+                errors += 1;
+                println!(
+                    "{} {}",
+                    errors,
+                    (errors as f64) / (errors as f64 + successes as f64)
+                );
+                if errors > 20 && (errors as f64) / (errors as f64 + successes as f64) > 0.5 {
+                    // TODO: figure out how to just return an error here
+                    quit = true;
+                }
+                println!("Dropping one stack trace: {:?}", x);
             }
+        }
+        if quit == true {
+            trace?;
         }
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
 }
 
 fn snapshot(pid: pid_t) -> Result<(), Error> {
-    let process_info = user_interface::process_info(pid)?;
-    let stack_trace_function = process_info.stack_trace_function;
-    let trace = stack_trace_function(process_info.current_thread_addr_location, process_info.pid)?;
+    let stack_trace_getter = address_finder::stack_trace_getter(pid)?;
+    let trace = stack_trace_getter.get()?;
     for x in trace.iter().rev() {
         println!("{}", x);
     }
     Ok(())
 }
 
-fn open_record_output(maybe_filename: Option<&str>) -> Result<Box<std::io::Write>, Error> {
+fn output_dir_name() -> Result<Box<std::path::PathBuf>, Error> {
     use std::os::unix::prelude::*;
+    use std::fs;
+    let home = std::env::var("HOME")?;
+    let mut dirname = std::path::Path::new(&home).join(".cache");
+    let dirs = vec![".rbspy", "records"];
+    for dir in dirs {
+        dirname = dirname.join(dir);
+        if !dirname.exists() {
+            // create dir with permissions 777 so that if we're running as sudo the user doesn't
+            // lose access to the dir. TODO: should use chown instead
+            fs::create_dir(&dirname)?;
+            let permissions = std::fs::Permissions::from_mode(0o777);
+            std::fs::set_permissions(&dirname, permissions)?;
+        }
+    }
+    Ok(Box::new(dirname))
+}
+
+fn open_record_output(maybe_filename: Option<&str>) -> Result<Box<std::io::Write>, Error> {
     match maybe_filename {
         Some(filename) => {
             let path = std::path::Path::new(filename);
@@ -106,26 +137,9 @@ fn open_record_output(maybe_filename: Option<&str>) -> Result<Box<std::io::Write
             Ok(Box::new(std::fs::File::create(path)?))
         }
         None => {
-            let home = std::env::var("HOME")?;
-            let dt = Utc::now();
-            let date = dt.to_rfc3339();
-            let dirname = std::path::Path::new(&home)
-                .join(".rbspy")
-                .join("records")
-                .join(date);
-            std::fs::create_dir_all(&dirname)
-                .context(format!("Error creating directory {:?}", dirname))?;
-            let permissions = std::fs::Permissions::from_mode(0o777);
-            std::fs::set_permissions(&dirname, permissions.clone());
-            std::fs::set_permissions(
-                std::path::Path::new(&home).join(".rbspy"),
-                permissions.clone(),
-            );
-            std::fs::set_permissions(
-                std::path::Path::new(&home).join(".rbspy").join("record"),
-                permissions,
-            );
-            let path = dirname.join("stacks.txt");
+            let filename = format!("{}-{}.txt", "rbspy", Utc::now().to_rfc3339());
+            let dirname = &output_dir_name()?;
+            let path = dirname.join(filename);
             println!("Recording data into {:?}...", path);
             Ok(Box::new(std::fs::File::create(path)?))
         }

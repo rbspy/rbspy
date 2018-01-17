@@ -4,7 +4,6 @@
 extern crate log;
 
 extern crate elf;
-#[macro_use]
 extern crate failure;
 #[macro_use]
 extern crate failure_derive;
@@ -16,88 +15,90 @@ extern crate ruby_bindings as bindings;
 
 mod proc_maps;
 
-pub mod user_interface {
-    use std;
-    use stack_trace;
-    use address_finder;
+pub mod address_finder {
+    use copy::*;
+    use elf;
     use failure::Error;
     use failure::ResultExt;
-    use libc::pid_t;
+    use libc::{c_char, pid_t};
+    use proc_maps::*;
+    use stack_trace;
     use std::time::Duration;
-    use copy;
+    use std;
 
     // holds all the information needed to run record() and snapshot()
-    // all this could probably go in a closure or something.
-    pub struct ProcessInfo {
-        pub pid: pid_t,
-        pub current_thread_addr_location: usize,
-        pub stack_trace_function:
-            Box<Fn(usize, pid_t) -> Result<Vec<stack_trace::FunctionCall>, copy::MemoryCopyError>>,
+    pub struct StackTraceGetter {
+        pid: pid_t,
+        current_thread_addr_location: usize,
+        stack_trace_function:
+            Box<Fn(usize, pid_t) -> Result<Vec<stack_trace::FunctionCall>, MemoryCopyError>>,
     }
 
-    pub fn process_info(pid: pid_t) -> Result<ProcessInfo, Error> {
-        let version = get_api_version(pid).context("Couldn't determine Ruby version")?;
+    impl StackTraceGetter {
+        pub fn get(&self) -> Result<Vec<stack_trace::FunctionCall>, MemoryCopyError> {
+            let stack_trace_function = &self.stack_trace_function;
+            stack_trace_function(self.current_thread_addr_location, self.pid)
+        }
+    }
+
+    pub fn stack_trace_getter(pid: pid_t) -> Result<StackTraceGetter, Error> {
+        let version = get_api_version_retry(pid).context("Couldn't determine Ruby version")?;
         debug!("version: {}", version);
-        Ok(ProcessInfo {
+        Ok(StackTraceGetter {
             pid: pid,
-            current_thread_addr_location: address_finder::current_thread_address_location(
-                pid,
-                &version,
-            )?,
+            current_thread_addr_location: current_thread_address_location(pid, &version)?,
             stack_trace_function: stack_trace::get_stack_trace_function(&version),
         })
     }
 
     #[test]
     fn test_get_nonexistent_process() {
-        let version = get_api_version(10000);
+        let version = get_api_version_retry(10000);
         match version
             .unwrap_err()
             .root_cause()
-            .downcast_ref::<address_finder::AddressFinderError>()
+            .downcast_ref::<AddressFinderError>()
             .unwrap()
         {
-            &address_finder::AddressFinderError::NoSuchProcess(10000) => {}
+            &AddressFinderError::NoSuchProcess(10000) => {}
             _ => assert!(false, "Expected NoSuchProcess error"),
         }
     }
 
     #[test]
     fn test_get_disallowed_process() {
-        let version = get_api_version(1);
+        let version = get_api_version_retry(1);
         match version
             .unwrap_err()
             .root_cause()
-            .downcast_ref::<address_finder::AddressFinderError>()
+            .downcast_ref::<AddressFinderError>()
             .unwrap()
         {
-            &address_finder::AddressFinderError::PermissionDenied(1) => {}
+            &AddressFinderError::PermissionDenied(1) => {}
             _ => assert!(false, "Expected NoSuchProcess error"),
         }
     }
 
-    fn get_api_version(pid: pid_t) -> Result<String, Error> {
+    fn get_api_version_retry(pid: pid_t) -> Result<String, Error> {
         // this exists because sometimes rbenv takes a while to exec the right Ruby binary.
         // we are dumb right now so we just... wait until it seems to work out.
         let mut i = 0;
         loop {
-            let version = address_finder::get_api_version(pid);
+            let version = get_api_version(pid);
             let mut ret = false;
             match &version {
                 &Err(ref err) => {
-                    match err.root_cause()
-                        .downcast_ref::<address_finder::AddressFinderError>()
-                    {
-                        Some(&address_finder::AddressFinderError::PermissionDenied(_)) => {
+                    match err.root_cause().downcast_ref::<AddressFinderError>() {
+                        Some(&AddressFinderError::PermissionDenied(_)) => {
                             ret = true;
                         }
-                        Some(&address_finder::AddressFinderError::NoSuchProcess(_)) => {
+                        Some(&AddressFinderError::NoSuchProcess(_)) => {
                             ret = true;
                         }
                         _ => {}
                     }
-                    match err.root_cause().downcast_ref::<copy::MemoryCopyError>() {
-                        Some(&copy::MemoryCopyError::PermissionDenied(_)) => {
+                    match err.root_cause().downcast_ref::<MemoryCopyError>() {
+                        Some(&MemoryCopyError::PermissionDenied(_)) => {
                             ret = true;
                         }
                         _ => {}
@@ -113,21 +114,9 @@ pub mod user_interface {
             std::thread::sleep(Duration::from_millis(1));
         }
     }
-}
-
-pub mod address_finder {
-    use copy::*;
-    use libc::*;
-    use std::fs::File;
-    use std::io::Read;
-    use failure::Error;
-    use std;
-    use elf;
-    use stack_trace;
-    use proc_maps::*;
 
     #[derive(Fail, Debug)]
-    pub enum AddressFinderError {
+    enum AddressFinderError {
         #[fail(display = "Failed to open ELF file: {}", _0)]
         ELFFileError(String),
         #[fail(display = "No process with PID: {}", _0)]
@@ -213,7 +202,7 @@ pub mod address_finder {
         None
     }
 
-    pub fn get_api_version(pid: pid_t) -> Result<String, Error> {
+    fn get_api_version(pid: pid_t) -> Result<String, Error> {
         let addr = get_api_address(pid)?;
         debug!("api addr: {:x}", addr);
         let x: [c_char; 15] = copy_struct(addr, pid)?;
@@ -252,7 +241,7 @@ pub mod address_finder {
     }
 
     #[cfg(target_os = "linux")]
-    pub fn get_bss_section(elf_file: &elf::File) -> Option<elf::types::SectionHeader> {
+    fn get_bss_section(elf_file: &elf::File) -> Option<elf::types::SectionHeader> {
         for s in &elf_file.sections {
             match s.shdr.name.as_ref() {
                 ".bss" => {
@@ -377,7 +366,7 @@ pub mod address_finder {
     }
 
     #[cfg(target_os = "linux")]
-    pub fn current_thread_address_location(pid: pid_t, version: &str) -> Result<usize, Error> {
+    fn current_thread_address_location(pid: pid_t, version: &str) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
         match current_thread_address_location_default(proginfo, version) {
             Some(addr) => Ok(addr),
@@ -431,7 +420,7 @@ pub mod address_finder {
     }
 
     #[cfg(target_os = "macos")]
-    pub fn current_thread_address_location(pid: pid_t) -> Result<usize, Error> {
+    fn current_thread_address_location(pid: pid_t) -> Result<usize, Error> {
         // TODO: Make this actually look up the `__mh_execute_header` base
         //   address in the binary via `nm`.
         let base_address = 0x100000000;
@@ -488,15 +477,15 @@ pub mod copy {
             .expect("Failed to convert PID into process handle. This should never happen.");
         debug!("copy_address_raw: addr: {:x}", addr as usize);
         let mut copy = vec![0; length];
-        source
-            .copy_address(addr as usize, &mut copy)
-            .map_err(|x| match x.kind() {
-                std::io::ErrorKind::NotFound => MemoryCopyError::ProcessEnded,
-                std::io::ErrorKind::PermissionDenied => {
-                    MemoryCopyError::PermissionDenied(source_pid)
-                }
-                _ => MemoryCopyError::Io(source_pid, addr, x),
-            })?;
+        source.copy_address(addr as usize, &mut copy).map_err(|x| {
+            if x.raw_os_error() == Some(3) {
+                MemoryCopyError::ProcessEnded
+            } else if x.kind() == std::io::ErrorKind::PermissionDenied {
+                MemoryCopyError::PermissionDenied(source_pid)
+            } else {
+                MemoryCopyError::Io(source_pid, addr, x)
+            }
+        })?;
         Ok(copy)
     }
 
@@ -911,7 +900,6 @@ macro_rules! get_cfps(
 
 pub mod stack_trace {
     use libc::pid_t;
-    use address_finder;
     use proc_maps::MapRange;
     use copy;
     use std::fmt;

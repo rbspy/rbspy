@@ -15,6 +15,8 @@ echo "distro tests"
 echo "============"
 echo ""
 
+set -x
+
 for distro in ubuntu1404 ubuntu1704 fedora arch2018
 do
    docker build -t rb-stacktrace-$distro -f ./docker/Dockerfile.$distro  ./docker/ >> /tmp/output 2>&1

@@ -70,7 +70,7 @@ fn test_parse_maps() {
     let expected = vec![
         MapRange {
             range_start: 0x00400000,
-            range_end: 0x00507000 ,
+            range_end: 0x00507000,
             offset: 0,
             dev: "00:14".to_string(),
             flags: "r-xp".to_string(),
@@ -79,7 +79,7 @@ fn test_parse_maps() {
         },
         MapRange {
             range_start: 0x00708000,
-            range_end: 0x0070a000 ,
+            range_end: 0x0070a000,
             offset: 0,
             dev: "00:00".to_string(),
             flags: "rw-p".to_string(),
@@ -88,7 +88,7 @@ fn test_parse_maps() {
         },
         MapRange {
             range_start: 0x0178c000,
-            range_end: 0x01849000 ,
+            range_end: 0x01849000,
             offset: 0,
             dev: "00:00".to_string(),
             flags: "rw-p".to_string(),
