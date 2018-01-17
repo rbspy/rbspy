@@ -79,6 +79,16 @@ pub mod address_finder {
         }
     }
 
+    #[test]
+    fn test_get_api_version_succeeds() {
+        let mut process = std::process::Command::new("/usr/bin/ruby").spawn().unwrap();
+        let pid = process.id() as pid_t;
+        let version = get_api_version_retry(pid);
+        assert!(version.is_ok());
+        process.kill();
+    }
+
+
     fn get_api_version_retry(pid: pid_t) -> Result<String, Error> {
         // this exists because sometimes rbenv takes a while to exec the right Ruby binary.
         // we are dumb right now so we just... wait until it seems to work out.
