@@ -66,7 +66,7 @@ fn record(filename: Option<&str>, pid: pid_t) -> Result<(), Error> {
     // in a format that Brendan Gregg's stackcollapse.pl script understands
     let process_info = user_interface::process_info(pid)?;
     let mut output = open_record_output(filename)?;
-    let ruby_current_thread_address_location = process_info.current_thread_addr_location as u64;
+    let ruby_current_thread_address_location = process_info.current_thread_addr_location as usize;
     let stack_trace_function = process_info.stack_trace_function;
     loop {
         let trace = stack_trace_function(ruby_current_thread_address_location, process_info.pid);
