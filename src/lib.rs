@@ -14,6 +14,8 @@ extern crate read_process_memory;
 extern crate regex;
 extern crate ruby_bindings as bindings;
 
+mod proc_maps;
+
 pub mod user_interface {
     use std;
     use stack_trace;
@@ -122,6 +124,7 @@ pub mod address_finder {
     use std;
     use elf;
     use stack_trace;
+    use proc_maps::*;
 
     #[derive(Fail, Debug)]
     pub enum AddressFinderError {
@@ -155,7 +158,11 @@ pub mod address_finder {
     }
 
     fn get_program_info(pid: pid_t) -> Result<ProgramInfo, AddressFinderError> {
-        let all_maps = get_proc_maps(pid)?;
+        let all_maps = get_proc_maps(pid).map_err(|x| match x.kind() {
+            std::io::ErrorKind::NotFound => AddressFinderError::NoSuchProcess(pid),
+            std::io::ErrorKind::PermissionDenied => AddressFinderError::PermissionDenied(pid),
+            _ => AddressFinderError::ProcMapsError(pid, x),
+        })?;
         let ruby_map =
             Box::new(get_ruby_map(&all_maps).ok_or(AddressFinderError::RubyMapNotFound(pid))?);
         let heap_map =
@@ -186,57 +193,6 @@ pub mod address_finder {
             ruby_elf: ruby_elf,
             libruby_elf: libruby_elf,
         })
-    }
-
-    #[derive(Debug, Clone)]
-    pub struct MapRange {
-        range_start: usize,
-        range_end: usize,
-        offset: usize,
-        dev: String,
-        flags: String,
-        inode: usize,
-        pathname: Option<String>,
-    }
-
-    fn get_proc_maps(pid: pid_t) -> Result<Vec<MapRange>, AddressFinderError> {
-        // Parses /proc/PID/maps into a Vec<MapRange>
-        // TODO: factor this out into a crate and make it work on Mac too
-        let maps_file = format!("/proc/{}/maps", pid);
-        let mut file = File::open(maps_file).map_err(|x| match x.kind() {
-            std::io::ErrorKind::NotFound => AddressFinderError::NoSuchProcess(pid),
-            std::io::ErrorKind::PermissionDenied => AddressFinderError::PermissionDenied(pid),
-            _ => AddressFinderError::ProcMapsError(pid, x),
-        })?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)
-            .map_err(|x| AddressFinderError::ProcMapsError(pid, x))?;
-        let mut vec: Vec<MapRange> = Vec::new();
-        for line in contents.split("\n") {
-            let mut split = line.split_whitespace();
-            let range = split.next();
-            if range == None {
-                break;
-            }
-            let mut range_split = range.unwrap().split("-");
-            let range_start = range_split.next().unwrap();
-            let range_end = range_split.next().unwrap();
-            let flags = split.next().unwrap();
-            let offset = split.next().unwrap();
-            let dev = split.next().unwrap();
-            let inode = split.next().unwrap();
-
-            vec.push(MapRange {
-                range_start: usize::from_str_radix(range_start, 16).unwrap(),
-                range_end: usize::from_str_radix(range_end, 16).unwrap(),
-                offset: usize::from_str_radix(offset, 16).unwrap(),
-                dev: dev.to_string(),
-                flags: flags.to_string(),
-                inode: usize::from_str_radix(inode, 10).unwrap(),
-                pathname: split.next().map(|x| x.to_string()),
-            });
-        }
-        Ok(vec)
     }
 
     #[cfg(target_os = "linux")]
@@ -344,14 +300,6 @@ pub mod address_finder {
             })
             .ok_or(AddressFinderError::CurrentThreadNotFound)?;
         Ok((i as usize) * (std::mem::size_of::<usize>() as usize) + read_addr)
-    }
-
-    pub fn in_memory_maps(x: usize, maps: &Vec<MapRange>) -> bool {
-        maps.iter().any({ |map| is_heap_addr(x, map) })
-    }
-
-    pub fn is_heap_addr(x: usize, map: &MapRange) -> bool {
-        x >= map.range_start && x <= map.range_end
     }
 
     #[cfg(target_os = "linux")]
@@ -687,10 +635,10 @@ macro_rules! get_stack_trace(
         Ok(trace)
     }
 
-    use address_finder::*;
+    use proc_maps::{maps_contain_addr, MapRange};
 
     pub fn is_maybe_thread(x: usize, pid: pid_t, heap_map: &MapRange, all_maps: &Vec<MapRange>) -> bool {
-        if !is_heap_addr(x, heap_map) {
+        if !heap_map.contains_addr(x) {
             return false;
         }
 
@@ -717,10 +665,10 @@ macro_rules! get_stack_trace(
 macro_rules! is_stack_base_1_9_0(
 () => (
     fn is_reasonable_thing(thread: &rb_thread_struct,  all_maps: &Vec<MapRange>) -> bool {
-        in_memory_maps(thread.vm as usize, all_maps) &&
-            in_memory_maps(thread.cfp as usize, all_maps) &&
-            in_memory_maps(thread.stack as usize, all_maps) &&
-            in_memory_maps(thread.self_ as usize, all_maps) &&
+        maps_contain_addr(thread.vm as usize, all_maps) &&
+            maps_contain_addr(thread.cfp as usize, all_maps) &&
+            maps_contain_addr(thread.stack as usize, all_maps) &&
+            maps_contain_addr(thread.self_ as usize, all_maps) &&
             thread.stack_size < 3000000 && thread.state >= 0
     }
 
@@ -732,9 +680,9 @@ macro_rules! is_stack_base_1_9_0(
 macro_rules! is_stack_base_2_5_0(
 () => (
     fn is_reasonable_thing(thread: &rb_execution_context_struct, all_maps: &Vec<MapRange>) -> bool {
-        in_memory_maps(thread.tag as usize, all_maps) &&
-            in_memory_maps(thread.cfp as usize, all_maps) &&
-            in_memory_maps(thread.vm_stack as usize, all_maps) &&
+        maps_contain_addr(thread.tag as usize, all_maps) &&
+            maps_contain_addr(thread.cfp as usize, all_maps) &&
+            maps_contain_addr(thread.vm_stack as usize, all_maps) &&
             thread.vm_stack_size < 3000000
     }
 
@@ -964,6 +912,7 @@ macro_rules! get_cfps(
 pub mod stack_trace {
     use libc::pid_t;
     use address_finder;
+    use proc_maps::MapRange;
     use copy;
     use std::fmt;
 
@@ -984,8 +933,7 @@ pub mod stack_trace {
 
     pub fn is_maybe_thread_function(
         version: &str,
-    ) -> Box<Fn(usize, pid_t, &address_finder::MapRange, &Vec<address_finder::MapRange>) -> bool>
-    {
+    ) -> Box<Fn(usize, pid_t, &MapRange, &Vec<MapRange>) -> bool> {
         let function = match version.as_ref() {
             "1.9.1" => self::ruby_1_9_1_0::is_maybe_thread,
             "1.9.2" => self::ruby_1_9_2_0::is_maybe_thread,
