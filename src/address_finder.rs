@@ -200,10 +200,10 @@ mod os_impl {
     use libc::pid_t;
     use stack_trace;
     use std;
-    use self::program_info::*;
+    use address_finder::AddressFinderError;
 
     pub fn current_thread_address_location(pid: pid_t, version: &str) -> Result<usize, Error> {
-        let proginfo = &program_info::get_program_info(pid)?;
+        let proginfo = &get_program_info(pid)?;
         match current_thread_address_location_default(proginfo, version) {
             Some(addr) => Ok(addr),
             None => {
@@ -348,97 +348,64 @@ mod os_impl {
             .clone()
     }
 
-    mod program_info {
-        use elf;
-        use libc::pid_t;
-        use std;
-        use proc_maps::*;
-        use failure::Error;
-        use address_finder::AddressFinderError;
+    // struct to hold everything we know about the program
+    pub struct ProgramInfo {
+        pub pid: pid_t,
+        pub all_maps: Vec<MapRange>,
+        pub ruby_map: Box<MapRange>,
+        pub heap_map: Box<MapRange>,
+        pub libruby_map: Box<Option<MapRange>>,
+        pub ruby_elf: elf::File,
+        pub libruby_elf: Option<elf::File>,
+    }
 
-        // struct to hold everything we know about the program
-        pub struct ProgramInfo {
-            pub pid: pid_t,
-            pub all_maps: Vec<MapRange>,
-            pub ruby_map: Box<MapRange>,
-            pub heap_map: Box<MapRange>,
-            pub libruby_map: Box<Option<MapRange>>,
-            pub ruby_elf: elf::File,
-            pub libruby_elf: Option<elf::File>,
-        }
+    pub fn get_program_info(pid: pid_t) -> Result<ProgramInfo, Error> {
+        let all_maps = get_proc_maps(pid).map_err(|x| match x.kind() {
+            std::io::ErrorKind::NotFound => AddressFinderError::NoSuchProcess(pid),
+            std::io::ErrorKind::PermissionDenied => AddressFinderError::PermissionDenied(pid),
+            _ => AddressFinderError::ProcMapsError(pid),
+        })?;
+        let ruby_map = Box::new(get_map(&all_maps, "bin/ruby", "r-xp")
+                                .ok_or(format_err!("Ruby map not found for PID: {}", pid))?);
+        let heap_map = Box::new(get_map(&all_maps, "[heap]", "rw-p")
+                                .ok_or(format_err!("Heap map not found for PID: {}", pid))?);
+        let ruby_path = &ruby_map
+            .pathname
+            .clone()
+            .expect("ruby map's pathname shouldn't be None");
+        let ruby_elf = elf::File::open_path(ruby_path)
+            .map_err(|_| format_err!("Couldn't open ELF file: {}", ruby_path))?;
+        let libruby_map = Box::new(get_map(&all_maps, "libruby", "r-xp"));
+        let libruby_elf = match *libruby_map {
+            Some(ref map) => {
+                let path = &map.pathname
+                    .clone()
+                    .expect("libruby map's pathname shouldn't be None");
+                Some(elf::File::open_path(path)
+                     .map_err(|_| format_err!("Couldn't open ELF file: {}", path))?)
+            }
+            _ => None,
+        };
+        Ok(ProgramInfo {
+            pid: pid,
+            all_maps: all_maps,
+            ruby_map: ruby_map,
+            heap_map: heap_map,
+            libruby_map: libruby_map,
+            ruby_elf: ruby_elf,
+            libruby_elf: libruby_elf,
+        })
+    }
 
-        pub fn get_program_info(pid: pid_t) -> Result<ProgramInfo, Error> {
-            let all_maps = get_proc_maps(pid).map_err(|x| match x.kind() {
-                std::io::ErrorKind::NotFound => AddressFinderError::NoSuchProcess(pid),
-                std::io::ErrorKind::PermissionDenied => AddressFinderError::PermissionDenied(pid),
-                _ => AddressFinderError::ProcMapsError(pid),
-            })?;
-            let ruby_map = Box::new(get_ruby_map(&all_maps)
-                .ok_or(format_err!("Ruby map not found for PID: {}", pid))?);
-            let heap_map = Box::new(get_heap_map(&all_maps)
-                .ok_or(format_err!("Heap map not found for PID: {}", pid))?);
-            let ruby_path = &ruby_map
-                .pathname
-                .clone()
-                .expect("ruby map's pathname shouldn't be None");
-            let ruby_elf = elf::File::open_path(ruby_path)
-                .map_err(|_| format_err!("Couldn't open ELF file: {}", ruby_path))?;
-            let libruby_map = Box::new(libruby_map(&all_maps));
-            let libruby_elf = match *libruby_map {
-                Some(ref map) => {
-                    let path = &map.pathname
-                        .clone()
-                        .expect("libruby map's pathname shouldn't be None");
-                    Some(elf::File::open_path(path)
-                        .map_err(|_| format_err!("Couldn't open ELF file: {}", path))?)
+    fn get_map(maps: &Vec<MapRange>, contains: &str, flags: &str) -> Option<MapRange> {
+        maps.iter()
+            .find(|ref m| {
+                if let Some(ref pathname) = m.pathname {
+                    pathname.contains(contains) && &m.flags == flags
+                } else {
+                    false
                 }
-                _ => None,
-            };
-            Ok(ProgramInfo {
-                pid: pid,
-                all_maps: all_maps,
-                ruby_map: ruby_map,
-                heap_map: heap_map,
-                libruby_map: libruby_map,
-                ruby_elf: ruby_elf,
-                libruby_elf: libruby_elf,
             })
-        }
-
-        fn get_ruby_map(maps: &Vec<MapRange>) -> Option<MapRange> {
-            maps.iter()
-                .find(|ref m| {
-                    if let Some(ref pathname) = m.pathname {
-                        pathname.contains("bin/ruby") && &m.flags == "r-xp"
-                    } else {
-                        false
-                    }
-                })
-                .map(|x| x.clone())
-        }
-
-        fn get_heap_map(maps: &Vec<MapRange>) -> Option<MapRange> {
-            maps.iter()
-                .find(|ref m| {
-                    if let Some(ref pathname) = m.pathname {
-                        return pathname == "[heap]";
-                    } else {
-                        return false;
-                    }
-                })
-                .map({ |x| x.clone() })
-        }
-
-        fn libruby_map(maps: &Vec<MapRange>) -> Option<MapRange> {
-            maps.iter()
-                .find(|ref m| {
-                    if let Some(ref pathname) = m.pathname {
-                        pathname.contains("libruby") && &m.flags == "r-xp"
-                    } else {
-                        false
-                    }
-                })
-                .map({ |x| x.clone() })
-        }
+        .map(|x| x.clone())
     }
 }
