@@ -17,8 +17,7 @@ pub struct StackFrame {
 pub struct StackTraceGetter {
     pid: pid_t,
     current_thread_addr_location: usize,
-    stack_trace_function:
-        Box<Fn(usize, pid_t) -> Result<Vec<StackFrame>, MemoryCopyError>>,
+    stack_trace_function: Box<Fn(usize, pid_t) -> Result<Vec<StackFrame>, MemoryCopyError>>,
 }
 
 impl fmt::Display for StackFrame {
@@ -51,12 +50,10 @@ pub fn stack_trace_getter(pid: pid_t) -> Result<StackTraceGetter, Error> {
 
 #[derive(Fail, Debug)]
 enum AddressFinderError {
-    #[fail(display = "No process with PID: {}", _0)]
-    NoSuchProcess(pid_t),
+    #[fail(display = "No process with PID: {}", _0)] NoSuchProcess(pid_t),
     #[fail(display = "Permission denied when reading from process {}. Try again with sudo?", _0)]
     PermissionDenied(pid_t),
-    #[fail(display = "Error reading /proc/{}/maps", _0)]
-    ProcMapsError(pid_t),
+    #[fail(display = "Error reading /proc/{}/maps", _0)] ProcMapsError(pid_t),
 }
 
 fn get_api_version_retry(pid: pid_t) -> Result<String, Error> {
@@ -115,10 +112,10 @@ fn test_get_nonexistent_process() {
         .root_cause()
         .downcast_ref::<AddressFinderError>()
         .unwrap()
-        {
-            &AddressFinderError::NoSuchProcess(10000) => {}
-            _ => assert!(false, "Expected NoSuchProcess error"),
-        }
+    {
+        &AddressFinderError::NoSuchProcess(10000) => {}
+        _ => assert!(false, "Expected NoSuchProcess error"),
+    }
 }
 
 #[test]
@@ -129,10 +126,10 @@ fn test_get_disallowed_process() {
         .root_cause()
         .downcast_ref::<AddressFinderError>()
         .unwrap()
-        {
-            &AddressFinderError::PermissionDenied(1) => {}
-            _ => assert!(false, "Expected NoSuchProcess error"),
-        }
+    {
+        &AddressFinderError::PermissionDenied(1) => {}
+        _ => assert!(false, "Expected NoSuchProcess error"),
+    }
 }
 
 #[test]
@@ -228,18 +225,17 @@ mod os_impl {
                     // if we have a ruby map but `ruby_version` isn't in it, we expect there to be
                     // a libruby map. If that's not true, that's a bug.
                     (*proginfo.libruby_map)
-                    .as_ref()
-                    .expect("Missing libruby map. Please report this!"),
+                        .as_ref()
+                        .expect("Missing libruby map. Please report this!"),
                     proginfo
-                    .libruby_elf
-                    .as_ref()
-                    .expect("Missing libruby ELF. Please report this!"),
+                        .libruby_elf
+                        .as_ref()
+                        .expect("Missing libruby ELF. Please report this!"),
                     ruby_version_symbol,
-                    ).ok_or(format_err!("Couldn't find ruby version."))
+                ).ok_or(format_err!("Couldn't find ruby version."))
             }
         }
     }
-
 
     fn elf_symbol_value(elf_file: &elf::File, symbol_name: &str) -> Option<usize> {
         // TODO: maybe move this to goblin so that it works on OS X & BSD, not just linux
@@ -247,13 +243,13 @@ mod os_impl {
         for s in sections {
             for sym in elf_file
                 .get_symbols(&s)
-                    .expect("Failed to get symbols from section")
-                    {
-                        if sym.name == symbol_name {
-                            debug!("symbol: {}", sym);
-                            return Some(sym.value as usize);
-                        }
-                    }
+                .expect("Failed to get symbols from section")
+            {
+                if sym.name == symbol_name {
+                    debug!("symbol: {}", sym);
+                    return Some(sym.value as usize);
+                }
+            }
         }
         None
     }
@@ -270,20 +266,18 @@ mod os_impl {
         None
     }
 
-
-
     fn current_thread_address_alt(proginfo: &ProgramInfo, version: &str) -> Result<usize, Error> {
         // Used when there's no symbol table. Looks through the .bss and uses a heuristic (found in
         // `is_maybe_thread`) to find the address of the current thread.
         let map = (*proginfo.libruby_map).as_ref().expect(
             "No libruby map: symbols are stripped so we expected to have one. Please report this!",
-            );
+        );
         let libruby_elf = proginfo.libruby_elf.as_ref().expect(
             "No libruby elf: symbols are stripped so we expected to have one. Please report this!",
-            );
+        );
         let bss_section = get_bss_section(libruby_elf).expect(
             "No BSS section (every Ruby ELF file should have a BSS section?). Please report this!",
-            );
+        );
         let load_header = elf_load_header(libruby_elf);
         debug!("bss_section header: {:?}", bss_section);
         let read_addr = map.range_start + bss_section.addr as usize - load_header.vaddr as usize;
@@ -296,7 +290,7 @@ mod os_impl {
             std::slice::from_raw_parts(
                 data.as_mut_ptr() as *mut usize,
                 data.capacity() as usize / std::mem::size_of::<usize>() as usize,
-                )
+            )
         };
 
         let is_maybe_thread = stack_trace::is_maybe_thread_function(version);
@@ -306,7 +300,10 @@ mod os_impl {
             .position({
                 |&x| is_maybe_thread(x, proginfo.pid, &proginfo.heap_map, &proginfo.all_maps)
             })
-        .ok_or(format_err!("Current thread address not found in process {}", &proginfo.pid))?;
+            .ok_or(format_err!(
+                "Current thread address not found in process {}",
+                &proginfo.pid
+            ))?;
         Ok((i as usize) * (std::mem::size_of::<usize>() as usize) + read_addr)
     }
 
@@ -314,7 +311,7 @@ mod os_impl {
         // uses the symbol table to get the address of the current thread
         proginfo: &ProgramInfo,
         version: &str,
-        ) -> Option<usize> {
+    ) -> Option<usize> {
         // TODO: comment this somewhere
         if version == "2.5.0" {
             // TODO: make this more robust
@@ -322,13 +319,13 @@ mod os_impl {
                 &proginfo.ruby_map,
                 &proginfo.ruby_elf,
                 "ruby_current_execution_context_ptr",
-                )
+            )
         } else {
             get_symbol_addr(
                 &proginfo.ruby_map,
                 &proginfo.ruby_elf,
                 "ruby_current_thread",
-                )
+            )
         }
     }
 
@@ -347,7 +344,7 @@ mod os_impl {
             .find(|ref ph| {
                 ph.progtype == elf::types::PT_LOAD && (ph.flags.0 & elf::types::PF_X.0) != 0
             })
-        .expect("No executable LOAD header found in ELF file. Please report this!")
+            .expect("No executable LOAD header found in ELF file. Please report this!")
             .clone()
     }
 
@@ -376,10 +373,10 @@ mod os_impl {
                 std::io::ErrorKind::PermissionDenied => AddressFinderError::PermissionDenied(pid),
                 _ => AddressFinderError::ProcMapsError(pid),
             })?;
-            let ruby_map =
-                Box::new(get_ruby_map(&all_maps).ok_or(format_err!("Ruby map not found for PID: {}", pid))?);
-            let heap_map =
-                Box::new(get_heap_map(&all_maps).ok_or(format_err!("Heap map not found for PID: {}", pid))?);
+            let ruby_map = Box::new(get_ruby_map(&all_maps)
+                .ok_or(format_err!("Ruby map not found for PID: {}", pid))?);
+            let heap_map = Box::new(get_heap_map(&all_maps)
+                .ok_or(format_err!("Heap map not found for PID: {}", pid))?);
             let ruby_path = &ruby_map
                 .pathname
                 .clone()
@@ -393,7 +390,7 @@ mod os_impl {
                         .clone()
                         .expect("libruby map's pathname shouldn't be None");
                     Some(elf::File::open_path(path)
-                         .map_err(|_| format_err!("Couldn't open ELF file: {}", path))?)
+                        .map_err(|_| format_err!("Couldn't open ELF file: {}", path))?)
                 }
                 _ => None,
             };
@@ -417,7 +414,7 @@ mod os_impl {
                         false
                     }
                 })
-            .map(|x| x.clone())
+                .map(|x| x.clone())
         }
 
         fn get_heap_map(maps: &Vec<MapRange>) -> Option<MapRange> {
@@ -429,7 +426,7 @@ mod os_impl {
                         return false;
                     }
                 })
-            .map({ |x| x.clone() })
+                .map({ |x| x.clone() })
         }
 
         fn libruby_map(maps: &Vec<MapRange>) -> Option<MapRange> {
@@ -441,7 +438,7 @@ mod os_impl {
                         false
                     }
                 })
-            .map({ |x| x.clone() })
+                .map({ |x| x.clone() })
         }
     }
 }

@@ -1,22 +1,36 @@
-extern crate log;
+#![cfg_attr(rustc_nightly, feature(test))]
 
+#[cfg(test)]
+extern crate byteorder;
 extern crate chrono;
 extern crate clap;
+extern crate elf;
 extern crate env_logger;
 #[macro_use]
 extern crate failure;
+#[macro_use]
+extern crate failure_derive;
+#[cfg(test)]
+#[macro_use]
+extern crate lazy_static;
 extern crate libc;
-extern crate rbspy;
-
+#[macro_use]
+extern crate log;
+extern crate read_process_memory;
 #[cfg(target_os = "macos")]
 extern crate regex;
+extern crate ruby_bindings as bindings;
 
 use chrono::prelude::*;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use libc::pid_t;
 use failure::Error;
 
-use rbspy::*;
+pub mod proc_maps;
+pub mod address_finder;
+pub mod copy;
+pub mod stack_trace;
+pub mod test_utils;
 
 fn do_main() -> Result<(), Error> {
     env_logger::init().unwrap();

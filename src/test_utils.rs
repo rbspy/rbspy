@@ -1,12 +1,11 @@
-extern crate read_process_memory;
 extern crate elf;
+extern crate read_process_memory;
 
 use std::io;
 
 use libc;
 
 use read_process_memory::CopyAddress;
-
 
 // Data for use in tests and benchmarks :-)
 #[cfg(test)]
@@ -27,8 +26,10 @@ pub mod data {
 
     pub const RUBY_CURRENT_THREAD_ADDR: usize = 0x55f35c094040;
 
-    const COREDUMP_FILE: &'static str = concat!(env!("CARGO_MANIFEST_DIR"),
-                                                "/testdata/ruby-coredump.14341.gz");
+    const COREDUMP_FILE: &'static str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/testdata/ruby-coredump.14341.gz"
+    );
 
     lazy_static! {
         pub static ref COREDUMP: CoreDump = {
@@ -76,7 +77,7 @@ mod tests {
 
     use std::mem;
 
-    use byteorder::{ReadBytesExt, LittleEndian};
+    use byteorder::{LittleEndian, ReadBytesExt};
 
     use read_process_memory::CopyAddress;
 
@@ -88,10 +89,13 @@ mod tests {
 
     #[test]
     fn test_get_ruby_current_thread() {
-
         let mut buf = vec![0u8; mem::size_of::<usize>()];
-        COREDUMP.copy_address(RUBY_CURRENT_THREAD_ADDR, &mut buf).unwrap();
-        assert_eq!(RUBY_CURRENT_THREAD_VAL,
-                   buf.as_slice().read_u64::<LittleEndian>().unwrap() as usize);
+        COREDUMP
+            .copy_address(RUBY_CURRENT_THREAD_ADDR, &mut buf)
+            .unwrap();
+        assert_eq!(
+            RUBY_CURRENT_THREAD_VAL,
+            buf.as_slice().read_u64::<LittleEndian>().unwrap() as usize
+        );
     }
 }

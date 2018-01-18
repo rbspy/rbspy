@@ -4,10 +4,9 @@ use read_process_memory::*;
 
 #[derive(Fail, Debug)]
 pub enum MemoryCopyError {
-    #[fail(display = "Permission denied when reading from process {}. Try again with sudo?",
-           _0)]
-        PermissionDenied(pid_t),
-        #[fail(display = "Failed to copy memory address {:x} from PID {}", _1, _0)]
+    #[fail(display = "Permission denied when reading from process {}. Try again with sudo?", _0)]
+    PermissionDenied(pid_t),
+    #[fail(display = "Failed to copy memory address {:x} from PID {}", _1, _0)]
     Io(pid_t, usize, #[cause] std::io::Error),
     #[fail(display = "Process isn't running")] ProcessEnded,
     #[fail(display = "Other")] Other,
@@ -15,18 +14,11 @@ pub enum MemoryCopyError {
     InvalidStringError(#[cause] std::string::FromUtf8Error),
 }
 
-// #[derive(Fail, Debug)]
-// #[fail(display = "Failed to copy memory address")]
-// pub enum MemoryCopyError{
-//     #[fail(display = "Failed to copy memory address {} from PID {}", _0, _1)]
-//     Io(pid_t, usize, #[cause] std::io::Error),
-// }
-
 pub fn copy_vec<T>(
     addr: usize,
     length: usize,
     source_pid: pid_t,
-    ) -> Result<Vec<T>, MemoryCopyError> {
+) -> Result<Vec<T>, MemoryCopyError> {
     let mut vec = copy_address_raw(addr, length * std::mem::size_of::<T>(), source_pid)?;
     let capacity = vec.capacity() as usize / std::mem::size_of::<T>() as usize;
     let ptr = vec.as_mut_ptr() as *mut T;
@@ -38,7 +30,7 @@ pub fn copy_address_raw(
     addr: usize,
     length: usize,
     source_pid: pid_t,
-    ) -> Result<Vec<u8>, MemoryCopyError> {
+) -> Result<Vec<u8>, MemoryCopyError> {
     let source = source_pid
         .try_into_process_handle()
         .expect("Failed to convert PID into process handle. This should never happen.");

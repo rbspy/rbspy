@@ -5,7 +5,7 @@ use address_finder::StackFrame;
 
 pub fn is_maybe_thread_function(
     version: &str,
-    ) -> Box<Fn(usize, pid_t, &MapRange, &Vec<MapRange>) -> bool> {
+) -> Box<Fn(usize, pid_t, &MapRange, &Vec<MapRange>) -> bool> {
     let function = match version.as_ref() {
         "1.9.1" => self::ruby_1_9_1_0::is_maybe_thread,
         "1.9.2" => self::ruby_1_9_2_0::is_maybe_thread,
@@ -51,7 +51,7 @@ pub fn is_maybe_thread_function(
 
 pub fn get_stack_trace_function(
     version: &str,
-    ) -> Box<Fn(usize, pid_t) -> Result<Vec<StackFrame>, copy::MemoryCopyError>> {
+) -> Box<Fn(usize, pid_t) -> Result<Vec<StackFrame>, copy::MemoryCopyError>> {
     let stack_trace_function = match version {
         "1.9.1" => self::ruby_1_9_1_0::get_stack_trace,
         "1.9.2" => self::ruby_1_9_2_0::get_stack_trace,
@@ -94,7 +94,6 @@ pub fn get_stack_trace_function(
     };
     Box::new(stack_trace_function)
 }
-
 
 macro_rules! ruby_bindings_v_1_9_x(
     ($ruby_version:ident) => (
