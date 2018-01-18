@@ -1,146 +1,20 @@
-use copy::*;
-use failure::Error;
-use failure::ResultExt;
-use libc::{c_char, pid_t};
-use stack_trace;
-use std::fmt;
-use std::time::Duration;
-use std;
+pub use self::os_impl::*;
+use libc::pid_t;
 
-pub struct StackFrame {
-    pub name: String,
-    pub path: String,
-    pub lineno: Option<u32>,
-}
-
-// Use a StackTraceGetter to get stack traces
-pub struct StackTraceGetter {
-    pid: pid_t,
-    current_thread_addr_location: usize,
-    stack_trace_function: Box<Fn(usize, pid_t) -> Result<Vec<StackFrame>, MemoryCopyError>>,
-}
-
-impl fmt::Display for StackFrame {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.lineno {
-            Some(line) => write!(f, "{} - {} line {}", self.name, self.path, line),
-            None => write!(f, "{} - {}", self.name, self.path),
-        }
-    }
-}
-
-impl StackTraceGetter {
-    pub fn get(&self) -> Result<Vec<StackFrame>, MemoryCopyError> {
-        let stack_trace_function = &self.stack_trace_function;
-        stack_trace_function(self.current_thread_addr_location, self.pid)
-    }
-}
-
-pub fn stack_trace_getter(pid: pid_t) -> Result<StackTraceGetter, Error> {
-    let version = get_ruby_version_retry(pid).context("Couldn't determine Ruby version")?;
-    debug!("version: {}", version);
-    Ok(StackTraceGetter {
-        pid: pid,
-        current_thread_addr_location: os_impl::current_thread_address_location(pid, &version)?,
-        stack_trace_function: stack_trace::get_stack_trace_function(&version),
-    })
-}
-
-// Everything below here is private
+/* 
+ * Operating-system specific code for getting 
+ * a) the address of the current thread, and
+ * b) the address of the Ruby version of a PID
+ *
+ * from a running Ruby process. Involves a lot of reading memory maps and symbols.
+ */
 
 #[derive(Fail, Debug)]
-enum AddressFinderError {
+pub enum AddressFinderError {
     #[fail(display = "No process with PID: {}", _0)] NoSuchProcess(pid_t),
     #[fail(display = "Permission denied when reading from process {}. Try again with sudo?", _0)]
     PermissionDenied(pid_t),
     #[fail(display = "Error reading /proc/{}/maps", _0)] ProcMapsError(pid_t),
-}
-
-fn get_ruby_version_retry(pid: pid_t) -> Result<String, Error> {
-    // this exists because sometimes rbenv takes a while to exec the right Ruby binary.
-    // we are dumb right now so we just... wait until it seems to work out.
-    let mut i = 0;
-    loop {
-        let version = get_ruby_version(pid);
-        let mut ret = false;
-        match &version {
-            &Err(ref err) => {
-                match err.root_cause().downcast_ref::<AddressFinderError>() {
-                    Some(&AddressFinderError::PermissionDenied(_)) => {
-                        ret = true;
-                    }
-                    Some(&AddressFinderError::NoSuchProcess(_)) => {
-                        ret = true;
-                    }
-                    _ => {}
-                }
-                match err.root_cause().downcast_ref::<MemoryCopyError>() {
-                    Some(&MemoryCopyError::PermissionDenied(_)) => {
-                        ret = true;
-                    }
-                    _ => {}
-                }
-            }
-            _ => {}
-        }
-        if i > 100 || version.is_ok() || ret {
-            return Ok(version?);
-        }
-        // if it doesn't work, sleep for 1ms and try again
-        i += 1;
-        std::thread::sleep(Duration::from_millis(1));
-    }
-}
-
-pub fn get_ruby_version(pid: pid_t) -> Result<String, Error> {
-    let addr = os_impl::get_ruby_version_address(pid)?;
-    debug!("ruby version addr: {:x}", addr);
-    let x: [c_char; 15] = copy_struct(addr, pid)?;
-    debug!("ruby version struct: {:?}", x);
-    Ok(unsafe {
-        std::ffi::CStr::from_ptr(x.as_ptr() as *mut c_char)
-            .to_str()?
-            .to_owned()
-    })
-}
-
-#[test]
-fn test_get_nonexistent_process() {
-    let version = get_ruby_version_retry(10000);
-    match version
-        .unwrap_err()
-        .root_cause()
-        .downcast_ref::<AddressFinderError>()
-        .unwrap()
-    {
-        &AddressFinderError::NoSuchProcess(10000) => {}
-        _ => assert!(false, "Expected NoSuchProcess error"),
-    }
-}
-
-#[test]
-fn test_get_disallowed_process() {
-    let version = get_ruby_version_retry(1);
-    match version
-        .unwrap_err()
-        .root_cause()
-        .downcast_ref::<AddressFinderError>()
-        .unwrap()
-    {
-        &AddressFinderError::PermissionDenied(1) => {}
-        _ => assert!(false, "Expected NoSuchProcess error"),
-    }
-}
-
-#[test]
-fn test_current_thread_address_location() {
-    let mut process = std::process::Command::new("/usr/bin/ruby").spawn().unwrap();
-    let pid = process.id() as pid_t;
-    let version = get_ruby_version_retry(pid);
-    assert!(version.is_ok(), format!("version not ok: {:?}", version));
-    let result = os_impl::current_thread_address_location(pid, &version.unwrap());
-    assert!(result.is_ok(), format!("result not ok: {:?}", result));
-    process.kill().unwrap();
 }
 
 #[cfg(target_os = "macos")]
@@ -181,7 +55,7 @@ mod os_impl {
     }
 
     #[cfg(target_os = "macos")]
-    fn current_thread_address_location(pid: pid_t) -> Result<usize, Error> {
+    fn current_thread_address(pid: pid_t) -> Result<usize, Error> {
         // TODO: Make this actually look up the `__mh_execute_header` base
         //   address in the binary via `nm`.
         let base_address = 0x100000000;
@@ -198,17 +72,16 @@ mod os_impl {
     use proc_maps::*;
     use failure::Error;
     use libc::pid_t;
-    use stack_trace;
     use std;
     use address_finder::AddressFinderError;
 
-    pub fn current_thread_address_location(pid: pid_t, version: &str) -> Result<usize, Error> {
+    pub fn current_thread_address(pid: pid_t, version: &str, is_maybe_thread: Box<Fn(usize, pid_t, &MapRange, &Vec<MapRange>) -> bool>) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
-        match current_thread_address_location_default(proginfo, version) {
+        match current_thread_address_symbol_table(proginfo, version) {
             Some(addr) => Ok(addr),
             None => {
                 debug!("Trying to find address location another way");
-                Ok(current_thread_address_alt(proginfo, version)?)
+                Ok(current_thread_address_search_bss(proginfo, is_maybe_thread)?)
             }
         }
     }
@@ -266,8 +139,8 @@ mod os_impl {
         None
     }
 
-    fn current_thread_address_alt(proginfo: &ProgramInfo, version: &str) -> Result<usize, Error> {
-        // Used when there's no symbol table. Looks through the .bss and uses a heuristic (found in
+    fn current_thread_address_search_bss(proginfo: &ProgramInfo, is_maybe_thread: Box<Fn(usize, pid_t, &MapRange, &Vec<MapRange>) -> bool> ) -> Result<usize, Error> {
+        // Used when there's no symbol table. Looks through the .bss and uses a search_bss (found in
         // `is_maybe_thread`) to find the address of the current thread.
         let map = (*proginfo.libruby_map).as_ref().expect(
             "No libruby map: symbols are stripped so we expected to have one. Please report this!",
@@ -293,8 +166,6 @@ mod os_impl {
             )
         };
 
-        let is_maybe_thread = stack_trace::is_maybe_thread_function(version);
-
         let i = slice
             .iter()
             .position({
@@ -307,13 +178,13 @@ mod os_impl {
         Ok((i as usize) * (std::mem::size_of::<usize>() as usize) + read_addr)
     }
 
-    fn current_thread_address_location_default(
-        // uses the symbol table to get the address of the current thread
+    fn current_thread_address_symbol_table(
+        // Uses the symbol table to get the address of the current thread
         proginfo: &ProgramInfo,
         version: &str,
     ) -> Option<usize> {
         // TODO: comment this somewhere
-        if version == "2.5.0" {
+        if version >= "2.5.0" {
             // TODO: make this more robust
             get_symbol_addr(
                 &proginfo.ruby_map,

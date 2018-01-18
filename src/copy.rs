@@ -2,6 +2,10 @@ use std;
 use libc::pid_t;
 use read_process_memory::*;
 
+/**
+ * Utility functions for copying memory out of a process
+ */
+
 #[derive(Fail, Debug)]
 pub enum MemoryCopyError {
     #[fail(display = "Permission denied when reading from process {}. Try again with sudo?", _0)]

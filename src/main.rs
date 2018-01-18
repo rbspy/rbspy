@@ -28,8 +28,9 @@ use failure::Error;
 
 pub mod proc_maps;
 pub mod address_finder;
+pub mod initialize;
 pub mod copy;
-pub mod stack_trace;
+pub mod ruby_version;
 pub mod test_utils;
 
 fn do_main() -> Result<(), Error> {
@@ -77,13 +78,13 @@ fn main() {
 fn record(filename: Option<&str>, pid: pid_t) -> Result<(), Error> {
     // This gets a stack trace and then just prints it out
     // in a format that Brendan Gregg's stackcollapse.pl script understands
-    let stack_trace_getter = address_finder::stack_trace_getter(pid)?;
+    let getter = initialize::initialize(pid)?;
     let mut output = open_record_output(filename)?;
     let mut errors = 0;
     let mut successes = 0;
     let mut quit = false;
     loop {
-        let trace = stack_trace_getter.get();
+        let trace = getter.get_trace();
         match trace {
             Err(copy::MemoryCopyError::ProcessEnded) => return Ok(()),
             Ok(ref ok_trace) => {
@@ -116,8 +117,8 @@ fn record(filename: Option<&str>, pid: pid_t) -> Result<(), Error> {
 }
 
 fn snapshot(pid: pid_t) -> Result<(), Error> {
-    let stack_trace_getter = address_finder::stack_trace_getter(pid)?;
-    let trace = stack_trace_getter.get()?;
+    let getter = initialize::initialize(pid)?;
+    let trace = getter.get_trace()?;
     for x in trace.iter().rev() {
         println!("{}", x);
     }

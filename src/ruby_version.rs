@@ -1,101 +1,14 @@
-use libc::pid_t;
-use proc_maps::MapRange;
-use copy;
-use address_finder::StackFrame;
+/*
+ * Ruby version specific code for reading a stack trace out of a Ruby process's memory.
+ *
+ * Implemented through a series of macros, because there are subtle differences in struct layout
+ * between similar Ruby versions (like 2.2.1 vs 2.2.2) that mean it's easiest to compile a
+ * different function for every Ruby minor version.
+ *
+ * Defines a bunch of submodules, one per Ruby version (`ruby_1_9_3`, `ruby_2_2_0`, etc.)
+ */
 
-pub fn is_maybe_thread_function(
-    version: &str,
-) -> Box<Fn(usize, pid_t, &MapRange, &Vec<MapRange>) -> bool> {
-    let function = match version.as_ref() {
-        "1.9.1" => self::ruby_1_9_1_0::is_maybe_thread,
-        "1.9.2" => self::ruby_1_9_2_0::is_maybe_thread,
-        "1.9.3" => self::ruby_1_9_3_0::is_maybe_thread,
-        "2.0.0" => self::ruby_2_0_0_0::is_maybe_thread,
-        "2.1.0" => self::ruby_2_1_0::is_maybe_thread,
-        "2.1.1" => self::ruby_2_1_1::is_maybe_thread,
-        "2.1.2" => self::ruby_2_1_2::is_maybe_thread,
-        "2.1.3" => self::ruby_2_1_3::is_maybe_thread,
-        "2.1.4" => self::ruby_2_1_4::is_maybe_thread,
-        "2.1.5" => self::ruby_2_1_5::is_maybe_thread,
-        "2.1.6" => self::ruby_2_1_6::is_maybe_thread,
-        "2.1.7" => self::ruby_2_1_7::is_maybe_thread,
-        "2.1.8" => self::ruby_2_1_8::is_maybe_thread,
-        "2.1.9" => self::ruby_2_1_9::is_maybe_thread,
-        "2.1.10" => self::ruby_2_1_10::is_maybe_thread,
-        "2.2.0" => self::ruby_2_2_0::is_maybe_thread,
-        "2.2.1" => self::ruby_2_2_1::is_maybe_thread,
-        "2.2.2" => self::ruby_2_2_2::is_maybe_thread,
-        "2.2.3" => self::ruby_2_2_3::is_maybe_thread,
-        "2.2.4" => self::ruby_2_2_4::is_maybe_thread,
-        "2.2.5" => self::ruby_2_2_5::is_maybe_thread,
-        "2.2.6" => self::ruby_2_2_6::is_maybe_thread,
-        "2.2.7" => self::ruby_2_2_7::is_maybe_thread,
-        "2.2.8" => self::ruby_2_2_8::is_maybe_thread,
-        "2.2.9" => self::ruby_2_2_9::is_maybe_thread,
-        "2.3.0" => self::ruby_2_3_0::is_maybe_thread,
-        "2.3.1" => self::ruby_2_3_1::is_maybe_thread,
-        "2.3.2" => self::ruby_2_3_2::is_maybe_thread,
-        "2.3.3" => self::ruby_2_3_3::is_maybe_thread,
-        "2.3.4" => self::ruby_2_3_4::is_maybe_thread,
-        "2.3.5" => self::ruby_2_3_5::is_maybe_thread,
-        "2.3.6" => self::ruby_2_3_6::is_maybe_thread,
-        "2.4.0" => self::ruby_2_4_0::is_maybe_thread,
-        "2.4.1" => self::ruby_2_4_1::is_maybe_thread,
-        "2.4.2" => self::ruby_2_4_2::is_maybe_thread,
-        "2.4.3" => self::ruby_2_4_3::is_maybe_thread,
-        "2.5.0" => self::ruby_2_5_0_rc1::is_maybe_thread,
-        _ => panic!("oh no"),
-    };
-    Box::new(function)
-}
-
-pub fn get_stack_trace_function(
-    version: &str,
-) -> Box<Fn(usize, pid_t) -> Result<Vec<StackFrame>, copy::MemoryCopyError>> {
-    let stack_trace_function = match version {
-        "1.9.1" => self::ruby_1_9_1_0::get_stack_trace,
-        "1.9.2" => self::ruby_1_9_2_0::get_stack_trace,
-        "1.9.3" => self::ruby_1_9_3_0::get_stack_trace,
-        "2.0.0" => self::ruby_2_0_0_0::get_stack_trace,
-        "2.1.0" => self::ruby_2_1_0::get_stack_trace,
-        "2.1.1" => self::ruby_2_1_1::get_stack_trace,
-        "2.1.2" => self::ruby_2_1_2::get_stack_trace,
-        "2.1.3" => self::ruby_2_1_3::get_stack_trace,
-        "2.1.4" => self::ruby_2_1_4::get_stack_trace,
-        "2.1.5" => self::ruby_2_1_5::get_stack_trace,
-        "2.1.6" => self::ruby_2_1_6::get_stack_trace,
-        "2.1.7" => self::ruby_2_1_7::get_stack_trace,
-        "2.1.8" => self::ruby_2_1_8::get_stack_trace,
-        "2.1.9" => self::ruby_2_1_9::get_stack_trace,
-        "2.1.10" => self::ruby_2_1_10::get_stack_trace,
-        "2.2.0" => self::ruby_2_2_0::get_stack_trace,
-        "2.2.1" => self::ruby_2_2_1::get_stack_trace,
-        "2.2.2" => self::ruby_2_2_2::get_stack_trace,
-        "2.2.3" => self::ruby_2_2_3::get_stack_trace,
-        "2.2.4" => self::ruby_2_2_4::get_stack_trace,
-        "2.2.5" => self::ruby_2_2_5::get_stack_trace,
-        "2.2.6" => self::ruby_2_2_6::get_stack_trace,
-        "2.2.7" => self::ruby_2_2_7::get_stack_trace,
-        "2.2.8" => self::ruby_2_2_8::get_stack_trace,
-        "2.2.9" => self::ruby_2_2_9::get_stack_trace,
-        "2.3.0" => self::ruby_2_3_0::get_stack_trace,
-        "2.3.1" => self::ruby_2_3_1::get_stack_trace,
-        "2.3.2" => self::ruby_2_3_2::get_stack_trace,
-        "2.3.3" => self::ruby_2_3_3::get_stack_trace,
-        "2.3.4" => self::ruby_2_3_4::get_stack_trace,
-        "2.3.5" => self::ruby_2_3_5::get_stack_trace,
-        "2.3.6" => self::ruby_2_3_6::get_stack_trace,
-        "2.4.0" => self::ruby_2_4_0::get_stack_trace,
-        "2.4.1" => self::ruby_2_4_1::get_stack_trace,
-        "2.4.2" => self::ruby_2_4_2::get_stack_trace,
-        "2.4.3" => self::ruby_2_4_3::get_stack_trace,
-        "2.5.0" => self::ruby_2_5_0_rc1::get_stack_trace,
-        _ => panic!("oh no"),
-    };
-    Box::new(stack_trace_function)
-}
-
-macro_rules! ruby_bindings_v_1_9_x(
+macro_rules! ruby_version_v_1_9_x(
     ($ruby_version:ident) => (
         pub mod $ruby_version {
             use std;
@@ -107,14 +20,14 @@ macro_rules! ruby_bindings_v_1_9_x(
             get_stack_trace!(rb_thread_struct);
             get_ruby_string!();
             get_cfps!();
-            get_label_and_path_1_9_0!();
+            get_stack_frame_1_9_0!();
             is_stack_base_1_9_0!();
         }
         ));
 
-macro_rules! ruby_bindings(
+macro_rules! ruby_version_v_2_0_to_2_2(
     ($ruby_version:ident) => (
-        mod $ruby_version {
+       pub mod $ruby_version {
             use std;
             use copy::*;
             use bindings::$ruby_version::*;
@@ -138,14 +51,14 @@ macro_rules! ruby_bindings(
             get_ruby_string!();
             get_cfps!();
             get_lineno_2_0_0!();
-            get_label_and_path_2_0_0!();
+            get_stack_frame_2_0_0!();
             is_stack_base_1_9_0!();
         }
 ));
 
-macro_rules! ruby_bindings_v2(
+macro_rules! ruby_version_v_2_3_to_2_4(
     ($ruby_version:ident) => (
-        mod $ruby_version {
+       pub mod $ruby_version {
             use std;
             use copy::*;
             use bindings::$ruby_version::*;
@@ -156,14 +69,14 @@ macro_rules! ruby_bindings_v2(
             get_ruby_string!();
             get_cfps!();
             get_lineno_2_3_0!();
-            get_label_and_path_2_3_0!();
+            get_stack_frame_2_3_0!();
             is_stack_base_1_9_0!();
         }
         ));
 
-macro_rules! ruby_bindings_v2_5_x(
+macro_rules! ruby_version_v2_5_x(
     ($ruby_version:ident) => (
-        mod $ruby_version {
+       pub mod $ruby_version {
             use std;
             use copy::*;
             use bindings::$ruby_version::*;
@@ -174,7 +87,7 @@ macro_rules! ruby_bindings_v2_5_x(
             get_ruby_string!();
             get_cfps!();
             get_lineno_2_5_0!();
-            get_label_and_path_2_5_0!();
+            get_stack_frame_2_5_0!();
             is_stack_base_2_5_0!();
             get_ruby_string_array_2_5_0!();
         }
@@ -183,7 +96,7 @@ macro_rules! ruby_bindings_v2_5_x(
 macro_rules! get_stack_trace(
     ($thread_type:ident) => (
 
-        use stack_trace::StackFrame;
+        use initialize::StackFrame;
 
         pub fn get_stack_trace(
             ruby_current_thread_address_location: usize,
@@ -207,7 +120,7 @@ macro_rules! get_stack_trace(
                 }
                 let iseq_struct: rb_iseq_struct = copy_struct(cfp.iseq as usize, source_pid)?;
                 debug!("iseq_struct: {:?}", iseq_struct);
-                let label_path  = get_label_and_path(&iseq_struct, &cfp, source_pid);
+                let label_path  = get_stack_frame(&iseq_struct, &cfp, source_pid);
                 match label_path {
                     Ok(call)  => trace.push(call),
                     Err(x) => {
@@ -323,9 +236,9 @@ macro_rules! get_ruby_string(
         }
 ));
 
-macro_rules! get_label_and_path_1_9_0(
+macro_rules! get_stack_frame_1_9_0(
     () => (
-        fn get_label_and_path(
+        fn get_stack_frame(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source_pid: pid_t,
@@ -434,9 +347,9 @@ macro_rules! get_lineno_2_5_0(
         }
 ));
 
-macro_rules! get_label_and_path_2_0_0(
+macro_rules! get_stack_frame_2_0_0(
     () => (
-        fn get_label_and_path(
+        fn get_stack_frame(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source_pid: pid_t,
@@ -449,9 +362,9 @@ macro_rules! get_label_and_path_2_0_0(
         }
         ));
 
-macro_rules! get_label_and_path_2_3_0(
+macro_rules! get_stack_frame_2_3_0(
     () => (
-        fn get_label_and_path(
+        fn get_stack_frame(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source_pid: pid_t,
@@ -465,9 +378,9 @@ macro_rules! get_label_and_path_2_3_0(
         }
         ));
 
-macro_rules! get_label_and_path_2_5_0(
+macro_rules! get_stack_frame_2_5_0(
     () => (
-        fn get_label_and_path(
+        fn get_stack_frame(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source_pid: pid_t,
@@ -497,40 +410,40 @@ macro_rules! get_cfps(
         }
         ));
 
-ruby_bindings_v_1_9_x!(ruby_1_9_1_0);
-ruby_bindings_v_1_9_x!(ruby_1_9_2_0);
-ruby_bindings_v_1_9_x!(ruby_1_9_3_0);
-ruby_bindings!(ruby_2_0_0_0);
-ruby_bindings!(ruby_2_1_0);
-ruby_bindings!(ruby_2_1_1);
-ruby_bindings!(ruby_2_1_2);
-ruby_bindings!(ruby_2_1_3);
-ruby_bindings!(ruby_2_1_4);
-ruby_bindings!(ruby_2_1_5);
-ruby_bindings!(ruby_2_1_6);
-ruby_bindings!(ruby_2_1_7);
-ruby_bindings!(ruby_2_1_8);
-ruby_bindings!(ruby_2_1_9);
-ruby_bindings!(ruby_2_1_10);
-ruby_bindings!(ruby_2_2_0);
-ruby_bindings!(ruby_2_2_1);
-ruby_bindings!(ruby_2_2_2);
-ruby_bindings!(ruby_2_2_3);
-ruby_bindings!(ruby_2_2_4);
-ruby_bindings!(ruby_2_2_5);
-ruby_bindings!(ruby_2_2_6);
-ruby_bindings!(ruby_2_2_7);
-ruby_bindings!(ruby_2_2_8);
-ruby_bindings!(ruby_2_2_9);
-ruby_bindings_v2!(ruby_2_3_0);
-ruby_bindings_v2!(ruby_2_3_1);
-ruby_bindings_v2!(ruby_2_3_2);
-ruby_bindings_v2!(ruby_2_3_3);
-ruby_bindings_v2!(ruby_2_3_4);
-ruby_bindings_v2!(ruby_2_3_5);
-ruby_bindings_v2!(ruby_2_3_6);
-ruby_bindings_v2!(ruby_2_4_0);
-ruby_bindings_v2!(ruby_2_4_1);
-ruby_bindings_v2!(ruby_2_4_2);
-ruby_bindings_v2!(ruby_2_4_3);
-ruby_bindings_v2_5_x!(ruby_2_5_0_rc1);
+ruby_version_v_1_9_x!(ruby_1_9_1_0);
+ruby_version_v_1_9_x!(ruby_1_9_2_0);
+ruby_version_v_1_9_x!(ruby_1_9_3_0);
+ruby_version_v_2_0_to_2_2!(ruby_2_0_0_0);
+ruby_version_v_2_0_to_2_2!(ruby_2_1_0);
+ruby_version_v_2_0_to_2_2!(ruby_2_1_1);
+ruby_version_v_2_0_to_2_2!(ruby_2_1_2);
+ruby_version_v_2_0_to_2_2!(ruby_2_1_3);
+ruby_version_v_2_0_to_2_2!(ruby_2_1_4);
+ruby_version_v_2_0_to_2_2!(ruby_2_1_5);
+ruby_version_v_2_0_to_2_2!(ruby_2_1_6);
+ruby_version_v_2_0_to_2_2!(ruby_2_1_7);
+ruby_version_v_2_0_to_2_2!(ruby_2_1_8);
+ruby_version_v_2_0_to_2_2!(ruby_2_1_9);
+ruby_version_v_2_0_to_2_2!(ruby_2_1_10);
+ruby_version_v_2_0_to_2_2!(ruby_2_2_0);
+ruby_version_v_2_0_to_2_2!(ruby_2_2_1);
+ruby_version_v_2_0_to_2_2!(ruby_2_2_2);
+ruby_version_v_2_0_to_2_2!(ruby_2_2_3);
+ruby_version_v_2_0_to_2_2!(ruby_2_2_4);
+ruby_version_v_2_0_to_2_2!(ruby_2_2_5);
+ruby_version_v_2_0_to_2_2!(ruby_2_2_6);
+ruby_version_v_2_0_to_2_2!(ruby_2_2_7);
+ruby_version_v_2_0_to_2_2!(ruby_2_2_8);
+ruby_version_v_2_0_to_2_2!(ruby_2_2_9);
+ruby_version_v_2_3_to_2_4!(ruby_2_3_0);
+ruby_version_v_2_3_to_2_4!(ruby_2_3_1);
+ruby_version_v_2_3_to_2_4!(ruby_2_3_2);
+ruby_version_v_2_3_to_2_4!(ruby_2_3_3);
+ruby_version_v_2_3_to_2_4!(ruby_2_3_4);
+ruby_version_v_2_3_to_2_4!(ruby_2_3_5);
+ruby_version_v_2_3_to_2_4!(ruby_2_3_6);
+ruby_version_v_2_3_to_2_4!(ruby_2_4_0);
+ruby_version_v_2_3_to_2_4!(ruby_2_4_1);
+ruby_version_v_2_3_to_2_4!(ruby_2_4_2);
+ruby_version_v_2_3_to_2_4!(ruby_2_4_3);
+ruby_version_v2_5_x!(ruby_2_5_0_rc1);
