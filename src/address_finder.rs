@@ -3,9 +3,9 @@ use failure::Error;
 use failure::ResultExt;
 use libc::{c_char, pid_t};
 use stack_trace;
+use std::fmt;
 use std::time::Duration;
 use std;
-use std::fmt;
 
 pub struct StackFrame {
     pub name: String,

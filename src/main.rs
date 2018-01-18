@@ -49,7 +49,7 @@ fn do_main() -> Result<(), Error> {
             let maybe_cmd = sub_m.values_of("cmd");
             let maybe_filename = sub_m.value_of("file");
             let pid: pid_t = match maybe_pid {
-                Some(x) => x.parse().map_err(|_| format_err!("Invalid PID: {}", x))?,
+                Some(pid_string) => pid_string.parse().map_err(|_| format_err!("Invalid PID: {}", pid_string))?,
                 None => {
                     exec_cmd(&mut maybe_cmd.expect("Either PID or command is required to record"))?
                 }
