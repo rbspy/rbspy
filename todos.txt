@@ -1,0 +1,12 @@
+* don't use process::exit, instead do something else
+* install a panic handler that kills the child when starting a child
+* write architecture document
+* write tests for some of the stack_trace macros using the code in test_utils.rs
+* implement some of the get_stack_trace_function stuff in a more readable way
+* implement line number support in Ruby 1.9.3
+* switch back to stable Rust
+
+AFTER RELEASE
+
+* Mac support
+* Container support
