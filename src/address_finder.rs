@@ -37,7 +37,7 @@ impl StackTraceGetter {
 }
 
 pub fn stack_trace_getter(pid: pid_t) -> Result<StackTraceGetter, Error> {
-    let version = get_api_version_retry(pid).context("Couldn't determine Ruby version")?;
+    let version = get_ruby_version_retry(pid).context("Couldn't determine Ruby version")?;
     debug!("version: {}", version);
     Ok(StackTraceGetter {
         pid: pid,
@@ -56,12 +56,12 @@ enum AddressFinderError {
     #[fail(display = "Error reading /proc/{}/maps", _0)] ProcMapsError(pid_t),
 }
 
-fn get_api_version_retry(pid: pid_t) -> Result<String, Error> {
+fn get_ruby_version_retry(pid: pid_t) -> Result<String, Error> {
     // this exists because sometimes rbenv takes a while to exec the right Ruby binary.
     // we are dumb right now so we just... wait until it seems to work out.
     let mut i = 0;
     loop {
-        let version = get_api_version(pid);
+        let version = get_ruby_version(pid);
         let mut ret = false;
         match &version {
             &Err(ref err) => {
@@ -92,11 +92,11 @@ fn get_api_version_retry(pid: pid_t) -> Result<String, Error> {
     }
 }
 
-pub fn get_api_version(pid: pid_t) -> Result<String, Error> {
-    let addr = os_impl::get_api_address(pid)?;
-    debug!("api addr: {:x}", addr);
+pub fn get_ruby_version(pid: pid_t) -> Result<String, Error> {
+    let addr = os_impl::get_ruby_version_address(pid)?;
+    debug!("ruby version addr: {:x}", addr);
     let x: [c_char; 15] = copy_struct(addr, pid)?;
-    debug!("api struct: {:?}", x);
+    debug!("ruby version struct: {:?}", x);
     Ok(unsafe {
         std::ffi::CStr::from_ptr(x.as_ptr() as *mut c_char)
             .to_str()?
@@ -106,7 +106,7 @@ pub fn get_api_version(pid: pid_t) -> Result<String, Error> {
 
 #[test]
 fn test_get_nonexistent_process() {
-    let version = get_api_version_retry(10000);
+    let version = get_ruby_version_retry(10000);
     match version
         .unwrap_err()
         .root_cause()
@@ -120,7 +120,7 @@ fn test_get_nonexistent_process() {
 
 #[test]
 fn test_get_disallowed_process() {
-    let version = get_api_version_retry(1);
+    let version = get_ruby_version_retry(1);
     match version
         .unwrap_err()
         .root_cause()
@@ -136,10 +136,10 @@ fn test_get_disallowed_process() {
 fn test_current_thread_address_location() {
     let mut process = std::process::Command::new("/usr/bin/ruby").spawn().unwrap();
     let pid = process.id() as pid_t;
-    let version = get_api_version_retry(pid);
-    assert!(version.is_ok());
+    let version = get_ruby_version_retry(pid);
+    assert!(version.is_ok(), format!("version not ok: {:?}", version));
     let result = os_impl::current_thread_address_location(pid, &version.unwrap());
-    assert!(result.is_ok());
+    assert!(result.is_ok(), format!("result not ok: {:?}", result));
     process.kill().unwrap();
 }
 
@@ -213,7 +213,7 @@ mod os_impl {
         }
     }
 
-    pub fn get_api_address(pid: pid_t) -> Result<usize, Error> {
+    pub fn get_ruby_version_address(pid: pid_t) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
         let ruby_version_symbol = "ruby_version";
         let symbol_addr =
