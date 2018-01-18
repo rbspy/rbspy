@@ -65,7 +65,7 @@ fn parse_proc_maps(contents: &str) -> Vec<MapRange> {
 
 #[test]
 fn test_parse_maps() {
-    let contents = include_str!("../testdata/map.txt");
+    let contents = include_str!("../ci/testdata/map.txt");
     let vec = parse_proc_maps(contents);
     let expected = vec![
         MapRange {
