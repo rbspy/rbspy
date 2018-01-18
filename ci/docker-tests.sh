@@ -19,7 +19,7 @@ set -x
 
 for distro in ubuntu1404 ubuntu1704 fedora arch2018
 do
-   docker build -t rb-stacktrace-$distro -f ./docker/Dockerfile.$distro  ./docker/ >> /tmp/output 2>&1
+   docker build -t rb-stacktrace-$distro -f ./ci/docker/Dockerfile.$distro  ./ci/docker/ >> /tmp/output 2>&1
    echo -n "${distro}... "
    docker run -v=/tmp/artifacts:/stuff rb-stacktrace-$distro env RUST_BACKTRACE=1 /stuff/rbspy record --file /dev/null /usr/bin/ruby /stuff/short_program.rb
 done
