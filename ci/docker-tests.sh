@@ -2,8 +2,8 @@ set -eux
 rm -rf /tmp/artifacts
 mkdir /tmp/artifacts
 cp target/$TARGET/debug/rbspy /tmp/artifacts
-cp examples/short_program.rb /tmp/artifacts
-cp examples/infinite.rb /tmp/artifacts
+cp testdata/ruby-programs/short_program.rb /tmp/artifacts
+cp testdata/ruby-programs/infinite.rb /tmp/artifacts
 
 rm -f /tmp/output
 touch /tmp/output
