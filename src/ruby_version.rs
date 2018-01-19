@@ -8,7 +8,7 @@
  * Defines a bunch of submodules, one per Ruby version (`ruby_1_9_3`, `ruby_2_2_0`, etc.)
  */
 
-macro_rules! ruby_version_v_1_9_x(
+macro_rules! ruby_version_v_1_9_1(
     ($ruby_version:ident) => (
         pub mod $ruby_version {
             use std;
@@ -21,7 +21,27 @@ macro_rules! ruby_version_v_1_9_x(
             get_ruby_string!();
             get_cfps!();
             get_lineno_1_9_0!();
-            get_stack_frame_1_9_0!();
+            get_stack_frame_1_9_1!();
+            is_stack_base_1_9_0!();
+        }
+        ));
+
+
+macro_rules! ruby_version_v_1_9_2_to_3(
+    // support for absolute paths appears for 1.9.2
+    ($ruby_version:ident) => (
+        pub mod $ruby_version {
+            use std;
+            use copy::*;
+            use bindings::$ruby_version::*;
+            use copy::MemoryCopyError;
+            use read_process_memory::CopyAddress;
+
+            get_stack_trace!(rb_thread_struct);
+            get_ruby_string!();
+            get_cfps!();
+            get_lineno_1_9_0!();
+            get_stack_frame_1_9_2!();
             is_stack_base_1_9_0!();
         }
         ));
@@ -195,11 +215,13 @@ macro_rules! is_stack_base_2_5_0(
 
 macro_rules! get_ruby_string_array_2_5_0(
     () => (
-        fn get_ruby_string_array<T>(addr: usize, string_class: usize, source: &T) -> Result<String, MemoryCopyError> where T: CopyAddress{
+        // Returns (path, absolute_path)
+        fn get_ruby_string_array<T>(addr: usize, string_class: usize, source: &T) -> Result<(String, String), MemoryCopyError> where T: CopyAddress{
             // todo: we're doing an extra copy here for no reason
             let rstring: RString = copy_struct(addr, source)?;
             if rstring.basic.klass as usize == string_class {
-                return get_ruby_string(addr, source);
+                let s = get_ruby_string(addr, source)?;
+                return Ok((s.clone(), s))
             }
             // otherwise it's an RArray
             let rarray: RArray = copy_struct(addr, source)?;
@@ -207,8 +229,9 @@ macro_rules! get_ruby_string_array_2_5_0(
             // TODO: this assumes that the array contents are stored inline and not on the heap
             // I think this will always be true but we should check instead
             // the reason I am not checking is that I don't know how to check yet
-            let addr: usize = unsafe { rarray.as_.ary[1] as usize }; // 1 means get the absolute path, not the relative path
-            get_ruby_string(addr, source)
+            let path_addr: usize = unsafe { rarray.as_.ary[0] as usize }; // 1 means get the absolute path, not the relative path
+            let abs_path_addr: usize = unsafe { rarray.as_.ary[1] as usize }; // 1 means get the absolute path, not the relative path
+            Ok((get_ruby_string(path_addr, source)?, get_ruby_string(abs_path_addr, source)?))
         }
         ));
 
@@ -237,7 +260,7 @@ macro_rules! get_ruby_string(
         }
 ));
 
-macro_rules! get_stack_frame_1_9_0(
+macro_rules! get_stack_frame_1_9_1(
     () => (
         fn get_stack_frame<T>(
             iseq_struct: &rb_iseq_struct,
@@ -246,8 +269,26 @@ macro_rules! get_stack_frame_1_9_0(
             ) -> Result<StackFrame, MemoryCopyError> where T: CopyAddress{
             Ok(StackFrame{
                 name: get_ruby_string(iseq_struct.name as usize, source)?,
-                path: get_ruby_string(iseq_struct.filename as usize, source)?,
-                lineno: Some(get_lineno(iseq_struct, cfp, source)?),
+                relative_path: get_ruby_string(iseq_struct.filename as usize, source)?,
+                absolute_path: None, 
+                lineno: get_lineno(iseq_struct, cfp, source)?,
+            })
+        }
+        ));
+
+
+macro_rules! get_stack_frame_1_9_2(
+    () => (
+        fn get_stack_frame<T>(
+            iseq_struct: &rb_iseq_struct,
+            cfp: &rb_control_frame_t,
+            source: &T,
+            ) -> Result<StackFrame, MemoryCopyError> where T: CopyAddress{
+            Ok(StackFrame{
+                name: get_ruby_string(iseq_struct.name as usize, source)?,
+                relative_path: get_ruby_string(iseq_struct.filename as usize, source)?,
+                absolute_path: Some(get_ruby_string(iseq_struct.filepath as usize, source)?),
+                lineno: get_lineno(iseq_struct, cfp, source)?,
             })
         }
         ));
@@ -389,8 +430,9 @@ macro_rules! get_stack_frame_2_0_0(
             ) -> Result<StackFrame, MemoryCopyError> where T: CopyAddress{
             Ok(StackFrame{
                 name: get_ruby_string(iseq_struct.location.label as usize, source)?,
-                path: get_ruby_string(iseq_struct.location.path as usize, source)?,
-                lineno: Some(get_lineno(iseq_struct, cfp, source)?),
+                relative_path: get_ruby_string(iseq_struct.location.path as usize, source)?,
+                absolute_path: Some(get_ruby_string(iseq_struct.location.absolute_path as usize, source)?),
+                lineno: get_lineno(iseq_struct, cfp, source)?,
             })
         }
         ));
@@ -405,8 +447,9 @@ macro_rules! get_stack_frame_2_3_0(
             let body: rb_iseq_constant_body = copy_struct(iseq_struct.body as usize, source)?;
             Ok(StackFrame{
                 name: get_ruby_string(body.location.label as usize, source)?,
-                path: get_ruby_string(body.location.path as usize, source)?,
-                lineno: Some(get_lineno(&body, cfp, source)?),
+                relative_path: get_ruby_string(body.location.path as usize, source)?,
+                absolute_path: Some(get_ruby_string(body.location.absolute_path as usize, source)?),
+                lineno: get_lineno(&body, cfp, source)?,
             })
         }
         ));
@@ -420,10 +463,12 @@ macro_rules! get_stack_frame_2_5_0(
             ) -> Result<StackFrame, MemoryCopyError> where T: CopyAddress{
             let body: rb_iseq_constant_body = copy_struct(iseq_struct.body as usize, source)?;
             let rstring: RString = copy_struct(body.location.label as usize, source)?;
+            let (path, absolute_path) = get_ruby_string_array(body.location.pathobj as usize, rstring.basic.klass as usize, source)?;
             Ok(StackFrame{
                 name: get_ruby_string(body.location.label as usize, source)?,
-                path:  get_ruby_string_array(body.location.pathobj as usize, rstring.basic.klass as usize, source)?,
-                lineno: Some(get_lineno(&body, cfp, source)?),
+                relative_path: path,
+                absolute_path: Some(absolute_path),
+                lineno: get_lineno(&body, cfp, source)?,
             })
         }
         ));
@@ -448,9 +493,9 @@ macro_rules! get_cfps(
         }
         ));
 
-ruby_version_v_1_9_x!(ruby_1_9_1_0);
-ruby_version_v_1_9_x!(ruby_1_9_2_0);
-ruby_version_v_1_9_x!(ruby_1_9_3_0);
+ruby_version_v_1_9_1!(ruby_1_9_1_0);
+ruby_version_v_1_9_2_to_3!(ruby_1_9_2_0);
+ruby_version_v_1_9_2_to_3!(ruby_1_9_3_0);
 ruby_version_v_2_0_to_2_2!(ruby_2_0_0_0);
 ruby_version_v_2_0_to_2_2!(ruby_2_1_0);
 ruby_version_v_2_0_to_2_2!(ruby_2_1_1);

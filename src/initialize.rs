@@ -43,8 +43,9 @@ pub fn initialize(pid: pid_t) -> Result<StackTraceGetter, Error> {
 #[derive(Debug, PartialEq)]
 pub struct StackFrame {
     pub name: String,
-    pub path: String,
-    pub lineno: Option<u32>,
+    pub relative_path: String,
+    pub absolute_path: Option<String>,
+    pub lineno: u32,
 }
 
 // Use a StackTraceGetter to get stack traces
@@ -57,9 +58,10 @@ pub struct StackTraceGetter {
 
 impl fmt::Display for StackFrame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.lineno {
-            Some(line) => write!(f, "{} - {} line {}", self.name, self.path, line),
-            None => write!(f, "{} - {}", self.name, self.path),
+        if let Some(abspath) = self.absolute_path.as_ref() {
+            write!(f, "{} - {} line {}", self.name, abspath, self.lineno)
+        } else {
+            write!(f, "{} - {} line {}", self.name, self.relative_path, self.lineno)
         }
     }
 }

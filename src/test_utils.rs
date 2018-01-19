@@ -120,82 +120,66 @@ mod tests {
 
     use initialize::StackFrame;
 
-    fn real_stack_trace_lineno_relative() -> Vec<StackFrame> {
+    fn real_stack_trace_main() -> Vec<StackFrame> {
         vec![
             StackFrame {
                 name: "aaa".to_string(),
-                path: "ci/ruby-programs/infinite.rb".to_string(),
-                lineno: Some(2),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 2,
             },
             StackFrame {
                 name: "bbb".to_string(),
-                path: "ci/ruby-programs/infinite.rb".to_string(),
-                lineno: Some(6),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 6,
             },
             StackFrame {
                 name: "ccc".to_string(),
-                path: "ci/ruby-programs/infinite.rb".to_string(),
-                lineno: Some(10),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 10,
             },
             StackFrame {
                 name: "block in <main>".to_string(),
-                path: "ci/ruby-programs/infinite.rb".to_string(),
-                lineno: Some(14),
-            },
-        ]
-    }
-
-    fn real_stack_trace_lineno_relative_main() -> Vec<StackFrame> {
-        vec![
-            StackFrame {
-                name: "aaa".to_string(),
-                path: "ci/ruby-programs/infinite.rb".to_string(),
-                lineno: Some(2),
-            },
-            StackFrame {
-                name: "bbb".to_string(),
-                path: "ci/ruby-programs/infinite.rb".to_string(),
-                lineno: Some(6),
-            },
-            StackFrame {
-                name: "ccc".to_string(),
-                path: "ci/ruby-programs/infinite.rb".to_string(),
-                lineno: Some(10),
-            },
-            StackFrame {
-                name: "block in <main>".to_string(),
-                path: "ci/ruby-programs/infinite.rb".to_string(),
-                lineno: Some(14),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 14,
             },
             StackFrame {
                 name: "<main>".to_string(),
-                path: "ci/ruby-programs/infinite.rb".to_string(),
-                lineno: Some(13),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 13,
             },
         ]
     }
 
-    fn real_stack_trace_lineno() -> Vec<StackFrame> {
+    fn real_stack_trace() -> Vec<StackFrame> {
         vec![
             StackFrame {
                 name: "aaa".to_string(),
-                path: "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
-                lineno: Some(2),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 2,
             },
             StackFrame {
                 name: "bbb".to_string(),
-                path: "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
-                lineno: Some(6),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 6,
             },
             StackFrame {
                 name: "ccc".to_string(),
-                path: "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
-                lineno: Some(10),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 10,
             },
             StackFrame {
                 name: "block in <main>".to_string(),
-                path: "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
-                lineno: Some(14),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 14,
             },
         ]
     }
@@ -206,7 +190,7 @@ mod tests {
         let stack_trace =
             ruby_version::ruby_2_1_6::get_stack_trace(current_thread_addr, &*COREDUMP_2_1_6)
                 .unwrap();
-        assert_eq!(real_stack_trace_lineno_relative_main(), stack_trace);
+        assert_eq!(real_stack_trace_main(), stack_trace);
     }
     #[test]
     fn test_get_ruby_stack_trace_1_9_3() {
@@ -214,7 +198,7 @@ mod tests {
         let stack_trace =
             ruby_version::ruby_1_9_3_0::get_stack_trace(current_thread_addr, &*COREDUMP_1_9_3)
                 .unwrap();
-        assert_eq!(real_stack_trace_lineno_relative_main(), stack_trace);
+        assert_eq!(real_stack_trace_main(), stack_trace);
     }
 
     #[test]
@@ -223,7 +207,7 @@ mod tests {
         let stack_trace =
             ruby_version::ruby_2_5_0_rc1::get_stack_trace(current_thread_addr, &*COREDUMP_2_5_0)
                 .unwrap();
-        assert_eq!(real_stack_trace_lineno(), stack_trace);
+        assert_eq!(real_stack_trace(), stack_trace);
     }
 
     #[test]
@@ -232,6 +216,6 @@ mod tests {
         let stack_trace =
             ruby_version::ruby_2_4_0::get_stack_trace(current_thread_addr, &*COREDUMP_2_4_0)
                 .unwrap();
-        assert_eq!(real_stack_trace_lineno_relative(), stack_trace);
+        assert_eq!(real_stack_trace(), stack_trace);
     }
 }
