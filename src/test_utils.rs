@@ -120,36 +120,6 @@ mod tests {
 
     use initialize::StackFrame;
 
-    fn real_stack_trace() -> Vec<StackFrame> {
-        vec![
-            StackFrame {
-                name: "aaa".to_string(),
-                path: "ci/ruby-programs/infinite.rb".to_string(),
-                lineno: None,
-            },
-            StackFrame {
-                name: "bbb".to_string(),
-                path: "ci/ruby-programs/infinite.rb".to_string(),
-                lineno: None,
-            },
-            StackFrame {
-                name: "ccc".to_string(),
-                path: "ci/ruby-programs/infinite.rb".to_string(),
-                lineno: None,
-            },
-            StackFrame {
-                name: "block in <main>".to_string(),
-                path: "ci/ruby-programs/infinite.rb".to_string(),
-                lineno: None,
-            },
-            StackFrame {
-                name: "<main>".to_string(),
-                path: "ci/ruby-programs/infinite.rb".to_string(),
-                lineno: None,
-            },
-        ]
-    }
-
     fn real_stack_trace_lineno_relative() -> Vec<StackFrame> {
         vec![
             StackFrame {
@@ -244,7 +214,7 @@ mod tests {
         let stack_trace =
             ruby_version::ruby_1_9_3_0::get_stack_trace(current_thread_addr, &*COREDUMP_1_9_3)
                 .unwrap();
-        assert_eq!(real_stack_trace(), stack_trace);
+        assert_eq!(real_stack_trace_lineno_relative_main(), stack_trace);
     }
 
     #[test]

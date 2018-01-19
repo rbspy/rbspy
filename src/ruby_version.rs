@@ -20,6 +20,7 @@ macro_rules! ruby_version_v_1_9_x(
             get_stack_trace!(rb_thread_struct);
             get_ruby_string!();
             get_cfps!();
+            get_lineno_1_9_0!();
             get_stack_frame_1_9_0!();
             is_stack_base_1_9_0!();
         }
@@ -246,10 +247,42 @@ macro_rules! get_stack_frame_1_9_0(
             Ok(StackFrame{
                 name: get_ruby_string(iseq_struct.name as usize, source)?,
                 path: get_ruby_string(iseq_struct.filename as usize, source)?,
-                lineno: None,
+                lineno: Some(get_lineno(iseq_struct, cfp, source)?),
             })
         }
         ));
+
+macro_rules! get_lineno_1_9_0(
+    () => (
+        fn get_lineno<T>(
+            iseq_struct: &rb_iseq_struct,
+            cfp: &rb_control_frame_t,
+            source: &T,
+            ) -> Result<u32, MemoryCopyError> where T: CopyAddress{
+            let mut pos = cfp.pc as usize - iseq_struct.iseq_encoded as usize;
+            if pos != 0 {
+                pos -= 1;
+            }
+            let t_size = iseq_struct.insn_info_size as usize;
+            if t_size == 0 {
+                Ok(0) //TODO: really?
+            } else if t_size == 1 {
+                let table: [iseq_insn_info_entry; 1] = copy_struct(iseq_struct.insn_info_table as usize, source)?;
+                Ok(table[0].line_no as u32)
+            } else {
+                let table: Vec<iseq_insn_info_entry> = copy_vec(iseq_struct.insn_info_table as usize, t_size as usize, source)?;
+                for i in 0..t_size {
+                    if pos == table[i].position as usize {
+                        return Ok(table[i].line_no as u32)
+                    } else if table[i].position as usize > pos {
+                        return Ok(table[i-1].line_no as u32)
+                    }
+                }
+                Ok(table[t_size-1].line_no as u32)
+            }
+        }
+));
+
 
 macro_rules! get_lineno_2_0_0(
     () => (
