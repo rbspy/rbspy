@@ -120,10 +120,6 @@ mod tests {
 
     use initialize::StackFrame;
 
-    // Values are correct for the ruby-coredump.14341.gz file.
-    const RUBY_CURRENT_THREAD_ADDR: usize = 0x55f35c094040;
-    const RUBY_CURRENT_THREAD_VAL: usize = 0x55f35cb765c0;
-
     fn real_stack_trace() -> Vec<StackFrame> {
         vec![
             StackFrame {
