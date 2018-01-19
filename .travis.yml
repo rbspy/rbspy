@@ -41,6 +41,8 @@ matrix:
 
 before_install:
   - export PATH="$PATH:$HOME/.cargo/bin"
+  - sudo apt-get update
+  - sudo apt-get -y install perl
 
 install:
   - bash ci/install.sh
