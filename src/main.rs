@@ -148,7 +148,7 @@ fn write_flamegraph(stacks_filename: &str) -> Result<(), Error> {
     };
     let output_svg = std::fs::File::create(&svg_filename)?;
     println!("Writing flamegraph to {}", svg_filename);
-    let mut child = Command::new("perl").arg("-").arg(stacks_filename).stdin(Stdio::piped()).stdout(output_svg).spawn()?;
+    let mut child = Command::new("perl").arg("-").arg(stacks_filename).stdin(Stdio::piped()).stdout(output_svg).spawn().context("Couldn't execute perl")?;
     { 
         let stdin = child.stdin.as_mut().expect("failed to write to stdin");
         stdin.write_all(FLAMEGRAPH_SCRIPT)?;
