@@ -20,16 +20,59 @@ pub mod data {
 
     use super::*;
 
-    pub const RUBY_CURRENT_THREAD_ADDR: usize = 0x55f35c094040;
-
-    const COREDUMP_FILE: &'static str = concat!(
+    const COREDUMP_FILE_2_4_0: &'static str = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/ci/testdata/ruby-coredump.14341.gz"
+        "/ci/testdata/ruby-coredump.2.4.0.gz"
+    );
+
+    const COREDUMP_FILE_1_9_3: &'static str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/ci/testdata/ruby-coredump-1.9.3.gz"
+    );
+
+    const COREDUMP_FILE_2_5_0: &'static str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/ci/testdata/ruby-coredump-2.5.0.gz"
+    );
+
+    const COREDUMP_FILE_2_1_6: &'static str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/ci/testdata/ruby-coredump-2.1.6.gz"
     );
 
     lazy_static! {
-        pub static ref COREDUMP: CoreDump = {
-            let file = File::open(COREDUMP_FILE).unwrap();
+        pub static ref COREDUMP_2_4_0: CoreDump = {
+            let file = File::open(COREDUMP_FILE_2_4_0).unwrap();
+            let mut buf = vec![];
+            GzDecoder::new(file).unwrap().read_to_end(&mut buf).unwrap();
+
+            CoreDump::from(elf::File::open_stream(&mut Cursor::new(buf)).unwrap())
+        };
+    }
+
+    lazy_static! {
+        pub static ref COREDUMP_1_9_3: CoreDump = {
+            let file = File::open(COREDUMP_FILE_1_9_3).unwrap();
+            let mut buf = vec![];
+            GzDecoder::new(file).unwrap().read_to_end(&mut buf).unwrap();
+
+            CoreDump::from(elf::File::open_stream(&mut Cursor::new(buf)).unwrap())
+        };
+    }
+
+    lazy_static! {
+        pub static ref COREDUMP_2_5_0: CoreDump = {
+            let file = File::open(COREDUMP_FILE_2_5_0).unwrap();
+            let mut buf = vec![];
+            GzDecoder::new(file).unwrap().read_to_end(&mut buf).unwrap();
+
+            CoreDump::from(elf::File::open_stream(&mut Cursor::new(buf)).unwrap())
+        };
+    }
+
+    lazy_static! {
+        pub static ref COREDUMP_2_1_6: CoreDump = {
+            let file = File::open(COREDUMP_FILE_2_1_6).unwrap();
             let mut buf = vec![];
             GzDecoder::new(file).unwrap().read_to_end(&mut buf).unwrap();
 
@@ -71,27 +114,158 @@ impl CopyAddress for CoreDump {
 mod tests {
     extern crate byteorder;
 
-    use std::mem;
+    use super::data::*;
 
-    use byteorder::{LittleEndian, ReadBytesExt};
+    use ruby_version;
 
-    use read_process_memory::CopyAddress;
-
-    use super::data::COREDUMP;
+    use initialize::StackFrame;
 
     // Values are correct for the ruby-coredump.14341.gz file.
     const RUBY_CURRENT_THREAD_ADDR: usize = 0x55f35c094040;
     const RUBY_CURRENT_THREAD_VAL: usize = 0x55f35cb765c0;
 
+    fn real_stack_trace() -> Vec<StackFrame> {
+        vec![
+            StackFrame {
+                name: "aaa".to_string(),
+                path: "ci/ruby-programs/infinite.rb".to_string(),
+                lineno: None,
+            },
+            StackFrame {
+                name: "bbb".to_string(),
+                path: "ci/ruby-programs/infinite.rb".to_string(),
+                lineno: None,
+            },
+            StackFrame {
+                name: "ccc".to_string(),
+                path: "ci/ruby-programs/infinite.rb".to_string(),
+                lineno: None,
+            },
+            StackFrame {
+                name: "block in <main>".to_string(),
+                path: "ci/ruby-programs/infinite.rb".to_string(),
+                lineno: None,
+            },
+            StackFrame {
+                name: "<main>".to_string(),
+                path: "ci/ruby-programs/infinite.rb".to_string(),
+                lineno: None,
+            },
+        ]
+    }
+
+    fn real_stack_trace_lineno_relative() -> Vec<StackFrame> {
+        vec![
+            StackFrame {
+                name: "aaa".to_string(),
+                path: "ci/ruby-programs/infinite.rb".to_string(),
+                lineno: Some(2),
+            },
+            StackFrame {
+                name: "bbb".to_string(),
+                path: "ci/ruby-programs/infinite.rb".to_string(),
+                lineno: Some(6),
+            },
+            StackFrame {
+                name: "ccc".to_string(),
+                path: "ci/ruby-programs/infinite.rb".to_string(),
+                lineno: Some(10),
+            },
+            StackFrame {
+                name: "block in <main>".to_string(),
+                path: "ci/ruby-programs/infinite.rb".to_string(),
+                lineno: Some(14),
+            },
+        ]
+    }
+
+    fn real_stack_trace_lineno_relative_main() -> Vec<StackFrame> {
+        vec![
+            StackFrame {
+                name: "aaa".to_string(),
+                path: "ci/ruby-programs/infinite.rb".to_string(),
+                lineno: Some(2),
+            },
+            StackFrame {
+                name: "bbb".to_string(),
+                path: "ci/ruby-programs/infinite.rb".to_string(),
+                lineno: Some(6),
+            },
+            StackFrame {
+                name: "ccc".to_string(),
+                path: "ci/ruby-programs/infinite.rb".to_string(),
+                lineno: Some(10),
+            },
+            StackFrame {
+                name: "block in <main>".to_string(),
+                path: "ci/ruby-programs/infinite.rb".to_string(),
+                lineno: Some(14),
+            },
+            StackFrame {
+                name: "<main>".to_string(),
+                path: "ci/ruby-programs/infinite.rb".to_string(),
+                lineno: Some(13),
+            },
+        ]
+    }
+
+    fn real_stack_trace_lineno() -> Vec<StackFrame> {
+        vec![
+            StackFrame {
+                name: "aaa".to_string(),
+                path: "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                lineno: Some(2),
+            },
+            StackFrame {
+                name: "bbb".to_string(),
+                path: "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                lineno: Some(6),
+            },
+            StackFrame {
+                name: "ccc".to_string(),
+                path: "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                lineno: Some(10),
+            },
+            StackFrame {
+                name: "block in <main>".to_string(),
+                path: "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                lineno: Some(14),
+            },
+        ]
+    }
+
     #[test]
-    fn test_get_ruby_current_thread() {
-        let mut buf = vec![0u8; mem::size_of::<usize>()];
-        COREDUMP
-            .copy_address(RUBY_CURRENT_THREAD_ADDR, &mut buf)
-            .unwrap();
-        assert_eq!(
-            RUBY_CURRENT_THREAD_VAL,
-            buf.as_slice().read_u64::<LittleEndian>().unwrap() as usize
-        );
+    fn test_get_ruby_stack_trace_2_1_6() {
+        let current_thread_addr = 0x562658abd7f0;
+        let stack_trace =
+            ruby_version::ruby_2_1_6::get_stack_trace(current_thread_addr, &*COREDUMP_2_1_6)
+                .unwrap();
+        assert_eq!(real_stack_trace_lineno_relative_main(), stack_trace);
+    }
+    #[test]
+    fn test_get_ruby_stack_trace_1_9_3() {
+        let current_thread_addr = 0x823930;
+        let stack_trace =
+            ruby_version::ruby_1_9_3_0::get_stack_trace(current_thread_addr, &*COREDUMP_1_9_3)
+                .unwrap();
+        assert_eq!(real_stack_trace(), stack_trace);
+    }
+
+    #[test]
+    fn test_get_ruby_stack_trace_2_5_0() {
+        let current_thread_addr = 0x55dd8c3b7758;
+        let stack_trace =
+            ruby_version::ruby_2_5_0_rc1::get_stack_trace(current_thread_addr, &*COREDUMP_2_5_0)
+                .unwrap();
+        assert_eq!(real_stack_trace_lineno(), stack_trace);
+    }
+
+    #[test]
+    fn test_get_ruby_stack_trace_2_4_0() {
+        let current_thread_addr = 0x55df44959920;
+        let stack_trace =
+            ruby_version::ruby_2_4_0::get_stack_trace(current_thread_addr, &*COREDUMP_2_4_0)
+                .unwrap();
+        assert_eq!(real_stack_trace_lineno_relative(), stack_trace);
     }
 }

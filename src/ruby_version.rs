@@ -14,8 +14,8 @@ macro_rules! ruby_version_v_1_9_x(
             use std;
             use copy::*;
             use bindings::$ruby_version::*;
-            use libc::pid_t;
             use copy::MemoryCopyError;
+            use read_process_memory::CopyAddress;
 
             get_stack_trace!(rb_thread_struct);
             get_ruby_string!();
@@ -31,8 +31,8 @@ macro_rules! ruby_version_v_2_0_to_2_2(
             use std;
             use copy::*;
             use bindings::$ruby_version::*;
-            use libc::pid_t;
             use copy::MemoryCopyError;
+            use read_process_memory::CopyAddress;
 
 
             // These 4 functions are the
@@ -62,8 +62,8 @@ macro_rules! ruby_version_v_2_3_to_2_4(
             use std;
             use copy::*;
             use bindings::$ruby_version::*;
-            use libc::pid_t;
             use copy::MemoryCopyError;
+            use read_process_memory::CopyAddress;
 
             get_stack_trace!(rb_thread_struct);
             get_ruby_string!();
@@ -80,8 +80,8 @@ macro_rules! ruby_version_v2_5_x(
             use std;
             use copy::*;
             use bindings::$ruby_version::*;
-            use libc::pid_t;
             use copy::MemoryCopyError;
+            use read_process_memory::CopyAddress;
 
             get_stack_trace!(rb_execution_context_struct);
             get_ruby_string!();
@@ -98,29 +98,29 @@ macro_rules! get_stack_trace(
 
         use initialize::StackFrame;
 
-        pub fn get_stack_trace(
+        pub fn get_stack_trace<T>(
             ruby_current_thread_address_location: usize,
-            source_pid: pid_t,
-            ) -> Result<Vec<StackFrame>, MemoryCopyError> {
+            source: &T,
+            ) -> Result<Vec<StackFrame>, MemoryCopyError> where T: CopyAddress{
             debug!(
                 "current address location: {:x}",
                 ruby_current_thread_address_location
                 );
             let current_thread_addr: usize =
-                copy_struct(ruby_current_thread_address_location, source_pid)?;
+                copy_struct(ruby_current_thread_address_location, source)?;
             debug!("{:x}", current_thread_addr);
-            let thread: $thread_type = copy_struct(current_thread_addr, source_pid)?;
+            let thread: $thread_type = copy_struct(current_thread_addr, source)?;
             debug!("thread: {:?}", thread);
             let mut trace = Vec::new();
-            let cfps = get_cfps(thread.cfp as usize, stack_base(&thread) as usize, source_pid)?;
+            let cfps = get_cfps(thread.cfp as usize, stack_base(&thread) as usize, source)?;
             for cfp in cfps.iter() {
                 if cfp.iseq as usize == 0  || cfp.pc as usize == 0 {
                     debug!("huh."); // TODO: fixmeup
                     continue;
                 }
-                let iseq_struct: rb_iseq_struct = copy_struct(cfp.iseq as usize, source_pid)?;
+                let iseq_struct: rb_iseq_struct = copy_struct(cfp.iseq as usize, source)?;
                 debug!("iseq_struct: {:?}", iseq_struct);
-                let label_path  = get_stack_frame(&iseq_struct, &cfp, source_pid);
+                let label_path  = get_stack_frame(&iseq_struct, &cfp, source);
                 match label_path {
                     Ok(call)  => trace.push(call),
                     Err(x) => {
@@ -138,12 +138,12 @@ macro_rules! get_stack_trace(
 
 use proc_maps::{maps_contain_addr, MapRange};
 
-pub fn is_maybe_thread(x: usize, pid: pid_t, heap_map: &MapRange, all_maps: &Vec<MapRange>) -> bool {
+pub fn is_maybe_thread<T>(x: usize, source: &T, heap_map: &MapRange, all_maps: &Vec<MapRange>) -> bool where T: CopyAddress{
     if !heap_map.contains_addr(x) {
         return false;
     }
 
-    let thread: $thread_type = match copy_struct(x, pid) {
+    let thread: $thread_type = match copy_struct(x, source) {
         Ok(x) => x,
         _ => { return false; },
     };
@@ -194,20 +194,20 @@ macro_rules! is_stack_base_2_5_0(
 
 macro_rules! get_ruby_string_array_2_5_0(
     () => (
-        fn get_ruby_string_array(addr: usize, string_class: usize, source_pid: pid_t) -> Result<String, MemoryCopyError> {
+        fn get_ruby_string_array<T>(addr: usize, string_class: usize, source: &T) -> Result<String, MemoryCopyError> where T: CopyAddress{
             // todo: we're doing an extra copy here for no reason
-            let rstring: RString = copy_struct(addr, source_pid)?;
+            let rstring: RString = copy_struct(addr, source)?;
             if rstring.basic.klass as usize == string_class {
-                return get_ruby_string(addr, source_pid);
+                return get_ruby_string(addr, source);
             }
             // otherwise it's an RArray
-            let rarray: RArray = copy_struct(addr, source_pid)?;
+            let rarray: RArray = copy_struct(addr, source)?;
             debug!("blah: {}, array: {:?}", addr, unsafe { rarray.as_.ary });
             // TODO: this assumes that the array contents are stored inline and not on the heap
             // I think this will always be true but we should check instead
             // the reason I am not checking is that I don't know how to check yet
             let addr: usize = unsafe { rarray.as_.ary[1] as usize }; // 1 means get the absolute path, not the relative path
-            get_ruby_string(addr, source_pid)
+            get_ruby_string(addr, source)
         }
         ));
 
@@ -215,9 +215,9 @@ macro_rules! get_ruby_string(
     () => (
         use std::ffi::CStr;
 
-        fn get_ruby_string(addr: usize, source_pid: pid_t) -> Result<String, MemoryCopyError> {
+        fn get_ruby_string<T>(addr: usize, source: &T) -> Result<String, MemoryCopyError> where T: CopyAddress{
             let vec = {
-                let rstring: RString = copy_struct(addr, source_pid)?;
+                let rstring: RString = copy_struct(addr, source)?;
                 let basic = rstring.basic;
                 let is_array = basic.flags & 1 << 13 == 0;
                 if is_array {
@@ -228,7 +228,7 @@ macro_rules! get_ruby_string(
                     unsafe {
                         let addr = rstring.as_.heap.ptr as usize;
                         let len = rstring.as_.heap.len as usize;
-                        copy_address_raw(addr as usize, len, source_pid)?
+                        copy_address_raw(addr as usize, len, source)?
                     }
                 }
             };
@@ -238,14 +238,14 @@ macro_rules! get_ruby_string(
 
 macro_rules! get_stack_frame_1_9_0(
     () => (
-        fn get_stack_frame(
+        fn get_stack_frame<T>(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
-            source_pid: pid_t,
-            ) -> Result<StackFrame, MemoryCopyError> {
+            source: &T,
+            ) -> Result<StackFrame, MemoryCopyError> where T: CopyAddress{
             Ok(StackFrame{
-                name: get_ruby_string(iseq_struct.name as usize, source_pid)?,
-                path: get_ruby_string(iseq_struct.filename as usize, source_pid)?,
+                name: get_ruby_string(iseq_struct.name as usize, source)?,
+                path: get_ruby_string(iseq_struct.filename as usize, source)?,
                 lineno: None,
             })
         }
@@ -253,11 +253,11 @@ macro_rules! get_stack_frame_1_9_0(
 
 macro_rules! get_lineno_2_0_0(
     () => (
-        fn get_lineno(
+        fn get_lineno<T>(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
-            source_pid: pid_t,
-            ) -> Result<u32, MemoryCopyError> {
+            source: &T,
+            ) -> Result<u32, MemoryCopyError> where T: CopyAddress{
             let mut pos = cfp.pc as usize - iseq_struct.iseq_encoded as usize;
             if pos != 0 {
                 pos -= 1;
@@ -266,10 +266,10 @@ macro_rules! get_lineno_2_0_0(
             if t_size == 0 {
                 Ok(0) //TODO: really?
             } else if t_size == 1 {
-                let table: [iseq_line_info_entry; 1] = copy_struct(iseq_struct.line_info_table as usize, source_pid)?;
+                let table: [iseq_line_info_entry; 1] = copy_struct(iseq_struct.line_info_table as usize, source)?;
                 Ok(table[0].line_no)
             } else {
-                let table: Vec<iseq_line_info_entry> = copy_vec(iseq_struct.line_info_table as usize, t_size as usize, source_pid)?;
+                let table: Vec<iseq_line_info_entry> = copy_vec(iseq_struct.line_info_table as usize, t_size as usize, source)?;
                 for i in 0..t_size {
                     if pos == table[i].position as usize {
                         return Ok(table[i].line_no)
@@ -284,11 +284,11 @@ macro_rules! get_lineno_2_0_0(
 
 macro_rules! get_lineno_2_3_0(
     () => (
-        fn get_lineno(
+        fn get_lineno<T>(
             iseq_struct: &rb_iseq_constant_body,
             cfp: &rb_control_frame_t,
-            source_pid: pid_t,
-            ) -> Result<u32, MemoryCopyError> {
+            source: &T,
+            ) -> Result<u32, MemoryCopyError> where T: CopyAddress{
             if iseq_struct.iseq_encoded as usize > cfp.pc as usize {
                 return Err(MemoryCopyError::Other);
             }
@@ -300,10 +300,10 @@ macro_rules! get_lineno_2_3_0(
             if t_size == 0 {
                 Ok(0) //TODO: really?
             } else if t_size == 1 {
-                let table: [iseq_line_info_entry; 1] = copy_struct(iseq_struct.line_info_table as usize, source_pid)?;
+                let table: [iseq_line_info_entry; 1] = copy_struct(iseq_struct.line_info_table as usize, source)?;
                 Ok(table[0].line_no)
             } else {
-                let table: Vec<iseq_line_info_entry> = copy_vec(iseq_struct.line_info_table as usize, t_size as usize, source_pid)?;
+                let table: Vec<iseq_line_info_entry> = copy_vec(iseq_struct.line_info_table as usize, t_size as usize, source)?;
                 for i in 0..t_size {
                     if pos == table[i].position as usize {
                         return Ok(table[i].line_no)
@@ -318,11 +318,11 @@ macro_rules! get_lineno_2_3_0(
 
 macro_rules! get_lineno_2_5_0(
     () => (
-        fn get_lineno(
+        fn get_lineno<T>(
             iseq_struct: &rb_iseq_constant_body,
             cfp: &rb_control_frame_t,
-            source_pid: pid_t,
-            ) -> Result<u32, MemoryCopyError> {
+            source: &T,
+            ) -> Result<u32, MemoryCopyError> where T: CopyAddress{
             let mut pos = cfp.pc as usize - iseq_struct.iseq_encoded as usize;
             if pos != 0 {
                 pos -= 1;
@@ -331,10 +331,10 @@ macro_rules! get_lineno_2_5_0(
             if t_size == 0 {
                 Ok(0) //TODO: really?
             } else if t_size == 1 {
-                let table: [iseq_insn_info_entry; 1] = copy_struct(iseq_struct.insns_info as usize, source_pid)?;
+                let table: [iseq_insn_info_entry; 1] = copy_struct(iseq_struct.insns_info as usize, source)?;
                 Ok(table[0].line_no as u32)
             } else {
-                let table: Vec<iseq_insn_info_entry> = copy_vec(iseq_struct.insns_info as usize, t_size as usize, source_pid)?;
+                let table: Vec<iseq_insn_info_entry> = copy_vec(iseq_struct.insns_info as usize, t_size as usize, source)?;
                 for i in 0..t_size {
                     if pos == table[i].position as usize {
                         return Ok(table[i].line_no as u32)
@@ -349,48 +349,48 @@ macro_rules! get_lineno_2_5_0(
 
 macro_rules! get_stack_frame_2_0_0(
     () => (
-        fn get_stack_frame(
+        fn get_stack_frame<T>(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
-            source_pid: pid_t,
-            ) -> Result<StackFrame, MemoryCopyError> {
+            source: &T,
+            ) -> Result<StackFrame, MemoryCopyError> where T: CopyAddress{
             Ok(StackFrame{
-                name: get_ruby_string(iseq_struct.location.label as usize, source_pid)?,
-                path: get_ruby_string(iseq_struct.location.path as usize, source_pid)?,
-                lineno: Some(get_lineno(iseq_struct, cfp, source_pid)?),
+                name: get_ruby_string(iseq_struct.location.label as usize, source)?,
+                path: get_ruby_string(iseq_struct.location.path as usize, source)?,
+                lineno: Some(get_lineno(iseq_struct, cfp, source)?),
             })
         }
         ));
 
 macro_rules! get_stack_frame_2_3_0(
     () => (
-        fn get_stack_frame(
+        fn get_stack_frame<T>(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
-            source_pid: pid_t,
-            ) -> Result<StackFrame, MemoryCopyError> {
-            let body: rb_iseq_constant_body = copy_struct(iseq_struct.body as usize, source_pid)?;
+            source: &T,
+            ) -> Result<StackFrame, MemoryCopyError> where T: CopyAddress{
+            let body: rb_iseq_constant_body = copy_struct(iseq_struct.body as usize, source)?;
             Ok(StackFrame{
-                name: get_ruby_string(body.location.label as usize, source_pid)?,
-                path: get_ruby_string(body.location.path as usize, source_pid)?,
-                lineno: Some(get_lineno(&body, cfp, source_pid)?),
+                name: get_ruby_string(body.location.label as usize, source)?,
+                path: get_ruby_string(body.location.path as usize, source)?,
+                lineno: Some(get_lineno(&body, cfp, source)?),
             })
         }
         ));
 
 macro_rules! get_stack_frame_2_5_0(
     () => (
-        fn get_stack_frame(
+        fn get_stack_frame<T>(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
-            source_pid: pid_t,
-            ) -> Result<StackFrame, MemoryCopyError> {
-            let body: rb_iseq_constant_body = copy_struct(iseq_struct.body as usize, source_pid)?;
-            let rstring: RString = copy_struct(body.location.label as usize, source_pid)?;
+            source: &T,
+            ) -> Result<StackFrame, MemoryCopyError> where T: CopyAddress{
+            let body: rb_iseq_constant_body = copy_struct(iseq_struct.body as usize, source)?;
+            let rstring: RString = copy_struct(body.location.label as usize, source)?;
             Ok(StackFrame{
-                name: get_ruby_string(body.location.label as usize, source_pid)?,
-                path:  get_ruby_string_array(body.location.pathobj as usize, rstring.basic.klass as usize, source_pid)?,
-                lineno: Some(get_lineno(&body, cfp, source_pid)?),
+                name: get_ruby_string(body.location.label as usize, source)?,
+                path:  get_ruby_string_array(body.location.pathobj as usize, rstring.basic.klass as usize, source)?,
+                lineno: Some(get_lineno(&body, cfp, source)?),
             })
         }
         ));
@@ -405,8 +405,8 @@ macro_rules! get_cfps(
         // The base of the call stack is therefore at
         //   stack + stack_size * sizeof(VALUE) - sizeof(rb_control_frame_t)
         // (with everything in bytes).
-        fn get_cfps(cfp_address: usize, stack_base: usize, source_pid: pid_t) -> Result<Vec<rb_control_frame_t>, MemoryCopyError> {
-            Ok(copy_vec(cfp_address, (stack_base as usize - cfp_address) as usize / std::mem::size_of::<rb_control_frame_t>(), source_pid)?)
+        fn get_cfps<T>(cfp_address: usize, stack_base: usize, source: &T) -> Result<Vec<rb_control_frame_t>, MemoryCopyError> where T: CopyAddress{
+            Ok(copy_vec(cfp_address, (stack_base as usize - cfp_address) as usize / std::mem::size_of::<rb_control_frame_t>(), source)?)
         }
         ));
 

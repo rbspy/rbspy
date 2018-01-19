@@ -1,8 +1,8 @@
 pub use self::os_impl::*;
 use libc::pid_t;
 
-/* 
- * Operating-system specific code for getting 
+/*
+ * Operating-system specific code for getting
  * a) the address of the current thread, and
  * b) the address of the Ruby version of a PID
  *
@@ -74,14 +74,22 @@ mod os_impl {
     use libc::pid_t;
     use std;
     use address_finder::AddressFinderError;
+    use read_process_memory::*;
 
-    pub fn current_thread_address(pid: pid_t, version: &str, is_maybe_thread: Box<Fn(usize, pid_t, &MapRange, &Vec<MapRange>) -> bool>) -> Result<usize, Error> {
+    pub fn current_thread_address(
+        pid: pid_t,
+        version: &str,
+        is_maybe_thread: Box<Fn(usize, &ProcessHandle, &MapRange, &Vec<MapRange>) -> bool>,
+    ) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
         match current_thread_address_symbol_table(proginfo, version) {
             Some(addr) => Ok(addr),
             None => {
                 debug!("Trying to find address location another way");
-                Ok(current_thread_address_search_bss(proginfo, is_maybe_thread)?)
+                Ok(current_thread_address_search_bss(
+                    proginfo,
+                    is_maybe_thread,
+                )?)
             }
         }
     }
@@ -139,7 +147,10 @@ mod os_impl {
         None
     }
 
-    fn current_thread_address_search_bss(proginfo: &ProgramInfo, is_maybe_thread: Box<Fn(usize, pid_t, &MapRange, &Vec<MapRange>) -> bool> ) -> Result<usize, Error> {
+    fn current_thread_address_search_bss(
+        proginfo: &ProgramInfo,
+        is_maybe_thread: Box<Fn(usize, &ProcessHandle, &MapRange, &Vec<MapRange>) -> bool>,
+    ) -> Result<usize, Error> {
         // Used when there's no symbol table. Looks through the .bss and uses a search_bss (found in
         // `is_maybe_thread`) to find the address of the current thread.
         let map = (*proginfo.libruby_map).as_ref().expect(
@@ -156,8 +167,8 @@ mod os_impl {
         let read_addr = map.range_start + bss_section.addr as usize - load_header.vaddr as usize;
 
         debug!("read_addr: {:x}", read_addr);
-        let mut data =
-            copy_address_raw(read_addr as usize, bss_section.size as usize, proginfo.pid)?;
+        let source = &proginfo.pid.try_into_process_handle().unwrap();
+        let mut data = copy_address_raw(read_addr as usize, bss_section.size as usize, source)?;
         debug!("successfully read data");
         let slice: &[usize] = unsafe {
             std::slice::from_raw_parts(
@@ -168,9 +179,7 @@ mod os_impl {
 
         let i = slice
             .iter()
-            .position({
-                |&x| is_maybe_thread(x, proginfo.pid, &proginfo.heap_map, &proginfo.all_maps)
-            })
+            .position({ |&x| is_maybe_thread(x, source, &proginfo.heap_map, &proginfo.all_maps) })
             .ok_or(format_err!(
                 "Current thread address not found in process {}",
                 &proginfo.pid
@@ -237,9 +246,9 @@ mod os_impl {
             _ => AddressFinderError::ProcMapsError(pid),
         })?;
         let ruby_map = Box::new(get_map(&all_maps, "bin/ruby", "r-xp")
-                                .ok_or(format_err!("Ruby map not found for PID: {}", pid))?);
+            .ok_or(format_err!("Ruby map not found for PID: {}", pid))?);
         let heap_map = Box::new(get_map(&all_maps, "[heap]", "rw-p")
-                                .ok_or(format_err!("Heap map not found for PID: {}", pid))?);
+            .ok_or(format_err!("Heap map not found for PID: {}", pid))?);
         let ruby_path = &ruby_map
             .pathname
             .clone()
@@ -253,7 +262,7 @@ mod os_impl {
                     .clone()
                     .expect("libruby map's pathname shouldn't be None");
                 Some(elf::File::open_path(path)
-                     .map_err(|_| format_err!("Couldn't open ELF file: {}", path))?)
+                    .map_err(|_| format_err!("Couldn't open ELF file: {}", path))?)
             }
             _ => None,
         };
@@ -277,6 +286,6 @@ mod os_impl {
                     false
                 }
             })
-        .map(|x| x.clone())
+            .map(|x| x.clone())
     }
 }

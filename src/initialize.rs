@@ -10,6 +10,7 @@ use ruby_version;
 use address_finder::*;
 use address_finder;
 use proc_maps::*;
+use read_process_memory::*;
 
 /**
  * Initialization code for the profiler.
@@ -30,11 +31,16 @@ pub fn initialize(pid: pid_t) -> Result<StackTraceGetter, Error> {
     debug!("version: {}", version);
     Ok(StackTraceGetter {
         pid: pid,
-        current_thread_addr_location: address_finder::current_thread_address(pid, &version, is_maybe_thread)?,
+        current_thread_addr_location: address_finder::current_thread_address(
+            pid,
+            &version,
+            is_maybe_thread,
+        )?,
         stack_trace_function: get_stack_trace_function(&version),
     })
 }
 
+#[derive(Debug, PartialEq)]
 pub struct StackFrame {
     pub name: String,
     pub path: String,
@@ -45,7 +51,8 @@ pub struct StackFrame {
 pub struct StackTraceGetter {
     pid: pid_t,
     current_thread_addr_location: usize,
-    stack_trace_function: Box<Fn(usize, pid_t) -> Result<Vec<StackFrame>, MemoryCopyError>>,
+    stack_trace_function:
+        Box<Fn(usize, &ProcessHandle) -> Result<Vec<StackFrame>, MemoryCopyError>>,
 }
 
 impl fmt::Display for StackFrame {
@@ -60,7 +67,10 @@ impl fmt::Display for StackFrame {
 impl StackTraceGetter {
     pub fn get_trace(&self) -> Result<Vec<StackFrame>, MemoryCopyError> {
         let stack_trace_function = &self.stack_trace_function;
-        stack_trace_function(self.current_thread_addr_location, self.pid)
+        stack_trace_function(
+            self.current_thread_addr_location,
+            &self.pid.try_into_process_handle().unwrap(),
+        )
     }
 }
 
@@ -85,7 +95,7 @@ fn get_ruby_version_retry(pid: pid_t) -> Result<String, Error> {
                     _ => {}
                 }
                 match err.root_cause().downcast_ref::<MemoryCopyError>() {
-                    Some(&MemoryCopyError::PermissionDenied(_)) => {
+                    Some(&MemoryCopyError::PermissionDenied) => {
                         ret = true;
                     }
                     _ => {}
@@ -105,7 +115,7 @@ fn get_ruby_version_retry(pid: pid_t) -> Result<String, Error> {
 pub fn get_ruby_version(pid: pid_t) -> Result<String, Error> {
     let addr = address_finder::get_ruby_version_address(pid)?;
     debug!("ruby version addr: {:x}", addr);
-    let x: [c_char; 15] = copy_struct(addr, pid)?;
+    let x: [c_char; 15] = copy_struct(addr, &pid.try_into_process_handle().unwrap())?;
     debug!("ruby version struct: {:?}", x);
     Ok(unsafe {
         std::ffi::CStr::from_ptr(x.as_ptr() as *mut c_char)
@@ -152,9 +162,12 @@ fn test_current_thread_address() {
     process.kill().unwrap();
 }
 
-fn is_maybe_thread_function(
+fn is_maybe_thread_function<T: 'static>(
     version: &str,
-) -> Box<Fn(usize, pid_t, &MapRange, &Vec<MapRange>) -> bool> {
+) -> Box<Fn(usize, &T, &MapRange, &Vec<MapRange>) -> bool>
+where
+    T: CopyAddress,
+{
     let function = match version.as_ref() {
         "1.9.1" => ruby_version::ruby_1_9_1_0::is_maybe_thread,
         "1.9.2" => ruby_version::ruby_1_9_2_0::is_maybe_thread,
@@ -198,9 +211,12 @@ fn is_maybe_thread_function(
     Box::new(function)
 }
 
-fn get_stack_trace_function(
+fn get_stack_trace_function<T: 'static>(
     version: &str,
-) -> Box<Fn(usize, pid_t) -> Result<Vec<StackFrame>, copy::MemoryCopyError>> {
+) -> Box<Fn(usize, &T) -> Result<Vec<StackFrame>, copy::MemoryCopyError>>
+where
+    T: CopyAddress,
+{
     let stack_trace_function = match version {
         "1.9.1" => ruby_version::ruby_1_9_1_0::get_stack_trace,
         "1.9.2" => ruby_version::ruby_1_9_2_0::get_stack_trace,
