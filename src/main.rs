@@ -4,6 +4,7 @@
 extern crate byteorder;
 extern crate chrono;
 extern crate clap;
+extern crate ctrlc;
 extern crate elf;
 extern crate env_logger;
 #[macro_use]
@@ -47,27 +48,28 @@ fn do_main() -> Result<(), Error> {
     env_logger::init().unwrap();
 
     let matches: ArgMatches<'static> = arg_parser().get_matches();
+    let maybe_pid: Option<pid_t> = match matches.subcommand().1.unwrap().value_of("pid") {
+        Some(pid_string) => Some(pid_string
+                                 .parse()
+                                 .map_err(|_| format_err!("Invalid PID: {}", pid_string))?),
+        None => None,
+    };
     match matches.subcommand() {
-        ("snapshot", Some(sub_m)) => {
-            let pid_string = sub_m.value_of("pid").expect("Failed to find PID");
-            let pid = pid_string
-                .parse()
-                .map_err(|_| format_err!("Invalid PID: {}", pid_string))?;
+        ("snapshot", _) => {
+            let pid = maybe_pid.expect("PID is required for snapshot");
             Ok(snapshot(pid)?)
         }
         ("record", Some(sub_m)) => {
-            let maybe_pid = sub_m.value_of("pid");
             let maybe_cmd = sub_m.values_of("cmd");
             let maybe_filename = sub_m.value_of("file");
             let pid: pid_t = match maybe_pid {
-                Some(pid_string) => pid_string
-                    .parse()
-                    .map_err(|_| format_err!("Invalid PID: {}", pid_string))?,
+                Some(pid) => pid,
                 None => {
                     exec_cmd(&mut maybe_cmd.expect("Either PID or command is required to record"))?
                 }
             };
-            Ok(record(maybe_filename, pid)?)
+            let is_subcommand = maybe_pid == None;
+            Ok(record(maybe_filename, pid, is_subcommand)?)
         }
         _ => panic!("not a valid subcommand"),
     }
@@ -87,12 +89,26 @@ fn main() {
     }
 }
 
-fn record(filename: Option<&str>, pid: pid_t) -> Result<(), Error> {
+fn record(filename: Option<&str>, pid: pid_t, is_subcommand: bool) -> Result<(), Error> {
     // This gets a stack trace and then just prints it out
     // in a format that Brendan Gregg's stackcollapse.pl script understands
     let getter = initialize::initialize(pid)?;
     let output_filename = output_filename(&std::env::var("HOME")?, filename)?;
+
     println!("Recording data to {}", &output_filename);
+    println!("Press Ctrl+C to stop");
+
+    let outfile = output_filename.clone();
+    if is_subcommand {
+        // ignore Ctrl+C, on Ctrl+C the subprocess should just exit and then we'll exit normally
+        ctrlc::set_handler(move || {}).expect("Error setting Ctrl-C handler");
+    } else {
+        // set a signal handler so that we can write a flamegraph
+        ctrlc::set_handler(move || {
+            println!("Interrupted.");
+            write_flamegraph(&outfile).expect("Writing flamegraph failed"); std::process::exit(0);
+        }).expect("Error setting Ctrl-C handler");
+    }
     let mut output = std::fs::File::create(&output_filename).context(format!("Failed to create output file {}", &output_filename))?;
     let mut errors = 0;
     let mut successes = 0;

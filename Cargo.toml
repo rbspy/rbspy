@@ -11,13 +11,13 @@ license = "MIT"
 libc = "0.2.15"
 chrono = "0.4"
 clap = "2"
+ctrlc = "3.1.0"
 elf = "0.0.10"
 log = "0.3.6"
 env_logger = "0.3.4"
 rand = "0.4"
 read-process-memory = "0.1.0"
 failure = "0.1.1"
-tempdir = "0.3.4"
 
 failure_derive = "0.1.1"
 ruby-bindings = { path = "ruby-bindings" }
@@ -34,6 +34,7 @@ libarchive3-sys = "0.1.2"
 flate2 = "0.2.14"
 byteorder = "0.5"
 lazy_static = "0.2.1"
+tempdir = "0.3.4"
 
 [build-dependencies]
 rustc_version = "0.1.7"
