@@ -439,6 +439,11 @@ macro_rules! get_cfps(
         //   stack + stack_size * sizeof(VALUE) - sizeof(rb_control_frame_t)
         // (with everything in bytes).
         fn get_cfps<T>(cfp_address: usize, stack_base: usize, source: &T) -> Result<Vec<rb_control_frame_t>, MemoryCopyError> where T: CopyAddress{
+            if (stack_base as usize) <= cfp_address {
+                // this probably means we've hit some kind of race, return an error so we can try
+                // again
+                return Err(MemoryCopyError::Other);
+            }
             Ok(copy_vec(cfp_address, (stack_base as usize - cfp_address) as usize / std::mem::size_of::<rb_control_frame_t>(), source)?)
         }
         ));
