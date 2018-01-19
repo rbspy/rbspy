@@ -20,10 +20,6 @@ pub mod data {
 
     use super::*;
 
-    pub static DEBUG_INFO: &'static [u8] = include_bytes!("../ci/testdata/debug_info");
-    pub static DEBUG_ABBREV: &'static [u8] = include_bytes!("../ci/testdata/debug_abbrev");
-    pub static DEBUG_STR: &'static [u8] = include_bytes!("../ci/testdata/debug_str");
-
     pub const RUBY_CURRENT_THREAD_ADDR: usize = 0x55f35c094040;
 
     const COREDUMP_FILE: &'static str = concat!(
