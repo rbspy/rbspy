@@ -14,8 +14,10 @@ clap = "2"
 elf = "0.0.10"
 log = "0.3.6"
 env_logger = "0.3.4"
+rand = "0.4"
 read-process-memory = "0.1.0"
 failure = "0.1.1"
+tempdir = "0.3.4"
 
 failure_derive = "0.1.1"
 ruby-bindings = { path = "ruby-bindings" }
