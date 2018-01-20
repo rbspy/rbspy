@@ -17,6 +17,18 @@ env:
   global:
     # This will be part of the release tarball
     - PROJECT_NAME=rbspy
+    - RUSTFLAGS="-C link-dead-code"
+
+addons:
+  apt:
+    packages:
+      - libcurl4-openssl-dev
+      - libelf-dev
+      - libdw-dev
+      - cmake
+      - gcc
+      - binutils-dev
+      - libiberty-dev
 
 # AFAICT There are a few ways to set up the build jobs. This one is not the DRYest but I feel is the
 # easiest to reason about.
@@ -53,6 +65,9 @@ script:
 before_deploy:
   - bash ci/before_deploy.sh
 
+
+after_success:
+  - bash ci/after_success.sh
 deploy:
   provider: releases
   # *REALLY* not production ready!
