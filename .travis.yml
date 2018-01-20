@@ -23,12 +23,12 @@ env:
 # NOTE Make *sure* you don't remove a reference (&foo) if you are going to dereference it (*foo)
 matrix:
   include:
-    # nightly channel
+    # stable channel
     - os: linux
-      rust: nightly
+      rust: stable
       env: TARGET=x86_64-unknown-linux-gnu
     - os: linux
-      rust: nightly
+      rust: stable
       env: TARGET=x86_64-unknown-linux-musl
       dist: trusty
       sudo: required

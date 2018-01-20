@@ -1,6 +1,5 @@
 * don't use process::exit, instead do something else
 * install a panic handler that kills the child when starting a child
-* write architecture document
 * implement some of the get_stack_trace_function stuff in a more readable way
 * switch back to stable Rust
 * research if you can have C code that calls Ruby code
