@@ -78,11 +78,11 @@ fn do_main() -> Result<(), Error> {
 fn main() {
     match do_main() {
         Err(x) => {
-            println!("Error. Causes: ");
+            eprintln!("Error. Causes: ");
             for c in x.causes() {
-                println!("- {}", c);
+                eprintln!("- {}", c);
             }
-            println!("{}", x.backtrace());
+            eprintln!("{}", x.backtrace());
             std::process::exit(1);
         }
         _ => {}
@@ -95,8 +95,8 @@ fn record(filename: Option<&str>, pid: pid_t, is_subcommand: bool) -> Result<(),
     let getter = initialize::initialize(pid)?;
     let output_filename = output_filename(&std::env::var("HOME")?, filename)?;
 
-    println!("Recording data to {}", &output_filename);
-    println!("Press Ctrl+C to stop");
+    eprintln!("Recording data to {}", &output_filename);
+    eprintln!("Press Ctrl+C to stop");
 
     let outfile = output_filename.clone();
     if is_subcommand {
@@ -105,7 +105,7 @@ fn record(filename: Option<&str>, pid: pid_t, is_subcommand: bool) -> Result<(),
     } else {
         // set a signal handler so that we can write a flamegraph
         ctrlc::set_handler(move || {
-            println!("Interrupted.");
+            eprintln!("Interrupted.");
             write_flamegraph(&outfile).expect("Writing flamegraph failed"); std::process::exit(0);
         }).expect("Error setting Ctrl-C handler");
     }
@@ -134,7 +134,7 @@ fn record(filename: Option<&str>, pid: pid_t, is_subcommand: bool) -> Result<(),
                     // TODO: figure out how to just return an error here
                     quit = true;
                 }
-                println!("Dropping one stack trace: {:?}", x);
+                eprintln!("Dropping one stack trace: {:?}", x);
             }
         }
         if quit == true {
@@ -163,7 +163,7 @@ fn write_flamegraph(stacks_filename: &str) -> Result<(), Error> {
         stacks_filename.to_owned() + ".svg"
     };
     let output_svg = std::fs::File::create(&svg_filename)?;
-    println!("Writing flamegraph to {}", svg_filename);
+    eprintln!("Writing flamegraph to {}", svg_filename);
     let mut child = Command::new("perl").arg("-").arg(stacks_filename).stdin(Stdio::piped()).stdout(output_svg).spawn().context("Couldn't execute perl")?;
     { 
         let stdin = child.stdin.as_mut().expect("failed to write to stdin");
