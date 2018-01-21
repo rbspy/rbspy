@@ -84,29 +84,30 @@ fn get_ruby_version_retry(pid: pid_t) -> Result<String, Error> {
     let mut i = 0;
     loop {
         let version = get_ruby_version(pid);
-        let mut ret = false;
-        match &version {
-            &Err(ref err) => {
+        if i > 100 {
+            return Ok(version?);
+        }
+        match version {
+            Err(err) => {
                 match err.root_cause().downcast_ref::<AddressFinderError>() {
                     Some(&AddressFinderError::PermissionDenied(_)) => {
-                        ret = true;
+                        return Err(err.into());
                     }
                     Some(&AddressFinderError::NoSuchProcess(_)) => {
-                        ret = true;
+                        return Err(err.into());
                     }
                     _ => {}
                 }
                 match err.root_cause().downcast_ref::<MemoryCopyError>() {
                     Some(&MemoryCopyError::PermissionDenied) => {
-                        ret = true;
+                        return Err(err.into());
                     }
                     _ => {}
                 }
             }
-            _ => {}
-        }
-        if i > 100 || version.is_ok() || ret {
-            return Ok(version?);
+            Ok(x) => {
+                return Ok(x.into());
+            }
         }
         // if it doesn't work, sleep for 1ms and try again
         i += 1;
