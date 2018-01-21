@@ -11,13 +11,12 @@ extern crate env_logger;
 extern crate failure;
 #[macro_use]
 extern crate failure_derive;
-#[cfg(test)]
-#[macro_use]
-extern crate lazy_static;
 extern crate libc;
 #[macro_use]
 extern crate log;
 extern crate read_process_memory;
+#[cfg(test)]
+extern crate rbspy_testdata;
 extern crate rand;
 #[cfg(target_os = "macos")]
 extern crate regex;
@@ -46,7 +45,6 @@ pub mod address_finder;
 pub mod initialize;
 pub mod copy;
 pub mod ruby_version;
-pub mod test_utils;
 
 const FLAMEGRAPH_SCRIPT: &'static [u8] = include_bytes!("../vendor/flamegraph/flamegraph.pl");
 

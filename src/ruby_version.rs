@@ -530,3 +530,112 @@ ruby_version_v_2_3_to_2_4!(ruby_2_4_1);
 ruby_version_v_2_3_to_2_4!(ruby_2_4_2);
 ruby_version_v_2_3_to_2_4!(ruby_2_4_3);
 ruby_version_v2_5_x!(ruby_2_5_0_rc1);
+
+#[cfg(test)]
+mod tests {
+    use rbspy_testdata::*;
+
+    use ruby_version;
+
+    use initialize::StackFrame;
+
+    fn real_stack_trace_main() -> Vec<StackFrame> {
+        vec![
+            StackFrame {
+                name: "aaa".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 2,
+            },
+            StackFrame {
+                name: "bbb".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 6,
+            },
+            StackFrame {
+                name: "ccc".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 10,
+            },
+            StackFrame {
+                name: "block in <main>".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 14,
+            },
+            StackFrame {
+                name: "<main>".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 13,
+            },
+            ]
+    }
+
+    fn real_stack_trace() -> Vec<StackFrame> {
+        vec![
+            StackFrame {
+                name: "aaa".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 2,
+            },
+            StackFrame {
+                name: "bbb".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 6,
+            },
+            StackFrame {
+                name: "ccc".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 10,
+            },
+            StackFrame {
+                name: "block in <main>".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 14,
+            },
+            ]
+    }
+
+    #[test]
+    fn test_get_ruby_stack_trace_2_1_6() {
+        let current_thread_addr = 0x562658abd7f0;
+        let stack_trace =
+            ruby_version::ruby_2_1_6::get_stack_trace(current_thread_addr, &*COREDUMP_2_1_6)
+            .unwrap();
+        assert_eq!(real_stack_trace_main(), stack_trace);
+    }
+
+    #[test]
+    fn test_get_ruby_stack_trace_1_9_3() {
+        let current_thread_addr = 0x823930;
+        let stack_trace =
+            ruby_version::ruby_1_9_3_0::get_stack_trace(current_thread_addr, &*COREDUMP_1_9_3)
+            .unwrap();
+        assert_eq!(real_stack_trace_main(), stack_trace);
+    }
+
+    #[test]
+    fn test_get_ruby_stack_trace_2_5_0() {
+        let current_thread_addr = 0x55dd8c3b7758;
+        let stack_trace =
+            ruby_version::ruby_2_5_0_rc1::get_stack_trace(current_thread_addr, &*COREDUMP_2_5_0)
+            .unwrap();
+        assert_eq!(real_stack_trace(), stack_trace);
+    }
+
+    #[test]
+    fn test_get_ruby_stack_trace_2_4_0() {
+        let current_thread_addr = 0x55df44959920;
+        let stack_trace =
+            ruby_version::ruby_2_4_0::get_stack_trace(current_thread_addr, &*COREDUMP_2_4_0)
+            .unwrap();
+        assert_eq!(real_stack_trace(), stack_trace);
+    }
+}
