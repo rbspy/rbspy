@@ -5,14 +5,19 @@
 
 Have you ever wanted to know what functions your Ruby program is calling? `rbspy` can tell you!
 
-`rbspy` is a sampling profiler for Ruby. It's the only Ruby profiler that can profile arbitrary Ruby
-processes that are already running.
+`rbspy` lets you profile running Ruby processes. It's the only Ruby profiler that can profile
+arbitrary Ruby processes that are already running.
 
 It's currently alpha software, and is being actively developed. Please report bugs!
 
 ## Requirements
 
-Only works on Linux (though Mac support is planned)
+rbspy only runs on Linux\*. Mac support is planned.
+
+<small>
+\* kernel version 3.2+ required. For Ubuntu, this means Ubuntu 12.04 or newer.
+</small>
+
 
 ## How to get rbspy
 
