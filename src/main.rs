@@ -30,7 +30,11 @@ use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use libc::pid_t;
 use failure::Error;
 use failure::ResultExt;
+use std::fs::DirBuilder;
 use std::io::Write;
+use std::path::{PathBuf, Path};
+use std::env;
+use std::process::Command;
 
 #[cfg(test)]
 use tempdir::TempDir;
@@ -44,34 +48,51 @@ pub mod test_utils;
 
 const FLAMEGRAPH_SCRIPT: &'static [u8] = include_bytes!("../vendor/flamegraph/flamegraph.pl");
 
+/// The kinds of things we can call `rbspy record` on.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+enum Target {
+    Pid { pid: pid_t },
+    Subprocess {
+        prog: String,
+        args: Vec<String>,
+    },
+}
+use Target::*;
+
+/// Subcommand.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+enum SubCmd {
+    /// Record `target`, writing output `output`.
+    Record { target: Target, out_path: PathBuf  },
+    /// Capture and print a stacktrace snapshot of process `pid`.
+    Snapshot {pid: pid_t},
+}
+use SubCmd::*;
+
+/// Top level args type.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+struct Args {
+    cmd: SubCmd,
+}
+
+
 fn do_main() -> Result<(), Error> {
     env_logger::init().unwrap();
 
-    let matches: ArgMatches<'static> = arg_parser().get_matches();
-    let maybe_pid: Option<pid_t> = match matches.subcommand().1.unwrap().value_of("pid") {
-        Some(pid_string) => Some(pid_string
-                                 .parse()
-                                 .map_err(|_| format_err!("Invalid PID: {}", pid_string))?),
-        None => None,
-    };
-    match matches.subcommand() {
-        ("snapshot", _) => {
-            let pid = maybe_pid.expect("PID is required for snapshot");
-            Ok(snapshot(pid)?)
-        }
-        ("record", Some(sub_m)) => {
-            let maybe_cmd = sub_m.values_of("cmd");
-            let maybe_filename = sub_m.value_of("file");
-            let pid: pid_t = match maybe_pid {
-                Some(pid) => pid,
-                None => {
-                    exec_cmd(&mut maybe_cmd.expect("Either PID or command is required to record"))?
-                }
+    let args = Args::from_args()?;
+
+    match args.cmd {
+        Snapshot { pid } => snapshot(pid),
+        Record { target, out_path } => {
+            let (pid, spawned) = match target {
+                Pid {pid} => (pid, false),
+                Subprocess { prog, args } => (Command::new(prog)
+                    .args(args)
+                    .spawn()?.id() as pid_t, true)
             };
-            let is_subcommand = maybe_pid == None;
-            Ok(record(maybe_filename, pid, is_subcommand)?)
-        }
-        _ => panic!("not a valid subcommand"),
+
+            record(&out_path, pid, spawned)
+        },
     }
 }
 
@@ -89,30 +110,28 @@ fn main() {
     }
 }
 
-fn record(filename: Option<&str>, pid: pid_t, is_subcommand: bool) -> Result<(), Error> {
+fn record(output_filename: &Path, pid: pid_t, is_subcommand: bool) -> Result<(), Error> {
     // This gets a stack trace and then just prints it out
     // in a format that Brendan Gregg's stackcollapse.pl script understands
     let getter = initialize::initialize(pid)?;
-    let output_filename = output_filename(&std::env::var("HOME")?, filename)?;
 
-    eprintln!("Recording data to {}", &output_filename);
+    eprintln!("Recording data to {}", output_filename.display());
     eprintln!("Press Ctrl+C to stop");
 
-    let outfile = output_filename.clone();
     if is_subcommand {
         // ignore Ctrl+C, on Ctrl+C the subprocess should just exit and then we'll exit normally
         ctrlc::set_handler(move || {}).expect("Error setting Ctrl-C handler");
     } else {
+        let outfile = output_filename.to_owned();
         // set a signal handler so that we can write a flamegraph
         ctrlc::set_handler(move || {
             eprintln!("Interrupted.");
             write_flamegraph(&outfile).expect("Writing flamegraph failed"); std::process::exit(0);
         }).expect("Error setting Ctrl-C handler");
     }
-    let mut output = std::fs::File::create(&output_filename).context(format!("Failed to create output file {}", &output_filename))?;
+    let mut output = std::fs::File::create(&output_filename).context(format!("Failed to create output file {}", &output_filename.display()))?;
     let mut errors = 0;
     let mut successes = 0;
-    let mut quit = false;
     loop {
         let trace = getter.get_trace();
         match trace {
@@ -128,17 +147,13 @@ fn record(filename: Option<&str>, pid: pid_t, is_subcommand: bool) -> Result<(),
                 }
                 writeln!(output, " {}", 1)?;
             }
-            Err(ref x) => {
+            Err(x) => {
                 errors += 1;
                 if errors > 20 && (errors as f64) / (errors as f64 + successes as f64) > 0.5 {
-                    // TODO: figure out how to just return an error here
-                    quit = true;
+                    return Err(x.into());
                 }
                 eprintln!("Dropping one stack trace: {:?}", x);
             }
-        }
-        if quit == true {
-            trace?;
         }
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
@@ -154,17 +169,21 @@ fn test_write_flamegraph() {
     tempdir.close().unwrap();
 }
 
-fn write_flamegraph(stacks_filename: &str) -> Result<(), Error> {
+fn write_flamegraph<P: AsRef<Path>>(stacks_filename: P) -> Result<(), Error> {
     use std::io::Write;
     use std::process::{Command, Stdio};
-    let svg_filename = if stacks_filename.contains(".txt") {
-        stacks_filename.replace(".txt", ".svg")
-    } else {
-        stacks_filename.to_owned() + ".svg"
-    };
+    let stacks_filename = stacks_filename.as_ref();
+    let svg_filename = stacks_filename.with_extension("svg");
     let output_svg = std::fs::File::create(&svg_filename)?;
-    eprintln!("Writing flamegraph to {}", svg_filename);
-    let mut child = Command::new("perl").arg("-").arg(stacks_filename).stdin(Stdio::piped()).stdout(output_svg).spawn().context("Couldn't execute perl")?;
+    eprintln!("Writing flamegraph to {}", svg_filename.display());
+    let mut child = Command::new("perl")
+        .arg("-")
+        .arg(stacks_filename)
+        .stdin(Stdio::piped())
+        .stdout(output_svg)
+        .spawn()
+        .context("Couldn't execute perl")?;
+    // TODO(nll): Remove this silliness after non-lexical lifetimes land.
     { 
         let stdin = child.stdin.as_mut().expect("failed to write to stdin");
         stdin.write_all(FLAMEGRAPH_SCRIPT)?;
@@ -182,55 +201,44 @@ fn snapshot(pid: pid_t) -> Result<(), Error> {
     Ok(())
 }
 
-fn output_dir_name(base_dir: &str) -> Result<Box<std::path::PathBuf>, Error> {
-    use std::os::unix::prelude::*;
-    use std::fs;
-    let mut dirname = std::path::PathBuf::new().join(base_dir);
-    let dirs = vec![".cache", "rbspy", "records"];
-    for dir in dirs {
-        dirname = dirname.join(dir);
-        if !dirname.exists() {
-            // create dir with permissions 777 so that if we're running as sudo the user doesn't
-            // lose access to the dir. TODO: should use chown instead
-            fs::create_dir(&dirname)?;
-            let permissions = std::fs::Permissions::from_mode(0o777);
-            std::fs::set_permissions(&dirname, permissions)?;
-        }
-    }
-    Ok(Box::new(dirname))
-}
-
 #[test]
 fn test_output_filename() {
     let d = TempDir::new("temp").unwrap();
     let dirname = d.path().to_str().unwrap();
-    assert_eq!(output_filename("", Some("foo")).unwrap(), "foo");
+    assert_eq!(output_filename("", Some("foo")).unwrap(), Path::new("foo"));
     let generated_filename = output_filename(dirname, None).unwrap();
-    assert!(generated_filename.contains(".cache/rbspy/records/rbspy-"));
+    assert!(generated_filename.to_string_lossy().contains(".cache/rbspy/records/rbspy-"));
 }
 
-fn output_filename(base_dir: &str, maybe_filename: Option<&str>) -> Result<String, Error> {
+fn output_filename(base_dir: &str, maybe_filename: Option<&str>) -> Result<PathBuf, Error> {
     use rand::{self, Rng};
 
     let path = match maybe_filename {
         Some(filename) => {
-            filename.to_string()
+            filename.into()
         }
         None => {
             let s = rand::thread_rng().gen_ascii_chars().take(10).collect::<String>();
             let filename = format!("{}-{}-{}.txt", "rbspy", Utc::now().format("%Y-%m-%d"), s);
-            let dirname = &output_dir_name(base_dir)?;
-            let path = dirname.join(&filename);
-            path.to_str().unwrap().to_string()
+            let dirname = Path::new(base_dir).join(".cache/rbspy/records");
+            DirBuilder::new()
+                .recursive(true)
+                .create(&dirname)?;
+            dirname.join(&filename)
         }
     };
     Ok(path)
 }
 
-fn exec_cmd(args: &mut std::iter::Iterator<Item = &str>) -> Result<pid_t, Error> {
-    let arg1 = args.next().unwrap();
-    let pid = std::process::Command::new(arg1).args(args).spawn()?.id() as pid_t;
-    Ok(pid)
+/// Check `s` is a positive integer.
+// This assumes a process group isn't a sensible thing to snapshot; could be wrong!
+fn validate_pid(s: String) -> Result<(), String> {
+    let pid: pid_t = s.parse()
+        .map_err(|_| "PID must be an integer".to_string())?;
+    if pid <= 0 {
+        return Err("PID must be positive".to_string());
+    }
+    Ok(())
 }
 
 fn arg_parser() -> App<'static, 'static> {
@@ -240,40 +248,118 @@ fn arg_parser() -> App<'static, 'static> {
         .subcommand(
             SubCommand::with_name("snapshot")
                 .about("Snapshot a single stack trace")
-                .arg(
-                    Arg::from_usage("-p --pid=[PID] 'PID of the Ruby process you want to profile'")
-                        .required_unless("cmd"),
+                .arg(Arg::from_usage(
+                        "-p --pid=[PID] 'PID of the Ruby process you want to profile'")
+                    .validator(validate_pid)
+                    .required(true)
                 ),
         )
         .subcommand(
             SubCommand::with_name("record")
                 .about("Record process")
                 .arg(
-                    Arg::from_usage("-p --pid=[PID] 'PID of the Ruby process you want to profile'")
-                        .required_unless("cmd"),
-                )
-                .arg(Arg::from_usage("-f --file=[FILE] 'File to write output to'").required(false))
-                .arg(Arg::from_usage("<cmd>... 'commands to run'").required(false)),
-        )
+                    Arg::from_usage(
+                        "-p --pid=[PID] 'PID of the Ruby process you want to profile'")
+                    .validator(validate_pid)
+                    // It's a bit confusing but this is how to get exactly-one-of behaviour
+                    // for `--pid` and `cmd`.
+                    .required_unless("cmd")
+                    .conflicts_with("cmd"),
+                    )
+                .arg(Arg::from_usage("-f --file=[FILE] 'File to write output to'")
+                     .required(false))
+                .arg(Arg::from_usage("<cmd>... 'command to run'")
+                     .required(false)),
+                     )
 }
 
-#[test]
-fn test_arg_parsing() {
-    let parser = arg_parser();
-    // let result = parser.get_matches_from(vec!("rbspy", "stackcollapse", "-p", "1234"));
-    let result = parser.get_matches_from(vec!["rbspy", "record", "--pid", "1234"]);
-    let result = result.subcommand_matches("record").unwrap();
-    assert!(result.value_of("pid").unwrap() == "1234");
+impl Args {
+    /// Converts from clap's matches.
+    // TODO(TryFrom): Replace with TryFrom whenever that stabilizes.
+    // TODO(maybe): Consider replacing with one of the derive-based arg thingies.
+    fn from<'a, I: IntoIterator<Item=String> + 'a>(args: I) -> Result<Args, Error> {
+        let matches: ArgMatches<'a> = arg_parser().get_matches_from(args);
 
-    let parser = arg_parser();
-    let result = parser.get_matches_from(vec!["rbspy", "snapshot", "--pid", "1234"]);
-    let result = result.subcommand_matches("snapshot").unwrap();
-    assert!(result.value_of("pid").unwrap() == "1234");
+        fn get_pid(matches: &ArgMatches) -> Option<pid_t> {
+            if let Some(pid_str) = matches.value_of("pid") {
+                Some(pid_str.parse()
+                     .expect("this shouldn't happen because clap validated the arg"))
+            } else {
+                None
+            }
+        }
 
-    let parser = arg_parser();
-    let result = parser.get_matches_from(vec!["rbspy", "record", "ruby", "blah.rb"]);
-    let result = result.subcommand_matches("record").unwrap();
-    let mut cmd_values = result.values_of("cmd").unwrap();
-    assert!(cmd_values.next().unwrap() == "ruby");
-    assert!(cmd_values.next().unwrap() == "blah.rb");
+        let cmd = match matches.subcommand() {
+            ("snapshot", Some(submatches)) => Snapshot {
+                pid: get_pid(submatches)
+                    .expect("this shouldn't happen because clap requires a pid")
+            },
+            ("record", Some(submatches)) => {
+                let out_path = output_filename(&std::env::var("HOME")?, submatches.value_of("file"))?;
+                let target = if let Some(pid) = get_pid(submatches) {
+                    Pid { pid }
+                } else {
+                    let mut cmd = submatches.values_of("cmd")
+                        .expect("shouldn't happen");
+                    let prog = cmd.next().expect("nope");
+                    let args = cmd;
+                    Subprocess {
+                        prog: prog.to_string(),
+                        args: args.map(String::from).collect(),
+                    }
+                };
+                Record {
+                    target,
+                    out_path
+                }
+            }
+            _ => panic!("this shouldn't happen, please report the command you ran!"),
+        };
+
+        Ok(Args { cmd })
+    }
+
+    fn from_args() -> Result<Args, Error> {
+        Args::from(env::args())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn make_args(args: &str) -> Vec<String> {
+        args.split_whitespace().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn test_arg_parsing() {
+        match Args::from(make_args("rbspy record --pid 1234")).unwrap() {
+            Args { cmd: Record { target: Pid { pid: 1234 }, .. } } => (),
+            x => panic!("Unexpected: {:?}", x),
+        };
+
+        let args = Args::from(make_args("rbspy snapshot --pid 1234")).unwrap();
+        assert_eq!(args, Args { cmd: Snapshot { pid: 1234 } });
+
+        match Args::from(make_args("rbspy record ruby blah.rb")).unwrap() {
+            Args {
+                cmd: Record {
+                    target: Subprocess { prog, args },
+                    ..
+                }
+            } => {
+                assert_eq!(prog, "ruby");
+                assert_eq!(args, vec!["blah.rb".to_string()]);
+            },
+            x => panic!("Unexpected: {:?}", x),
+        };
+
+        let args = Args::from(make_args("rbspy record --pid 1234 --file foo.txt")).unwrap();
+        assert_eq!(args, Args {
+            cmd: Record {
+                target: Pid { pid: 1234 },
+                out_path: "foo.txt".into(),
+            }
+        });
+    }
 }
