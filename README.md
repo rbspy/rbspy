@@ -68,6 +68,10 @@ A major goal for this project is to get more maintainers and contributors. Pull 
 improve usability, fix bugs, or help rbspy support more operating systems are very welcome. If you
 have questions about contributing come chat [on gitter](https://gitter.im/rbspy/rbspy).
 
+If you're not a very experienced Rust programmer, you're very welcome to contribute. A major reason
+rbspy is written in Rust is that Rust is more approachable than C/C++.
+https://www.rust-lang.org/en-US/ has great resources for learning Rust.
+
 ## Building rbspy
 
 1. Install cargo from [crates.io](https://crates.io/)
