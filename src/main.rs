@@ -126,7 +126,8 @@ fn record(output_filename: &Path, pid: pid_t, is_subcommand: bool) -> Result<(),
         // set a signal handler so that we can write a flamegraph
         ctrlc::set_handler(move || {
             eprintln!("Interrupted.");
-            write_flamegraph(&outfile).expect("Writing flamegraph failed"); std::process::exit(0);
+            write_flamegraph(&outfile).expect("Writing flamegraph failed");
+            std::process::exit(0);
         }).expect("Error setting Ctrl-C handler");
     }
     let mut output = std::fs::File::create(&output_filename).context(format!("Failed to create output file {}", &output_filename.display()))?;
