@@ -1,0 +1,39 @@
+[package]
+name = "rbspy"
+version = "0.1.1"
+authors = ["Julia Evans <julia@jvns.ca>"]
+
+license = "MIT"
+
+[workspace]
+
+[dependencies]
+libc = "0.2.15"
+chrono = "0.4"
+clap = "2"
+ctrlc = "3.1.0"
+elf = "0.0.10"
+log = "0.3.6"
+env_logger = "0.3.4"
+rand = "0.4"
+read-process-memory = "0.1.0"
+failure = "0.1.1"
+
+failure_derive = "0.1.1"
+ruby-bindings = { path = "ruby-bindings" }
+
+[target.'cfg(target_os="macos")'.dependencies]
+mach = "0.0.5"
+regex = "0.2.3"
+libproc = "0.1.0"
+object = "0.1.0"
+libarchive = "0.1.1"
+libarchive3-sys = "0.1.2"
+
+[dev-dependencies]
+byteorder = "0.5"
+rbspy-testdata = { git = "https://github.com/rbspy/rbspy-testdata.git" }
+tempdir = "0.3.4"
+
+[build-dependencies]
+rustc_version = "0.1.7"
