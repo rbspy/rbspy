@@ -110,6 +110,15 @@ fn main() {
     }
 }
 
+fn snapshot(pid: pid_t) -> Result<(), Error> {
+    let getter = initialize::initialize(pid)?;
+    let trace = getter.get_trace()?;
+    for x in trace.iter().rev() {
+        println!("{}", x);
+    }
+    Ok(())
+}
+
 fn record(output_filename: &Path, pid: pid_t, is_subcommand: bool) -> Result<(), Error> {
     // This gets a stack trace and then just prints it out
     // in a format that Brendan Gregg's stackcollapse.pl script understands
@@ -117,6 +126,9 @@ fn record(output_filename: &Path, pid: pid_t, is_subcommand: bool) -> Result<(),
 
     eprintln!("Recording data to {}", output_filename.display());
     eprintln!("Press Ctrl+C to stop");
+
+    let mut errors = 0;
+    let mut total = 0;
 
     if is_subcommand {
         // ignore Ctrl+C, on Ctrl+C the subprocess should just exit and then we'll exit normally
@@ -126,21 +138,22 @@ fn record(output_filename: &Path, pid: pid_t, is_subcommand: bool) -> Result<(),
         // set a signal handler so that we can write a flamegraph
         ctrlc::set_handler(move || {
             eprintln!("Interrupted.");
+            print_errors(errors, total);
             write_flamegraph(&outfile).expect("Writing flamegraph failed"); std::process::exit(0);
         }).expect("Error setting Ctrl-C handler");
     }
+
     let mut output = std::fs::File::create(&output_filename).context(format!("Failed to create output file {}", &output_filename.display()))?;
-    let mut errors = 0;
-    let mut successes = 0;
     loop {
+        total += 1;
         let trace = getter.get_trace();
         match trace {
             Err(copy::MemoryCopyError::ProcessEnded) => {
+                print_errors(errors, total);
                 write_flamegraph(&output_filename).context("Failed to write flamegraph")?;
                 return Ok(())
             },
             Ok(ref ok_trace) => {
-                successes += 1;
                 for t in ok_trace.iter().rev() {
                     write!(output, "{}", t)?;
                     write!(output, ";")?;
@@ -149,13 +162,19 @@ fn record(output_filename: &Path, pid: pid_t, is_subcommand: bool) -> Result<(),
             }
             Err(x) => {
                 errors += 1;
-                if errors > 20 && (errors as f64) / (errors as f64 + successes as f64) > 0.5 {
+                if errors > 20 && (errors as f64) / (total as f64) > 0.5 {
+                    print_errors(errors, total);
                     return Err(x.into());
                 }
-                eprintln!("Dropping one stack trace: {:?}", x);
             }
         }
         std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+}
+
+fn print_errors(errors: u32, total: u32) {
+    if errors > 0 {
+        eprintln!("Dropped {}/{} stack traces because of errors", errors, total);
     }
 }
 
@@ -192,14 +211,7 @@ fn write_flamegraph<P: AsRef<Path>>(stacks_filename: P) -> Result<(), Error> {
     Ok(())
 }
 
-fn snapshot(pid: pid_t) -> Result<(), Error> {
-    let getter = initialize::initialize(pid)?;
-    let trace = getter.get_trace()?;
-    for x in trace.iter().rev() {
-        println!("{}", x);
-    }
-    Ok(())
-}
+
 
 #[test]
 fn test_output_filename() {
