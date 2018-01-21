@@ -15,7 +15,7 @@ It's currently alpha software, and is being actively developed. Please report bu
 rbspy only runs on Linux\*. Mac support is planned.
 
 <small>
-\* kernel version 3.2+ required. For Ubuntu, this means Ubuntu 12.04 or newer.
+* kernel version 3.2+ required. For Ubuntu, this means Ubuntu 12.04 or newer.
 </small>
 
 
@@ -31,8 +31,9 @@ rbspy currently has 2 features: snapshot and record.
 
 **Snapshot**
 
-Snapshot takes a single stack trace from the specified process, prints it, and exits. Must be run as
-root.
+Snapshot takes a single stack trace from the specified process, prints it, and exits. This is
+useful if you have a stuck Ruby program and just want to know what it's doing right now.  Must be
+run as root.
 
 ```
 sudo rbspy snapshot --pid $PID
@@ -40,8 +41,10 @@ sudo rbspy snapshot --pid $PID
 
 **Record**
 
-Record records stack traces from your process for displaying as a flamegraph. You can either give it
-the PID of an already-running process to record, or ask it to execute and record a new Ruby process.
+Record records stack traces from your process and generates a flamegraph. You can either give it the
+PID of an already-running process to record, or ask it to execute and record a new Ruby process.
+
+This is useful when you want to know what functions your program is spending most of its time in.
 
 ```
 sudo rbspy record --pid $PID
@@ -49,7 +52,8 @@ sudo rbspy record --pid $PID
 rbspy record ruby myprogram.rb
 ```
 
-When recording, rbspy will save data to ~/.rbspy/records.
+When recording, rbspy will by default save data to `~/.cache/rbspy/records`. You can also specify an
+output file with `--file`.
 
 **Generate a flamegraph**
 
