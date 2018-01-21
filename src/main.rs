@@ -35,6 +35,8 @@ use std::io::Write;
 use std::path::{PathBuf, Path};
 use std::env;
 use std::process::Command;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 #[cfg(test)]
 use tempdir::TempDir;
@@ -127,8 +129,10 @@ fn record(output_filename: &Path, pid: pid_t, is_subcommand: bool) -> Result<(),
     eprintln!("Recording data to {}", output_filename.display());
     eprintln!("Press Ctrl+C to stop");
 
-    let mut errors = 0;
-    let mut total = 0;
+    let total = Arc::new(AtomicUsize::new(0));
+    let errors = Arc::new(AtomicUsize::new(0));
+    let total_clone = total.clone();
+    let errors_clone = errors.clone();
 
     if is_subcommand {
         // ignore Ctrl+C, on Ctrl+C the subprocess should just exit and then we'll exit normally
@@ -138,14 +142,14 @@ fn record(output_filename: &Path, pid: pid_t, is_subcommand: bool) -> Result<(),
         // set a signal handler so that we can write a flamegraph
         ctrlc::set_handler(move || {
             eprintln!("Interrupted.");
-            print_errors(errors, total);
+            print_errors(errors_clone.clone(), total_clone.clone());
             write_flamegraph(&outfile).expect("Writing flamegraph failed"); std::process::exit(0);
         }).expect("Error setting Ctrl-C handler");
     }
 
     let mut output = std::fs::File::create(&output_filename).context(format!("Failed to create output file {}", &output_filename.display()))?;
     loop {
-        total += 1;
+        total.fetch_add(1, Ordering::Relaxed);
         let trace = getter.get_trace();
         match trace {
             Err(copy::MemoryCopyError::ProcessEnded) => {
@@ -161,8 +165,10 @@ fn record(output_filename: &Path, pid: pid_t, is_subcommand: bool) -> Result<(),
                 writeln!(output, " {}", 1)?;
             }
             Err(x) => {
-                errors += 1;
-                if errors > 20 && (errors as f64) / (total as f64) > 0.5 {
+                errors.fetch_add(1, Ordering::Relaxed);
+                let e = errors.fetch_add(0, Ordering::Relaxed) as f64;
+                let t = total.fetch_add(0, Ordering::Relaxed) as f64;
+                if e > 20.0 && e/t > 0.5 {
                     print_errors(errors, total);
                     return Err(x.into());
                 }
@@ -172,9 +178,11 @@ fn record(output_filename: &Path, pid: pid_t, is_subcommand: bool) -> Result<(),
     }
 }
 
-fn print_errors(errors: u32, total: u32) {
-    if errors > 0 {
-        eprintln!("Dropped {}/{} stack traces because of errors", errors, total);
+fn print_errors(errors: Arc<AtomicUsize>, total: Arc<AtomicUsize>) {
+    let e = errors.fetch_add(0, Ordering::Relaxed);
+    let t = total.fetch_add(0, Ordering::Relaxed);
+    if e > 0 {
+        eprintln!("Dropped {}/{} stack traces because of errors.", e, t);
     }
 }
 

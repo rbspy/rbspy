@@ -55,6 +55,21 @@ rbspy record ruby myprogram.rb
 When recording, rbspy will by default save data to `~/.cache/rbspy/records`. You can also specify an
 output file with `--file`.
 
+## On the "Dropped X/Y stack traces because of errors" message
+
+rbspy does not stop your Ruby processes to collect information about what it's doing. This is for
+both performance reasons and general production-safety reasons -- only **reading** from your Ruby
+processes and not altering them in any way means that rbspy is safer to run on production Ruby
+applications. rbspy does not use ptrace or signals.
+
+This means that sometimes rbspy will try to read a stack trace out of a Ruby process, there will be
+a race, and the memory of that process will temporarily be in an invalid state which means rbspy
+can't collect its stack. `rbspy record` handles this by just dropping that stack trace and trying
+again later, and reports the total number of dropped stack traces when it's done.
+
+A typical error message here is something like "Dropped 13/3700 stack traces because of errors". If
+you're seeing high error rates (more than 1/100 or so), please create an issue.
+
 ## Missing features
 
 * Mac support 
