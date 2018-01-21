@@ -55,31 +55,20 @@ rbspy record ruby myprogram.rb
 When recording, rbspy will by default save data to `~/.cache/rbspy/records`. You can also specify an
 output file with `--file`.
 
-**Generate a flamegraph**
-
-Here's how to convert the output of `rbspy record` into a flamegraph.
-
-1. Get the [FlameGraph repository](https://github.com/brendangregg/FlameGraph) and add it to your PATH
-1. run `stackcollapse.pl < stacks | flamegraph.pl > output.svg`
-1. Open output.svg in Firefox or Chrome! You should get a beautiful graph like this: (click
-   to enlarge)
-
-<a href="http://jvns.ca/images/sampling.png"><img src="http://jvns.ca/images/sampling.png" width="400px"></a>
-
 ## Missing features
 
 * Mac support 
 * Profile multiple threads
 * Profile C extensions (rbspy will simply ignore any calls into C extensions)
 * Profile processes running in containers
-* Generate flamegraphs without relying on an external script
 
 ## Contributing
 
-Contributions are very welcome! rbspy is written in Rust. If you don't know Rust but you're
-interested in learning some Rust and contributing, we'd love to have you. The reason that rbspy is
-written in Rust (and not C, like many other Ruby tools) is that Rust is easier to learn than C in a
-lot of ways.
+A major goal for this project is to get more maintainers and contributors. Pull requests that
+improve usability, fix bugs, or help rbspy support more operating systems are very welcome. If you
+have questions about contributing come chat [on gitter](https://gitter.im/rbspy/rbspy).
+
+## Building rbspy
 
 1. Install cargo from [crates.io](https://crates.io/)
 1. `cargo build` to build
