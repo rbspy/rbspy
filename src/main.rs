@@ -48,6 +48,7 @@ pub mod copy;
 pub mod ruby_version;
 
 const FLAMEGRAPH_SCRIPT: &'static [u8] = include_bytes!("../vendor/flamegraph/flamegraph.pl");
+const BILLION: u32 = 1000 * 1000 * 1000; // for nanosleep
 
 /// The kinds of things we can call `rbspy record` on.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -64,7 +65,7 @@ use Target::*;
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 enum SubCmd {
     /// Record `target`, writing output `output`.
-    Record { target: Target, out_path: PathBuf, sample_rate: u64  },
+    Record { target: Target, out_path: PathBuf, sample_rate: u32  },
     /// Capture and print a stacktrace snapshot of process `pid`.
     Snapshot {pid: pid_t},
 }
@@ -120,7 +121,7 @@ fn snapshot(pid: pid_t) -> Result<(), Error> {
     Ok(())
 }
 
-fn record(output_filename: &Path, pid: pid_t, sample_rate: u64, is_subcommand: bool) -> Result<(), Error> {
+fn record(output_filename: &Path, pid: pid_t, sample_rate: u32, is_subcommand: bool) -> Result<(), Error> {
     // This gets a stack trace and then just prints it out
     // in a format that Brendan Gregg's stackcollapse.pl script understands
     let getter = initialize::initialize(pid)?;
@@ -173,7 +174,7 @@ fn record(output_filename: &Path, pid: pid_t, sample_rate: u64, is_subcommand: b
                 }
             }
         }
-        std::thread::sleep(std::time::Duration::from_millis(1000/sample_rate));
+        std::thread::sleep(std::time::Duration::new(0, BILLION/sample_rate));
     }
 }
 
@@ -317,7 +318,7 @@ impl Args {
             },
             ("record", Some(submatches)) => {
                 let out_path = output_filename(&std::env::var("HOME")?, submatches.value_of("file"))?;
-                let sample_rate = value_t!(submatches, "rate", u64).unwrap_or(100);
+                let sample_rate = value_t!(submatches, "rate", u32).unwrap_or(100);
                 let target = if let Some(pid) = get_pid(submatches) {
                     Pid { pid }
                 } else {
