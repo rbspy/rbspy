@@ -1,7 +1,11 @@
+# rbspy
+
 <a href="https://travis-ci.org/rbspy/rbspy"><img src="https://travis-ci.org/rbspy/rbspy.svg"></a>
 [![Join the chat at https://gitter.im/rbspy/rbspy](https://badges.gitter.im/rbspy/rbspy.svg)](https://gitter.im/rbspy/rbspy?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-# rbspy
+<img src="https://github.com/rbspy/rbspy/raw/master/logo/rbspy.png" width="128px">
+
+----
 
 Have you ever wanted to know what functions your Ruby program is calling? `rbspy` can tell you!
 
