@@ -35,7 +35,7 @@ rbspy only runs on Linux\*. Mac support is planned.
 
 rbspy currently has 2 features: snapshot and record.
 
-**Snapshot**
+### Snapshot
 
 Snapshot takes a single stack trace from the specified process, prints it, and exits. This is
 useful if you have a stuck Ruby program and just want to know what it's doing right now.  Must be
@@ -45,7 +45,7 @@ run as root.
 sudo rbspy snapshot --pid $PID
 ```
 
-**Record**
+### Record
 
 Record records stack traces from your process and generates a flamegraph. You can either give it the
 PID of an already-running process to record, or ask it to execute and record a new Ruby process.
@@ -58,13 +58,14 @@ sudo rbspy record --pid $PID
 rbspy record ruby myprogram.rb
 ```
 
-When recording, rbspy will by default save data to `~/.cache/rbspy/records`. You can also specify an
-output file with `--file`.
+**Optional Arguments**
+ * `--file`: Specifies where rbspy will save data. By default, rbspy saves to `~/.cache/rbspy/records`.
+ * `--rate`: Specifies the frequency of that stack traces are recorded. The interval is determined by `1000/rate`. The default rate is 100hz.
 
 ## What's a flamegraph?
 
 rbspy uses [Brendan Gregg's flamegraph script](https://github.com/brendangregg/flamegraph) to
-generate flamegraphs! 
+generate flamegraphs!
 
 A flamegraph is a way to visualize profiling data from a process. Here's a flamegraph of
 Jekyll building a blog recorded with `rbspy record jekyll build`.
@@ -95,7 +96,7 @@ you're seeing high error rates (more than 1/100 or so), please create an issue.
 
 Contributions in any of these areas would be very welcome.
 
-* Mac support 
+* Mac support
 * BSD/Windows support
 * Profile multiple threads
 * Profile C extensions (rbspy will simply ignore any calls into C extensions)
