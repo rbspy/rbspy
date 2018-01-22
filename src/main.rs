@@ -65,7 +65,7 @@ use Target::*;
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 enum SubCmd {
     /// Record `target`, writing output `output`.
-    Record { target: Target, out_path: PathBuf, sample_rate: u32  },
+    Record { target: Target, out_path: PathBuf, sample_rate: u32, maybe_duration: Option<std::time::Duration>},
     /// Capture and print a stacktrace snapshot of process `pid`.
     Snapshot {pid: pid_t},
 }
@@ -85,7 +85,7 @@ fn do_main() -> Result<(), Error> {
 
     match args.cmd {
         Snapshot { pid } => snapshot(pid),
-        Record { target, out_path, sample_rate } => {
+        Record { target, out_path, sample_rate, maybe_duration } => {
             let (pid, spawned) = match target {
                 Pid {pid} => (pid, false),
                 Subprocess { prog, args } => (Command::new(prog)
@@ -93,7 +93,7 @@ fn do_main() -> Result<(), Error> {
                     .spawn()?.id() as pid_t, true)
             };
 
-            record(&out_path, pid, sample_rate, spawned)
+            record(&out_path, pid, sample_rate, maybe_duration, spawned)
         },
     }
 }
@@ -121,13 +121,16 @@ fn snapshot(pid: pid_t) -> Result<(), Error> {
     Ok(())
 }
 
-fn record(output_filename: &Path, pid: pid_t, sample_rate: u32, is_subcommand: bool) -> Result<(), Error> {
+fn record(output_filename: &Path, pid: pid_t, sample_rate: u32, maybe_duration: Option<std::time::Duration>, is_subcommand: bool) -> Result<(), Error> {
     // This gets a stack trace and then just prints it out
     // in a format that Brendan Gregg's stackcollapse.pl script understands
     let getter = initialize::initialize(pid)?;
 
     eprintln!("Recording data to {}", output_filename.display());
-    eprintln!("Press Ctrl+C to stop");
+    let maybe_stop_time = match maybe_duration {
+        None => { eprintln!("Press Ctrl+C to stop"); None },
+        Some(duration) => { Some(std::time::Instant::now() + duration) }
+    };
 
     let total = Arc::new(AtomicUsize::new(0));
     let errors = Arc::new(AtomicUsize::new(0));
@@ -172,6 +175,11 @@ fn record(output_filename: &Path, pid: pid_t, sample_rate: u32, is_subcommand: b
                     print_errors(errors, total);
                     return Err(x.into());
                 }
+            }
+        }
+        if let Some(stop_time) = maybe_stop_time {
+            if std::time::Instant::now() > stop_time {
+                return Ok(());
             }
         }
         std::thread::sleep(std::time::Duration::new(0, BILLION/sample_rate));
@@ -290,6 +298,9 @@ fn arg_parser() -> App<'static, 'static> {
                      .required(false))
                 .arg(Arg::from_usage("-r --rate=[RATE] 'Samples per second collected'")
 		     .required(false))
+                .arg(Arg::from_usage("-d --duration=[DURATION] 'Length of time before ending data collection'")
+                .conflicts_with("cmd")
+		     .required(false))
                 .arg(Arg::from_usage("<cmd>... 'command to run'")
                      .required(false)),
                      )
@@ -318,6 +329,11 @@ impl Args {
             },
             ("record", Some(submatches)) => {
                 let out_path = output_filename(&std::env::var("HOME")?, submatches.value_of("file"))?;
+                let maybe_duration = match value_t!(submatches, "duration", u64) {
+                    Err(_) =>  None ,
+                    Ok(integer_duration) =>  Some(std::time::Duration::from_secs(integer_duration))
+                };
+
                 let sample_rate = value_t!(submatches, "rate", u32).unwrap_or(100);
                 let target = if let Some(pid) = get_pid(submatches) {
                     Pid { pid }
@@ -334,7 +350,8 @@ impl Args {
                 Record {
                     target,
                     out_path,
-                    sample_rate
+                    sample_rate,
+                    maybe_duration
                 }
             }
             _ => panic!("this shouldn't happen, please report the command you ran!"),
@@ -383,7 +400,8 @@ mod tests {
             cmd: Record {
                 target: Pid { pid: 1234 },
                 out_path: "foo.txt".into(),
-                sample_rate: 100
+                sample_rate: 100,
+                maybe_duration: None
             }
         });
 
@@ -392,7 +410,18 @@ mod tests {
             cmd: Record {
                 target: Pid { pid: 1234 },
                 out_path: "foo.txt".into(),
-                sample_rate: 25
+                sample_rate: 25,
+                maybe_duration: None
+            }
+        });
+
+        let args = Args::from(make_args("rbspy record --pid 1234 --file foo.txt --duration 60")).unwrap();
+        assert_eq!(args, Args {
+            cmd: Record {
+                target: Pid { pid: 1234 },
+                out_path: "foo.txt".into(),
+                sample_rate: 100,
+                maybe_duration: Some(std::time::Duration::from_secs(60))
             }
         });
     }
