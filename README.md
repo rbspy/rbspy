@@ -61,6 +61,21 @@ rbspy record ruby myprogram.rb
 When recording, rbspy will by default save data to `~/.cache/rbspy/records`. You can also specify an
 output file with `--file`.
 
+## What's a flamegraph?
+
+rbspy uses [Brendan Gregg's flamegraph script](https://github.com/brendangregg/flamegraph) to
+generate flamegraphs! 
+
+A flamegraph is a way to visualize profiling data from a process. Here's a flamegraph of
+Jekyll building a blog recorded with `rbspy record jekyll build`.
+
+You can see it spends about 50% of its time building the site (on the left, above `execute`) and
+about 50% of its time loading requires (on the right, above `require`).
+
+<a href="https://user-images.githubusercontent.com/817739/35201793-3a16071a-feec-11e7-8583-e1fa3c5e14b2.png">
+<img src="https://user-images.githubusercontent.com/817739/35201793-3a16071a-feec-11e7-8583-e1fa3c5e14b2.png">
+</a>
+
 ## On the "Dropped X/Y stack traces because of errors" message
 
 rbspy does not stop your Ruby processes to collect information about what it's doing. This is for
