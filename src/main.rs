@@ -3,6 +3,7 @@
 #[cfg(test)]
 extern crate byteorder;
 extern crate chrono;
+#[macro_use]
 extern crate clap;
 extern crate ctrlc;
 extern crate elf;
@@ -63,7 +64,7 @@ use Target::*;
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 enum SubCmd {
     /// Record `target`, writing output `output`.
-    Record { target: Target, out_path: PathBuf  },
+    Record { target: Target, out_path: PathBuf, sample_rate: u64  },
     /// Capture and print a stacktrace snapshot of process `pid`.
     Snapshot {pid: pid_t},
 }
@@ -83,7 +84,7 @@ fn do_main() -> Result<(), Error> {
 
     match args.cmd {
         Snapshot { pid } => snapshot(pid),
-        Record { target, out_path } => {
+        Record { target, out_path, sample_rate } => {
             let (pid, spawned) = match target {
                 Pid {pid} => (pid, false),
                 Subprocess { prog, args } => (Command::new(prog)
@@ -91,7 +92,7 @@ fn do_main() -> Result<(), Error> {
                     .spawn()?.id() as pid_t, true)
             };
 
-            record(&out_path, pid, spawned)
+            record(&out_path, pid, sample_rate, spawned)
         },
     }
 }
@@ -119,7 +120,7 @@ fn snapshot(pid: pid_t) -> Result<(), Error> {
     Ok(())
 }
 
-fn record(output_filename: &Path, pid: pid_t, is_subcommand: bool) -> Result<(), Error> {
+fn record(output_filename: &Path, pid: pid_t, sample_rate: u64, is_subcommand: bool) -> Result<(), Error> {
     // This gets a stack trace and then just prints it out
     // in a format that Brendan Gregg's stackcollapse.pl script understands
     let getter = initialize::initialize(pid)?;
@@ -172,7 +173,7 @@ fn record(output_filename: &Path, pid: pid_t, is_subcommand: bool) -> Result<(),
                 }
             }
         }
-        std::thread::sleep(std::time::Duration::from_millis(10));
+        std::thread::sleep(std::time::Duration::from_millis(1000/sample_rate));
     }
 }
 
@@ -209,7 +210,7 @@ fn write_flamegraph<P: AsRef<Path>>(stacks_filename: P) -> Result<(), Error> {
         .spawn()
         .context("Couldn't execute perl")?;
     // TODO(nll): Remove this silliness after non-lexical lifetimes land.
-    { 
+    {
         let stdin = child.stdin.as_mut().expect("failed to write to stdin");
         stdin.write_all(FLAMEGRAPH_SCRIPT)?;
     }
@@ -286,6 +287,8 @@ fn arg_parser() -> App<'static, 'static> {
                     )
                 .arg(Arg::from_usage("-f --file=[FILE] 'File to write output to'")
                      .required(false))
+                .arg(Arg::from_usage("-r --rate=[RATE] 'Samples per second collected'")
+		     .required(false))
                 .arg(Arg::from_usage("<cmd>... 'command to run'")
                      .required(false)),
                      )
@@ -314,6 +317,7 @@ impl Args {
             },
             ("record", Some(submatches)) => {
                 let out_path = output_filename(&std::env::var("HOME")?, submatches.value_of("file"))?;
+                let sample_rate = value_t!(submatches, "rate", u64).unwrap_or(100);
                 let target = if let Some(pid) = get_pid(submatches) {
                     Pid { pid }
                 } else {
@@ -328,7 +332,8 @@ impl Args {
                 };
                 Record {
                     target,
-                    out_path
+                    out_path,
+                    sample_rate
                 }
             }
             _ => panic!("this shouldn't happen, please report the command you ran!"),
@@ -377,6 +382,16 @@ mod tests {
             cmd: Record {
                 target: Pid { pid: 1234 },
                 out_path: "foo.txt".into(),
+                sample_rate: 100
+            }
+        });
+
+        let args = Args::from(make_args("rbspy record --pid 1234 --file foo.txt --rate 25")).unwrap();
+        assert_eq!(args, Args {
+            cmd: Record {
+                target: Pid { pid: 1234 },
+                out_path: "foo.txt".into(),
+                sample_rate: 25
             }
         });
     }
