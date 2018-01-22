@@ -61,6 +61,7 @@ rbspy record ruby myprogram.rb
 **Optional Arguments**
  * `--file`: Specifies where rbspy will save data. By default, rbspy saves to `~/.cache/rbspy/records`.
  * `--rate`: Specifies the frequency of that stack traces are recorded. The interval is determined by `1000/rate`. The default rate is 100hz.
+ * `--duration`: Specifies how long to run before stopping rbspy. This conficts with running a subcommand (`rbspy record ruby myprogram.rb`).
 
 ## What's a flamegraph?
 
