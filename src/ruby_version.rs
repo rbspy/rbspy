@@ -159,8 +159,8 @@ macro_rules! get_stack_trace(
 
 use proc_maps::{maps_contain_addr, MapRange};
 
-pub fn is_maybe_thread<T>(x: usize, source: &T, heap_map: &MapRange, all_maps: &Vec<MapRange>) -> bool where T: CopyAddress{
-    if !heap_map.contains_addr(x) {
+pub fn is_maybe_thread<T>(x: usize, source: &T, all_maps: &Vec<MapRange>) -> bool where T: CopyAddress{
+    if !maps_contain_addr(x, all_maps) {
         return false;
     }
 

@@ -167,7 +167,7 @@ fn test_current_thread_address() {
 
 fn is_maybe_thread_function<T: 'static>(
     version: &str,
-) -> Box<Fn(usize, &T, &MapRange, &Vec<MapRange>) -> bool>
+) -> Box<Fn(usize, &T, &Vec<MapRange>) -> bool>
 where
     T: CopyAddress,
 {

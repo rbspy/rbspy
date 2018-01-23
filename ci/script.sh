@@ -14,6 +14,13 @@ run_test_suite() {
 
     # sanity check the file type
     file target/$TARGET/debug/rbspy
+
+    sudo apt-get install -y libjemalloc1
+    sudo apt-get install -y libtcmalloc-minimal4
+
+    # test jemalloc + tcmalloc
+    target/$TARGET/debug/rbspy record env LD_PRELOAD=/usr/lib/libjemalloc.so.1 /usr/bin/ruby ci/ruby-programs/short_program.rb
+    target/$TARGET/debug/rbspy record env LD_PRELOAD=/usr/lib/libtcmalloc_minimal.so.4 /usr/bin/ruby ci/ruby-programs/short_program.rb
 }
 
 run_docker_tests() {
