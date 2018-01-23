@@ -79,7 +79,7 @@ mod os_impl {
     pub fn current_thread_address(
         pid: pid_t,
         version: &str,
-        is_maybe_thread: Box<Fn(usize, &ProcessHandle, &MapRange, &Vec<MapRange>) -> bool>,
+        is_maybe_thread: Box<Fn(usize, &ProcessHandle, &Vec<MapRange>) -> bool>,
     ) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
         match current_thread_address_symbol_table(proginfo, version) {
@@ -107,11 +107,11 @@ mod os_impl {
                     // a libruby map. If that's not true, that's a bug.
                     (*proginfo.libruby_map)
                         .as_ref()
-                        .expect("Missing libruby map. Please report this!"),
+                        .ok_or(format_err!("Missing libruby map. Please report this!"))?,
                     proginfo
                         .libruby_elf
                         .as_ref()
-                        .expect("Missing libruby ELF. Please report this!"),
+                        .ok_or(format_err!("Missing libruby ELF. Please report this!"))?,
                     ruby_version_symbol,
                 ).ok_or(format_err!("Couldn't find ruby version."))
             }
@@ -149,7 +149,7 @@ mod os_impl {
 
     fn current_thread_address_search_bss(
         proginfo: &ProgramInfo,
-        is_maybe_thread: Box<Fn(usize, &ProcessHandle, &MapRange, &Vec<MapRange>) -> bool>,
+        is_maybe_thread: Box<Fn(usize, &ProcessHandle, &Vec<MapRange>) -> bool>,
     ) -> Result<usize, Error> {
         // Used when there's no symbol table. Looks through the .bss and uses a search_bss (found in
         // `is_maybe_thread`) to find the address of the current thread.
@@ -179,7 +179,7 @@ mod os_impl {
 
         let i = slice
             .iter()
-            .position({ |&x| is_maybe_thread(x, source, &proginfo.heap_map, &proginfo.all_maps) })
+            .position({ |&x| is_maybe_thread(x, source, &proginfo.all_maps) })
             .ok_or(format_err!(
                 "Current thread address not found in process {}",
                 &proginfo.pid
@@ -233,7 +233,6 @@ mod os_impl {
         pub pid: pid_t,
         pub all_maps: Vec<MapRange>,
         pub ruby_map: Box<MapRange>,
-        pub heap_map: Box<MapRange>,
         pub libruby_map: Box<Option<MapRange>>,
         pub ruby_elf: elf::File,
         pub libruby_elf: Option<elf::File>,
@@ -247,14 +246,13 @@ mod os_impl {
         })?;
         let ruby_map = Box::new(get_map(&all_maps, "bin/ruby", "r-xp")
             .ok_or(format_err!("Ruby map not found for PID: {}", pid))?);
-        let heap_map = Box::new(get_map(&all_maps, "[heap]", "rw-p")
-            .ok_or(format_err!("Heap map not found for PID: {}", pid))?);
         let ruby_path = &ruby_map
             .pathname
             .clone()
             .expect("ruby map's pathname shouldn't be None");
         let ruby_elf = elf::File::open_path(ruby_path)
             .map_err(|_| format_err!("Couldn't open ELF file: {}", ruby_path))?;
+        let all_maps = get_proc_maps(pid).unwrap();
         let libruby_map = Box::new(get_map(&all_maps, "libruby", "r-xp"));
         let libruby_elf = match *libruby_map {
             Some(ref map) => {
@@ -270,7 +268,6 @@ mod os_impl {
             pid: pid,
             all_maps: all_maps,
             ruby_map: ruby_map,
-            heap_map: heap_map,
             libruby_map: libruby_map,
             ruby_elf: ruby_elf,
             libruby_elf: libruby_elf,
