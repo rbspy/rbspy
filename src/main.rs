@@ -44,22 +44,26 @@ use libc::pid_t;
 use failure::Error;
 use failure::ResultExt;
 
+use std::collections::HashSet;
 use std::fs::{DirBuilder, File};
 use std::path::{Path, PathBuf};
 use std::env;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Instant, Duration};
 use std::os::unix::prelude::*;
+use std::sync::mpsc::{sync_channel, channel, SyncSender, Receiver};
 
 pub mod core;
 pub mod ui;
 pub(crate) mod storage;
 
 use core::initialize::initialize;
+use core::types::StackTrace;
 use core::copy::MemoryCopyError;
 use ui::output;
+use ui::descendents::descendents_of;
 
 const BILLION: u64 = 1000 * 1000 * 1000; // for nanosleep
 
@@ -97,6 +101,7 @@ enum SubCmd {
         maybe_duration: Option<std::time::Duration>,
         format: OutputFormat,
         no_drop_root: bool,
+        with_subprocesses: bool
     },
     /// Capture and print a stacktrace snapshot of process `pid`.
     Snapshot { pid: pid_t },
@@ -133,6 +138,7 @@ fn do_main() -> Result<(), Error> {
             maybe_duration,
             format,
             no_drop_root,
+            with_subprocesses,
         } => {
             let pid = match target {
                 Pid { pid } => pid,
@@ -158,11 +164,12 @@ fn do_main() -> Result<(), Error> {
                 }
             };
 
-            record(
-                format.outputter(),
-                &out_path,
+            parallel_record(
+                format,
                 &raw_path,
+                &out_path,
                 pid,
+                with_subprocesses,
                 sample_rate,
                 maybe_duration,
             )
@@ -262,33 +269,14 @@ impl SampleTime {
     }
 }
 
-
-fn record(
-    mut out: Box<ui::output::Outputter>,
-    out_path: &Path,
-    raw_path: &Path,
-    pid: pid_t,
-    sample_rate: u32,
-    maybe_duration: Option<std::time::Duration>,
-) -> Result<(), Error> {
-    let getter = initialize(pid)?;
-
-    let mut raw_store = storage::Store::new(raw_path)?;
-    let mut summary_out = ui::summary::Stats::new();
-
-    let maybe_stop_time = match maybe_duration {
-        None => {
-            eprintln!("Press Ctrl+C to stop");
-            None
-        }
-        Some(duration) => Some(std::time::Instant::now() + duration),
-    };
-
-    let mut total = 0;
-    let mut errors = 0;
+/// Start thread(s) recording a PID and possibly its children. Tracks new processes
+/// Returns a pair of Receivers from which you can consume recorded stacktraces and errors
+fn spawn_recorder_children(pid: pid_t, with_subprocesses: bool, sample_rate: u32, maybe_stop_time: Option<Instant>) -> Result<(Receiver<StackTrace>, Receiver<Result<(), Error>>), Error> {
     let done = Arc::new(AtomicBool::new(false));
-    let done_clone = done.clone();
 
+    // Set up the Ctrl+C handler + the done mutex that we send to each recorder so that it knows
+    // when to stop
+    let done_clone = done.clone();
     ctrlc::set_handler(move || {
         if done_clone.load(Ordering::Relaxed) {
             eprintln!("Multiple interrupts received, exiting with haste!");
@@ -299,19 +287,181 @@ fn record(
         done_clone.store(true, Ordering::Relaxed);
     }).expect("Error setting Ctrl-C handler");
 
-    let mut sample_time = SampleTime::new(sample_rate);
+    eprintln!("Press Ctrl+C to stop");
+
+    // Create the sender/receiver channels and start the child threads off collecting stack traces
+    // from each target process.
+    // Give the child threads a buffer in case we fall a little behind with aggregating the stack
+    // traces, but not an unbounded buffer.
+    let (trace_sender, trace_receiver) = sync_channel(100);
+    let (error_sender, result_receiver) = channel();
+
+    match with_subprocesses {
+        false => {
+            // Start a single recorder thread
+            let done = done.clone();
+            std::thread::spawn(move || {
+                let result = record(
+                    pid,
+                    sample_rate,
+                    maybe_stop_time,
+                    done,
+                    trace_sender
+                    );
+                error_sender.send(result).unwrap();
+                drop(error_sender);
+            });
+        },
+        true => {
+            // Start a thread which watches for new descendents and starts new recorders when they
+            // appear
+            let done_clone = done.clone();
+            std::thread::spawn(move || {
+                let mut pids: HashSet<pid_t> = HashSet::new();
+                let done = done.clone();
+                // we need to exit this loop when the process we're monitoring exits, otherwise the
+                // sender channels won't get closed and rbspy will hang. So we check the done
+                // mutex.
+                while !done_clone.load(Ordering::Relaxed) {
+                    let descendents = descendents_of(pid).expect("Error finding descendents of pid");
+                    for pid in descendents {
+                        if pids.contains(&pid) {
+                            // already recording it, no need to start a new recording thread
+                            continue;
+                        }
+                        pids.insert(pid);
+                        let trace_sender = trace_sender.clone();
+                        let error_sender = error_sender.clone();
+                        let done = done.clone();
+                        std::thread::spawn(move || {
+                            let result = record(
+                                pid,
+                                sample_rate,
+                                maybe_stop_time,
+                                done,
+                                trace_sender
+                                );
+                            error_sender.send(result).expect("couldn't send error");
+                            drop(error_sender);
+                        });
+                    }
+                    std::thread::sleep(Duration::from_secs(1));
+                }
+            });
+        }
+    }
+    Ok((trace_receiver, result_receiver))
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn test_spawn_record_children_subprocesses() {
+    // Test that when we spawn a bunch of child threads to record subprocesses that we actually
+    // record stack traces for different PIDs
+    // We only run this test on linux because the subprocess code doesn't work on Mac yet
+    let mut process = std::process::Command::new("/usr/bin/ruby").arg("ci/ruby-programs/ruby_forks.rb").spawn().unwrap();
+    let pid = process.id() as pid_t;
+    let (trace_receiver, result_receiver) = spawn_recorder_children(pid, true, 10, None).unwrap();
+    process.wait().unwrap();
+    let results: Vec<_> = result_receiver.iter().take(4).collect();
+    // check that there are 4 distinct PIDs in the stack traces
+    let pids: HashSet<pid_t> = trace_receiver.iter().take(20).map(|x| x.pid.unwrap()).collect();
+    for r in results {
+        assert!(r.is_ok());
+    }
+    assert_eq!(pids.len(), 4);
+}
+
+fn parallel_record(
+    format: OutputFormat,
+    raw_path: &PathBuf,
+    out_path: &PathBuf,
+    pid: pid_t,
+    with_subprocesses: bool,
+    sample_rate: u32,
+    maybe_duration: Option<std::time::Duration>,
+) -> Result<(), Error> {
+
+    let maybe_stop_time = match maybe_duration {
+        Some(duration) => Some(std::time::Instant::now() + duration),
+        None => None
+    };
+
+    let (trace_receiver, result_receiver) = spawn_recorder_children(pid, with_subprocesses, sample_rate, maybe_stop_time)?;
+
+    // Aggregate stack traces as we receive them from the threads that are collecting them
+    // Aggregate to 3 places: the raw output (`.raw.gz`), some summary statistics we display live,
+    // and the formatted output (a flamegraph or something)
+    let mut out = format.outputter();
+    let mut summary_out = ui::summary::Stats::new();
+    let mut raw_store = storage::Store::new(raw_path)?;
+    let mut summary_time = std::time::Instant::now() + Duration::from_secs(1);
     let start_time = Instant::now();
+
+    for trace in trace_receiver.iter() {
+        out.record(&trace)?;
+        summary_out.add_function_name(&trace.trace);
+        raw_store.write(&trace)?;
+
+        // Print a summary every second
+        if std::time::Instant::now() > summary_time {
+            print_summary(&summary_out, &start_time)?;
+            summary_time = std::time::Instant::now() + Duration::from_secs(1);
+        }
+    }
+
+    // Finish writing all data to disk
+    eprintln!("Wrote raw data to {}", raw_path.display());
+    eprintln!("Writing formatted output to {}", out_path.display());
+
+    let out_file = File::create(&out_path).context(format!( "Failed to create output file {}", &out_path.display()))?;
+    out.complete(out_file)?;
+    raw_store.complete();
+
+    // Check for errors from the child threads. Ignore errors unless every single thread
+    // returned an error. If that happens, return the last error. This lets rbspy successfully
+    // record processes even if the parent thread isn't a Ruby process.
+    let mut num_ok = 0;
+    let mut last_result = Ok(());
+    for result in result_receiver.iter() {
+        if let Ok(_) = result {
+            num_ok += 1;
+        }
+        last_result = result;
+    }
+
+    match num_ok {
+        0 => last_result,
+        _ => Ok(()),
+    }
+}
+
+/// Records stack traces and sends them to a channel in another thread where they can be aggregated
+fn record(
+    pid: pid_t,
+    sample_rate: u32,
+    maybe_stop_time: Option<Instant>,
+    done: Arc<AtomicBool>,
+    sender: SyncSender<StackTrace>
+) -> Result<(), Error> {
+    let getter = core::initialize::initialize(pid)?;
+
+    let mut total = 0;
+    let mut errors = 0;
+
+    let mut sample_time = SampleTime::new(sample_rate);
     while !done.load(Ordering::Relaxed) {
         total += 1;
         let trace = getter.get_trace();
         match trace {
             Err(MemoryCopyError::ProcessEnded) => {
+                // we need to store done = true here to signal the other threads here that we
+                // should stop profiling
+                done.store(true, Ordering::Relaxed);
                 break;
             }
-            Ok(ref ok_trace) => {
-                out.record(ok_trace)?;
-                summary_out.add_function_name(&ok_trace.trace);
-                raw_store.write(ok_trace)?;
+            Ok(ok_trace) => {
+                sender.send(ok_trace)?;
             }
             Err(x) => {
                 errors += 1;
@@ -321,12 +471,10 @@ fn record(
                 }
             }
         }
-        // Print a summary every second
-        if total % (sample_rate as usize) == 0 {
-            print_summary(&summary_out, &start_time)?;
-        }
         if let Some(stop_time) = maybe_stop_time {
             if std::time::Instant::now() > stop_time {
+                // need to store done for same reason as above
+                done.store(true, Ordering::Relaxed);
                 break;
             }
         }
@@ -338,16 +486,6 @@ fn record(
         }
     }
 
-    // Finish writing all data to disk
-
-    raw_store.complete();
-    eprintln!("Wrote raw data to {}", raw_path.display());
-    eprintln!("Writing formatted output to {}", out_path.display());
-    let out_file = File::create(&out_path).context(format!(
-        "Failed to create output file {}",
-        &out_path.display()
-    ))?;
-    out.complete(out_file)?;
     Ok(())
 }
 
@@ -490,6 +628,10 @@ fn arg_parser() -> App<'static, 'static> {
                     ).conflicts_with("cmd")
                         .required(false),
                 )
+                .arg(
+                    Arg::from_usage( "-s --subprocesses='Record all subprocesses of the given PID or command'")
+                        .required(false)
+                )
                 .arg(Arg::from_usage("<cmd>... 'command to run'").required(false)),
         )
         .subcommand(
@@ -541,6 +683,7 @@ impl Args {
                 };
 
                 let no_drop_root = submatches.occurrences_of("no-drop-root") == 1;
+                let with_subprocesses = submatches.is_present("subprocesses");
 
                 let sample_rate = value_t!(submatches, "rate", u32).unwrap_or(100);
                 let target = if let Some(pid) = get_pid(submatches) {
@@ -562,6 +705,7 @@ impl Args {
                     maybe_duration,
                     format,
                     no_drop_root,
+                    with_subprocesses,
                 }
             }
             ("report", Some(submatches)) => Report {
@@ -600,6 +744,7 @@ mod tests {
             x => panic!("Unexpected: {:?}", x),
         };
 
+        // test snapshot
         let args = Args::from(make_args("rbspy snapshot --pid 1234")).unwrap();
         assert_eq!(
             args,
@@ -608,6 +753,7 @@ mod tests {
             }
         );
 
+        // test record with subcommand
         match Args::from(make_args("rbspy record ruby blah.rb")).unwrap() {
             Args {
                 cmd:
@@ -634,6 +780,7 @@ mod tests {
                     maybe_duration: None,
                     format: OutputFormat::flamegraph,
                     no_drop_root: false,
+                    with_subprocesses: false,
                 },
             }
         );
@@ -652,6 +799,7 @@ mod tests {
                     maybe_duration: None,
                     format: OutputFormat::flamegraph,
                     no_drop_root: false,
+                    with_subprocesses: false,
                 },
             }
         );
@@ -670,6 +818,7 @@ mod tests {
                     maybe_duration: Some(std::time::Duration::from_secs(60)),
                     format: OutputFormat::flamegraph,
                     no_drop_root: false,
+                    with_subprocesses: false,
                 },
             }
         );
@@ -688,12 +837,13 @@ mod tests {
                     maybe_duration: Some(std::time::Duration::from_secs(60)),
                     format: OutputFormat::callgrind,
                     no_drop_root: false,
+                    with_subprocesses: false,
                 },
             }
         );
 
         let args = Args::from(make_args(
-            "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --format callgrind --no-drop-root",
+            "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --no-drop-root",
         )).unwrap();
         assert_eq!(
             args,
@@ -704,10 +854,31 @@ mod tests {
                     raw_path: "raw.gz".into(),
                     sample_rate: 100,
                     maybe_duration: None,
-                    format: OutputFormat::callgrind,
+                    format: OutputFormat::flamegraph,
                     no_drop_root: true,
+                    with_subprocesses: false,
                 },
             }
         );
+
+        let args = Args::from(make_args(
+            "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --subprocesses",
+        )).unwrap();
+        assert_eq!(
+            args,
+            Args {
+                cmd: Record {
+                    target: Pid { pid: 1234 },
+                    out_path: "foo.txt".into(),
+                    raw_path: "raw.gz".into(),
+                    sample_rate: 100,
+                    maybe_duration: None,
+                    format: OutputFormat::flamegraph,
+                    no_drop_root: false,
+                    with_subprocesses: true,
+                },
+            }
+        );
+
     }
 }
