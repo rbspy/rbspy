@@ -269,6 +269,14 @@ fn validate_pid(s: String) -> Result<(), String> {
     Ok(())
 }
 
+// Prevent collision for the flamegraph filename
+fn validate_filename(s: String) -> Result<(), String> {
+    if s.ends_with(".svg") {
+        return Err("Filename must not end with .svg".to_string());
+    }
+    Ok(())
+}
+
 fn arg_parser() -> App<'static, 'static> {
     App::new("rbspy")
         .about("Sampling profiler for Ruby programs")
@@ -295,6 +303,7 @@ fn arg_parser() -> App<'static, 'static> {
                     .conflicts_with("cmd"),
                     )
                 .arg(Arg::from_usage("-f --file=[FILE] 'File to write output to'")
+                     .validator(validate_filename)
                      .required(false))
                 .arg(Arg::from_usage("-r --rate=[RATE] 'Samples per second collected'")
 		     .required(false))
