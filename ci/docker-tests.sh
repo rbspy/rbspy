@@ -22,7 +22,16 @@ do
    docker build -t rb-stacktrace-$distro -f ./ci/docker/Dockerfile.$distro  ./ci/docker/ >> /tmp/output 2>&1
    echo -n "${distro}... "
    docker run -v=/tmp/artifacts:/stuff rb-stacktrace-$distro env RUST_BACKTRACE=1 /stuff/rbspy record --file /tmp/stacks.txt /usr/bin/ruby /stuff/short_program.rb
+
+   echo -n "subprocess identification"
+   docker run -v=/tmp/artifacts:/stuff rb-stacktrace-$distro env RUST_BACKTRACE=1 /stuff/rbspy record --subprocesses /usr/bin/ruby /stuff/ruby_forks.rb
 done
+
+echo "=============================="
+echo "test subprocess identification"
+echo "=============================="
+echo ""
+
 
 echo "=================="
 echo "ruby version tests"
