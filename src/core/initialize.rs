@@ -155,7 +155,7 @@ fn test_get_disallowed_process() {
 #[test]
 #[cfg(target_os = "linux")]
 fn test_current_thread_address() {
-    let mut process = std::process::Command::new("/usr/bin/ruby").spawn().unwrap();
+    let mut process = std::process::Command::new("/usr/bin/ruby").arg("./ci/ruby-programs/infinite.rb").spawn().unwrap();
     let pid = process.id() as pid_t;
     let version = get_ruby_version_retry(pid).expect("version should exist");
     let is_maybe_thread = is_maybe_thread_function(&version);
