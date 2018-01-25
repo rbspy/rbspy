@@ -5,6 +5,8 @@ use read_process_memory::*;
  * Utility functions for copying memory out of a process
  */
 
+const MAX_COPY_LENGTH: usize = 1000000;
+
 #[derive(Fail, Debug)]
 pub enum MemoryCopyError {
     #[fail(display = "Permission denied when reading from process. Try again with sudo?")]
@@ -12,6 +14,7 @@ pub enum MemoryCopyError {
     #[fail(display = "Failed to copy memory address {:x}", _0)] Io(usize, #[cause] std::io::Error),
     #[fail(display = "Process isn't running")] ProcessEnded,
     #[fail(display = "Other")] Other,
+    #[fail(display = "Too much memory requested when copying: {}", _0)] RequestTooLarge(usize),
     #[fail(display = "Tried to read invalid string")]
     InvalidStringError(#[cause] std::string::FromUtf8Error),
 }
@@ -36,6 +39,9 @@ where
     T: CopyAddress,
 {
     debug!("copy_address_raw: addr: {:x}", addr as usize);
+    if length > MAX_COPY_LENGTH {
+        return Err(MemoryCopyError::RequestTooLarge(length));
+    }
     let mut copy = vec![0; length];
     source.copy_address(addr as usize, &mut copy).map_err(|x| {
         if x.raw_os_error() == Some(3) {
