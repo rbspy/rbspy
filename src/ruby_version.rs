@@ -123,31 +123,28 @@ macro_rules! get_stack_trace(
             ruby_current_thread_address_location: usize,
             source: &T,
             ) -> Result<Vec<StackFrame>, MemoryCopyError> where T: CopyAddress{
-            debug!(
-                "current address location: {:x}",
-                ruby_current_thread_address_location
-                );
             let current_thread_addr: usize =
                 copy_struct(ruby_current_thread_address_location, source)?;
-            debug!("{:x}", current_thread_addr);
             let thread: $thread_type = copy_struct(current_thread_addr, source)?;
-            debug!("thread: {:?}", thread);
             let mut trace = Vec::new();
             let cfps = get_cfps(thread.cfp as usize, stack_base(&thread) as usize, source)?;
             for cfp in cfps.iter() {
                 if cfp.iseq as usize == 0  || cfp.pc as usize == 0 {
-                    debug!("huh."); // TODO: fixmeup
+                    debug!("Either iseq or pc was 0, skipping CFP");
                     continue;
                 }
                 let iseq_struct: rb_iseq_struct = copy_struct(cfp.iseq as usize, source)?;
-                debug!("iseq_struct: {:?}", iseq_struct);
                 let label_path  = get_stack_frame(&iseq_struct, &cfp, source);
                 match label_path {
                     Ok(call)  => trace.push(call),
                     Err(x) => {
+                        debug!("Error: {}", x);
+                        debug!("cfp: {:?}", cfp);
+                        debug!("thread: {:?}", thread);
+                        debug!("iseq struct: {:?}", iseq_struct);
                         // this is a heuristic: the intent of this is that it skips function calls into C extensions
                         if trace.len() > 0 {
-                            debug!("guess that one didn't work; skipping");
+                            debug!("Skipping function call, possibly into C extension");
                         } else {
                             return Err(x);
                         }
@@ -175,7 +172,6 @@ pub fn is_maybe_thread<T>(x: usize, source: &T, all_maps: &Vec<MapRange>) -> boo
 
     let stack_base = stack_base(&thread);
     let diff = stack_base - thread.cfp as i64;
-    debug!("diff: {}", diff);
     if diff < 0 || diff > 3000000 {
         return false;
     }
@@ -225,7 +221,6 @@ macro_rules! get_ruby_string_array_2_5_0(
             }
             // otherwise it's an RArray
             let rarray: RArray = copy_struct(addr, source)?;
-            debug!("blah: {}, array: {:?}", addr, unsafe { rarray.as_.ary });
             // TODO: this assumes that the array contents are stored inline and not on the heap
             // I think this will always be true but we should check instead
             // the reason I am not checking is that I don't know how to check yet
@@ -252,7 +247,14 @@ macro_rules! get_ruby_string(
                     unsafe {
                         let addr = rstring.as_.heap.ptr as usize;
                         let len = rstring.as_.heap.len as usize;
-                        copy_address_raw(addr as usize, len, source)?
+                        let result = copy_address_raw(addr as usize, len, source);
+                        match result {
+                            Err(x) => {
+                                debug!("Error: Failed to get ruby string.\nrstring: {:?}, addr: {}, len: {}", rstring, addr, len);
+                                return Err(x.into());
+                            }
+                            Ok(x) => x
+                        }
                     }
                 }
             };
