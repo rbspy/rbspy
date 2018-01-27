@@ -122,6 +122,12 @@ fn snapshot(pid: pid_t) -> Result<(), Error> {
 }
 
 fn record(output_filename: &Path, pid: pid_t, sample_rate: u32, maybe_duration: Option<std::time::Duration>, is_subcommand: bool) -> Result<(), Error> {
+    do_record(output_filename, pid, sample_rate, maybe_duration, is_subcommand)?;
+    write_flamegraph(output_filename)?;
+    Ok(())
+}
+
+fn do_record(output_filename: &Path, pid: pid_t, sample_rate: u32, maybe_duration: Option<std::time::Duration>, is_subcommand: bool) -> Result<(), Error> {
     // This gets a stack trace and then just prints it out
     // in a format that Brendan Gregg's stackcollapse.pl script understands
     let getter = initialize::initialize(pid)?;
@@ -157,7 +163,6 @@ fn record(output_filename: &Path, pid: pid_t, sample_rate: u32, maybe_duration: 
         match trace {
             Err(copy::MemoryCopyError::ProcessEnded) => {
                 print_errors(errors, total);
-                write_flamegraph(&output_filename).context("Failed to write flamegraph")?;
                 return Ok(())
             },
             Ok(ref ok_trace) => {
