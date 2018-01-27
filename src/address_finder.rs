@@ -71,15 +71,10 @@ mod os_impl {
     use elf;
     use proc_maps::*;
     use failure::Error;
-    use failure::ResultExt;
     use libc::pid_t;
-    use libc;
     use std;
-    use std::fs;
-    use std::os::linux::fs::MetadataExt;
     use address_finder::AddressFinderError;
     use read_process_memory::*;
-    use std::os::unix::prelude::*;
 
     pub fn current_thread_address(
         pid: pid_t,
@@ -121,50 +116,6 @@ mod os_impl {
                 ).ok_or(format_err!("Couldn't find ruby version."))
             }
         }
-    }
-
-    fn switch_ns<F: AsRawFd>(f: &F) -> Result<(), Error> {
-        let fd = f.as_raw_fd();
-        let result = unsafe { libc::setns(fd, libc::CLONE_NEWNS) };
-        match result {
-            0 => Ok(()),
-            _ => Ok(Err(std::io::Error::last_os_error()).context(format!("Couldn't switch to mount namespace"))?),
-        }
-    }
-
-    fn proc_maps(pid: pid_t) -> Result<Vec<MapRange>, AddressFinderError> {
-        get_proc_maps(pid).map_err(|x| match x.kind() {
-            std::io::ErrorKind::NotFound => AddressFinderError::NoSuchProcess(pid),
-            std::io::ErrorKind::PermissionDenied => AddressFinderError::PermissionDenied(pid),
-            _ => AddressFinderError::ProcMapsError(pid),
-        })
-    }
-
-    fn get_program_info(pid: pid_t) -> Result<ProgramInfo, Error> {
-        // Check if the two processes are in the same mount namespace.
-        // If not, switch mount namespaces before running `get_program_info`
-        // We need to do this because the binaries we need to look at to find the symbols might be
-        // in a different mount namespace (like /usr/bin/ruby1.9.1 for instance) and if they are we
-        // have to switch mount namespaces to access them
-        let other_proc_mnt = &format!("/proc/{}/ns/mnt", pid);
-        let self_proc_mnt = "/proc/self/ns/mnt";
-        // We need to get `/proc/$PID/maps` before switching namespaces
-        let all_maps = proc_maps(pid)?;
-        // read the inode number to check if the two mount namespaces are the same
-        if fs::metadata(other_proc_mnt)?.st_ino() == fs::metadata(self_proc_mnt)?.st_ino() {
-            get_program_info_inner(pid, all_maps)
-        } else {
-            // switch mount namespace and then switch back after getting the program info
-            // We need to save the fd of the current mount namespace so we can switch back
-            let new_ns = fs::File::open(other_proc_mnt)?;
-            let old_ns = fs::File::open(self_proc_mnt)?;
-            switch_ns(&new_ns)?;
-            // if there's an error at any point, always switch back to the old namespace
-            defer!({switch_ns(&old_ns);});
-            let proginfo = get_program_info_inner(pid, all_maps);
-            proginfo
-        }
-        
     }
 
     fn elf_symbol_value(elf_file: &elf::File, symbol_name: &str) -> Option<usize> {
@@ -287,7 +238,12 @@ mod os_impl {
         pub libruby_elf: Option<elf::File>,
     }
 
-    pub fn get_program_info_inner(pid: pid_t, all_maps: Vec<MapRange>) -> Result<ProgramInfo, Error> {
+    pub fn get_program_info(pid: pid_t) -> Result<ProgramInfo, Error> {
+        let all_maps = get_proc_maps(pid).map_err(|x| match x.kind() {
+            std::io::ErrorKind::NotFound => AddressFinderError::NoSuchProcess(pid),
+            std::io::ErrorKind::PermissionDenied => AddressFinderError::PermissionDenied(pid),
+            _ => AddressFinderError::ProcMapsError(pid),
+        })?;
         let ruby_map = Box::new(get_map(&all_maps, "bin/ruby", "r-xp")
             .ok_or(format_err!("Ruby map not found for PID: {}", pid))?);
         let ruby_path = &ruby_map
@@ -296,6 +252,7 @@ mod os_impl {
             .expect("ruby map's pathname shouldn't be None");
         let ruby_elf = elf::File::open_path(ruby_path)
             .map_err(|_| format_err!("Couldn't open ELF file: {}", ruby_path))?;
+        let all_maps = get_proc_maps(pid).unwrap();
         let libruby_map = Box::new(get_map(&all_maps, "libruby", "r-xp"));
         let libruby_elf = match *libruby_map {
             Some(ref map) => {

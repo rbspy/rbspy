@@ -420,7 +420,6 @@ dependencies = [
  "regex 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "ruby-bindings 0.1.0",
  "rustc_version 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "scopeguard 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempdir 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -514,11 +513,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "semver 0.1.20 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
-
-[[package]]
-name = "scopeguard"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "semver"
@@ -770,7 +764,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum regex-syntax 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "ad890a5eef7953f55427c50575c680c42841653abd2b028b68cd223d157f62db"
 "checksum rustc-demangle 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "aee45432acc62f7b9a108cc054142dac51f979e69e71ddce7d6fc7adf29e817e"
 "checksum rustc_version 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "c5f5376ea5e30ce23c03eb77cbe4962b988deead10910c372b226388b594c084"
-"checksum scopeguard 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "94258f53601af11e6a49f722422f6e3425c52b06245a5cf9bc09908b174f5e27"
 "checksum semver 0.1.20 (registry+https://github.com/rust-lang/crates.io-index)" = "d4f410fedcf71af0345d7607d246e7ad15faaadd49d240ee3b24e5dc21a820ac"
 "checksum skeptic 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "061203a849117b0f7090baf8157aa91dac30545208fbb85166ac58b4ca33d89c"
 "checksum strsim 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b4d15c810519a91cf877e7e36e63fe068815c678181439f2f29e2562147c3694"
