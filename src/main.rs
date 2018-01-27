@@ -22,9 +22,6 @@ extern crate rand;
 #[cfg(target_os = "macos")]
 extern crate regex;
 extern crate ruby_bindings as bindings;
-#[cfg(target_os = "linux")]
-#[macro_use]
-extern crate scopeguard;
 #[cfg(test)]
 extern crate tempdir;
 

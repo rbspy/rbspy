@@ -22,9 +22,6 @@ failure = "0.1.1"
 failure_derive = "0.1.1"
 ruby-bindings = { path = "ruby-bindings" }
 
-[target.'cfg(target_os="linux")'.dependencies]
-scopeguard = "0.3.3"
-
 [target.'cfg(target_os="macos")'.dependencies]
 mach = "0.0.5"
 regex = "0.2.3"
