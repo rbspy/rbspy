@@ -238,6 +238,17 @@ mod os_impl {
         pub libruby_elf: Option<elf::File>,
     }
 
+    fn open_elf_file(pid: pid_t, map: &MapRange) -> Result<elf::File, Error> {
+        // Read binaries from `/proc/PID/root` because the target process might be in a different
+        // mount namespace. /proc/PID/root is the view of the filesystem that the target process
+        // has. (see the proc man page for more)
+        // So we read /usr/bin/ruby from /proc/PID/root/usr/bin/ruby
+        let map_path = map.pathname.as_ref().expect("map's pathname shouldn't be None");
+        let elf_path = format!("/proc/{}/root{}", pid, map_path);
+        elf::File::open_path(&elf_path)
+            .map_err(|_| format_err!("Couldn't open ELF file: {:?}", elf_path))
+    }
+
     pub fn get_program_info(pid: pid_t) -> Result<ProgramInfo, Error> {
         let all_maps = get_proc_maps(pid).map_err(|x| match x.kind() {
             std::io::ErrorKind::NotFound => AddressFinderError::NoSuchProcess(pid),
@@ -246,21 +257,12 @@ mod os_impl {
         })?;
         let ruby_map = Box::new(get_map(&all_maps, "bin/ruby", "r-xp")
             .ok_or(format_err!("Ruby map not found for PID: {}", pid))?);
-        let ruby_path = &ruby_map
-            .pathname
-            .clone()
-            .expect("ruby map's pathname shouldn't be None");
-        let ruby_elf = elf::File::open_path(ruby_path)
-            .map_err(|_| format_err!("Couldn't open ELF file: {}", ruby_path))?;
         let all_maps = get_proc_maps(pid).unwrap();
+        let ruby_elf = open_elf_file(pid, &ruby_map)?;
         let libruby_map = Box::new(get_map(&all_maps, "libruby", "r-xp"));
         let libruby_elf = match *libruby_map {
             Some(ref map) => {
-                let path = &map.pathname
-                    .clone()
-                    .expect("libruby map's pathname shouldn't be None");
-                Some(elf::File::open_path(path)
-                    .map_err(|_| format_err!("Couldn't open ELF file: {}", path))?)
+                Some(open_elf_file(pid, &map)?)
             }
             _ => None,
         };
