@@ -48,6 +48,16 @@ pub struct StackFrame {
     pub lineno: u32,
 }
 
+impl StackFrame {
+    pub fn path(&self) -> &str {
+        match self.absolute_path {
+            Some(ref p) => p.as_ref(),
+            None => self.relative_path.as_ref(),
+        }
+    }
+}
+
+
 // Use a StackTraceGetter to get stack traces
 pub struct StackTraceGetter {
     pid: pid_t,
@@ -58,11 +68,7 @@ pub struct StackTraceGetter {
 
 impl fmt::Display for StackFrame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(abspath) = self.absolute_path.as_ref() {
-            write!(f, "{} - {} line {}", self.name, abspath, self.lineno)
-        } else {
-            write!(f, "{} - {} line {}", self.name, self.relative_path, self.lineno)
-        }
+        write!(f, "{} - {} line {}", self.name, self.path(), self.lineno)
     }
 }
 
