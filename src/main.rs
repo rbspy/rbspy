@@ -30,16 +30,12 @@ use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use libc::pid_t;
 use failure::Error;
 use failure::ResultExt;
-use std::fs::DirBuilder;
-use std::io::Write;
+use std::fs::{DirBuilder, File};
 use std::path::{Path, PathBuf};
 use std::env;
 use std::process::Command;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-
-#[cfg(test)]
-use tempdir::TempDir;
 
 pub mod proc_maps;
 pub mod address_finder;
@@ -47,8 +43,8 @@ pub mod initialize;
 pub mod copy;
 pub mod ruby_version;
 pub mod callgrind;
+pub mod output;
 
-const FLAMEGRAPH_SCRIPT: &'static [u8] = include_bytes!("../vendor/flamegraph/flamegraph.pl");
 const BILLION: u32 = 1000 * 1000 * 1000; // for nanosleep
 
 /// The kinds of things we can call `rbspy record` on.
@@ -101,7 +97,15 @@ fn do_main() -> Result<(), Error> {
                 }
             };
 
-            record(&out_path, pid, sample_rate, maybe_duration, spawned)
+            let outputter = Box::new(output::Flamegraph);
+            record(
+                outputter,
+                &out_path,
+                pid,
+                sample_rate,
+                maybe_duration,
+                spawned,
+            )
         }
     }
 }
@@ -130,7 +134,8 @@ fn snapshot(pid: pid_t) -> Result<(), Error> {
 }
 
 fn record(
-    output_filename: &Path,
+    mut out: Box<output::Outputter>,
+    out_path: &Path,
     pid: pid_t,
     sample_rate: u32,
     maybe_duration: Option<std::time::Duration>,
@@ -140,7 +145,7 @@ fn record(
     // in a format that Brendan Gregg's stackcollapse.pl script understands
     let getter = initialize::initialize(pid)?;
 
-    eprintln!("Recording data to {}", output_filename.display());
+    eprintln!("Recording data to {}", out_path.display());
     let maybe_stop_time = match maybe_duration {
         None => {
             eprintln!("Press Ctrl+C to stop");
@@ -149,50 +154,43 @@ fn record(
         Some(duration) => Some(std::time::Instant::now() + duration),
     };
 
-    let total = Arc::new(AtomicUsize::new(0));
-    let errors = Arc::new(AtomicUsize::new(0));
-    let total_clone = total.clone();
-    let errors_clone = errors.clone();
+    let mut total = 0;
+    let mut errors = 0;
+    let done = Arc::new(AtomicBool::new(false));
+    let done_clone = done.clone();
 
     if is_subcommand {
         // ignore Ctrl+C, on Ctrl+C the subprocess should just exit and then we'll exit normally
         ctrlc::set_handler(move || {}).expect("Error setting Ctrl-C handler");
     } else {
-        let outfile = output_filename.to_owned();
-        // set a signal handler so that we can write a flamegraph
         ctrlc::set_handler(move || {
+            if done_clone.load(Ordering::Relaxed) {
+                eprintln!("Multiple interrupts received, exiting with haste!");
+                std::process::exit(1);
+            }
             eprintln!("Interrupted.");
-            print_errors(errors_clone.clone(), total_clone.clone());
-            write_flamegraph(&outfile).expect("Writing flamegraph failed");
-            std::process::exit(0);
+            // Trigger the end of the loop
+            done_clone.store(true, Ordering::Relaxed);
         }).expect("Error setting Ctrl-C handler");
     }
 
-    let mut output = std::fs::File::create(&output_filename).context(format!(
+    let mut out_file = File::create(&out_path).context(format!(
         "Failed to create output file {}",
-        &output_filename.display()
+        &out_path.display()
     ))?;
-    loop {
-        total.fetch_add(1, Ordering::Relaxed);
+    while !done.load(Ordering::Relaxed) {
+        total += 1;
         let trace = getter.get_trace();
         match trace {
             Err(copy::MemoryCopyError::ProcessEnded) => {
-                print_errors(errors, total);
-                write_flamegraph(&output_filename).context("Failed to write flamegraph")?;
-                return Ok(());
+                break;
             }
             Ok(ref ok_trace) => {
-                for t in ok_trace.iter().rev() {
-                    write!(output, "{}", t)?;
-                    write!(output, ";")?;
-                }
-                writeln!(output, " {}", 1)?;
+                out.record(&mut out_file, ok_trace)?;
             }
             Err(x) => {
-                errors.fetch_add(1, Ordering::Relaxed);
-                let e = errors.fetch_add(0, Ordering::Relaxed) as f64;
-                let t = total.fetch_add(0, Ordering::Relaxed) as f64;
-                if e > 20.0 && e / t > 0.5 {
+                errors += 1;
+                if errors > 20 && (errors as f64) / (total as f64) > 0.5 {
                     print_errors(errors, total);
                     return Err(x.into());
                 }
@@ -200,61 +198,29 @@ fn record(
         }
         if let Some(stop_time) = maybe_stop_time {
             if std::time::Instant::now() > stop_time {
-                return Ok(());
+                break;
             }
         }
         std::thread::sleep(std::time::Duration::new(0, BILLION / sample_rate));
     }
-}
 
-fn print_errors(errors: Arc<AtomicUsize>, total: Arc<AtomicUsize>) {
-    let e = errors.fetch_add(0, Ordering::Relaxed);
-    let t = total.fetch_add(0, Ordering::Relaxed);
-    if e > 0 {
-        eprintln!("Dropped {}/{} stack traces because of errors.", e, t);
-    }
-}
-
-#[test]
-fn test_write_flamegraph() {
-    let tempdir = TempDir::new("flamegraph").unwrap();
-    let stacks_file = tempdir.path().join("stacks.txt");
-    let mut file = std::fs::File::create(&stacks_file).expect("couldn't create file");
-    for _ in 1..10 {
-        file.write(b"a;a;a;a 1").unwrap();
-    }
-    write_flamegraph(stacks_file.to_str().unwrap()).expect("Couldn't write flamegraph");
-    tempdir.close().unwrap();
-}
-
-fn write_flamegraph<P: AsRef<Path>>(stacks_filename: P) -> Result<(), Error> {
-    use std::io::Write;
-    use std::process::{Command, Stdio};
-    let stacks_filename = stacks_filename.as_ref();
-    let svg_filename = stacks_filename.with_extension("svg");
-    let output_svg = std::fs::File::create(&svg_filename)?;
-    eprintln!("Writing flamegraph to {}", svg_filename.display());
-    let mut child = Command::new("perl")
-        .arg("-")
-        .arg(stacks_filename)
-        .stdin(Stdio::piped())
-        .stdout(output_svg)
-        .spawn()
-        .context("Couldn't execute perl")?;
-    // TODO(nll): Remove this silliness after non-lexical lifetimes land.
-    {
-        let stdin = child.stdin.as_mut().expect("failed to write to stdin");
-        stdin.write_all(FLAMEGRAPH_SCRIPT)?;
-    }
-    child.wait()?;
+    out.complete(out_path, out_file)?;
     Ok(())
 }
 
-
+fn print_errors(errors: usize, total: usize) {
+    if errors > 0 {
+        eprintln!(
+            "Dropped {}/{} stack traces because of errors.",
+            errors,
+            total
+        );
+    }
+}
 
 #[test]
 fn test_output_filename() {
-    let d = TempDir::new("temp").unwrap();
+    let d = tempdir::TempDir::new("temp").unwrap();
     let dirname = d.path().to_str().unwrap();
     assert_eq!(output_filename("", Some("foo")).unwrap(), Path::new("foo"));
     let generated_filename = output_filename(dirname, None).unwrap();
