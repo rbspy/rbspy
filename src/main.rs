@@ -15,10 +15,10 @@ extern crate failure_derive;
 extern crate libc;
 #[macro_use]
 extern crate log;
-extern crate read_process_memory;
+extern crate rand;
 #[cfg(test)]
 extern crate rbspy_testdata;
-extern crate rand;
+extern crate read_process_memory;
 #[cfg(target_os = "macos")]
 extern crate regex;
 extern crate ruby_bindings as bindings;
@@ -32,7 +32,7 @@ use failure::Error;
 use failure::ResultExt;
 use std::fs::DirBuilder;
 use std::io::Write;
-use std::path::{PathBuf, Path};
+use std::path::{Path, PathBuf};
 use std::env;
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -54,10 +54,7 @@ const BILLION: u32 = 1000 * 1000 * 1000; // for nanosleep
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 enum Target {
     Pid { pid: pid_t },
-    Subprocess {
-        prog: String,
-        args: Vec<String>,
-    },
+    Subprocess { prog: String, args: Vec<String> },
 }
 use Target::*;
 
@@ -65,9 +62,14 @@ use Target::*;
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 enum SubCmd {
     /// Record `target`, writing output `output`.
-    Record { target: Target, out_path: PathBuf, sample_rate: u32, maybe_duration: Option<std::time::Duration>},
+    Record {
+        target: Target,
+        out_path: PathBuf,
+        sample_rate: u32,
+        maybe_duration: Option<std::time::Duration>,
+    },
     /// Capture and print a stacktrace snapshot of process `pid`.
-    Snapshot {pid: pid_t},
+    Snapshot { pid: pid_t },
 }
 use SubCmd::*;
 
@@ -85,16 +87,21 @@ fn do_main() -> Result<(), Error> {
 
     match args.cmd {
         Snapshot { pid } => snapshot(pid),
-        Record { target, out_path, sample_rate, maybe_duration } => {
+        Record {
+            target,
+            out_path,
+            sample_rate,
+            maybe_duration,
+        } => {
             let (pid, spawned) = match target {
-                Pid {pid} => (pid, false),
-                Subprocess { prog, args } => (Command::new(prog)
-                    .args(args)
-                    .spawn()?.id() as pid_t, true)
+                Pid { pid } => (pid, false),
+                Subprocess { prog, args } => {
+                    (Command::new(prog).args(args).spawn()?.id() as pid_t, true)
+                }
             };
 
             record(&out_path, pid, sample_rate, maybe_duration, spawned)
-        },
+        }
     }
 }
 
@@ -121,15 +128,24 @@ fn snapshot(pid: pid_t) -> Result<(), Error> {
     Ok(())
 }
 
-fn record(output_filename: &Path, pid: pid_t, sample_rate: u32, maybe_duration: Option<std::time::Duration>, is_subcommand: bool) -> Result<(), Error> {
+fn record(
+    output_filename: &Path,
+    pid: pid_t,
+    sample_rate: u32,
+    maybe_duration: Option<std::time::Duration>,
+    is_subcommand: bool,
+) -> Result<(), Error> {
     // This gets a stack trace and then just prints it out
     // in a format that Brendan Gregg's stackcollapse.pl script understands
     let getter = initialize::initialize(pid)?;
 
     eprintln!("Recording data to {}", output_filename.display());
     let maybe_stop_time = match maybe_duration {
-        None => { eprintln!("Press Ctrl+C to stop"); None },
-        Some(duration) => { Some(std::time::Instant::now() + duration) }
+        None => {
+            eprintln!("Press Ctrl+C to stop");
+            None
+        }
+        Some(duration) => Some(std::time::Instant::now() + duration),
     };
 
     let total = Arc::new(AtomicUsize::new(0));
@@ -146,11 +162,15 @@ fn record(output_filename: &Path, pid: pid_t, sample_rate: u32, maybe_duration: 
         ctrlc::set_handler(move || {
             eprintln!("Interrupted.");
             print_errors(errors_clone.clone(), total_clone.clone());
-            write_flamegraph(&outfile).expect("Writing flamegraph failed"); std::process::exit(0);
+            write_flamegraph(&outfile).expect("Writing flamegraph failed");
+            std::process::exit(0);
         }).expect("Error setting Ctrl-C handler");
     }
 
-    let mut output = std::fs::File::create(&output_filename).context(format!("Failed to create output file {}", &output_filename.display()))?;
+    let mut output = std::fs::File::create(&output_filename).context(format!(
+        "Failed to create output file {}",
+        &output_filename.display()
+    ))?;
     loop {
         total.fetch_add(1, Ordering::Relaxed);
         let trace = getter.get_trace();
@@ -158,8 +178,8 @@ fn record(output_filename: &Path, pid: pid_t, sample_rate: u32, maybe_duration: 
             Err(copy::MemoryCopyError::ProcessEnded) => {
                 print_errors(errors, total);
                 write_flamegraph(&output_filename).context("Failed to write flamegraph")?;
-                return Ok(())
-            },
+                return Ok(());
+            }
             Ok(ref ok_trace) => {
                 for t in ok_trace.iter().rev() {
                     write!(output, "{}", t)?;
@@ -171,7 +191,7 @@ fn record(output_filename: &Path, pid: pid_t, sample_rate: u32, maybe_duration: 
                 errors.fetch_add(1, Ordering::Relaxed);
                 let e = errors.fetch_add(0, Ordering::Relaxed) as f64;
                 let t = total.fetch_add(0, Ordering::Relaxed) as f64;
-                if e > 20.0 && e/t > 0.5 {
+                if e > 20.0 && e / t > 0.5 {
                     print_errors(errors, total);
                     return Err(x.into());
                 }
@@ -182,7 +202,7 @@ fn record(output_filename: &Path, pid: pid_t, sample_rate: u32, maybe_duration: 
                 return Ok(());
             }
         }
-        std::thread::sleep(std::time::Duration::new(0, BILLION/sample_rate));
+        std::thread::sleep(std::time::Duration::new(0, BILLION / sample_rate));
     }
 }
 
@@ -199,7 +219,9 @@ fn test_write_flamegraph() {
     let tempdir = TempDir::new("flamegraph").unwrap();
     let stacks_file = tempdir.path().join("stacks.txt");
     let mut file = std::fs::File::create(&stacks_file).expect("couldn't create file");
-    for _ in 1..10 { file.write(b"a;a;a;a 1").unwrap(); }
+    for _ in 1..10 {
+        file.write(b"a;a;a;a 1").unwrap();
+    }
     write_flamegraph(stacks_file.to_str().unwrap()).expect("Couldn't write flamegraph");
     tempdir.close().unwrap();
 }
@@ -235,23 +257,26 @@ fn test_output_filename() {
     let dirname = d.path().to_str().unwrap();
     assert_eq!(output_filename("", Some("foo")).unwrap(), Path::new("foo"));
     let generated_filename = output_filename(dirname, None).unwrap();
-    assert!(generated_filename.to_string_lossy().contains(".cache/rbspy/records/rbspy-"));
+    assert!(
+        generated_filename
+            .to_string_lossy()
+            .contains(".cache/rbspy/records/rbspy-")
+    );
 }
 
 fn output_filename(base_dir: &str, maybe_filename: Option<&str>) -> Result<PathBuf, Error> {
     use rand::{self, Rng};
 
     let path = match maybe_filename {
-        Some(filename) => {
-            filename.into()
-        }
+        Some(filename) => filename.into(),
         None => {
-            let s = rand::thread_rng().gen_ascii_chars().take(10).collect::<String>();
+            let s = rand::thread_rng()
+                .gen_ascii_chars()
+                .take(10)
+                .collect::<String>();
             let filename = format!("{}-{}-{}.txt", "rbspy", Utc::now().format("%Y-%m-%d"), s);
             let dirname = Path::new(base_dir).join(".cache/rbspy/records");
-            DirBuilder::new()
-                .recursive(true)
-                .create(&dirname)?;
+            DirBuilder::new().recursive(true).create(&dirname)?;
             dirname.join(&filename)
         }
     };
@@ -261,8 +286,7 @@ fn output_filename(base_dir: &str, maybe_filename: Option<&str>) -> Result<PathB
 /// Check `s` is a positive integer.
 // This assumes a process group isn't a sensible thing to snapshot; could be wrong!
 fn validate_pid(s: String) -> Result<(), String> {
-    let pid: pid_t = s.parse()
-        .map_err(|_| "PID must be an integer".to_string())?;
+    let pid: pid_t = s.parse().map_err(|_| "PID must be an integer".to_string())?;
     if pid <= 0 {
         return Err("PID must be positive".to_string());
     }
@@ -284,10 +308,10 @@ fn arg_parser() -> App<'static, 'static> {
         .subcommand(
             SubCommand::with_name("snapshot")
                 .about("Snapshot a single stack trace")
-                .arg(Arg::from_usage(
-                        "-p --pid=[PID] 'PID of the Ruby process you want to profile'")
-                    .validator(validate_pid)
-                    .required(true)
+                .arg(
+                    Arg::from_usage("-p --pid=[PID] 'PID of the Ruby process you want to profile'")
+                        .validator(validate_pid)
+                        .required(true),
                 ),
         )
         .subcommand(
@@ -301,31 +325,40 @@ fn arg_parser() -> App<'static, 'static> {
                     // for `--pid` and `cmd`.
                     .required_unless("cmd")
                     .conflicts_with("cmd"),
-                    )
-                .arg(Arg::from_usage("-f --file=[FILE] 'File to write output to'")
-                     .validator(validate_filename)
-                     .required(false))
-                .arg(Arg::from_usage("-r --rate=[RATE] 'Samples per second collected'")
-		     .required(false))
-                .arg(Arg::from_usage("-d --duration=[DURATION] 'Length of time before ending data collection'")
-                .conflicts_with("cmd")
-		     .required(false))
-                .arg(Arg::from_usage("<cmd>... 'command to run'")
-                     .required(false)),
-                     )
+                )
+                .arg(
+                    Arg::from_usage("-f --file=[FILE] 'File to write output to'")
+                        .validator(validate_filename)
+                        .required(false),
+                )
+                .arg(
+                    Arg::from_usage("-r --rate=[RATE] 'Samples per second collected'")
+                        .required(false),
+                )
+                .arg(
+                    Arg::from_usage(
+                        "-d --duration=[DURATION] 'Length of time before ending data collection'",
+                    ).conflicts_with("cmd")
+                        .required(false),
+                )
+                .arg(Arg::from_usage("<cmd>... 'command to run'").required(false)),
+        )
 }
 
 impl Args {
     /// Converts from clap's matches.
     // TODO(TryFrom): Replace with TryFrom whenever that stabilizes.
     // TODO(maybe): Consider replacing with one of the derive-based arg thingies.
-    fn from<'a, I: IntoIterator<Item=String> + 'a>(args: I) -> Result<Args, Error> {
+    fn from<'a, I: IntoIterator<Item = String> + 'a>(args: I) -> Result<Args, Error> {
         let matches: ArgMatches<'a> = arg_parser().get_matches_from(args);
 
         fn get_pid(matches: &ArgMatches) -> Option<pid_t> {
             if let Some(pid_str) = matches.value_of("pid") {
-                Some(pid_str.parse()
-                     .expect("this shouldn't happen because clap validated the arg"))
+                Some(
+                    pid_str
+                        .parse()
+                        .expect("this shouldn't happen because clap validated the arg"),
+                )
             } else {
                 None
             }
@@ -334,21 +367,21 @@ impl Args {
         let cmd = match matches.subcommand() {
             ("snapshot", Some(submatches)) => Snapshot {
                 pid: get_pid(submatches)
-                    .expect("this shouldn't happen because clap requires a pid")
+                    .expect("this shouldn't happen because clap requires a pid"),
             },
             ("record", Some(submatches)) => {
-                let out_path = output_filename(&std::env::var("HOME")?, submatches.value_of("file"))?;
+                let out_path =
+                    output_filename(&std::env::var("HOME")?, submatches.value_of("file"))?;
                 let maybe_duration = match value_t!(submatches, "duration", u64) {
-                    Err(_) =>  None ,
-                    Ok(integer_duration) =>  Some(std::time::Duration::from_secs(integer_duration))
+                    Err(_) => None,
+                    Ok(integer_duration) => Some(std::time::Duration::from_secs(integer_duration)),
                 };
 
                 let sample_rate = value_t!(submatches, "rate", u32).unwrap_or(100);
                 let target = if let Some(pid) = get_pid(submatches) {
                     Pid { pid }
                 } else {
-                    let mut cmd = submatches.values_of("cmd")
-                        .expect("shouldn't happen");
+                    let mut cmd = submatches.values_of("cmd").expect("shouldn't happen");
                     let prog = cmd.next().expect("nope");
                     let args = cmd;
                     Subprocess {
@@ -360,7 +393,7 @@ impl Args {
                     target,
                     out_path,
                     sample_rate,
-                    maybe_duration
+                    maybe_duration,
                 }
             }
             _ => panic!("this shouldn't happen, please report the command you ran!"),
@@ -384,54 +417,79 @@ mod tests {
     #[test]
     fn test_arg_parsing() {
         match Args::from(make_args("rbspy record --pid 1234")).unwrap() {
-            Args { cmd: Record { target: Pid { pid: 1234 }, .. } } => (),
+            Args {
+                cmd:
+                    Record {
+                        target: Pid { pid: 1234 },
+                        ..
+                    },
+            } => (),
             x => panic!("Unexpected: {:?}", x),
         };
 
         let args = Args::from(make_args("rbspy snapshot --pid 1234")).unwrap();
-        assert_eq!(args, Args { cmd: Snapshot { pid: 1234 } });
+        assert_eq!(
+            args,
+            Args {
+                cmd: Snapshot { pid: 1234 },
+            }
+        );
 
         match Args::from(make_args("rbspy record ruby blah.rb")).unwrap() {
             Args {
-                cmd: Record {
-                    target: Subprocess { prog, args },
-                    ..
-                }
+                cmd:
+                    Record {
+                        target: Subprocess { prog, args },
+                        ..
+                    },
             } => {
                 assert_eq!(prog, "ruby");
                 assert_eq!(args, vec!["blah.rb".to_string()]);
-            },
+            }
             x => panic!("Unexpected: {:?}", x),
         };
 
         let args = Args::from(make_args("rbspy record --pid 1234 --file foo.txt")).unwrap();
-        assert_eq!(args, Args {
-            cmd: Record {
-                target: Pid { pid: 1234 },
-                out_path: "foo.txt".into(),
-                sample_rate: 100,
-                maybe_duration: None
+        assert_eq!(
+            args,
+            Args {
+                cmd: Record {
+                    target: Pid { pid: 1234 },
+                    out_path: "foo.txt".into(),
+                    sample_rate: 100,
+                    maybe_duration: None,
+                },
             }
-        });
+        );
 
-        let args = Args::from(make_args("rbspy record --pid 1234 --file foo.txt --rate 25")).unwrap();
-        assert_eq!(args, Args {
-            cmd: Record {
-                target: Pid { pid: 1234 },
-                out_path: "foo.txt".into(),
-                sample_rate: 25,
-                maybe_duration: None
+        let args = Args::from(make_args(
+            "rbspy record --pid 1234 --file foo.txt --rate 25",
+        )).unwrap();
+        assert_eq!(
+            args,
+            Args {
+                cmd: Record {
+                    target: Pid { pid: 1234 },
+                    out_path: "foo.txt".into(),
+                    sample_rate: 25,
+                    maybe_duration: None,
+                },
             }
-        });
+        );
 
-        let args = Args::from(make_args("rbspy record --pid 1234 --file foo.txt --duration 60")).unwrap();
-        assert_eq!(args, Args {
-            cmd: Record {
-                target: Pid { pid: 1234 },
-                out_path: "foo.txt".into(),
-                sample_rate: 100,
-                maybe_duration: Some(std::time::Duration::from_secs(60))
+        let args = Args::from(make_args(
+            "rbspy record --pid 1234 --file foo.txt --duration 60",
+        )).unwrap();
+        assert_eq!(
+            args,
+            Args {
+                cmd: Record {
+                    target: Pid { pid: 1234 },
+                    out_path: "foo.txt".into(),
+                    sample_rate: 100,
+                    maybe_duration: Some(std::time::Duration::from_secs(60)),
+                },
             }
-        });
+        );
     }
 }
