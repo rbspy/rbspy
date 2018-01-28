@@ -7,6 +7,7 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
+use callgrind;
 use initialize::StackFrame;
 
 const FLAMEGRAPH_SCRIPT: &'static [u8] = include_bytes!("../vendor/flamegraph/flamegraph.pl");
@@ -33,6 +34,21 @@ impl Outputter for Flamegraph {
     fn complete(&mut self, path: &Path, file: File) -> Result<(), Error> {
         drop(file); // close it!
         write_flamegraph(path).context("Writing flamegraph failed")?;
+        Ok(())
+    }
+}
+
+pub struct Callgrind(pub callgrind::Stats);
+
+impl Outputter for Callgrind {
+    fn record(&mut self, _file: &mut File, stack: &Vec<StackFrame>) -> Result<(), Error> {
+        self.0.add(stack);
+        Ok(())
+    }
+
+    fn complete(&mut self, _path: &Path, mut file: File) -> Result<(), Error> {
+        self.0.finish();
+        self.0.write(&mut file)?;
         Ok(())
     }
 }

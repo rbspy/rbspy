@@ -55,6 +55,15 @@ enum Target {
 }
 use Target::*;
 
+// Formats we can write to
+arg_enum!{
+    #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+    pub enum OutputFormat {
+        Flamegraph,
+        Callgrind,
+    }
+}
+
 /// Subcommand.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 enum SubCmd {
@@ -64,6 +73,7 @@ enum SubCmd {
         out_path: PathBuf,
         sample_rate: u32,
         maybe_duration: Option<std::time::Duration>,
+        format: OutputFormat,
     },
     /// Capture and print a stacktrace snapshot of process `pid`.
     Snapshot { pid: pid_t },
@@ -89,6 +99,7 @@ fn do_main() -> Result<(), Error> {
             out_path,
             sample_rate,
             maybe_duration,
+            format,
         } => {
             let (pid, spawned) = match target {
                 Pid { pid } => (pid, false),
@@ -97,9 +108,8 @@ fn do_main() -> Result<(), Error> {
                 }
             };
 
-            let outputter = Box::new(output::Flamegraph);
             record(
-                outputter,
+                format.outputter(),
                 &out_path,
                 pid,
                 sample_rate,
@@ -131,6 +141,15 @@ fn snapshot(pid: pid_t) -> Result<(), Error> {
         println!("{}", x);
     }
     Ok(())
+}
+
+impl OutputFormat {
+    fn outputter(self) -> Box<output::Outputter> {
+        match self {
+            OutputFormat::Flamegraph => Box::new(output::Flamegraph),
+            OutputFormat::Callgrind => Box::new(output::Callgrind(callgrind::Stats::new())),
+        }
+    }
 }
 
 fn record(
@@ -303,6 +322,12 @@ fn arg_parser() -> App<'static, 'static> {
                         .required(false),
                 )
                 .arg(
+                    Arg::from_usage("--format=[FORMAT] 'Output format to write'")
+                        .possible_values(&OutputFormat::variants())
+                        .case_insensitive(true)
+                        .default_value("Flamegraph"),
+                )
+                .arg(
                     Arg::from_usage(
                         "-d --duration=[DURATION] 'Length of time before ending data collection'",
                     ).conflicts_with("cmd")
@@ -356,11 +381,13 @@ impl Args {
                         args: args.map(String::from).collect(),
                     }
                 };
+                let format = value_t!(submatches, "format", OutputFormat).unwrap();
                 Record {
                     target,
                     out_path,
                     sample_rate,
                     maybe_duration,
+                    format,
                 }
             }
             _ => panic!("this shouldn't happen, please report the command you ran!"),
@@ -425,6 +452,7 @@ mod tests {
                     out_path: "foo.txt".into(),
                     sample_rate: 100,
                     maybe_duration: None,
+                    format: OutputFormat::Flamegraph,
                 },
             }
         );
@@ -440,6 +468,7 @@ mod tests {
                     out_path: "foo.txt".into(),
                     sample_rate: 25,
                     maybe_duration: None,
+                    format: OutputFormat::Flamegraph,
                 },
             }
         );
@@ -455,6 +484,23 @@ mod tests {
                     out_path: "foo.txt".into(),
                     sample_rate: 100,
                     maybe_duration: Some(std::time::Duration::from_secs(60)),
+                    format: OutputFormat::Flamegraph,
+                },
+            }
+        );
+
+        let args = Args::from(make_args(
+            "rbspy record --pid 1234 --file foo.txt --format callgrind --duration 60",
+        )).unwrap();
+        assert_eq!(
+            args,
+            Args {
+                cmd: Record {
+                    target: Pid { pid: 1234 },
+                    out_path: "foo.txt".into(),
+                    sample_rate: 100,
+                    maybe_duration: Some(std::time::Duration::from_secs(60)),
+                    format: OutputFormat::Callgrind,
                 },
             }
         );
