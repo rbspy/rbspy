@@ -3,6 +3,7 @@ use copy;
 use failure::Error;
 use failure::ResultExt;
 use libc::{c_char, pid_t};
+use std::cmp::Ordering;
 use std::fmt;
 use std::time::Duration;
 use std;
@@ -57,6 +58,20 @@ impl StackFrame {
     }
 }
 
+impl Ord for StackFrame {
+    fn cmp(&self, other: &StackFrame) -> Ordering {
+        self.path()
+            .cmp(other.path())
+            .then(self.name.cmp(&other.name))
+            .then(self.lineno.cmp(&other.lineno))
+    }
+}
+
+impl PartialOrd for StackFrame {
+    fn partial_cmp(&self, other: &StackFrame) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 // Use a StackTraceGetter to get stack traces
 pub struct StackTraceGetter {

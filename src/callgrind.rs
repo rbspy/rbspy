@@ -1,5 +1,5 @@
 use std::cmp::min;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io;
 
 use initialize::StackFrame;
@@ -108,7 +108,27 @@ impl Stats {
     }
 
     pub fn write(&self, w: &mut io::Write) -> io::Result<()> {
-        // TODO
+        writeln!(w, "# callgrind format")?;
+        writeln!(w, "version: 1")?;
+        writeln!(w, "creator: rbspy")?;
+        writeln!(w, "events: Samples")?;
+
+        // Sort for consistent results
+        let sorted: BTreeMap<_, _> = self.locations.0.iter().collect();
+        for (frame, loc) in sorted.iter() {
+            writeln!(w, "")?;
+            writeln!(w, "fl={}", frame.path())?;
+            writeln!(w, "fn={}", &frame.name)?;
+            writeln!(w, "{} {}", frame.lineno, loc.exclusive)?;
+            let csorted: BTreeMap<_, _> = loc.calls.iter().collect();
+            for (cframe, call) in csorted.iter() {
+                writeln!(w, "cfl={}", cframe.path())?;
+                writeln!(w, "cfn={}", &cframe.name)?;
+                writeln!(w, "calls={} {}", call.count, cframe.lineno)?;
+                writeln!(w, "{} {}", frame.lineno, call.inclusive)?;
+            }
+        }
+
         Ok(())
     }
 }
@@ -205,11 +225,63 @@ mod tests {
         assert_location(stats, f(1), 1, 3);
         assert_location(stats, f(2), 2, 1);
         assert_location(stats, f(3), 3, 0);
-        assert_location(stats, f(4), 0, 1);
-        assert_inclusive(stats, f(1), f(2), 3);
-        assert_inclusive(stats, f(1), f(3), 1);
-        assert_inclusive(stats, f(1), f(4), 1);
-        assert_inclusive(stats, f(2), f(3), 1);
-        assert_inclusive(stats, f(4), f(3), 1);
+        assert_location(stats, fdup(), 0, 1);
+        assert_inclusive(stats, f(1), f(2), 2, 3);
+        assert_inclusive(stats, f(1), f(3), 1, 1);
+        assert_inclusive(stats, f(1), fdup(), 1, 1);
+        assert_inclusive(stats, f(2), f(3), 1, 1);
+        assert_inclusive(stats, fdup(), f(3), 1, 1);
+    }
+
+    #[test]
+    fn stats_write() {
+        let expected = "# callgrind format
+version: 1
+creator: rbspy
+events: Samples
+
+fl=file1.rb
+fn=func1
+1 1
+cfl=file1.rb
+cfn=funcX
+calls=1 42
+1 1
+cfl=file2.rb
+cfn=func2
+calls=2 2
+1 3
+cfl=file3.rb
+cfn=func3
+calls=1 3
+1 1
+
+fl=file1.rb
+fn=funcX
+42 0
+cfl=file3.rb
+cfn=func3
+calls=1 3
+42 1
+
+fl=file2.rb
+fn=func2
+2 2
+cfl=file3.rb
+cfn=func3
+calls=1 3
+2 1
+
+fl=file3.rb
+fn=func3
+3 3
+";
+
+        let mut buf: Vec<u8> = Vec::new();
+        build_test_stats()
+            .write(&mut buf)
+            .expect("Callgrind write failed");
+        let actual = String::from_utf8(buf).expect("Callgrind output not utf8");
+        assert_eq!(actual, expected, "Unexpected callgrind output");
     }
 }
