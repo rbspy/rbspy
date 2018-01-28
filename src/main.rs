@@ -46,6 +46,7 @@ pub mod address_finder;
 pub mod initialize;
 pub mod copy;
 pub mod ruby_version;
+pub mod callgrind;
 
 const FLAMEGRAPH_SCRIPT: &'static [u8] = include_bytes!("../vendor/flamegraph/flamegraph.pl");
 const BILLION: u32 = 1000 * 1000 * 1000; // for nanosleep

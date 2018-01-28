@@ -40,7 +40,7 @@ pub fn initialize(pid: pid_t) -> Result<StackTraceGetter, Error> {
     })
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct StackFrame {
     pub name: String,
     pub relative_path: String,
