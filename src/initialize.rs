@@ -3,6 +3,7 @@ use copy;
 use failure::Error;
 use failure::ResultExt;
 use libc::{c_char, pid_t};
+use std::cmp::Ordering;
 use std::fmt;
 use std::time::Duration;
 use std;
@@ -40,12 +41,36 @@ pub fn initialize(pid: pid_t) -> Result<StackTraceGetter, Error> {
     })
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct StackFrame {
     pub name: String,
     pub relative_path: String,
     pub absolute_path: Option<String>,
     pub lineno: u32,
+}
+
+impl StackFrame {
+    pub fn path(&self) -> &str {
+        match self.absolute_path {
+            Some(ref p) => p.as_ref(),
+            None => self.relative_path.as_ref(),
+        }
+    }
+}
+
+impl Ord for StackFrame {
+    fn cmp(&self, other: &StackFrame) -> Ordering {
+        self.path()
+            .cmp(other.path())
+            .then(self.name.cmp(&other.name))
+            .then(self.lineno.cmp(&other.lineno))
+    }
+}
+
+impl PartialOrd for StackFrame {
+    fn partial_cmp(&self, other: &StackFrame) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 // Use a StackTraceGetter to get stack traces
@@ -58,11 +83,7 @@ pub struct StackTraceGetter {
 
 impl fmt::Display for StackFrame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(abspath) = self.absolute_path.as_ref() {
-            write!(f, "{} - {} line {}", self.name, abspath, self.lineno)
-        } else {
-            write!(f, "{} - {} line {}", self.name, self.relative_path, self.lineno)
-        }
+        write!(f, "{} - {} line {}", self.name, self.path(), self.lineno)
     }
 }
 
