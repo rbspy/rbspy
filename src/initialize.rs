@@ -31,7 +31,7 @@ pub fn initialize(pid: pid_t) -> Result<StackTraceGetter, Error> {
 
     debug!("version: {}", version);
     Ok(StackTraceGetter {
-        pid: pid,
+        process_handle: pid.try_into_process_handle().unwrap(),
         current_thread_addr_location: address_finder::current_thread_address(
             pid,
             &version,
@@ -75,7 +75,7 @@ impl PartialOrd for StackFrame {
 
 // Use a StackTraceGetter to get stack traces
 pub struct StackTraceGetter {
-    pid: pid_t,
+    process_handle: ProcessHandle,
     current_thread_addr_location: usize,
     stack_trace_function:
         Box<Fn(usize, &ProcessHandle) -> Result<Vec<StackFrame>, MemoryCopyError>>,
@@ -92,7 +92,7 @@ impl StackTraceGetter {
         let stack_trace_function = &self.stack_trace_function;
         stack_trace_function(
             self.current_thread_addr_location,
-            &self.pid.try_into_process_handle().unwrap(),
+            &self.process_handle,
         )
     }
 }
@@ -103,8 +103,9 @@ fn get_ruby_version_retry(pid: pid_t) -> Result<String, Error> {
     // this exists because sometimes rbenv takes a while to exec the right Ruby binary.
     // we are dumb right now so we just... wait until it seems to work out.
     let mut i = 0;
+    let source = &pid.try_into_process_handle().unwrap();
     loop {
-        let version = get_ruby_version(pid);
+        let version = get_ruby_version(pid, source);
         if i > 100 {
             return Ok(version?);
         }
@@ -112,6 +113,9 @@ fn get_ruby_version_retry(pid: pid_t) -> Result<String, Error> {
             Err(err) => {
                 match err.root_cause().downcast_ref::<AddressFinderError>() {
                     Some(&AddressFinderError::PermissionDenied(_)) => {
+                        return Err(err.into());
+                    }
+                    Some(&AddressFinderError::MacPermissionDenied(_)) => {
                         return Err(err.into());
                     }
                     Some(&AddressFinderError::NoSuchProcess(_)) => {
@@ -136,9 +140,9 @@ fn get_ruby_version_retry(pid: pid_t) -> Result<String, Error> {
     }
 }
 
-pub fn get_ruby_version(pid: pid_t) -> Result<String, Error> {
+pub fn get_ruby_version(pid: pid_t, source: &ProcessHandle) -> Result<String, Error> {
     let addr = address_finder::get_ruby_version_address(pid)?;
-    let x: [c_char; 15] = copy_struct(addr, &pid.try_into_process_handle().unwrap())?;
+    let x: [c_char; 15] = copy_struct(addr, source)?;
     Ok(unsafe {
         std::ffi::CStr::from_ptr(x.as_ptr() as *mut c_char)
             .to_str()?
@@ -147,6 +151,7 @@ pub fn get_ruby_version(pid: pid_t) -> Result<String, Error> {
 }
 
 #[test]
+#[cfg(target_os = "linux")]
 fn test_get_nonexistent_process() {
     let version = get_ruby_version_retry(10000);
     match version
@@ -161,6 +166,7 @@ fn test_get_nonexistent_process() {
 }
 
 #[test]
+#[cfg(target_os = "linux")]
 fn test_get_disallowed_process() {
     let version = get_ruby_version_retry(1);
     match version
@@ -173,7 +179,9 @@ fn test_get_disallowed_process() {
         _ => assert!(false, "Expected NoSuchProcess error"),
     }
 }
+
 #[test]
+#[cfg(target_os = "linux")]
 fn test_current_thread_address() {
     let mut process = std::process::Command::new("/usr/bin/ruby").spawn().unwrap();
     let pid = process.id() as pid_t;
@@ -182,6 +190,37 @@ fn test_current_thread_address() {
     let result = address_finder::current_thread_address(pid, &version, is_maybe_thread);
     assert!(result.is_ok(), format!("result not ok: {:?}", result));
     process.kill().unwrap();
+}
+
+
+#[test]
+#[cfg(target_os = "macos")]
+fn test_get_nonexistent_process() {
+    let version = get_ruby_version_retry(10000);
+    match version
+        .unwrap_err()
+        .root_cause()
+        .downcast_ref::<AddressFinderError>()
+        .unwrap()
+        {
+            &AddressFinderError::MacPermissionDenied(_) => {}
+            _ => assert!(false, "Expected PermissionDenied error"),
+        }
+}
+
+#[test]
+#[cfg(target_os = "macos")]
+fn test_get_disallowed_process() {
+    let version = get_ruby_version_retry(1);
+    match version
+        .unwrap_err()
+        .root_cause()
+        .downcast_ref::<AddressFinderError>()
+        .unwrap()
+        {
+            &AddressFinderError::MacPermissionDenied(_) => {}
+            _ => assert!(false, "Expected PermissionDenied error"),
+        }
 }
 
 fn is_maybe_thread_function<T: 'static>(

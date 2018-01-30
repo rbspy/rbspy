@@ -46,6 +46,9 @@ where
     source.copy_address(addr as usize, &mut copy).map_err(|x| {
         if x.raw_os_error() == Some(3) {
             MemoryCopyError::ProcessEnded
+        } else if x.raw_os_error() == Some(60) {
+            // On Mac code 60 seems to more or less correspond to "process ended"
+            MemoryCopyError::ProcessEnded
         } else if x.kind() == std::io::ErrorKind::PermissionDenied {
             MemoryCopyError::PermissionDenied
         } else {
