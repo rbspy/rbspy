@@ -10,9 +10,16 @@ extern crate elf;
 extern crate env_logger;
 #[macro_use]
 extern crate failure;
+#[cfg(target_os = "macos")]
+extern crate goblin;
 #[macro_use]
 extern crate failure_derive;
 extern crate libc;
+#[cfg(target_os = "macos")]
+extern crate libproc;
+#[cfg(target_os = "macos")]
+extern crate mach;
+extern crate nix;
 #[macro_use]
 extern crate log;
 extern crate rand;
@@ -21,6 +28,8 @@ extern crate rbspy_testdata;
 extern crate read_process_memory;
 #[cfg(target_os = "macos")]
 extern crate regex;
+#[cfg(target_os = "macos")]
+extern crate lazy_static;
 extern crate ruby_bindings as bindings;
 #[cfg(test)]
 extern crate tempdir;
@@ -36,8 +45,11 @@ use std::env;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::os::unix::prelude::*;
 
 pub mod proc_maps;
+#[cfg(target_os = "macos")]
+pub mod mac_maps;
 pub mod address_finder;
 pub mod initialize;
 pub mod copy;
@@ -74,6 +86,7 @@ enum SubCmd {
         sample_rate: u32,
         maybe_duration: Option<std::time::Duration>,
         format: OutputFormat,
+        no_drop_root: bool,
     },
     /// Capture and print a stacktrace snapshot of process `pid`.
     Snapshot { pid: pid_t },
@@ -100,11 +113,19 @@ fn do_main() -> Result<(), Error> {
             sample_rate,
             maybe_duration,
             format,
+            no_drop_root,
         } => {
             let pid = match target {
                 Pid { pid } => pid,
                 Subprocess { prog, args } => {
-                    Command::new(prog).args(args).spawn()?.id() as pid_t
+                    let uid_str = std::env::var("SUDO_UID");
+                    if nix::unistd::Uid::effective().is_root() && !no_drop_root  && uid_str.is_ok() {
+                        let uid: u32 = uid_str.unwrap().parse::<u32>().context("Failed to parse UID")?;
+                        eprintln!("Dropping permissions: running Ruby command as user {}", std::env::var("SUDO_USER")?);
+                        Command::new(prog).uid(uid).args(args).spawn()?.id() as pid_t
+                    } else {
+                        Command::new(prog).args(args).spawn()?.id() as pid_t
+                    }
                 }
             };
 
@@ -119,7 +140,24 @@ fn do_main() -> Result<(), Error> {
     }
 }
 
+fn sudo_if_not_root() -> bool {
+    let euid = nix::unistd::Uid::effective();
+    if euid.is_root() {
+        return true;
+    } else {
+        println!("rbspy only works as root on Mac. Try rerunning with `sudo --preserve-env !!`.");
+        println!("If you run `sudo rbspy record ruby your-program.rb`, rbspy will drop privileges when running `ruby your-program.rb`. If you want the Ruby program to run as root, use `rbspy --no-drop-root`.");
+        return false;
+    }
+}
+
 fn main() {
+    if cfg!(target_os = "macos") {
+        let ok = sudo_if_not_root();
+        if !ok {
+            return;
+        }
+    }
     match do_main() {
         Err(x) => {
             eprintln!("Error. Causes: ");
@@ -315,6 +353,10 @@ fn arg_parser() -> App<'static, 'static> {
                         .required(false),
                 )
                 .arg(
+                    Arg::from_usage("--no-drop-root 'Don't drop root privileges when running a Ruby program as a subprocess'")
+                        .required(false),
+                )
+                .arg(
                     Arg::from_usage("--format=[FORMAT] 'Output format to write'")
                         .possible_values(&OutputFormat::variants())
                         .case_insensitive(true)
@@ -362,6 +404,8 @@ impl Args {
                     Ok(integer_duration) => Some(std::time::Duration::from_secs(integer_duration)),
                 };
 
+                let no_drop_root = submatches.occurrences_of("no-drop-root") == 1;
+
                 let sample_rate = value_t!(submatches, "rate", u32).unwrap_or(100);
                 let target = if let Some(pid) = get_pid(submatches) {
                     Pid { pid }
@@ -381,6 +425,7 @@ impl Args {
                     sample_rate,
                     maybe_duration,
                     format,
+                    no_drop_root
                 }
             }
             _ => panic!("this shouldn't happen, please report the command you ran!"),
@@ -446,6 +491,7 @@ mod tests {
                     sample_rate: 100,
                     maybe_duration: None,
                     format: OutputFormat::Flamegraph,
+                    no_drop_root: false,
                 },
             }
         );
@@ -462,6 +508,7 @@ mod tests {
                     sample_rate: 25,
                     maybe_duration: None,
                     format: OutputFormat::Flamegraph,
+                    no_drop_root: false,
                 },
             }
         );
@@ -478,6 +525,7 @@ mod tests {
                     sample_rate: 100,
                     maybe_duration: Some(std::time::Duration::from_secs(60)),
                     format: OutputFormat::Flamegraph,
+                    no_drop_root: false,
                 },
             }
         );
@@ -494,6 +542,24 @@ mod tests {
                     sample_rate: 100,
                     maybe_duration: Some(std::time::Duration::from_secs(60)),
                     format: OutputFormat::Callgrind,
+                    no_drop_root: false,
+                },
+            }
+        );
+
+        let args = Args::from(make_args(
+            "rbspy record --pid 1234 --file foo.txt --format callgrind --no-drop-root",
+        )).unwrap();
+        assert_eq!(
+            args,
+            Args {
+                cmd: Record {
+                    target: Pid { pid: 1234 },
+                    out_path: "foo.txt".into(),
+                    sample_rate: 100,
+                    maybe_duration: None,
+                    format: OutputFormat::Callgrind,
+                    no_drop_root: true,
                 },
             }
         );
