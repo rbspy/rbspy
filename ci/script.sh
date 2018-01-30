@@ -10,7 +10,7 @@ set -ex
 # `before_deploy`/packaging phase
 run_test_suite() {
     cargo build --target $TARGET --verbose
-    cargo test --target $TARGET
+    env RUST_BACKTRACE=1 cargo test --target $TARGET
 
     # sanity check the file type
     file target/$TARGET/debug/rbspy
@@ -29,23 +29,30 @@ run_test_suite() {
 run_ruby_integration_tests_mac() {
     # Tests that rbspy works with rvm and rbenv-installed Ruby on Mac
     curl -sSL https://get.rvm.io | bash
-    brew install ruby-build
+    git clone https://github.com/rbenv/ruby-build.git /tmp/ruby-build
+    brew install openssl
+    brew install zlib
+    brew install yaml
+    brew install readline
+    PREFIX=/usr/local sudo /tmp/ruby-build/install.sh
     mkdir -p ~/.rbenv/versions
     export PATH=$PATH:~/.rvm/bin/
-    for version in ruby-2.0.0 ruby-2.2.0 ruby-2.4.0 ruby-2.5.0
+    ls ~/.rvm/rubies
+    for version in 2.2.0 2.4.0 2.5.0
         do
         ruby_version=ruby-$version
+
+        # rbenv
+        ruby-build $version ~/.rbenv/versions/$version
+        sudo env RUST_BACKTRACE=1 target/$TARGET/debug/rbspy record --file stacks.txt ~/.rbenv/versions/$version/bin/ruby ci/ruby-programs/short_program.rb
+        [ `wc -l stacks.txt | awk '{print $1}'` -gt "50" ]
 
         # rvm
         rvm install $ruby_version
         rvm use $ruby_version
-        sudo target/$TARGET/debug/rbspy record --file stacks.txt ruby ci/ruby-programs/short_program.rb
+        which ruby
+        sudo env RUST_BACKTRACE=1 target/$TARGET/debug/rbspy record --file stacks.txt ruby ci/ruby-programs/short_program.rb
         # check that the number of stacks counted is a reasonable number
-        [ `wc -l stacks.txt | awk '{print $1}'` -gt "50" ]
-
-        # rbenv
-        ruby-build $version ~/.rbenv/versions/$version
-        sudo target/$TARGET/debug/rbspy record --file stacks.txt ~/.rvm/rubies/$ruby_version/bin/ruby ci/ruby-programs/short_program.rb
         [ `wc -l stacks.txt | awk '{print $1}'` -gt "50" ]
         done
 }

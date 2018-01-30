@@ -31,7 +31,7 @@ pub fn initialize(pid: pid_t) -> Result<StackTraceGetter, Error> {
 
     debug!("version: {}", version);
     Ok(StackTraceGetter {
-        process_handle: pid.try_into_process_handle().unwrap(),
+        process_handle: pid.try_into_process_handle()?,
         current_thread_addr_location: address_finder::current_thread_address(
             pid,
             &version,
@@ -103,7 +103,7 @@ fn get_ruby_version_retry(pid: pid_t) -> Result<String, Error> {
     // this exists because sometimes rbenv takes a while to exec the right Ruby binary.
     // we are dumb right now so we just... wait until it seems to work out.
     let mut i = 0;
-    let source = &pid.try_into_process_handle().unwrap();
+    let source = &pid.try_into_process_handle().context("Couldn't connect to PID")?;
     loop {
         let version = get_ruby_version(pid, source);
         if i > 100 {
@@ -197,30 +197,18 @@ fn test_current_thread_address() {
 #[cfg(target_os = "macos")]
 fn test_get_nonexistent_process() {
     let version = get_ruby_version_retry(10000);
-    match version
-        .unwrap_err()
-        .root_cause()
-        .downcast_ref::<AddressFinderError>()
-        .unwrap()
-        {
-            &AddressFinderError::MacPermissionDenied(_) => {}
-            _ => assert!(false, "Expected PermissionDenied error"),
-        }
+    assert!(version.is_err());
 }
 
 #[test]
 #[cfg(target_os = "macos")]
 fn test_get_disallowed_process() {
-    let version = get_ruby_version_retry(1);
-    match version
-        .unwrap_err()
-        .root_cause()
-        .downcast_ref::<AddressFinderError>()
-        .unwrap()
-        {
-            &AddressFinderError::MacPermissionDenied(_) => {}
-            _ => assert!(false, "Expected PermissionDenied error"),
-        }
+    // getting the ruby version isn't allowed on Mac if the process isn't running as root
+    let mut process = std::process::Command::new("/usr/bin/ruby").spawn().unwrap();
+    let pid = process.id() as pid_t;
+    let version = get_ruby_version_retry(pid);
+    assert!(version.is_err());
+    process.kill().unwrap();
 }
 
 fn is_maybe_thread_function<T: 'static>(
