@@ -54,7 +54,8 @@ This is useful when you want to know what functions your program is spending mos
 
 ```
 sudo rbspy record --pid $PID
-# recording a subprocess doesn't require root access
+# recording a subprocess doesn't require root access on Linux
+# though on Mac rbspy always needs to run as root
 rbspy record ruby myprogram.rb
 ```
 
