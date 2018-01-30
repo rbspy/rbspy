@@ -101,10 +101,10 @@ fn do_main() -> Result<(), Error> {
             maybe_duration,
             format,
         } => {
-            let (pid, spawned) = match target {
-                Pid { pid } => (pid, false),
+            let pid = match target {
+                Pid { pid } => pid,
                 Subprocess { prog, args } => {
-                    (Command::new(prog).args(args).spawn()?.id() as pid_t, true)
+                    Command::new(prog).args(args).spawn()?.id() as pid_t
                 }
             };
 
@@ -114,7 +114,6 @@ fn do_main() -> Result<(), Error> {
                 pid,
                 sample_rate,
                 maybe_duration,
-                spawned,
             )
         }
     }
@@ -158,7 +157,6 @@ fn record(
     pid: pid_t,
     sample_rate: u32,
     maybe_duration: Option<std::time::Duration>,
-    is_subcommand: bool,
 ) -> Result<(), Error> {
     // This gets a stack trace and then just prints it out
     // in a format that Brendan Gregg's stackcollapse.pl script understands
@@ -178,20 +176,15 @@ fn record(
     let done = Arc::new(AtomicBool::new(false));
     let done_clone = done.clone();
 
-    if is_subcommand {
-        // ignore Ctrl+C, on Ctrl+C the subprocess should just exit and then we'll exit normally
-        ctrlc::set_handler(move || {}).expect("Error setting Ctrl-C handler");
-    } else {
-        ctrlc::set_handler(move || {
-            if done_clone.load(Ordering::Relaxed) {
-                eprintln!("Multiple interrupts received, exiting with haste!");
-                std::process::exit(1);
-            }
-            eprintln!("Interrupted.");
-            // Trigger the end of the loop
-            done_clone.store(true, Ordering::Relaxed);
-        }).expect("Error setting Ctrl-C handler");
-    }
+    ctrlc::set_handler(move || {
+        if done_clone.load(Ordering::Relaxed) {
+            eprintln!("Multiple interrupts received, exiting with haste!");
+            std::process::exit(1);
+        }
+        eprintln!("Interrupted.");
+        // Trigger the end of the loop
+        done_clone.store(true, Ordering::Relaxed);
+    }).expect("Error setting Ctrl-C handler");
 
     let mut out_file = File::create(&out_path).context(format!(
         "Failed to create output file {}",
