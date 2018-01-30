@@ -3,12 +3,15 @@
 #
 # Changes:
 #   - no deb
-#   - no osx, 32-bit or ARM
-#   - darwin commented out for now
+#   - no 32-bit or ARM
 #   - no ARM
 
 language: rust
-cache: cargo
+cache:
+  cargo: true
+  directories:
+   - /home/travis/.rvm/
+   - /home/travis/.rbenv/
 
 services:
   - docker
@@ -23,7 +26,10 @@ env:
 # NOTE Make *sure* you don't remove a reference (&foo) if you are going to dereference it (*foo)
 matrix:
   include:
-    # stable channel
+    - os: osx
+      rust: stable
+      env: TARGET=x86_64-apple-darwin
+      sudo: required
     - os: linux
       rust: stable
       env: TARGET=x86_64-unknown-linux-musl
@@ -38,8 +44,8 @@ matrix:
 
 before_install:
   - export PATH="$PATH:$HOME/.cargo/bin"
-  - sudo apt-get update
-  - sudo apt-get -y install perl
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get update ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get -y install perl; fi
 
 install:
   - bash ci/install.sh
