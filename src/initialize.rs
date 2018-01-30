@@ -83,7 +83,7 @@ pub struct StackTraceGetter {
 
 impl fmt::Display for StackFrame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} - {} line {}", self.name, self.path(), self.lineno)
+        write!(f, "{1}:{2}:in `{0}'", self.name, self.path(), self.lineno)
     }
 }
 
