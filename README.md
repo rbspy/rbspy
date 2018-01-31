@@ -18,7 +18,7 @@ It's currently alpha software, and is being actively developed. Please report bu
 
 ## Requirements
 
-rbspy only runs on Linux\*. Mac support is planned.
+rbspy runs on Linux\* and Mac.
 
 <small>
 * kernel version 3.2+ required. For Ubuntu, this means Ubuntu 12.04 or newer.
