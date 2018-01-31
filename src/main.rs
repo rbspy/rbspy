@@ -217,11 +217,18 @@ impl SampleTime {
         }
     }
 
-    pub fn get_sleep_time(&mut self) -> u32 {
+    pub fn get_sleep_time(&mut self) -> Result<u32, u32> {
+        // Returns either the amount of time to sleep (Ok(x)) until next sample time or an error of
+        // how far we're behind if we're behind the expected next sample time
         self.num_samples += 1;
         let elapsed = self.start_time.elapsed();
         let nanos_elapsed = elapsed.as_secs() * BILLION + elapsed.subsec_nanos() as u64;
-        (self.num_samples * self.nanos_between_samples - nanos_elapsed) as u32
+        let target_elapsed = self.num_samples * self.nanos_between_samples;
+        if target_elapsed < nanos_elapsed {
+            Err((nanos_elapsed - target_elapsed) as u32)
+        } else {
+            Ok((target_elapsed - nanos_elapsed) as u32)
+        }
     }
 }
 
@@ -289,8 +296,11 @@ fn record(
             }
         }
         // Sleep until the next expected sample time
-        let sleep_time = sample_time.get_sleep_time();
-        std::thread::sleep(std::time::Duration::new(0, sleep_time));
+        //
+        match sample_time.get_sleep_time() {
+            Ok(sleep_time) => {std::thread::sleep(std::time::Duration::new(0, sleep_time));},
+            Err(behind_time) => {eprintln!("Behind expected sample time by {} nanoseconds, results may be inaccurate. Try sampling at a lower rate with `--rate`. Current rate: {}.", behind_time, sample_rate);},
+        }
     }
 
     out.complete(out_path, out_file)?;
