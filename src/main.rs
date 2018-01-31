@@ -36,6 +36,7 @@ use std::env;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Instant;
 
 pub mod proc_maps;
 pub mod address_finder;
@@ -45,7 +46,7 @@ pub mod ruby_version;
 pub mod callgrind;
 pub mod output;
 
-const BILLION: u32 = 1000 * 1000 * 1000; // for nanosleep
+const BILLION: u64 = 1000 * 1000 * 1000; // for nanosleep
 
 /// The kinds of things we can call `rbspy record` on.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -151,6 +152,34 @@ impl OutputFormat {
     }
 }
 
+// This SampleTime struct helps us sample on a regular schedule ("exactly" 100 times per second, if
+// the sample rate is 100).
+// What we do is -- when doing the 1234th sample, we calculate the exact time the 1234th sample
+// should happen at, which is (start time + nanos_between_samples * 1234) and then sleep until that
+// time
+struct SampleTime {
+    start_time: Instant,
+    nanos_between_samples: u64,
+    num_samples: u64,
+}
+
+impl SampleTime {
+    pub fn new(rate: u32) -> SampleTime {
+        SampleTime{
+            start_time: Instant::now(),
+            nanos_between_samples: BILLION / (rate as u64),
+            num_samples: 0,
+        }
+    }
+
+    pub fn get_sleep_time(&mut self) -> u32 {
+        self.num_samples += 1;
+        let elapsed = self.start_time.elapsed();
+        let nanos_elapsed = elapsed.as_secs() * BILLION + elapsed.subsec_nanos() as u64;
+        (self.num_samples * self.nanos_between_samples - nanos_elapsed) as u32
+    }
+}
+
 fn record(
     mut out: Box<output::Outputter>,
     out_path: &Path,
@@ -190,6 +219,7 @@ fn record(
         "Failed to create output file {}",
         &out_path.display()
     ))?;
+    let mut sample_time = SampleTime::new(sample_rate);
     while !done.load(Ordering::Relaxed) {
         total += 1;
         let trace = getter.get_trace();
@@ -213,7 +243,9 @@ fn record(
                 break;
             }
         }
-        std::thread::sleep(std::time::Duration::new(0, BILLION / sample_rate));
+        // Sleep until the next expected sample time
+        let sleep_time = sample_time.get_sleep_time();
+        std::thread::sleep(std::time::Duration::new(0, sleep_time));
     }
 
     out.complete(out_path, out_file)?;
