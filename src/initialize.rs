@@ -206,6 +206,9 @@ fn test_get_disallowed_process() {
     // getting the ruby version isn't allowed on Mac if the process isn't running as root
     let mut process = std::process::Command::new("/usr/bin/ruby").spawn().unwrap();
     let pid = process.id() as pid_t;
+    // sleep to prevent freezes (because of High Sierra kernel bug)
+    // TODO: figure out how to work around this race in a cleaner way
+    std::thread::sleep(std::time::Duration::from_millis(10));
     let version = get_ruby_version_retry(pid);
     assert!(version.is_err());
     process.kill().unwrap();
