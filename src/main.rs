@@ -120,6 +120,11 @@ fn do_main() -> Result<(), Error> {
                 Pid { pid } => pid,
                 Subprocess { prog, args } => {
                     let uid_str = std::env::var("SUDO_UID");
+                    if cfg!(target_os = "macos") {
+                        // sleep to prevent freezes (because of High Sierra kernel bug)
+                        // TODO: figure out how to work around this race in a cleaner way
+                        std::thread::sleep(std::time::Duration::from_millis(10));
+                    }
                     if nix::unistd::Uid::effective().is_root() && !no_drop_root && uid_str.is_ok() {
                         let uid: u32 = uid_str.unwrap().parse::<u32>().context(
                             "Failed to parse UID",
