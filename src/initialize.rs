@@ -2,6 +2,7 @@ use copy::*;
 use copy;
 use failure::Error;
 use failure::ResultExt;
+use failure::Fail;
 use libc::{c_char, pid_t};
 use std::cmp::Ordering;
 use std::fmt;
@@ -100,14 +101,22 @@ impl StackTraceGetter {
 // Everything below here is private
 
 fn get_ruby_version_retry(pid: pid_t) -> Result<String, Error> {
-    // this exists because sometimes rbenv takes a while to exec the right Ruby binary.
-    // we are dumb right now so we just... wait until it seems to work out.
+    /* This exists because:
+     * a) Sometimes rbenv takes a while to exec the right Ruby binary.
+     * b) Dynamic linking takes a nonzero amount of time, so even after the right Ruby binary is
+     *    exec'd we still need to wait for the right memory maps to be in place
+     * c) On Mac, it can take a while between when the process is 'exec'ed and when we can get a
+     *    Mach port for the process (which we need to communicate with it)
+     *
+     * So we just keep retrying every millisecond and hope eventually it works
+     */
     let mut i = 0;
-    let source = &pid.try_into_process_handle().context(
-        "Couldn't connect to PID",
-    )?;
     loop {
-        let version = get_ruby_version(pid, source);
+        let maybe_source = pid.try_into_process_handle();
+        let version = match maybe_source {
+            Ok(source) => get_ruby_version(pid, &source),
+            Err(x) => Err(x.into()),
+        }.context("Couldn't create process handle for PID");
         if i > 100 {
             return Ok(version?);
         }
