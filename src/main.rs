@@ -106,6 +106,13 @@ fn do_main() -> Result<(), Error> {
 
     let args = Args::from_args()?;
 
+    if cfg!(target_os = "macos") {
+        let ok = sudo_if_not_root();
+        if !ok {
+            return Err(format_err!("rbspy needs to run as root on mac"));
+        }
+    }
+
     match args.cmd {
         Snapshot { pid } => snapshot(pid),
         Record {
@@ -165,12 +172,6 @@ fn sudo_if_not_root() -> bool {
 }
 
 fn main() {
-    if cfg!(target_os = "macos") {
-        let ok = sudo_if_not_root();
-        if !ok {
-            return;
-        }
-    }
     match do_main() {
         Err(x) => {
             eprintln!("Error. Causes: ");
