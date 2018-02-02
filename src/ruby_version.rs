@@ -20,6 +20,7 @@ macro_rules! ruby_version_v_1_9_1(
             get_stack_trace!(rb_thread_struct);
             get_ruby_string!();
             get_cfps!();
+            get_pos!(rb_iseq_struct);
             get_lineno_1_9_0!();
             get_stack_frame_1_9_1!();
             is_stack_base_1_9_0!();
@@ -40,6 +41,7 @@ macro_rules! ruby_version_v_1_9_2_to_3(
             get_stack_trace!(rb_thread_struct);
             get_ruby_string!();
             get_cfps!();
+            get_pos!(rb_iseq_struct);
             get_lineno_1_9_0!();
             get_stack_frame_1_9_2!();
             is_stack_base_1_9_0!();
@@ -71,6 +73,7 @@ macro_rules! ruby_version_v_2_0_to_2_2(
             get_stack_trace!(rb_thread_struct);
             get_ruby_string!();
             get_cfps!();
+            get_pos!(rb_iseq_struct);
             get_lineno_2_0_0!();
             get_stack_frame_2_0_0!();
             is_stack_base_1_9_0!();
@@ -89,6 +92,7 @@ macro_rules! ruby_version_v_2_3_to_2_4(
             get_stack_trace!(rb_thread_struct);
             get_ruby_string!();
             get_cfps!();
+            get_pos!(rb_iseq_constant_body);
             get_lineno_2_3_0!();
             get_stack_frame_2_3_0!();
             is_stack_base_1_9_0!();
@@ -107,6 +111,7 @@ macro_rules! ruby_version_v2_5_x(
             get_stack_trace!(rb_execution_context_struct);
             get_ruby_string!();
             get_cfps!();
+            get_pos!(rb_iseq_constant_body);
             get_lineno_2_5_0!();
             get_stack_frame_2_5_0!();
             is_stack_base_2_5_0!();
@@ -302,10 +307,7 @@ macro_rules! get_lineno_1_9_0(
             cfp: &rb_control_frame_t,
             source: &T,
             ) -> Result<u32, MemoryCopyError> where T: CopyAddress{
-            let mut pos = cfp.pc as usize - iseq_struct.iseq_encoded as usize;
-            if pos != 0 {
-                pos -= 1;
-            }
+            let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.insn_info_size as usize;
             if t_size == 0 {
                 Ok(0) //TODO: really?
@@ -334,10 +336,7 @@ macro_rules! get_lineno_2_0_0(
             cfp: &rb_control_frame_t,
             source: &T,
             ) -> Result<u32, MemoryCopyError> where T: CopyAddress{
-            let mut pos = cfp.pc as usize - iseq_struct.iseq_encoded as usize;
-            if pos != 0 {
-                pos -= 1;
-            }
+            let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.line_info_size as usize;
             if t_size == 0 {
                 Ok(0) //TODO: really?
@@ -365,13 +364,7 @@ macro_rules! get_lineno_2_3_0(
             cfp: &rb_control_frame_t,
             source: &T,
             ) -> Result<u32, MemoryCopyError> where T: CopyAddress{
-            if iseq_struct.iseq_encoded as usize > cfp.pc as usize {
-                return Err(MemoryCopyError::Other);
-            }
-            let mut pos = cfp.pc as usize - iseq_struct.iseq_encoded as usize; // TODO: investigate panic here
-            if pos != 0 {
-                pos -= 1;
-            }
+            let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.line_info_size as usize;
             if t_size == 0 {
                 Ok(0) //TODO: really?
@@ -392,6 +385,20 @@ macro_rules! get_lineno_2_3_0(
         }
 ));
 
+macro_rules! get_pos(
+    ($iseq_type:ident) => (
+        fn get_pos(iseq_struct: &$iseq_type, cfp: &rb_control_frame_t) -> Result<usize, MemoryCopyError> {
+            if (cfp.pc as usize) < (iseq_struct.iseq_encoded as usize) {
+                return Err(MemoryCopyError::Message(format!("program counter and iseq are out of sync")));
+            }
+            let mut pos = cfp.pc as usize - iseq_struct.iseq_encoded as usize;
+            if pos != 0 {
+                pos -= 1;
+            }
+            Ok(pos)
+        }
+));
+
 macro_rules! get_lineno_2_5_0(
     () => (
         fn get_lineno<T>(
@@ -399,10 +406,7 @@ macro_rules! get_lineno_2_5_0(
             cfp: &rb_control_frame_t,
             source: &T,
             ) -> Result<u32, MemoryCopyError> where T: CopyAddress{
-            let mut pos = cfp.pc as usize - iseq_struct.iseq_encoded as usize;
-            if pos != 0 {
-                pos -= 1;
-            }
+            let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.insns_info_size as usize;
             if t_size == 0 {
                 Ok(0) //TODO: really?
@@ -489,7 +493,7 @@ macro_rules! get_cfps(
             if (stack_base as usize) <= cfp_address {
                 // this probably means we've hit some kind of race, return an error so we can try
                 // again
-                return Err(MemoryCopyError::Other);
+                return Err(MemoryCopyError::Message(format!("stack base and cfp address out of sync. stack base: {:x}, cfp address: {:x}", stack_base as usize, cfp_address)));
             }
             Ok(copy_vec(cfp_address, (stack_base as usize - cfp_address) as usize / std::mem::size_of::<rb_control_frame_t>(), source)?)
         }

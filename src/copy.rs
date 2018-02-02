@@ -13,7 +13,7 @@ pub enum MemoryCopyError {
     PermissionDenied,
     #[fail(display = "Failed to copy memory address {:x}", _0)] Io(usize, #[cause] std::io::Error),
     #[fail(display = "Process isn't running")] ProcessEnded,
-    #[fail(display = "Other")] Other,
+    #[fail(display = "Copy error: {}", _0)] Message(String),
     #[fail(display = "Too much memory requested when copying: {}", _0)] RequestTooLarge(usize),
     #[fail(display = "Tried to read invalid string")]
     InvalidStringError(#[cause] std::string::FromUtf8Error),
