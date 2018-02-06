@@ -43,9 +43,9 @@ struct FileOutputter {
 }
 
 fn perf_data_callback() -> Box<FnMut(&[u8])> {
-    let getter = initialize::initialize(31874).unwrap();
+    let getter = initialize::initialize(4019).unwrap();
     let outputter = output::Callgrind(callgrind::Stats::new());
-    let file = File::open("/tmp/out.txt").unwrap();
+    let file = File::create("/tmp/out.txt").unwrap();
     let mut fo = FileOutputter{file, outputter: Box::new(outputter), getter};
     Box::new(move |_| {
         match fo.getter.get_trace() {
@@ -53,7 +53,7 @@ fn perf_data_callback() -> Box<FnMut(&[u8])> {
                 fo.outputter.record(&mut fo.file, &stack);
             }
             Err(MemoryCopyError::ProcessEnded) => {
-                let f = File::open("/tmp/blah1.txt").unwrap();
+                let f = File::create("/tmp/blah1.txt").unwrap();
                 fo.outputter.complete(Path::new("xxx"), f);
             } ,
             Err(_) => {},
