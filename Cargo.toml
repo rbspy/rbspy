@@ -23,7 +23,7 @@ libc = "0.2.34"
 ruby-bindings = { path = "ruby-bindings" }
 
 [target.'cfg(target_os="linux")'.dependencies]
-bcc = "0.0.2"
+bcc = { path = "/home/bork/work/rust-bcc" }
 
 [target.'cfg(target_os="macos")'.dependencies]
 mach = "0.1.2"
