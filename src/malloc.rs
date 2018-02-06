@@ -18,6 +18,7 @@ use std::ptr;
 use std;
 
 #[repr(C)]
+#[derive(Debug)]
 struct data_t {
     mem_ptr: size_t,
     current_thread_address: size_t,
@@ -39,7 +40,7 @@ int track_memory_allocation(struct pt_regs *ctx) {
     data_t data = {};
     size_t thread_addr = ADDRESS;
     data.mem_ptr = PT_REGS_PARM1(ctx);
-    bpf_probe_read(&data.cfp, sizeof(size_t), (void*) (thread_addr + CFP_OFFSET));
+    bpf_probe_read(&data.cfp, sizeof(size_t), (void*) (thread_addr + CFP_OFFSET * 8));
     events.perf_submit(ctx, &data, sizeof(data));
     return 0;
 };
@@ -65,7 +66,7 @@ fn perf_data_callback() -> Box<FnMut(&[u8])> {
     // let mut fo = FileOutputter{file, outputter: Box::new(outputter), getter};
     Box::new(move |x| {
         let data = parse_struct(x);
-        println!("{:x}", data.current_thread_address);
+        println!("{:?}", data);
         // match fo.getter.get_trace() {
         //     Ok(stack) => {
         //         fo.outputter.record(&mut fo.file, &stack);
@@ -96,12 +97,9 @@ pub fn trace_new_objects(pid: pid_t) -> Result<(), Error> {
     let cfp_offset = unsafe { offset_of!(bindings::ruby_2_4_0::rb_thread_t, cfp)};
     println!("cfp offset {:?}", cfp_offset);
     let table = connect(pid, thread_addr, cfp_offset)?;
+    let mut perf_map = perf::init_perf_map(table, perf_data_callback)?;
+    getter.get_trace();
     loop {
-        getter.get_trace();
-        std::thread::sleep(std::time::Duration::from_millis(200));
+        perf_map.poll(2000);
     }
-    // let mut perf_map = perf::init_perf_map(table, perf_data_callback)?;
-    // loop {
-    //     perf_map.poll(2000);
-    // }
 }
