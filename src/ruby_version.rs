@@ -126,8 +126,12 @@ macro_rules! get_stack_trace(
             let current_thread_addr: usize =
                 copy_struct(ruby_current_thread_address_location, source)?;
             let thread: $thread_type = copy_struct(current_thread_addr, source)?;
-            let mut trace = Vec::new();
             let cfps = get_cfps(thread.cfp as usize, stack_base(&thread) as usize, source)?;
+            parse_cfps(&cfps, source)
+        }
+
+        pub fn parse_cfps<T>(cfps: &[rb_control_frame_t], source: &T) -> Result<Vec<StackFrame>, MemoryCopyError> where T: CopyAddress{
+            let mut trace = Vec::new();
             for cfp in cfps.iter() {
                 if cfp.iseq as usize == 0  || cfp.pc as usize == 0 {
                     debug!("Either iseq or pc was 0, skipping CFP");
@@ -140,7 +144,6 @@ macro_rules! get_stack_trace(
                     Err(x) => {
                         debug!("Error: {}", x);
                         debug!("cfp: {:?}", cfp);
-                        debug!("thread: {:?}", thread);
                         debug!("iseq struct: {:?}", iseq_struct);
                         // this is a heuristic: the intent of this is that it skips function calls into C extensions
                         if trace.len() > 0 {
