@@ -77,7 +77,7 @@ impl PartialOrd for StackFrame {
 // Use a StackTraceGetter to get stack traces
 pub struct StackTraceGetter {
     process_handle: ProcessHandle,
-    current_thread_addr_location: usize,
+    pub current_thread_addr_location: usize,
     stack_trace_function:
         Box<Fn(usize, &ProcessHandle) -> Result<Vec<StackFrame>, MemoryCopyError>>,
 }

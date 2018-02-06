@@ -13,24 +13,27 @@ use copy::MemoryCopyError;
 use std::fs::File;
 use std::path::Path;
 
-fn connect(pid: pid_t) -> Result<Table, Error> {
+fn connect(pid: pid_t, current_thread_address: usize) -> Result<Table, Error> {
     let code = "
 #include <uapi/linux/ptrace.h>
 
 typedef struct data {
     size_t mem_ptr;
+    size_t current_thread_address;
 } data_t;
 
 BPF_PERF_OUTPUT(events);
 
 int track_memory_allocation(struct pt_regs *ctx) {
     data_t data = {};
+    size_t x;
+    bpf_probe_read(&x, sizeof(size_t), (void*) ADDRESS)
     data.mem_ptr = PT_REGS_PARM1(ctx);
     events.perf_submit(ctx, &data, sizeof(data));
     return 0;
 };
-    ";
-    let mut module = BPF::new(code)?;
+    ".replace("ADDRESS", &format!("{}", current_thread_address));
+    let mut module = BPF::new(&code)?;
     let uprobe = module.load_uprobe("track_memory_allocation")?;
     module.attach_uprobe(&format!("/proc/{}/exe", pid), "newobj_slowpath", uprobe, pid)?;
     Ok(module.table("events"))
