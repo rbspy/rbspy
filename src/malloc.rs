@@ -48,7 +48,7 @@ fn perf_data_callback() -> Box<FnMut(&[u8])> {
     let file = File::open("/tmp/out.txt").unwrap();
     let mut fo = FileOutputter{file, outputter: Box::new(outputter), getter};
     Box::new(move |_| {
-        match getter.get_trace() {
+        match fo.getter.get_trace() {
             Ok(stack) => {
                 fo.outputter.record(&mut fo.file, &stack);
             }
