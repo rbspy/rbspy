@@ -18,21 +18,20 @@ use std::ptr;
 use std;
 
 #[repr(C)]
-#[derive(Debug)]
 struct data_t {
     mem_ptr: size_t,
     cfp: size_t,
     cfps: [u8; 600],
 }
 
-fn connect(pid: pid_t, current_thread_address: usize, cfp_offset: usize, size: usize) -> Result<Table, Error> {
+fn connect(pid: pid_t, current_thread_address: usize, cfp_offset: usize) -> Result<Table, Error> {
     let code = "
 #include <uapi/linux/ptrace.h>
 
 typedef struct data {
     size_t mem_ptr;
     size_t cfp;
-    u8 cfps[CFP_TO_READ];
+    u8 cfps[400];
 
 } data_t;
 
@@ -50,7 +49,6 @@ int track_memory_allocation(struct pt_regs *ctx) {
     ";
     let code = code.replace("ADDRESS", &format!("{}", current_thread_address));
     let code = code.replace("CFP_OFFSET", &format!("{}", cfp_offset));
-    let code = code.replace("CFP_TO_READ", &format!("{}", size));
     let mut module = BPF::new(&code)?;
     let uprobe = module.load_uprobe("track_memory_allocation")?;
     module.attach_uprobe(&format!("/proc/{}/exe", pid), "newobj_slowpath", uprobe, pid)?;
@@ -62,6 +60,8 @@ struct FileOutputter {
     outputter: Box<Outputter>,
     getter: initialize::StackTraceGetter,
 }
+use bindings::ruby_2_4_0::rb_control_frame_t;
+use ruby_version;
 
 fn perf_data_callback() -> Box<FnMut(&[u8])> {
     // let getter = initialize::initialize(4019).unwrap();
@@ -71,6 +71,9 @@ fn perf_data_callback() -> Box<FnMut(&[u8])> {
     Box::new(move |x| {
         let data = parse_struct(x);
         println!("{:x} {:x}", data.mem_ptr, data.cfp);
+        let slice: &[rb_control_frame_t] = unsafe {std::slice::from_raw_parts(x.as_ptr() as *const rb_control_frame_t, 20)};
+        let stack = ruby_version::ruby_2_4_0::parse_cfps(slice);
+        println!("{:?}", stack);
         // match fo.getter.get_trace() {
         //     Ok(stack) => {
         //         fo.outputter.record(&mut fo.file, &stack);
@@ -98,11 +101,10 @@ pub fn trace_new_objects(pid: pid_t) -> Result<(), Error> {
     let getter = initialize::initialize(pid)?;
     let source = pid.try_into_process_handle().unwrap();
     let thread_addr: usize = copy_struct(getter.current_thread_addr_location, &source)?;
-    let size = std::mem::size_of::<bindings::ruby_2_4_0::rb_control_frame_t>() * 20;
     let cfp_offset = unsafe { offset_of!(bindings::ruby_2_4_0::rb_thread_t, cfp)};
     println!("cfp offset {:?}", cfp_offset);
     println!("thread addr {:x}", thread_addr);
-    let table = connect(pid, thread_addr, cfp_offset, size)?;
+    let table = connect(pid, thread_addr, cfp_offset)?;
     let mut perf_map = perf::init_perf_map(table, perf_data_callback)?;
     getter.get_trace();
     loop {
