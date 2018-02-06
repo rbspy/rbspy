@@ -22,6 +22,9 @@ nix = "0.10.0"
 libc = "0.2.34"
 ruby-bindings = { path = "ruby-bindings" }
 
+[target.'cfg(target_os="linux")'.dependencies]
+bcc = "0.0.2"
+
 [target.'cfg(target_os="macos")'.dependencies]
 mach = "0.1.2"
 regex = "0.2.3"

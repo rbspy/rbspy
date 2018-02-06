@@ -1,5 +1,7 @@
 #![cfg_attr(rustc_nightly, feature(test))]
 
+#[cfg(target_os = "linux")]
+extern crate bcc;
 #[cfg(test)]
 extern crate byteorder;
 extern crate chrono;
@@ -57,6 +59,7 @@ pub mod copy;
 pub mod ruby_version;
 pub mod callgrind;
 pub mod output;
+pub mod malloc;
 
 const BILLION: u64 = 1000 * 1000 * 1000; // for nanosleep
 
@@ -91,6 +94,7 @@ enum SubCmd {
     },
     /// Capture and print a stacktrace snapshot of process `pid`.
     Snapshot { pid: pid_t },
+    MemRecord { pid: pid_t },
 }
 use SubCmd::*;
 
@@ -115,6 +119,7 @@ fn do_main() -> Result<(), Error> {
 
     match args.cmd {
         Snapshot { pid } => snapshot(pid),
+        MemRecord { pid } => malloc::trace_new_objects(pid),
         Record {
             target,
             out_path,
@@ -387,6 +392,15 @@ fn arg_parser() -> App<'static, 'static> {
                 ),
         )
         .subcommand(
+            SubCommand::with_name("memrecord")
+                .about("record memory allocations")
+                .arg(
+                    Arg::from_usage("-p --pid=[PID] 'PID of the Ruby process you want to profile'")
+                        .validator(validate_pid)
+                        .required(true),
+                ),
+        )
+        .subcommand(
             SubCommand::with_name("record")
                 .about("Record process")
                 .arg(
@@ -448,6 +462,10 @@ impl Args {
 
         let cmd = match matches.subcommand() {
             ("snapshot", Some(submatches)) => Snapshot {
+                pid: get_pid(submatches)
+                    .expect("this shouldn't happen because clap requires a pid"),
+            },
+            ("memrecord", Some(submatches)) => MemRecord {
                 pid: get_pid(submatches)
                     .expect("this shouldn't happen because clap requires a pid"),
             },
