@@ -21,7 +21,7 @@ use std;
 #[derive(Debug)]
 struct data_t {
     mem_ptr: size_t,
-    current_thread_address: size_t,
+    cfp: size_t,
 }
 
 fn connect(pid: pid_t, current_thread_address: usize, cfp_offset: usize) -> Result<Table, Error> {
@@ -40,7 +40,7 @@ int track_memory_allocation(struct pt_regs *ctx) {
     data_t data = {};
     size_t thread_addr = ADDRESS;
     data.mem_ptr = PT_REGS_PARM1(ctx);
-    bpf_probe_read(&data.cfp, sizeof(size_t), (void*) (thread_addr + CFP_OFFSET * 8));
+    bpf_probe_read(&data.cfp, sizeof(size_t), (void*) (thread_addr + CFP_OFFSET));
     events.perf_submit(ctx, &data, sizeof(data));
     return 0;
 };
@@ -96,6 +96,7 @@ pub fn trace_new_objects(pid: pid_t) -> Result<(), Error> {
     let thread_addr: usize = copy_struct(getter.current_thread_addr_location, &source)?;
     let cfp_offset = unsafe { offset_of!(bindings::ruby_2_4_0::rb_thread_t, cfp)};
     println!("cfp offset {:?}", cfp_offset);
+    println!("thread addr {:x}", thread_addr);
     let table = connect(pid, thread_addr, cfp_offset)?;
     let mut perf_map = perf::init_perf_map(table, perf_data_callback)?;
     getter.get_trace();
