@@ -8,8 +8,6 @@ use initialize;
 use output;
 use output::Outputter;
 
-use std::sync::Mutex;
-use std::sync::Arc;
 use std::fs::File;
 
 fn connect(pid: pid_t) -> Result<Table, Error> {
@@ -35,22 +33,30 @@ int track_memory_allocation(struct pt_regs *ctx) {
     Ok(module.table("events"))
 }
 
-pub fn trace_new_objects(pid: pid_t) -> Result<(), Error> {
-    let getter = initialize::initialize(pid)?;
-    let file = File::open("/tmp/out.txt")?;
+struct FileOutputter {
+    file: File,
+    outputter: Box<Outputter>,
+    getter: initialize::StackTraceGetter,
+}
 
-    let table = connect(pid)?;
+fn perf_data_callback() -> Box<FnMut(&[u8])> {
+    let getter = initialize::initialize(31101).unwrap();
+    let file = File::open("/tmp/out.txt").unwrap();
     let outputter = output::Flamegraph;
-    let file_mutex = Arc::new(Mutex::new(&mut file));
-    let mut perf_map = perf::init_perf_map(table, || Box::new(|_| {
-        let stack = getter.get_trace().unwrap();
-        if let Ok(ref mutex) = file_mutex.try_lock() {
-            outputter.record(**mutex, &stack);
-        } else {
-            println!("try_lock failed");
+    let mut fo = FileOutputter{file, outputter: Box::new(outputter), getter};
+    Box::new(move |_| {
+        match fo.getter.get_trace() {
+            Ok(stack) => {
+                fo.outputter.record(&mut fo.file, &stack);
+            }
+            Err(x) => { println!("oh no: {:?}", x); } ,
         }
-    }
-    ))?;
+    })
+}
+
+pub fn trace_new_objects(pid: pid_t) -> Result<(), Error> {
+    let table = connect(pid)?;
+    let mut perf_map = perf::init_perf_map(table, perf_data_callback)?;
     loop {
         perf_map.poll(2000);
     }
