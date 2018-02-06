@@ -72,7 +72,9 @@ fn perf_data_callback() -> Box<FnMut(&[u8])> {
         let data = parse_struct(x);
         println!("{:x} {:x}", data.mem_ptr, data.cfp);
         let slice: &[rb_control_frame_t] = unsafe {std::slice::from_raw_parts(x.as_ptr() as *const rb_control_frame_t, 20)};
-        let stack = ruby_version::ruby_2_4_0::parse_cfps(slice);
+        let pid: pid_t  = 17610;
+        let source = pid.try_into_process_handle().unwrap();
+        let stack = ruby_version::ruby_2_4_0::parse_cfps(slice, &source);
         println!("{:?}", stack);
         // match fo.getter.get_trace() {
         //     Ok(stack) => {
