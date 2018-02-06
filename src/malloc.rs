@@ -10,6 +10,7 @@ use initialize;
 use output;
 use output::Outputter;
 use copy::*;
+use bindings;
 
 use std::fs::File;
 use std::path::Path;
@@ -22,27 +23,32 @@ struct data_t {
     current_thread_address: size_t,
 }
 
-fn connect(pid: pid_t, current_thread_address: usize) -> Result<Table, Error> {
+fn connect(pid: pid_t, current_thread_address: usize, cfp_offset: usize) -> Result<Table, Error> {
     let code = "
 #include <uapi/linux/ptrace.h>
 
 typedef struct data {
     size_t mem_ptr;
-    size_t current_thread_address;
+    size_t cfp;
+
 } data_t;
 
 BPF_PERF_OUTPUT(events);
 
 int track_memory_allocation(struct pt_regs *ctx) {
     data_t data = {};
-    size_t x = ADDRESS;
+    size_t thread_addr = ADDRESS;
+    int cfp_offset = CFP_OFFSET;
     data.mem_ptr = PT_REGS_PARM1(ctx);
-    bpf_probe_read(&data.current_thread_address, sizeof(size_t), (void*) x );
+    bpf_probe_read(&data.cfp, sizeof(size_t), (void*) (thread_addr + 8*cfp_offset));
+    data.cfp = array[ARRAY_SIZE - 1];
     events.perf_submit(ctx, &data, sizeof(data));
     return 0;
 };
     ";
     let code = code.replace("ADDRESS", &format!("{}", current_thread_address));
+    let code = code.replace("CFP_OFFSET", &format!("{}", cfp_offset / 8));
+    let code = code.replace("ARRAY_SIZE", &format!("{}", cfp_offset / 64 + 1));
     let mut module = BPF::new(&code)?;
     let uprobe = module.load_uprobe("track_memory_allocation")?;
     module.attach_uprobe(&format!("/proc/{}/exe", pid), "newobj_slowpath", uprobe, pid)?;
@@ -80,11 +86,19 @@ fn parse_struct(x: &[u8]) -> data_t {
     unsafe { ptr::read(x.as_ptr() as *const data_t) }
 }
 
+macro_rules! offset_of {
+    ($ty:ty, $field:ident) => {
+        &(*(0 as *const $ty)).$field as *const _ as usize
+    }
+}
+
 pub fn trace_new_objects(pid: pid_t) -> Result<(), Error> {
     let getter = initialize::initialize(pid)?;
     let source = pid.try_into_process_handle().unwrap();
     let thread_addr: usize = copy_struct(getter.current_thread_addr_location, &source)?;
-    let table = connect(pid, thread_addr)?;
+    let cfp_offset = unsafe { offset_of!(bindings::ruby_2_4_0::rb_thread_t, cfp)};
+    println!("cfp offset {:?}", cfp_offset);
+    let table = connect(pid, thread_addr, cfp_offset)?;
     loop {
         getter.get_trace();
         std::thread::sleep(std::time::Duration::from_millis(200));
