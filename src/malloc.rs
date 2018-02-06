@@ -4,11 +4,14 @@ use bcc::table::Table;
 use failure::Error;
 use libc::pid_t;
 
+use callgrind;
 use initialize;
 use output;
 use output::Outputter;
+use copy::MemoryCopyError;
 
 use std::fs::File;
+use std::path::Path;
 
 fn connect(pid: pid_t) -> Result<Table, Error> {
     let code = "
@@ -40,16 +43,20 @@ struct FileOutputter {
 }
 
 fn perf_data_callback() -> Box<FnMut(&[u8])> {
-    let getter = initialize::initialize(31101).unwrap();
+    let getter = initialize::initialize(31874).unwrap();
+    let outputter = output::Callgrind(callgrind::Stats::new());
     let file = File::open("/tmp/out.txt").unwrap();
-    let outputter = output::Flamegraph;
     let mut fo = FileOutputter{file, outputter: Box::new(outputter), getter};
     Box::new(move |_| {
-        match fo.getter.get_trace() {
+        match getter.get_trace() {
             Ok(stack) => {
                 fo.outputter.record(&mut fo.file, &stack);
             }
-            Err(x) => { println!("oh no: {:?}", x); } ,
+            Err(MemoryCopyError::ProcessEnded) => {
+                let f = File::open("/tmp/blah1.txt").unwrap();
+                fo.outputter.complete(Path::new("xxx"), f);
+            } ,
+            Err(_) => {},
         }
     })
 }
