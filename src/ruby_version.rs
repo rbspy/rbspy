@@ -132,15 +132,30 @@ macro_rules! get_stack_trace(
 
         pub fn parse_cfps<T>(cfps: &[rb_control_frame_t], source: &T) -> Result<Vec<StackFrame>, MemoryCopyError> where T: CopyAddress{
             let mut trace = Vec::new();
+            debug!("hiiiii");
             for cfp in cfps.iter() {
                 if cfp.iseq as usize == 0  || cfp.pc as usize == 0 {
                     debug!("Either iseq or pc was 0, skipping CFP");
                     continue;
                 }
-                let iseq_struct: rb_iseq_struct = copy_struct(cfp.iseq as usize, source)?;
+                let maybe_iseq_struct = copy_struct::<rb_iseq_struct, T>(cfp.iseq as usize, source);
+                let iseq_struct = match maybe_iseq_struct {
+                    Ok(x) => x,
+                    Err(x) => {
+                        if trace.len() > 0 {
+                            debug!("couldn't read iseq struct, giving up & continuing");
+                            // TODO TODO: FIXME
+                            return Ok(trace);
+                        } else {
+                            return Err(x);
+                        }
+                    }
+                };
                 let label_path  = get_stack_frame(&iseq_struct, &cfp, source);
                 match label_path {
-                    Ok(call)  => trace.push(call),
+                    Ok(call)  => { 
+                        trace.push(call)
+                    },
                     Err(x) => {
                         debug!("Error: {}", x);
                         debug!("cfp: {:?}", cfp);

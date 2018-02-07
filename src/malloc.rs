@@ -21,7 +21,7 @@ use std;
 struct data_t {
     mem_ptr: size_t,
     cfp: size_t,
-    cfps: [u8; 600],
+    cfps: [u8; 432],
 }
 
 fn connect(pid: pid_t, current_thread_address: usize, cfp_offset: usize) -> Result<Table, Error> {
@@ -31,7 +31,7 @@ fn connect(pid: pid_t, current_thread_address: usize, cfp_offset: usize) -> Resu
 typedef struct data {
     size_t mem_ptr;
     size_t cfp;
-    u8 cfps[400];
+    u8 cfps[432];
 
 } data_t;
 
@@ -42,6 +42,7 @@ int track_memory_allocation(struct pt_regs *ctx) {
     size_t thread_addr = ADDRESS;
     data.mem_ptr = PT_REGS_PARM1(ctx);
     bpf_probe_read(&data.cfp, sizeof(size_t), (void*) (thread_addr + CFP_OFFSET));
+    // OK OK OK
     bpf_probe_read(&data.cfps, sizeof(data.cfps), (void*) data.cfp);
     events.perf_submit(ctx, &data, sizeof(data));
     return 0;
@@ -60,7 +61,7 @@ struct FileOutputter {
     outputter: Box<Outputter>,
     getter: initialize::StackTraceGetter,
 }
-use bindings::ruby_2_4_0::rb_control_frame_t;
+use bindings::ruby_2_4_0::*;
 use ruby_version;
 
 fn perf_data_callback() -> Box<FnMut(&[u8])> {
@@ -70,21 +71,27 @@ fn perf_data_callback() -> Box<FnMut(&[u8])> {
     // let mut fo = FileOutputter{file, outputter: Box::new(outputter), getter};
     Box::new(move |x| {
         let data = parse_struct(x);
-        println!("{:x} {:x}", data.mem_ptr, data.cfp);
-        let slice: &[rb_control_frame_t] = unsafe {std::slice::from_raw_parts(x.as_ptr() as *const rb_control_frame_t, 20)};
-        let pid: pid_t  = 17610;
+        let slice: &[rb_control_frame_t] = unsafe {std::slice::from_raw_parts(data.cfps.as_ptr() as *const rb_control_frame_t, 20)};
+        let pid: pid_t  = 21516;
         let source = pid.try_into_process_handle().unwrap();
         let stack = ruby_version::ruby_2_4_0::parse_cfps(slice, &source);
-        println!("{:?}", stack);
-        // match fo.getter.get_trace() {
+        match stack {
+            Ok(stack) => {
+                for t in stack.iter().rev() {
+                    print!("{}", t);
+                    print!(";");
+                }
+                println!(" {}", 1);
+            }
+             Err(MemoryCopyError::ProcessEnded) => {
+                 std::process::exit(0);
+             } ,
+             Err(_) => {},
+        };
+            // match fo.getter.get_trace() {
         //     Ok(stack) => {
         //         fo.outputter.record(&mut fo.file, &stack);
         //     }
-        //     Err(MemoryCopyError::ProcessEnded) => {
-        //         let f = File::create("/tmp/blah1.txt").unwrap();
-        //         fo.outputter.complete(Path::new("xxx"), f);
-        //     } ,
-        //     Err(_) => {},
         // }
     })
 }
@@ -100,6 +107,7 @@ macro_rules! offset_of {
 }
 
 pub fn trace_new_objects(pid: pid_t) -> Result<(), Error> {
+    println!("size of cfp {:?}", std::mem::size_of::<rb_control_frame_t>());
     let getter = initialize::initialize(pid)?;
     let source = pid.try_into_process_handle().unwrap();
     let thread_addr: usize = copy_struct(getter.current_thread_addr_location, &source)?;
