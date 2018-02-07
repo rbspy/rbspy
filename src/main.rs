@@ -30,7 +30,7 @@ extern crate read_process_memory;
 extern crate regex;
 #[cfg(target_os = "macos")]
 extern crate lazy_static;
-extern crate ruby_bindings as bindings;
+extern crate rbspy_ruby_structs as bindings;
 #[cfg(test)]
 extern crate tempdir;
 
