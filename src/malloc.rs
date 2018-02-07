@@ -17,6 +17,8 @@ use std::path::Path;
 use std::ptr;
 use std;
 
+static mut PID: pid_t = 0;
+
 #[repr(C)]
 struct data_t {
     mem_ptr: size_t,
@@ -72,16 +74,19 @@ fn perf_data_callback() -> Box<FnMut(&[u8])> {
     Box::new(move |x| {
         let data = parse_struct(x);
         let slice: &[rb_control_frame_t] = unsafe {std::slice::from_raw_parts(data.cfps.as_ptr() as *const rb_control_frame_t, 20)};
-        let pid: pid_t  = 21516;
+        let pid: pid_t  = unsafe {PID};
         let source = pid.try_into_process_handle().unwrap();
-        let stack = ruby_version::ruby_2_4_0::parse_cfps(slice, &source);
+        let stack = ruby_version::ruby_2_4_0::parse_cfps(&slice[..1], &source);
         match stack {
             Ok(stack) => {
-                for t in stack.iter().rev() {
-                    print!("{}", t);
-                    print!(";");
+                if stack.len() > 0 {
+                    println!("{} {} {}", stack[0].name, stack[0].relative_path, stack[0].lineno);
                 }
-                println!(" {}", 1);
+                // for t in stack.iter().rev() {
+                //     print!("{}", t);
+                //     print!(";");
+                // }
+                // println!(" {}", 1);
             }
              Err(MemoryCopyError::ProcessEnded) => {
                  std::process::exit(0);
@@ -108,6 +113,7 @@ macro_rules! offset_of {
 
 pub fn trace_new_objects(pid: pid_t) -> Result<(), Error> {
     println!("size of cfp {:?}", std::mem::size_of::<rb_control_frame_t>());
+    unsafe {PID = pid};
     let getter = initialize::initialize(pid)?;
     let source = pid.try_into_process_handle().unwrap();
     let thread_addr: usize = copy_struct(getter.current_thread_addr_location, &source)?;
