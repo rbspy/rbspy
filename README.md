@@ -98,7 +98,6 @@ you're seeing high error rates (more than 1/100 or so), please create an issue.
 
 Contributions in any of these areas would be very welcome.
 
-* Mac support
 * BSD/Windows support
 * Profile multiple threads
 * Profile C extensions (rbspy will simply ignore any calls into C extensions)
