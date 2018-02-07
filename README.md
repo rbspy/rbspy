@@ -101,7 +101,6 @@ Contributions in any of these areas would be very welcome.
 * BSD/Windows support
 * Profile multiple threads
 * Profile C extensions (rbspy will simply ignore any calls into C extensions)
-* Profile processes running in containers
 
 ## Contributing
 
