@@ -23,7 +23,7 @@ macro_rules! ruby_version_v_1_9_1(
             get_pos!(rb_iseq_struct);
             get_lineno_1_9_0!();
             get_stack_frame_1_9_1!();
-            is_stack_base_1_9_0!();
+            stack_field_1_9_0!();
         }
         ));
 
@@ -44,7 +44,7 @@ macro_rules! ruby_version_v_1_9_2_to_3(
             get_pos!(rb_iseq_struct);
             get_lineno_1_9_0!();
             get_stack_frame_1_9_2!();
-            is_stack_base_1_9_0!();
+            stack_field_1_9_0!();
         }
         ));
 
@@ -76,7 +76,7 @@ macro_rules! ruby_version_v_2_0_to_2_2(
             get_pos!(rb_iseq_struct);
             get_lineno_2_0_0!();
             get_stack_frame_2_0_0!();
-            is_stack_base_1_9_0!();
+            stack_field_1_9_0!();
         }
 ));
 
@@ -95,7 +95,7 @@ macro_rules! ruby_version_v_2_3_to_2_4(
             get_pos!(rb_iseq_constant_body);
             get_lineno_2_3_0!();
             get_stack_frame_2_3_0!();
-            is_stack_base_1_9_0!();
+            stack_field_1_9_0!();
         }
         ));
 
@@ -114,7 +114,7 @@ macro_rules! ruby_version_v2_5_x(
             get_pos!(rb_iseq_constant_body);
             get_lineno_2_5_0!();
             get_stack_frame_2_5_0!();
-            is_stack_base_2_5_0!();
+            stack_field_2_5_0!();
             get_ruby_string_array_2_5_0!();
         }
         ));
@@ -161,6 +161,19 @@ macro_rules! get_stack_trace(
 
 use proc_maps::{maps_contain_addr, MapRange};
 
+// Checks whether the address looks even vaguely like a thread struct, mostly by making sure its
+// addresses are reasonable
+fn could_be_thread(thread: &$thread_type, all_maps: &Vec<MapRange>) -> bool {
+    maps_contain_addr(thread.tag as usize, all_maps) &&
+        maps_contain_addr(thread.cfp as usize, all_maps) &&
+        maps_contain_addr(stack_field(thread) as usize, all_maps) &&
+        stack_size_field(thread) < 3000000
+}
+
+fn stack_base(thread: &$thread_type) -> i64 {
+    stack_field(thread) + stack_size_field(thread) * std::mem::size_of::<VALUE>() as i64 - 1 * std::mem::size_of::<rb_control_frame_t>() as i64
+}
+
 pub fn is_maybe_thread<T>(x: usize, source: &T, all_maps: &Vec<MapRange>) -> bool where T: CopyAddress{
     if !maps_contain_addr(x, all_maps) {
         return false;
@@ -171,7 +184,7 @@ pub fn is_maybe_thread<T>(x: usize, source: &T, all_maps: &Vec<MapRange>) -> boo
         _ => { return false; },
     };
 
-    if !is_reasonable_thing(&thread, all_maps) {
+    if !could_be_thread(&thread, all_maps) {
         return false;
     }
 
@@ -185,32 +198,26 @@ pub fn is_maybe_thread<T>(x: usize, source: &T, all_maps: &Vec<MapRange>) -> boo
 }
 ));
 
-macro_rules! is_stack_base_1_9_0(
+macro_rules! stack_field_1_9_0(
     () => (
-        fn is_reasonable_thing(thread: &rb_thread_struct,  all_maps: &Vec<MapRange>) -> bool {
-            maps_contain_addr(thread.vm as usize, all_maps) &&
-                maps_contain_addr(thread.cfp as usize, all_maps) &&
-                maps_contain_addr(thread.stack as usize, all_maps) &&
-                maps_contain_addr(thread.self_ as usize, all_maps) &&
-                thread.stack_size < 3000000 && thread.state >= 0
+        fn stack_field(thread: &rb_thread_struct) -> i64 {
+            thread.stack as i64
         }
 
-        fn stack_base(thread: &rb_thread_struct) -> i64 {
-            thread.stack as i64 + thread.stack_size as i64 * std::mem::size_of::<VALUE>() as i64 - 1 * std::mem::size_of::<rb_control_frame_t>() as i64
+        fn stack_size_field(thread: &rb_thread_struct) -> i64 {
+            thread.stack_size as i64
         }
         ));
 
-macro_rules! is_stack_base_2_5_0(
+macro_rules! stack_field_2_5_0(
     () => (
-        fn is_reasonable_thing(thread: &rb_execution_context_struct, all_maps: &Vec<MapRange>) -> bool {
-            maps_contain_addr(thread.tag as usize, all_maps) &&
-                maps_contain_addr(thread.cfp as usize, all_maps) &&
-                maps_contain_addr(thread.vm_stack as usize, all_maps) &&
-                thread.vm_stack_size < 3000000
+
+        fn stack_field(thread: &rb_execution_context_struct) -> i64 {
+            thread.vm_stack as i64
         }
 
-        fn stack_base(thread: &rb_execution_context_struct) -> i64 {
-            thread.vm_stack as i64 + thread.vm_stack_size as i64 * std::mem::size_of::<VALUE>() as i64 - 1 * std::mem::size_of::<rb_control_frame_t>() as i64
+        fn stack_size_field(thread: &rb_execution_context_struct) -> i64 {
+            thread.vm_stack_size as i64
         }
         ));
 
