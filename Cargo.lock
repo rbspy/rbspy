@@ -433,7 +433,7 @@ dependencies = [
  "nix 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "object 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "rbspy-testdata 0.1.0 (git+https://github.com/rbspy/rbspy-testdata.git)",
+ "rbspy-testdata 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "read-process-memory 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "ruby-bindings 0.1.0",
@@ -443,8 +443,8 @@ dependencies = [
 
 [[package]]
 name = "rbspy-testdata"
-version = "0.1.0"
-source = "git+https://github.com/rbspy/rbspy-testdata.git#431814a7eb50b0bde083b2a52be9e5f68e117518"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "elf 0.0.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -780,7 +780,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum quote 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)" = "7a6e920b65c65f10b2ae65c831a81a073a89edd28c7cce89475bff467ab4167a"
 "checksum rand 0.3.20 (registry+https://github.com/rust-lang/crates.io-index)" = "512870020642bb8c221bf68baa1b2573da814f6ccfe5c9699b1c303047abe9b1"
 "checksum rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "eba5f8cb59cc50ed56be8880a5c7b496bfd9bd26394e176bc67884094145c2c5"
-"checksum rbspy-testdata 0.1.0 (git+https://github.com/rbspy/rbspy-testdata.git)" = "<none>"
+"checksum rbspy-testdata 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "de560d75a16ac4f974a3c6621c06bcf1fb1e505ee06e4f9705cf8b4ab975408b"
 "checksum read-process-memory 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "950b829b2477880c74aaed706d681bc8d50d4e2b15b5e4d98ed33d5d4f93712e"
 "checksum redox_syscall 0.1.37 (registry+https://github.com/rust-lang/crates.io-index)" = "0d92eecebad22b767915e4d529f89f28ee96dbbf5a4810d2b844373f136417fd"
 "checksum redox_termios 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7e891cfe48e9100a70a3b6eb652fef28920c117d366339687bd5576160db0f76"
