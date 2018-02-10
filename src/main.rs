@@ -419,7 +419,7 @@ fn arg_parser() -> App<'static, 'static> {
                 )
                 .arg(
                     Arg::from_usage(
-                        "-d --duration=[DURATION] 'Length of time before ending data collection'",
+                        "-d --duration=[DURATION] 'Number of seconds to record for'",
                     ).conflicts_with("cmd")
                         .required(false),
                 )
