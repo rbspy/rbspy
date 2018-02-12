@@ -48,15 +48,11 @@ use std::sync::Arc;
 use std::time::Instant;
 use std::os::unix::prelude::*;
 
-pub mod proc_maps;
-#[cfg(target_os = "macos")]
-pub mod mac_maps;
-pub mod address_finder;
-pub mod initialize;
-pub mod copy;
-pub mod ruby_version;
-pub mod callgrind;
-pub mod output;
+pub mod core;
+pub mod ui;
+
+use core::initialize::initialize;
+use core::copy::MemoryCopyError;
 
 const BILLION: u64 = 1000 * 1000 * 1000; // for nanosleep
 
@@ -186,7 +182,7 @@ fn main() {
 }
 
 fn snapshot(pid: pid_t) -> Result<(), Error> {
-    let getter = initialize::initialize(pid)?;
+    let getter = initialize(pid)?;
     let trace = getter.get_trace()?;
     for x in trace.iter().rev() {
         println!("{}", x);
@@ -195,10 +191,10 @@ fn snapshot(pid: pid_t) -> Result<(), Error> {
 }
 
 impl OutputFormat {
-    fn outputter(self) -> Box<output::Outputter> {
+    fn outputter(self) -> Box<ui::output::Outputter> {
         match self {
-            OutputFormat::Flamegraph => Box::new(output::Flamegraph),
-            OutputFormat::Callgrind => Box::new(output::Callgrind(callgrind::Stats::new())),
+            OutputFormat::Flamegraph => Box::new(ui::output::Flamegraph),
+            OutputFormat::Callgrind => Box::new(ui::output::Callgrind(ui::callgrind::Stats::new())),
         }
     }
 }
@@ -239,13 +235,13 @@ impl SampleTime {
 }
 
 fn record(
-    mut out: Box<output::Outputter>,
+    mut out: Box<ui::output::Outputter>,
     out_path: &Path,
     pid: pid_t,
     sample_rate: u32,
     maybe_duration: Option<std::time::Duration>,
 ) -> Result<(), Error> {
-    let getter = initialize::initialize(pid)?;
+    let getter = initialize(pid)?;
 
     eprintln!("Recording data to {}", out_path.display());
     let maybe_stop_time = match maybe_duration {
@@ -280,7 +276,7 @@ fn record(
         total += 1;
         let trace = getter.get_trace();
         match trace {
-            Err(copy::MemoryCopyError::ProcessEnded) => {
+            Err(MemoryCopyError::ProcessEnded) => {
                 break;
             }
             Ok(ref ok_trace) => {

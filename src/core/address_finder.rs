@@ -21,12 +21,13 @@ pub enum AddressFinderError {
 
 #[cfg(target_os = "macos")]
 mod os_impl {
-    use address_finder::AddressFinderError;
+    use core::address_finder::AddressFinderError;
+    use core::proc_maps::MapRange;
+    use core::mac_maps::*;
+
     use failure::Error;
     use libc::pid_t;
-    use proc_maps::MapRange;
     use read_process_memory::*;
-    use mac_maps::*;
 
     pub fn get_ruby_version_address(pid: pid_t) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
@@ -141,13 +142,14 @@ mod os_impl {
 
 #[cfg(target_os = "linux")]
 mod os_impl {
-    use copy::*;
+    use core::address_finder::AddressFinderError;
+    use core::copy::*;
+    use core::proc_maps::*;
+
     use elf;
-    use proc_maps::*;
     use failure::Error;
     use libc::pid_t;
     use std;
-    use address_finder::AddressFinderError;
     use read_process_memory::*;
 
     pub fn current_thread_address(

@@ -7,7 +7,7 @@
  *
  * Defines a bunch of submodules, one per Ruby version (`ruby_1_9_3`, `ruby_2_2_0`, etc.)
  */
-use initialize::StackFrame;
+use core::initialize::StackFrame;
 
 
 // we use this stack frame when there's a C function that we don't recognize in the stack. This
@@ -25,9 +25,9 @@ macro_rules! ruby_version_v_1_9_1(
     ($ruby_version:ident) => (
         pub mod $ruby_version {
             use std;
-            use copy::*;
             use bindings::$ruby_version::*;
-            use copy::MemoryCopyError;
+            use core::copy::*;
+            use core::copy::MemoryCopyError;
             use read_process_memory::CopyAddress;
 
             get_stack_trace!(rb_thread_struct);
@@ -46,9 +46,9 @@ macro_rules! ruby_version_v_1_9_2_to_3(
     ($ruby_version:ident) => (
         pub mod $ruby_version {
             use std;
-            use copy::*;
+            use core::copy::*;
+            use core::copy::MemoryCopyError;
             use bindings::$ruby_version::*;
-            use copy::MemoryCopyError;
             use read_process_memory::CopyAddress;
 
             get_stack_trace!(rb_thread_struct);
@@ -65,9 +65,9 @@ macro_rules! ruby_version_v_2_0_to_2_2(
     ($ruby_version:ident) => (
        pub mod $ruby_version {
             use std;
-            use copy::*;
+            use core::copy::*;
+            use core::copy::MemoryCopyError;
             use bindings::$ruby_version::*;
-            use copy::MemoryCopyError;
             use read_process_memory::CopyAddress;
 
 
@@ -97,9 +97,9 @@ macro_rules! ruby_version_v_2_3_to_2_4(
     ($ruby_version:ident) => (
        pub mod $ruby_version {
             use std;
-            use copy::*;
+            use core::copy::*;
+            use core::copy::MemoryCopyError;
             use bindings::$ruby_version::*;
-            use copy::MemoryCopyError;
             use read_process_memory::CopyAddress;
 
             get_stack_trace!(rb_thread_struct);
@@ -116,9 +116,9 @@ macro_rules! ruby_version_v2_5_x(
     ($ruby_version:ident) => (
        pub mod $ruby_version {
             use std;
-            use copy::*;
+            use core::copy::*;
+            use core::copy::MemoryCopyError;
             use bindings::$ruby_version::*;
-            use copy::MemoryCopyError;
             use read_process_memory::CopyAddress;
 
             get_stack_trace!(rb_execution_context_struct);
@@ -135,8 +135,8 @@ macro_rules! ruby_version_v2_5_x(
 macro_rules! get_stack_trace(
     ($thread_type:ident) => (
 
-        use initialize::StackFrame;
-        use ruby_version::unknown_c_function;
+        use core::initialize::StackFrame;
+        use core::ruby_version::unknown_c_function;
 
         pub fn get_stack_trace<T>(
             ruby_current_thread_address_location: usize,
@@ -189,7 +189,7 @@ macro_rules! get_stack_trace(
             Ok(trace)
         }
 
-use proc_maps::{maps_contain_addr, MapRange};
+use core::proc_maps::{maps_contain_addr, MapRange};
 
 // Checks whether the address looks even vaguely like a thread struct, mostly by making sure its
 // addresses are reasonable
@@ -578,10 +578,9 @@ ruby_version_v2_5_x!(ruby_2_5_0_rc1);
 mod tests {
     use rbspy_testdata::*;
 
-    use ruby_version;
-    use ruby_version::unknown_c_function;
-
-    use initialize::StackFrame;
+    use core::ruby_version;
+    use core::ruby_version::unknown_c_function;
+    use core::initialize::StackFrame;
 
     fn real_stack_trace_1_9_3() -> Vec<StackFrame> {
         vec![
