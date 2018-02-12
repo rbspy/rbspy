@@ -1,18 +1,20 @@
-use copy::*;
-use copy;
+use core::address_finder::*;
+use core::address_finder;
+use core::copy::*;
+use core::copy;
+use core::proc_maps::*;
+use core::ruby_version;
+
 use failure::Error;
 use failure::ResultExt;
 use failure::Fail;
+use read_process_memory::*;
 use libc::{c_char, pid_t};
+
 use std::cmp::Ordering;
 use std::fmt;
 use std::time::Duration;
 use std;
-use ruby_version;
-use address_finder::*;
-use address_finder;
-use proc_maps::*;
-use read_process_memory::*;
 
 /**
  * Initialization code for the profiler.

@@ -7,10 +7,10 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use callgrind;
-use initialize::StackFrame;
+use ui::callgrind;
+use core::initialize::StackFrame;
 
-const FLAMEGRAPH_SCRIPT: &'static [u8] = include_bytes!("../vendor/flamegraph/flamegraph.pl");
+const FLAMEGRAPH_SCRIPT: &'static [u8] = include_bytes!("../../vendor/flamegraph/flamegraph.pl");
 
 pub trait Outputter {
     fn record(&mut self, file: &mut File, stack: &Vec<StackFrame>) -> Result<(), Error>;

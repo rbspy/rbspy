@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::collections::{BTreeMap, HashMap};
 use std::io;
 
-use initialize::StackFrame;
+use core::initialize::StackFrame;
 
 #[derive(Debug)]
 struct Call {
@@ -135,7 +135,7 @@ impl Stats {
 
 #[cfg(test)]
 mod tests {
-    use callgrind::*;
+    use ui::callgrind::*;
 
     // Build a test stackframe
     fn f(i: u32) -> StackFrame {
