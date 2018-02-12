@@ -17,12 +17,12 @@ pub trait Outputter {
     fn complete(&mut self, path: &Path, file: File) -> Result<(), Error>;
 }
 
-// This gets a stack trace and then just prints it out
-// in a format that Brendan Gregg's stackcollapse.pl script understands
+// Uses Brendan Gregg's flamegraph.pl script (which we vendor) to visualize stack traces
 pub struct Flamegraph;
 
 impl Outputter for Flamegraph {
     fn record(&mut self, file: &mut File, stack: &Vec<StackFrame>) -> Result<(), Error> {
+        // This is the input file format that flamegraph.pl expects: 'a; b; c 1'
         for t in stack.iter().rev() {
             write!(file, "{}", t)?;
             write!(file, ";")?;

@@ -245,8 +245,6 @@ fn record(
     sample_rate: u32,
     maybe_duration: Option<std::time::Duration>,
 ) -> Result<(), Error> {
-    // This gets a stack trace and then just prints it out
-    // in a format that Brendan Gregg's stackcollapse.pl script understands
     let getter = initialize::initialize(pid)?;
 
     eprintln!("Recording data to {}", out_path.display());
