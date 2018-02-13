@@ -8,6 +8,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 use ui::callgrind;
+use ui::summary;
 use core::initialize::StackFrame;
 
 const FLAMEGRAPH_SCRIPT: &'static [u8] = include_bytes!("../../vendor/flamegraph/flamegraph.pl");
@@ -48,6 +49,34 @@ impl Outputter for Callgrind {
 
     fn complete(&mut self, _path: &Path, mut file: File) -> Result<(), Error> {
         self.0.finish();
+        self.0.write(&mut file)?;
+        Ok(())
+    }
+}
+
+pub struct Summary(pub summary::Stats);
+
+impl Outputter for Summary {
+    fn record(&mut self, _file: &mut File, stack: &Vec<StackFrame>) -> Result<(), Error> {
+        self.0.add_function_name(stack);
+        Ok(())
+    }
+
+    fn complete(&mut self, _path: &Path, mut file: File) -> Result<(), Error> {
+        self.0.write(&mut file)?;
+        Ok(())
+    }
+}
+
+pub struct SummaryLine(pub summary::Stats);
+
+impl Outputter for SummaryLine {
+    fn record(&mut self, _file: &mut File, stack: &Vec<StackFrame>) -> Result<(), Error> {
+        self.0.add_lineno(stack);
+        Ok(())
+    }
+
+    fn complete(&mut self, _path: &Path, mut file: File) -> Result<(), Error> {
         self.0.write(&mut file)?;
         Ok(())
     }

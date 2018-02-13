@@ -53,6 +53,7 @@ pub mod ui;
 
 use core::initialize::initialize;
 use core::copy::MemoryCopyError;
+use ui::output;
 
 const BILLION: u64 = 1000 * 1000 * 1000; // for nanosleep
 
@@ -66,10 +67,15 @@ use Target::*;
 
 // Formats we can write to
 arg_enum!{
+    // The values of this enum get translated directly to command line arguments. Make them
+    // lowercase so that we don't have camelcase command line arguments
     #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+    #[allow(non_camel_case_types)]
     pub enum OutputFormat {
-        Flamegraph,
-        Callgrind,
+        flamegraph,
+        callgrind,
+        summary,
+        summary_by_line,
     }
 }
 
@@ -193,8 +199,10 @@ fn snapshot(pid: pid_t) -> Result<(), Error> {
 impl OutputFormat {
     fn outputter(self) -> Box<ui::output::Outputter> {
         match self {
-            OutputFormat::Flamegraph => Box::new(ui::output::Flamegraph),
-            OutputFormat::Callgrind => Box::new(ui::output::Callgrind(ui::callgrind::Stats::new())),
+            OutputFormat::flamegraph => Box::new(output::Flamegraph),
+            OutputFormat::callgrind => Box::new(output::Callgrind(ui::callgrind::Stats::new())),
+            OutputFormat::summary => Box::new(output::Summary(ui::summary::Stats::new())),
+            OutputFormat::summary_by_line => Box::new(output::SummaryLine(ui::summary::Stats::new())),
         }
     }
 }
@@ -539,7 +547,7 @@ mod tests {
                     out_path: "foo.txt".into(),
                     sample_rate: 100,
                     maybe_duration: None,
-                    format: OutputFormat::Flamegraph,
+                    format: OutputFormat::flamegraph,
                     no_drop_root: false,
                 },
             }
@@ -556,7 +564,7 @@ mod tests {
                     out_path: "foo.txt".into(),
                     sample_rate: 25,
                     maybe_duration: None,
-                    format: OutputFormat::Flamegraph,
+                    format: OutputFormat::flamegraph,
                     no_drop_root: false,
                 },
             }
@@ -573,7 +581,7 @@ mod tests {
                     out_path: "foo.txt".into(),
                     sample_rate: 100,
                     maybe_duration: Some(std::time::Duration::from_secs(60)),
-                    format: OutputFormat::Flamegraph,
+                    format: OutputFormat::flamegraph,
                     no_drop_root: false,
                 },
             }
@@ -590,7 +598,7 @@ mod tests {
                     out_path: "foo.txt".into(),
                     sample_rate: 100,
                     maybe_duration: Some(std::time::Duration::from_secs(60)),
-                    format: OutputFormat::Callgrind,
+                    format: OutputFormat::callgrind,
                     no_drop_root: false,
                 },
             }
@@ -607,7 +615,7 @@ mod tests {
                     out_path: "foo.txt".into(),
                     sample_rate: 100,
                     maybe_duration: None,
-                    format: OutputFormat::Callgrind,
+                    format: OutputFormat::callgrind,
                     no_drop_root: true,
                 },
             }
