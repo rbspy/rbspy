@@ -57,25 +57,29 @@ impl Stats {
         self.total_traces += 1;
         self.inc_self(Stats::name_lineno(&stack[0]));
         let mut set: HashSet<&StackFrame> = HashSet::new();
-        for frame in stack {
-            set.insert(&frame);
-        }
+        for frame in stack { set.insert(&frame); }
         for frame in set {
             self.inc_tot(Stats::name_lineno(frame));
         }
     }
 
     pub fn write(&self, w: &mut io::Write) -> io::Result<()> {
+        self.write_counts(w, None, None)
+    }
+
+    pub fn print_top_n(&self, n: usize, truncate: Option<usize>) -> io::Result<()> {
+        self.write_counts(&mut ::std::io::stdout(), Some(n), truncate)
+    }
+
+    fn write_counts(&self, w: &mut io::Write, top: Option<usize>, truncate: Option<usize>) -> io::Result<()> {
+        let top = top.unwrap_or(::std::usize::MAX);
+        let truncate = truncate.unwrap_or(::std::usize::MAX);
         let mut sorted: Vec<(u64, u64, &str)> = self.counts.iter().map(|(x,y)| (y.self_, y.total, x.as_ref())).collect();
         sorted.sort();
-        // TODO: don't print header if stdout is a pipe so the only thing on stdout is the numbers
+        let counts = sorted.iter().rev().take(top);
         writeln!(w, "{}", Stats::HEADER)?;
-        for &(self_, total, name) in sorted.iter().rev() {
-            writeln!(w, "{:>6.2} {:>8.2}  {}", 100.0 * (self_ as f64) / (self.total_traces as f64), 100.0 * (total as f64) / (self.total_traces as f64), name)?;
-        }
-        println!("{}", Stats::HEADER);
-        for &(self_, total, name) in sorted.iter().rev().take(20) {
-            println!("{:>6.2} {:>8.2}  {}", 100.0 * (self_ as f64) / (self.total_traces as f64), 100.0 * (total as f64) / (self.total_traces as f64), name);
+        for &(self_, total, name) in counts {
+            writeln!(w, "{:>6.2} {:>8.2}  {:.*}", 100.0 * (self_ as f64) / (self.total_traces as f64), 100.0 * (total as f64) / (self.total_traces as f64), truncate - 14 - 3, name)?;
         }
         Ok(())
     }
