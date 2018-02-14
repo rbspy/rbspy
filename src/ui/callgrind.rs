@@ -4,23 +4,72 @@ use std::io;
 
 use core::initialize::StackFrame;
 
+/*
+ * **Notes about the overall design**
+ *
+ * The Callgrind format encodes performance data basically as a graph, where the nodes are
+ * functions (like `a`) and the edges are statistics about calls between functions. The `Locations`
+ * struct is where that graph is stored, and to print out the callgrind file at the end we iterate
+ * over that struct in a pretty straightforward way.
+ *
+ * Unlike the flamegraph format (which doesn't care about the order of the stack traces you've
+ * collected at all), the callgrind format **does** care about the order. The callgrind format
+ * implicitly assumes that we have a tracing profile of our program and that you can get exact
+ * counts of the number of calls between every 2 functions. Since rbspy is a sampling profiler,
+ * this means we have to make some assumptions to make this format work!
+ *
+ * **counting function calls**
+ *
+ * The 'count' field in the `Call` struct attempts to count function calls from a -> b
+ * The main assumption we make to do this is that if we have a stack (a,b,c) followed by another
+ * one with a common prefix (a,b,f,g), then that represents the same function call `a -> b`. This
+ * isn't necessarily true but if we're sampling at a high enough rate it's a reasonable assumption.
+ *
+ * Here's an example: let's assume we have these 4 stack traces:
+ *
+ *
+ * ```
+ * a b c d d g x
+ * a b c d d // count calls d -> g and g -> x
+ * a b c d   // count calls d -> d
+ * a b c d d //
+ * a b e f g // count calls b -> c, c -> d, d -> d
+ * // end: count calls a -> b, b -> e, e -> f, f -> g
+ * ```
+ *
+ * For the above example, here's the data this callgrind code would store for a, b, c, d in the
+ * Locations struct.
+ *
+ * You can see that there are 3 numbers we track:
+ *  * `exclusive`: number of times the function was at the top of a stack trace
+ *  * `inclusive`: number of stack traces including a call x -> y
+ *  * `count`: number of estimated calls from x -> y during execution (using assumption above)
+ *
+ * a: {exclusive: 0, calls: {b -> {inclusive: 4, count: 1}}}
+ * b: {exclusive: 0, calls: {c -> {inclusive: 3, count: 1}, e -> {inclusive: 1, count: 1}}}
+ * c: {exclusive: 0, calls: {d -> {inclusive: 3, count: 1}}}
+ * d: {exclusive: 3, calls: {d -> {inclusive: 4, count: 2}, g -> {inclusive: 1, count: 1}}}
+ *
+ */
+
+
 // Stats about the relationship between two functions, one of which
 // calls the other.
 #[derive(Debug)]
 struct Call {
-    // How many times has the outer function called the inner one?
+    // Estimate of number of times this call was made (see above comment)
     count: usize,
 
-    // How many samples were found inside the inner function
-    // (including all sub-functions), when called by the outer?
+    // Number of stack traces including this call.
+    // 'a b c d' includes the call b -> c, 'a b e c d' does not
     inclusive: usize,
 }
 
 // Stats about a single function.
 #[derive(Debug, Default)]
 struct Location {
-    // How many samples were found inside this function only, not
-    // including calls to sub-functions?
+    // How many times does this function appear at the top of a stack trace
+    // where it's the most recent function called?
     exclusive: usize,
 
     // Data about the calls from this function to other functions.
@@ -48,6 +97,7 @@ struct StackEntry {
 pub struct Stats {
     // The current stack, along with tracking information.
     // The root function is at element zero.
+    // Not used in final reporting, only for tracking an ongoing profile.
     stack: Vec<StackEntry>,
 
     // Overall stats about this program.
@@ -84,7 +134,7 @@ impl Locations {
             inclusive: 0,
         });
 
-        // Add both the count and the inclusive samples cound.
+        // Add both the count and the inclusive samples count.
         val.count += 1;
         val.inclusive += child.inclusive;
     }
@@ -135,8 +185,22 @@ impl Stats {
             common += 1;
         }
 
-        // 2. Items only on the previous stack won't be kept, so we have to
-        // integrate them into our stats.
+        // 2. Items only on the previous stack won't be kept. These already have exclusive +
+        //    inclusive counts on them, so we just need to add those exclusive + inclusive counts
+        //    into our data. For example if we have:
+        //          c -> {exclusive: 2, inclusive: 5}
+        //          d -> {exclusive: 0, inclusive: 2}
+        //          e -> {exclusive: 5, inclusive: 10}
+        //    then we'll:
+        //    - add {2, 0, 5} to {c, d, e}'s exclusive counts respectively
+        //    - add these counts to calls:
+        //         b -> c : {count: 1, inclusive: 17}
+        //         c -> d : {count: 1, inclusive: 12}
+        //         d -> e : {count: 1, inclusive: 10}
+        //    - add 17 to the 'inclusive' count on `b`
+        //    We add up the inclusive counts because we only increment the 'inclusive' number on
+        //    the top element of the stack, so the 'inclusive' number of every stack element is the
+        //    sum of its inclusive property and that of all its children.
         while self.stack.len() > common {
             // For each entry, pop it from our stored stack, and track its
             // exclusive sample count.
