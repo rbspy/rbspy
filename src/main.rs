@@ -35,13 +35,11 @@ extern crate rbspy_ruby_structs as bindings;
 extern crate tempdir;
 extern crate term_size;
 
-use chrono::prelude::*;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use libc::pid_t;
 use failure::Error;
 use failure::ResultExt;
 
-use std::fs::{DirBuilder, File};
 use std::path::{Path, PathBuf};
 use std::env;
 use std::process::Command;
@@ -87,7 +85,7 @@ enum SubCmd {
     /// Record `target`, writing output `output`.
     Record {
         target: Target,
-        out_path: PathBuf,
+        output_dir: PathBuf,
         sample_rate: u32,
         maybe_duration: Option<std::time::Duration>,
         format: OutputFormat,
@@ -121,7 +119,7 @@ fn do_main() -> Result<(), Error> {
         Snapshot { pid } => snapshot(pid),
         Record {
             target,
-            out_path,
+            output_dir,
             sample_rate,
             maybe_duration,
             format,
@@ -153,7 +151,7 @@ fn do_main() -> Result<(), Error> {
 
             record(
                 format.outputter(),
-                &out_path,
+                &output_dir,
                 pid,
                 sample_rate,
                 maybe_duration,
@@ -245,8 +243,8 @@ impl SampleTime {
 }
 
 fn record(
-    mut out: Box<ui::output::Outputter>,
-    out_path: &Path,
+    outputter: Box<ui::output::Outputter>,
+    output_dir: &Path,
     pid: pid_t,
     sample_rate: u32,
     maybe_duration: Option<std::time::Duration>,
@@ -254,7 +252,9 @@ fn record(
     let getter = initialize(pid)?;
 
     let mut summary_out = ui::summary::Stats::new();
-    eprintln!("Recording data to {}", out_path.display());
+    let mut output = output::Output::new(output_dir, outputter)?;
+
+    eprintln!("Recording data to {}", output.path.display());
     let maybe_stop_time = match maybe_duration {
         None => {
             eprintln!("Press Ctrl+C to stop");
@@ -278,10 +278,6 @@ fn record(
         done_clone.store(true, Ordering::Relaxed);
     }).expect("Error setting Ctrl-C handler");
 
-    let mut out_file = File::create(&out_path).context(format!(
-        "Failed to create output file {}",
-        &out_path.display()
-    ))?;
     let mut sample_time = SampleTime::new(sample_rate);
     while !done.load(Ordering::Relaxed) {
         total += 1;
@@ -291,7 +287,7 @@ fn record(
                 break;
             }
             Ok(ref ok_trace) => {
-                out.record(&mut out_file, ok_trace)?;
+                output.record(ok_trace)?;
                 summary_out.add_function_name(ok_trace);
             }
             Err(x) => {
@@ -304,7 +300,7 @@ fn record(
         }
         // Print a summary every second
         if total % (sample_rate as usize) == 0 {
-            print_summary(&summary_out, out_path)?;
+            print_summary(&summary_out, &output.path)?;
         }
         if let Some(stop_time) = maybe_stop_time {
             if std::time::Instant::now() > stop_time {
@@ -319,7 +315,7 @@ fn record(
         }
     }
 
-    out.complete(out_path, out_file)?;
+    output.complete()?;
     Ok(())
 }
 
@@ -344,38 +340,6 @@ fn print_errors(errors: usize, total: usize) {
             total
         );
     }
-}
-
-#[test]
-fn test_output_filename() {
-    let d = tempdir::TempDir::new("temp").unwrap();
-    let dirname = d.path().to_str().unwrap();
-    assert_eq!(output_filename("", Some("foo")).unwrap(), Path::new("foo"));
-    let generated_filename = output_filename(dirname, None).unwrap();
-    assert!(
-        generated_filename
-            .to_string_lossy()
-            .contains(".cache/rbspy/records/rbspy-")
-    );
-}
-
-fn output_filename(base_dir: &str, maybe_filename: Option<&str>) -> Result<PathBuf, Error> {
-    use rand::{self, Rng};
-
-    let path = match maybe_filename {
-        Some(filename) => filename.into(),
-        None => {
-            let s = rand::thread_rng()
-                .gen_ascii_chars()
-                .take(10)
-                .collect::<String>();
-            let filename = format!("{}-{}-{}.txt", "rbspy", Utc::now().format("%Y-%m-%d"), s);
-            let dirname = Path::new(base_dir).join(".cache/rbspy/records");
-            DirBuilder::new().recursive(true).create(&dirname)?;
-            dirname.join(&filename)
-        }
-    };
-    Ok(path)
 }
 
 /// Check `s` is a positive integer.
@@ -422,7 +386,7 @@ fn arg_parser() -> App<'static, 'static> {
                     .conflicts_with("cmd"),
                 )
                 .arg(
-                    Arg::from_usage("-f --file=[FILE] 'File to write output to'")
+                    Arg::from_usage("-o --output-dir=[Dir] 'Directory to write output to (default ~/.cache/rbspy/records)'")
                         .validator(validate_filename)
                         .required(false),
                 )
@@ -475,8 +439,7 @@ impl Args {
                     .expect("this shouldn't happen because clap requires a pid"),
             },
             ("record", Some(submatches)) => {
-                let out_path =
-                    output_filename(&std::env::var("HOME")?, submatches.value_of("file"))?;
+                let output_dir = output::create_output_dir(submatches.value_of("dir"))?;
                 let maybe_duration = match value_t!(submatches, "duration", u64) {
                     Err(_) => None,
                     Ok(integer_duration) => Some(std::time::Duration::from_secs(integer_duration)),
@@ -499,7 +462,7 @@ impl Args {
                 let format = value_t!(submatches, "format", OutputFormat).unwrap();
                 Record {
                     target,
-                    out_path,
+                    output_dir,
                     sample_rate,
                     maybe_duration,
                     format,
@@ -559,7 +522,7 @@ mod tests {
             x => panic!("Unexpected: {:?}", x),
         };
 
-        let args = Args::from(make_args("rbspy record --pid 1234 --file foo.txt")).unwrap();
+        let args = Args::from(make_args("rbspy record --pid 1234 --dir /tmp/test")).unwrap();
         assert_eq!(
             args,
             Args {
@@ -575,7 +538,7 @@ mod tests {
         );
 
         let args = Args::from(make_args(
-            "rbspy record --pid 1234 --file foo.txt --rate 25",
+            "rbspy record --pid 1234 --dir /tmp/test --rate 25",
         )).unwrap();
         assert_eq!(
             args,
@@ -592,14 +555,14 @@ mod tests {
         );
 
         let args = Args::from(make_args(
-            "rbspy record --pid 1234 --file foo.txt --duration 60",
+            "rbspy record --pid 1234 --dir /tmp/test --duration 60",
         )).unwrap();
         assert_eq!(
             args,
             Args {
                 cmd: Record {
                     target: Pid { pid: 1234 },
-                    out_path: "foo.txt".into(),
+                    output_dir: "/tmp/test".into(),
                     sample_rate: 100,
                     maybe_duration: Some(std::time::Duration::from_secs(60)),
                     format: OutputFormat::flamegraph,
@@ -609,14 +572,14 @@ mod tests {
         );
 
         let args = Args::from(make_args(
-            "rbspy record --pid 1234 --file foo.txt --format callgrind --duration 60",
+            "rbspy record --pid 1234 --dir /tmp/test --format callgrind --duration 60",
         )).unwrap();
         assert_eq!(
             args,
             Args {
                 cmd: Record {
                     target: Pid { pid: 1234 },
-                    out_path: "foo.txt".into(),
+                    output_dir: "/tmp/test".into(),
                     sample_rate: 100,
                     maybe_duration: Some(std::time::Duration::from_secs(60)),
                     format: OutputFormat::callgrind,
@@ -626,14 +589,14 @@ mod tests {
         );
 
         let args = Args::from(make_args(
-            "rbspy record --pid 1234 --file foo.txt --format callgrind --no-drop-root",
+            "rbspy record --pid 1234 --dir /tmp/test --format callgrind --no-drop-root",
         )).unwrap();
         assert_eq!(
             args,
             Args {
                 cmd: Record {
                     target: Pid { pid: 1234 },
-                    out_path: "foo.txt".into(),
+                    output_dir: "/tmp/test".into(),
                     sample_rate: 100,
                     maybe_duration: None,
                     format: OutputFormat::callgrind,
