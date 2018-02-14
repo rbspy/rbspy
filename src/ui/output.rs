@@ -101,8 +101,10 @@ fn write_flamegraph<P: AsRef<Path>>(stacks_filename: P) -> Result<(), Error> {
     eprintln!("Writing flamegraph to {}", svg_filename.display());
     let mut child = Command::new("perl")
         .arg("-")
+        .arg("--inverted") // icicle graphs are easier to read
+        .arg("--minwidth").arg("2") // min width 2 pixels saves on disk space
         .arg(stacks_filename)
-        .stdin(Stdio::piped())
+        .stdin(Stdio::piped()) // pipe in the flamegraph.pl script to stdin
         .stdout(output_svg)
         .spawn()
         .context("Couldn't execute perl")?;
