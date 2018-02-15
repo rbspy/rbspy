@@ -54,17 +54,26 @@ This is useful when you want to know what functions your program is spending mos
 You can record stack traces in two different ways, by PID or by executing a new ruby process.
 
 #### Record by PID
+
 ```
+# Must be run as root
 sudo rbspy record --pid $PID
-# recording a subprocess doesn't require root access on Linux
-# though on Mac rbspy always needs to run as root
 ```
 
 #### Record by executing the process through rbspy
+
 ```
+# Must be run as root on Mac (but not Linux)
 rbspy record ruby myprogram.rb
-# this will require sudo or root access on both mac and linux
 ```
+
+The reason this has to be run as root on Mac but not on Linux is that Mac and Linux systems APIs are
+different. rbspy can use the `process_vm_readv` system call to read memory from a child process on
+Linux without being root, but can't do the same with `vm_read` on Mac.
+
+If run with sudo, `rbspy record` by default drops root privileges when executing a subprocess. So if
+you're user `bork` and run `sudo rbspy record ruby script.rb`. You can disable this with
+`--no-drop-root`.
 
 #### Optional Arguments
 
