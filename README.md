@@ -47,19 +47,29 @@ sudo rbspy snapshot --pid $PID
 
 ### Record
 
-Record records stack traces from your process and generates a flamegraph. You can either give it the
-PID of an already-running process to record, or ask it to execute and record a new Ruby process.
+Record records stack traces from your process and generates a flamegraph.
 
 This is useful when you want to know what functions your program is spending most of its time in.
 
+You can record stack traces in two different ways, by PID or by executing a new ruby process.
+
+#### Record by PID
 ```
 sudo rbspy record --pid $PID
 # recording a subprocess doesn't require root access on Linux
 # though on Mac rbspy always needs to run as root
-rbspy record ruby myprogram.rb
 ```
 
-**Optional Arguments**
+#### Record by executing the process through rbspy
+```
+rbspy record ruby myprogram.rb
+# this will require sudo or root access on both mac and linux
+```
+
+#### Optional Arguments
+
+These work regardless of how you started the recording.
+
  * `--file`: Specifies where rbspy will save data. By default, rbspy saves to `~/.cache/rbspy/records`.
  * `--rate`: Specifies the frequency of that stack traces are recorded. The interval is determined by `1000/rate`. The default rate is 100hz.
  * `--duration`: Specifies how long to run before stopping rbspy. This conficts with running a subcommand (`rbspy record ruby myprogram.rb`).
