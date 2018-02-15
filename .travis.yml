@@ -57,26 +57,26 @@ before_deploy:
   - bash ci/before_deploy.sh
 
 deploy:
-  provider: releases
-  # *REALLY* not production ready!
-  prerelease: true
-  # To generate key:
-  # - Go to 'https://github.com/settings/tokens/new' and generate a Token with only the
-  # `public_repo` scope enabled
-  # - Call `travis encrypt $github_token` where $github_token is the token you got in the previous
-  # step and `travis` is the official Travis CI gem (see https://rubygems.org/gems/travis/)
-  # - Enter the "encrypted value" below
-  api_key:
-    secure: g3yZvnK3m4hW2MNk6Nm2qVkgjL/hnNrsWwqvO7HvvD7VmQGWX2LBpNQE3plQsXhZeELdwWJuvYE5fp/rgjl3xS6/fRw/vpCvvfWB/Meq/YVoPJyq+FjXFLonkONhnJlIqvGohkRWZrAg0K+DBcu0+Db0uuQrjIrUG2TPNfETCRYKj90eJYChYQhqdxr0tv4SywpKZhR6AZqkvKkOMItM2kuCePEshtDJACj4OxWFXzCMEri1JZhqqdCqpYYsq/hqCcBlkey6tp4ul0d9qcNSaCRbWZlJ4Tli2h/K7MsfLVesSifisBVE/cdNvu7RxF1Ei01tivkT8Up69LM9JZdiBcmOrveOJd7Hd0R69R3Z3cGYvJiQq2svh6fqMIY0E/mLTfyuc+khJdf+zgr9tX3Qqa3HORyCDaDNVYws0HXEVpfNvmHrLeG3DWbtuYcFpKDbvcmN2fSuqvvxdhHrrSSwGhzD/dr4v3zq+xJUIS3qtS1lpu/kCcGmT9n7i73bFOyEOClCukPa//61/2W0KdBYJKU+jJaKljMJ3rNSbjH5DzYxBAbWgcywSebJwmcGTwourKJZsBoInCWLK6QXHuHrm6VcGJPO01JDHNuAXS5t7CY0Ju+ft6vbtOEaWykC4fbns2EuxOeLKA1U+KpjP4mQdpr/fV4bpMVAJyY9QO/FgVo=
-  file_glob: true
-  file: ${PROJECT_NAME}-${TRAVIS_TAG}-${TARGET}.*
-  # don't delete the artifacts from previous phases
-  skip_cleanup: true
-  # deploy when a new tag is pushed
-  on:
-    # channel to use to produce the release artifacts
-    condition: $TRAVIS_RUST_VERSION = stable
-    tags: true
+  - provider: releases
+    prerelease: true
+    api_key:
+      secure: g3yZvnK3m4hW2MNk6Nm2qVkgjL/hnNrsWwqvO7HvvD7VmQGWX2LBpNQE3plQsXhZeELdwWJuvYE5fp/rgjl3xS6/fRw/vpCvvfWB/Meq/YVoPJyq+FjXFLonkONhnJlIqvGohkRWZrAg0K+DBcu0+Db0uuQrjIrUG2TPNfETCRYKj90eJYChYQhqdxr0tv4SywpKZhR6AZqkvKkOMItM2kuCePEshtDJACj4OxWFXzCMEri1JZhqqdCqpYYsq/hqCcBlkey6tp4ul0d9qcNSaCRbWZlJ4Tli2h/K7MsfLVesSifisBVE/cdNvu7RxF1Ei01tivkT8Up69LM9JZdiBcmOrveOJd7Hd0R69R3Z3cGYvJiQq2svh6fqMIY0E/mLTfyuc+khJdf+zgr9tX3Qqa3HORyCDaDNVYws0HXEVpfNvmHrLeG3DWbtuYcFpKDbvcmN2fSuqvvxdhHrrSSwGhzD/dr4v3zq+xJUIS3qtS1lpu/kCcGmT9n7i73bFOyEOClCukPa//61/2W0KdBYJKU+jJaKljMJ3rNSbjH5DzYxBAbWgcywSebJwmcGTwourKJZsBoInCWLK6QXHuHrm6VcGJPO01JDHNuAXS5t7CY0Ju+ft6vbtOEaWykC4fbns2EuxOeLKA1U+KpjP4mQdpr/fV4bpMVAJyY9QO/FgVo=
+    file_glob: true
+    file: ${PROJECT_NAME}-${TRAVIS_TAG}-${TARGET}.*
+    # don't delete the artifacts from previous phases
+    skip_cleanup: true
+    # deploy when a new tag is pushed
+    on:
+      # channel to use to produce the release artifacts
+      condition: $TRAVIS_RUST_VERSION = stable
+      tags: true
+ - provider: packagecloud
+   repository: rbspy
+   username: rbspy
+   dist: ubuntu/xenial
+   token: 
+     secure: A8eiSAnLhH8MqqGM6fx6koTe4xC1XzccGd8qCwabQbBfB4FXQszMIz2iuEOSadLwvrgepTTWy0+okDUG5xPyKYNSnpwTWG2EaMwe3MUt9sBIdkL7wEAnDHpywr6cD+CNnbA8lG6mso1bkvv9TsS8aLdnFSQdTEb0WbcffKLsW94PUNyD0AjI4PChY++LtpVM3ku9bqxnKOkBqAMhBTDvgeZ7dya4IzLtbBey4oSLEjW0zOhswYvim6S9Se15nR2ARP54T5Qf8iUO1dYsCwkIXCEPfsiEi7Kik/qendGcMXkxQ56UApvF+fTVGne6FfsAT1zh4BAHreVP2JkqEGwUh2LbLKFp4KHcGOqP39mDQJl4zuAtXeRHjSM7rGHa7tB5PoIf4OiaZxGhQR/0e5R3AUWoxfapBCiCKztUtQ/QUbt9JKw6HIDm86sPh9O/1+Ehen+KMkTBrqOTzG7mLxuVjJVjH2qnDCCYFsD8VhaoABpm1LhIqV/rdTn8DT8jIsZfQx2yEUrOYof0Nz1GJeIoChHQYkHf2JEoarGkuSKe26cBUeb7IzpS3VUI5QifKQ2+3bamUPevYs7xAzh4SZT/fFRqQKDe60AwYLTeLeoxqYUicOyT1+0BQBaExsqhWnmz6u+whTI8hFFCFaF07Nf6NlUtb2cExzCth4bHlpNBgkQ=
+
 
 branches:
   only:

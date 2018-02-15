@@ -26,9 +26,15 @@ mk_tarball() {
     rm -r $td
 }
 
+mk_deb() {
+    cargo install cargo-deb
+    cargo deb
+}
+
 main() {
     mk_artifacts
     mk_tarball
+    mk_deb
 }
 
 main
