@@ -31,6 +31,10 @@ extern crate regex;
 #[cfg(target_os = "macos")]
 extern crate lazy_static;
 extern crate rbspy_ruby_structs as bindings;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
 extern crate tempdir;
 extern crate term_size;
 
@@ -51,6 +55,7 @@ use std::os::unix::prelude::*;
 
 pub mod core;
 pub mod ui;
+pub(crate) mod storage;
 
 use core::initialize::initialize;
 use core::copy::MemoryCopyError;
@@ -87,6 +92,7 @@ enum SubCmd {
     Record {
         target: Target,
         out_path: PathBuf,
+        raw_path: PathBuf,
         sample_rate: u32,
         maybe_duration: Option<std::time::Duration>,
         format: OutputFormat,
@@ -121,6 +127,7 @@ fn do_main() -> Result<(), Error> {
         Record {
             target,
             out_path,
+            raw_path,
             sample_rate,
             maybe_duration,
             format,
@@ -153,6 +160,7 @@ fn do_main() -> Result<(), Error> {
             record(
                 format.outputter(),
                 &out_path,
+                &raw_path,
                 pid,
                 sample_rate,
                 maybe_duration,
@@ -206,6 +214,15 @@ impl OutputFormat {
             OutputFormat::summary_by_line => Box::new(output::SummaryLine(ui::summary::Stats::new())),
         }
     }
+
+    fn extension(&self) -> String {
+        match self {
+            &OutputFormat::flamegraph => "flamegraph.svg",
+            &OutputFormat::callgrind => "callgrind.txt",
+            &OutputFormat::summary => "summary.txt",
+            &OutputFormat::summary_by_line => "summary_by_line.txt",
+        }.to_string()
+    }
 }
 
 // This SampleTime struct helps us sample on a regular schedule ("exactly" 100 times per second, if
@@ -243,16 +260,20 @@ impl SampleTime {
     }
 }
 
+
 fn record(
     mut out: Box<ui::output::Outputter>,
     out_path: &Path,
+    raw_path: &Path,
     pid: pid_t,
     sample_rate: u32,
     maybe_duration: Option<std::time::Duration>,
 ) -> Result<(), Error> {
     let getter = initialize(pid)?;
 
+    let mut raw_store = storage::Store::new(raw_path)?;
     let mut summary_out = ui::summary::Stats::new();
+
     let maybe_stop_time = match maybe_duration {
         None => {
             eprintln!("Press Ctrl+C to stop");
@@ -287,6 +308,7 @@ fn record(
             Ok(ref ok_trace) => {
                 out.record(ok_trace)?;
                 summary_out.add_function_name(ok_trace);
+                raw_store.write(ok_trace)?;
             }
             Err(x) => {
                 errors += 1;
@@ -298,7 +320,7 @@ fn record(
         }
         // Print a summary every second
         if total % (sample_rate as usize) == 0 {
-            print_summary(&summary_out, out_path)?;
+            print_summary(&summary_out)?;
         }
         if let Some(stop_time) = maybe_stop_time {
             if std::time::Instant::now() > stop_time {
@@ -313,7 +335,11 @@ fn record(
         }
     }
 
-    eprintln!("Writing data to {}", out_path.display());
+    // Finish writing all data to disk
+
+    raw_store.complete();
+    eprintln!("Wrote raw data to {}", raw_path.display());
+    eprintln!("Writing formatted output to {}", out_path.display());
     let out_file = File::create(&out_path).context(format!(
         "Failed to create output file {}",
         &out_path.display()
@@ -322,14 +348,13 @@ fn record(
     Ok(())
 }
 
-fn print_summary(summary_out: &ui::summary::Stats, out_path: &Path) -> Result<(), Error> {
+fn print_summary(summary_out: &ui::summary::Stats) -> Result<(), Error> {
     let width = match term_size::dimensions() {
         Some((w, _)) => Some(w as usize),
         None => None,
     };
     println!("{}[2J", 27 as char); // clear screen
     println!("{}[0;0H", 27 as char); // go to 0,0
-    eprintln!("Recording data to {}", out_path.display());
     eprintln!("Summary of profiling data so far:");
     summary_out.print_top_n(20, width)?;
     Ok(())
@@ -421,7 +446,12 @@ fn arg_parser() -> App<'static, 'static> {
                     .conflicts_with("cmd"),
                 )
                 .arg(
-                    Arg::from_usage("-f --file=[FILE] 'File to write output to'")
+                    Arg::from_usage("--raw-file=[FILE] 'File to write raw data to (will be gzipped)'")
+                        .validator(validate_filename)
+                        .required(false),
+                )
+                .arg(
+                    Arg::from_usage("-f --file=[FILE] 'File to write formatted output to'")
                         .validator(validate_filename)
                         .required(false),
                 )
@@ -475,14 +505,9 @@ impl Args {
             },
             ("record", Some(submatches)) => {
                 let format = value_t!(submatches, "format", OutputFormat).unwrap();
-                let extension = match format {
-                    OutputFormat::flamegraph => "flamegraph.svg",
-                    OutputFormat::callgrind => "callgrind.txt",
-                    OutputFormat::summary => "summary.txt",
-                    OutputFormat::summary_by_line => "summary_by_line.txt",
-                };
+                let raw_path = output_filename(&std::env::var("HOME")?, submatches.value_of("raw-file"), "raw.gz")?;
                 let out_path =
-                    output_filename(&std::env::var("HOME")?, submatches.value_of("file"), extension)?;
+                    output_filename(&std::env::var("HOME")?, submatches.value_of("file"), &format.extension())?;
                 let maybe_duration = match value_t!(submatches, "duration", u64) {
                     Err(_) => None,
                     Ok(integer_duration) => Some(std::time::Duration::from_secs(integer_duration)),
@@ -505,6 +530,7 @@ impl Args {
                 Record {
                     target,
                     out_path,
+                    raw_path,
                     sample_rate,
                     maybe_duration,
                     format,
@@ -564,13 +590,14 @@ mod tests {
             x => panic!("Unexpected: {:?}", x),
         };
 
-        let args = Args::from(make_args("rbspy record --pid 1234 --file foo.txt")).unwrap();
+        let args = Args::from(make_args("rbspy record --pid 1234 --file foo.txt --raw-file raw.gz")).unwrap();
         assert_eq!(
             args,
             Args {
                 cmd: Record {
                     target: Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
+                    raw_path: "raw.gz".into(),
                     sample_rate: 100,
                     maybe_duration: None,
                     format: OutputFormat::flamegraph,
@@ -580,7 +607,7 @@ mod tests {
         );
 
         let args = Args::from(make_args(
-            "rbspy record --pid 1234 --file foo.txt --rate 25",
+            "rbspy record --pid 1234 --file foo.txt --raw-file raw.gz --rate 25",
         )).unwrap();
         assert_eq!(
             args,
@@ -588,6 +615,7 @@ mod tests {
                 cmd: Record {
                     target: Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
+                    raw_path: "raw.gz".into(),
                     sample_rate: 25,
                     maybe_duration: None,
                     format: OutputFormat::flamegraph,
@@ -597,7 +625,7 @@ mod tests {
         );
 
         let args = Args::from(make_args(
-            "rbspy record --pid 1234 --file foo.txt --duration 60",
+            "rbspy record --pid 1234 --file foo.txt --raw-file raw.gz --duration 60",
         )).unwrap();
         assert_eq!(
             args,
@@ -605,6 +633,7 @@ mod tests {
                 cmd: Record {
                     target: Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
+                    raw_path: "raw.gz".into(),
                     sample_rate: 100,
                     maybe_duration: Some(std::time::Duration::from_secs(60)),
                     format: OutputFormat::flamegraph,
@@ -614,7 +643,7 @@ mod tests {
         );
 
         let args = Args::from(make_args(
-            "rbspy record --pid 1234 --file foo.txt --format callgrind --duration 60",
+            "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --format callgrind --duration 60",
         )).unwrap();
         assert_eq!(
             args,
@@ -622,6 +651,7 @@ mod tests {
                 cmd: Record {
                     target: Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
+                    raw_path: "raw.gz".into(),
                     sample_rate: 100,
                     maybe_duration: Some(std::time::Duration::from_secs(60)),
                     format: OutputFormat::callgrind,
@@ -631,7 +661,7 @@ mod tests {
         );
 
         let args = Args::from(make_args(
-            "rbspy record --pid 1234 --file foo.txt --format callgrind --no-drop-root",
+            "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --format callgrind --no-drop-root",
         )).unwrap();
         assert_eq!(
             args,
@@ -639,6 +669,7 @@ mod tests {
                 cmd: Record {
                     target: Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
+                    raw_path: "raw.gz".into(),
                     sample_rate: 100,
                     maybe_duration: None,
                     format: OutputFormat::callgrind,
