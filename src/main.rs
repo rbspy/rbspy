@@ -31,7 +31,6 @@ extern crate regex;
 #[cfg(target_os = "macos")]
 extern crate lazy_static;
 extern crate rbspy_ruby_structs as bindings;
-#[cfg(test)]
 extern crate tempdir;
 extern crate term_size;
 
@@ -201,7 +200,7 @@ fn snapshot(pid: pid_t) -> Result<(), Error> {
 impl OutputFormat {
     fn outputter(self) -> Box<ui::output::Outputter> {
         match self {
-            OutputFormat::flamegraph => Box::new(output::Flamegraph),
+            OutputFormat::flamegraph => Box::new(output::Flamegraph(ui::flamegraph::Stats::new())),
             OutputFormat::callgrind => Box::new(output::Callgrind(ui::callgrind::Stats::new())),
             OutputFormat::summary => Box::new(output::Summary(ui::summary::Stats::new())),
             OutputFormat::summary_by_line => Box::new(output::SummaryLine(ui::summary::Stats::new())),
@@ -254,7 +253,6 @@ fn record(
     let getter = initialize(pid)?;
 
     let mut summary_out = ui::summary::Stats::new();
-    eprintln!("Recording data to {}", out_path.display());
     let maybe_stop_time = match maybe_duration {
         None => {
             eprintln!("Press Ctrl+C to stop");
@@ -278,10 +276,6 @@ fn record(
         done_clone.store(true, Ordering::Relaxed);
     }).expect("Error setting Ctrl-C handler");
 
-    let mut out_file = File::create(&out_path).context(format!(
-        "Failed to create output file {}",
-        &out_path.display()
-    ))?;
     let mut sample_time = SampleTime::new(sample_rate);
     while !done.load(Ordering::Relaxed) {
         total += 1;
@@ -291,7 +285,7 @@ fn record(
                 break;
             }
             Ok(ref ok_trace) => {
-                out.record(&mut out_file, ok_trace)?;
+                out.record(ok_trace)?;
                 summary_out.add_function_name(ok_trace);
             }
             Err(x) => {
@@ -319,7 +313,12 @@ fn record(
         }
     }
 
-    out.complete(out_path, out_file)?;
+    eprintln!("Writing data to {}", out_path.display());
+    let out_file = File::create(&out_path).context(format!(
+        "Failed to create output file {}",
+        &out_path.display()
+    ))?;
+    out.complete(out_file)?;
     Ok(())
 }
 
@@ -350,8 +349,8 @@ fn print_errors(errors: usize, total: usize) {
 fn test_output_filename() {
     let d = tempdir::TempDir::new("temp").unwrap();
     let dirname = d.path().to_str().unwrap();
-    assert_eq!(output_filename("", Some("foo")).unwrap(), Path::new("foo"));
-    let generated_filename = output_filename(dirname, None).unwrap();
+    assert_eq!(output_filename("", Some("foo"), "txt").unwrap(), Path::new("foo"));
+    let generated_filename = output_filename(dirname, None, "txt").unwrap();
     assert!(
         generated_filename
             .to_string_lossy()
@@ -359,7 +358,7 @@ fn test_output_filename() {
     );
 }
 
-fn output_filename(base_dir: &str, maybe_filename: Option<&str>) -> Result<PathBuf, Error> {
+fn output_filename(base_dir: &str, maybe_filename: Option<&str>, extension: &str) -> Result<PathBuf, Error> {
     use rand::{self, Rng};
 
     let path = match maybe_filename {
@@ -369,7 +368,7 @@ fn output_filename(base_dir: &str, maybe_filename: Option<&str>) -> Result<PathB
                 .gen_ascii_chars()
                 .take(10)
                 .collect::<String>();
-            let filename = format!("{}-{}-{}.txt", "rbspy", Utc::now().format("%Y-%m-%d"), s);
+            let filename = format!("{}-{}-{}.{}", "rbspy", Utc::now().format("%Y-%m-%d"), s, extension);
             let dirname = Path::new(base_dir).join(".cache/rbspy/records");
             DirBuilder::new().recursive(true).create(&dirname)?;
             dirname.join(&filename)
@@ -475,8 +474,15 @@ impl Args {
                     .expect("this shouldn't happen because clap requires a pid"),
             },
             ("record", Some(submatches)) => {
+                let format = value_t!(submatches, "format", OutputFormat).unwrap();
+                let extension = match format {
+                    OutputFormat::flamegraph => "flamegraph.svg",
+                    OutputFormat::callgrind => "callgrind.txt",
+                    OutputFormat::summary => "summary.txt",
+                    OutputFormat::summary_by_line => "summary_by_line.txt",
+                };
                 let out_path =
-                    output_filename(&std::env::var("HOME")?, submatches.value_of("file"))?;
+                    output_filename(&std::env::var("HOME")?, submatches.value_of("file"), extension)?;
                 let maybe_duration = match value_t!(submatches, "duration", u64) {
                     Err(_) => None,
                     Ok(integer_duration) => Some(std::time::Duration::from_secs(integer_duration)),
@@ -496,7 +502,6 @@ impl Args {
                         args: args.map(String::from).collect(),
                     }
                 };
-                let format = value_t!(submatches, "format", OutputFormat).unwrap();
                 Record {
                     target,
                     out_path,
