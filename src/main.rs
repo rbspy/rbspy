@@ -51,6 +51,7 @@ use std::os::unix::prelude::*;
 
 pub mod core;
 pub mod ui;
+pub(crate) mod storage;
 
 use core::initialize::initialize;
 use core::copy::MemoryCopyError;
