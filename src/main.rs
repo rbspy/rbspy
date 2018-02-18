@@ -145,7 +145,10 @@ fn do_main() -> Result<(), Error> {
             };
 
             let pids = if with_subprocesses {
-                 descendents::descendents_of(pid)
+                 match descendents::descendents_of(pid) {
+                     Err(error_string) => { eprintln!("Error finding descendents: {}", error_string); Vec::new() },
+                     Ok(result) => { result }
+                 }
             } else {
                 let mut pids = Vec::new();
                 pids.push(pid);
@@ -297,7 +300,9 @@ fn parallel_record(
     }
 
     for recorder in recorders {
-        recorder.join();
+        if let Err(e) = recorder.join() {
+            eprintln!("Error joining recorder: {:?}", e);
+        }
     }
 
     Ok(())
