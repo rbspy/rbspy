@@ -117,12 +117,13 @@ macro_rules! ruby_version_v2_5_x(
 macro_rules! get_stack_trace(
     ($thread_type:ident) => (
 
-        use initialize::StackFrame;
+        use initialize::{StackFrame, Process, StackTrace};
 
         pub fn get_stack_trace<T>(
             ruby_current_thread_address_location: usize,
-            source: &T,
-            ) -> Result<Vec<StackFrame>, MemoryCopyError> where T: CopyAddress{
+            process: &Process<T>,
+            ) -> Result<StackTrace, MemoryCopyError> where T: CopyAddress {
+            let source = &process.source;
             let current_thread_addr: usize =
                 copy_struct(ruby_current_thread_address_location, source)?;
             let thread: $thread_type = copy_struct(current_thread_addr, source)?;
@@ -151,7 +152,7 @@ macro_rules! get_stack_trace(
                     }
                 }
             }
-            Ok(trace)
+            Ok(StackTrace{trace, pid: process.pid})
         }
 
 use proc_maps::{maps_contain_addr, MapRange};
@@ -539,7 +540,7 @@ mod tests {
 
     use ruby_version;
 
-    use initialize::StackFrame;
+    use initialize::{StackFrame, Process};
 
     fn real_stack_trace_main() -> Vec<StackFrame> {
         vec![
@@ -609,35 +610,35 @@ mod tests {
     fn test_get_ruby_stack_trace_2_1_6() {
         let current_thread_addr = 0x562658abd7f0;
         let stack_trace =
-            ruby_version::ruby_2_1_6::get_stack_trace(current_thread_addr, &*COREDUMP_2_1_6)
+            ruby_version::ruby_2_1_6::get_stack_trace::<CoreDump>(current_thread_addr, &Process{pid: 0, source: COREDUMP_2_1_6.into()})
             .unwrap();
-        assert_eq!(real_stack_trace_main(), stack_trace);
+        assert_eq!(real_stack_trace_main(), stack_trace.trace);
     }
 
     #[test]
     fn test_get_ruby_stack_trace_1_9_3() {
         let current_thread_addr = 0x823930;
         let stack_trace =
-            ruby_version::ruby_1_9_3_0::get_stack_trace(current_thread_addr, &*COREDUMP_1_9_3)
+            ruby_version::ruby_1_9_3_0::get_stack_trace::<CoreDump>(current_thread_addr, &Process{pid: 0, source: COREDUMP_1_9_3.into()})
             .unwrap();
-        assert_eq!(real_stack_trace_main(), stack_trace);
+        assert_eq!(real_stack_trace_main(), stack_trace.trace);
     }
 
     #[test]
     fn test_get_ruby_stack_trace_2_5_0() {
         let current_thread_addr = 0x55dd8c3b7758;
         let stack_trace =
-            ruby_version::ruby_2_5_0_rc1::get_stack_trace(current_thread_addr, &*COREDUMP_2_5_0)
+            ruby_version::ruby_2_5_0_rc1::get_stack_trace::<CoreDump>(current_thread_addr, &Process{pid: 0, source: COREDUMP_2_5_0.into()})
             .unwrap();
-        assert_eq!(real_stack_trace(), stack_trace);
+        assert_eq!(real_stack_trace(), stack_trace.trace);
     }
 
     #[test]
     fn test_get_ruby_stack_trace_2_4_0() {
         let current_thread_addr = 0x55df44959920;
         let stack_trace =
-            ruby_version::ruby_2_4_0::get_stack_trace(current_thread_addr, &*COREDUMP_2_4_0)
+            ruby_version::ruby_2_4_0::get_stack_trace::<CoreDump>(current_thread_addr, &Process{pid: 0, source: &*COREDUMP_2_4_0.into()})
             .unwrap();
-        assert_eq!(real_stack_trace(), stack_trace);
+        assert_eq!(real_stack_trace(), stack_trace.trace);
     }
 }

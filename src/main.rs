@@ -203,7 +203,7 @@ fn main() {
 fn snapshot(pid: pid_t) -> Result<(), Error> {
     let getter = initialize::initialize(pid)?;
     let trace = getter.get_trace()?;
-    for x in trace.iter().rev() {
+    for x in trace.trace.iter().rev() {
         println!("{}", x);
     }
     Ok(())
@@ -683,10 +683,6 @@ mod tests {
             Args {
                 cmd: Record {
                     target: Pid { pid: 1234 },
-                    out_path: "foo.txt".into(),
-                    sample_rate: 100,
-                    maybe_duration: None,
-                    format: OutputFormat::Callgrind,
                     maybe_filename: Some("foo.txt".to_string()),
                     sample_rate: 100,
                     maybe_duration: None,
