@@ -8,12 +8,12 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 use callgrind;
-use initialize::StackFrame;
+use initialize::StackTrace;
 
 const FLAMEGRAPH_SCRIPT: &'static [u8] = include_bytes!("../vendor/flamegraph/flamegraph.pl");
 
 pub trait Outputter {
-    fn record(&mut self, file: &mut File, stack: &Vec<StackFrame>) -> Result<(), Error>;
+    fn record(&mut self, file: &mut File, stack: &StackTrace) -> Result<(), Error>;
     fn complete(&mut self, path: &Path, file: File) -> Result<(), Error>;
 }
 
@@ -22,8 +22,8 @@ pub trait Outputter {
 pub struct Flamegraph;
 
 impl Outputter for Flamegraph {
-    fn record(&mut self, file: &mut File, stack: &Vec<StackFrame>) -> Result<(), Error> {
-        for t in stack.iter().rev() {
+    fn record(&mut self, file: &mut File, stack: &StackTrace) -> Result<(), Error> {
+        for t in stack.trace.iter().rev() {
             write!(file, "{}", t)?;
             write!(file, ";")?;
         }
@@ -41,8 +41,8 @@ impl Outputter for Flamegraph {
 pub struct Callgrind(pub callgrind::Stats);
 
 impl Outputter for Callgrind {
-    fn record(&mut self, _file: &mut File, stack: &Vec<StackFrame>) -> Result<(), Error> {
-        self.0.add(stack);
+    fn record(&mut self, file: &mut File, stack: &StackTrace) -> Result<(), Error> {
+        self.0.add(&stack.trace);
         Ok(())
     }
 
