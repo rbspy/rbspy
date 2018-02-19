@@ -683,12 +683,8 @@ mod tests {
             Args {
                 cmd: Record {
                     target: Pid { pid: 1234 },
-                    out_path: "foo.txt".into(),
                     sample_rate: 100,
-                    maybe_duration: None,
-                    format: OutputFormat::Callgrind,
                     maybe_filename: Some("foo.txt".to_string()),
-                    sample_rate: 100,
                     maybe_duration: None,
                     format: OutputFormat::Flamegraph,
                     no_drop_root: false,
