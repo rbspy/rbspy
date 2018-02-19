@@ -47,7 +47,13 @@ sudo rbspy snapshot --pid $PID
 
 ### Record
 
-Record records stack traces from your process and generates a flamegraph.
+Record records stack traces from your process and saves them to disk.
+
+`rbspy record` will save 2 files: a gzipped raw data file, and a visualization (by default a flamegraph, you
+can configure the visualization format with `--format`). The raw data file contains every stack
+trace that `rbspy` recorded, so that you can generate other visualizations later if you want. By
+default, rbspy saves both files to `~/.cache/rbspy/records`, but you can customize where those are
+stored with `--file` and `--raw-file`.
 
 This is useful when you want to know what functions your program is spending most of its time in.
 
@@ -77,11 +83,40 @@ you're user `bork` and run `sudo rbspy record ruby script.rb`. You can disable t
 
 #### Optional Arguments
 
-These work regardless of how you started the recording.
+These work regardless of how you started the recording. 
 
- * `--file`: Specifies where rbspy will save data. By default, rbspy saves to `~/.cache/rbspy/records`.
  * `--rate`: Specifies the frequency of that stack traces are recorded. The interval is determined by `1000/rate`. The default rate is 100hz.
  * `--duration`: Specifies how long to run before stopping rbspy. This conficts with running a subcommand (`rbspy record ruby myprogram.rb`).
+ * `--format`: Specifies what format to use to report profiling data. The options are:
+   * `flamegraph`: generates a flamegraph SVG that you can view in a browser
+   * `callgrind`: generates a callgrind-formatted file that you can view with a tool like
+     `kcachegrind`.
+   * `summary`: aggregates % self and % total times by function. Useful to get a basic overview
+   * `summary_by_line`: aggregates % self and % total times by line number. Especially useful when
+      there's 1 line in your program which is taking up all the time.
+ * `--file`: Specifies where rbspy will save formatted output. 
+ * `--raw-file`: Specifies where rbspy will save formatted data. Use a gz extension because it will be gzipped.
+
+## Reporting
+
+If you have a raw rbspy data file that you've previously recorded, you can use `rbspy report` to
+generate different kinds of visualizations from it (the flamegraph/callgrind/summary formats, as
+documented above). This is useful because you can record raw data from a program and then decide how
+you want to visualize it afterwards.
+
+For example, here's what recording a simple program and then generating a summary report looks like:
+
+```
+$ sudo rbspy record --raw-file raw.gz ruby ci/ruby-programs/short_program.rb
+$ rbspy report -f summary -i raw.gz -o summary.txt
+$ cat summary.txt
+% self  % total  name
+100.00   100.00  <c function> - unknown
+  0.00   100.00  ccc - ci/ruby-programs/short_program.rb
+  0.00   100.00  bbb - ci/ruby-programs/short_program.rb
+  0.00   100.00  aaa - ci/ruby-programs/short_program.rb
+  0.00   100.00  <main> - ci/ruby-programs/short_program.rb
+```
 
 ## What's a flamegraph?
 

@@ -100,6 +100,7 @@ enum SubCmd {
     },
     /// Capture and print a stacktrace snapshot of process `pid`.
     Snapshot { pid: pid_t },
+    Report { format: OutputFormat, input: PathBuf, output: PathBuf, },
 }
 use SubCmd::*;
 
@@ -165,7 +166,8 @@ fn do_main() -> Result<(), Error> {
                 sample_rate,
                 maybe_duration,
             )
-        }
+        },
+        Report{format, input, output} => report(format, input, output),
     }
 }
 
@@ -348,6 +350,17 @@ fn record(
     Ok(())
 }
 
+fn report(format: OutputFormat, input: PathBuf, output: PathBuf) -> Result<(), Error>{
+    let input_file = File::open(input)?;
+    let stuff = storage::from_reader(input_file)?;
+    let mut outputter = format.outputter();
+    for trace in stuff {
+        outputter.record(&trace)?;
+    }
+    outputter.complete(File::create(output)?)?;
+    Ok(())
+}
+
 fn print_summary(summary_out: &ui::summary::Stats) -> Result<(), Error> {
     let width = match term_size::dimensions() {
         Some((w, _)) => Some(w as usize),
@@ -467,7 +480,7 @@ fn arg_parser() -> App<'static, 'static> {
                     Arg::from_usage("--format=[FORMAT] 'Output format to write'")
                         .possible_values(&OutputFormat::variants())
                         .case_insensitive(true)
-                        .default_value("Flamegraph"),
+                        .default_value("flamegraph"),
                 )
                 .arg(
                     Arg::from_usage(
@@ -476,6 +489,18 @@ fn arg_parser() -> App<'static, 'static> {
                         .required(false),
                 )
                 .arg(Arg::from_usage("<cmd>... 'command to run'").required(false)),
+        )
+        .subcommand(
+            SubCommand::with_name("report")
+                .about("Generate visualization from raw data recorded by `rbspy record`")
+                .arg(Arg::from_usage("-i --input=[FILE] 'Input raw data to use'"))
+                .arg(Arg::from_usage("-o --output=[FILE] 'Output file'"))
+                .arg(
+                    Arg::from_usage("-f --format=[FORMAT] 'Output format to write'")
+                        .possible_values(&OutputFormat::variants())
+                        .case_insensitive(true)
+                        .default_value("flamegraph"),
+                )
         )
 }
 
@@ -537,6 +562,11 @@ impl Args {
                     no_drop_root,
                 }
             }
+            ("report", Some(submatches)) => Report {
+                format: value_t!(submatches, "format", OutputFormat).unwrap(),
+                input: value_t!(submatches, "input", String).unwrap().into(),
+                output: value_t!(submatches, "output", String).unwrap().into(),
+            },
             _ => panic!("this shouldn't happen, please report the command you ran!"),
         };
 
