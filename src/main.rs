@@ -309,7 +309,7 @@ fn record(
             }
             Ok(ref ok_trace) => {
                 out.record(ok_trace)?;
-                summary_out.add_function_name(ok_trace);
+                summary_out.add_function_name(&ok_trace.trace);
                 raw_store.write(ok_trace)?;
             }
             Err(x) => {
@@ -352,7 +352,7 @@ fn record(
 
 fn report(format: OutputFormat, input: PathBuf, output: PathBuf) -> Result<(), Error>{
     let input_file = File::open(input)?;
-    let stuff = storage::from_reader(input_file)?;
+    let stuff = storage::from_reader(input_file)?.0;
     let mut outputter = format.outputter();
     for trace in stuff {
         outputter.record(&trace)?;

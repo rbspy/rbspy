@@ -28,13 +28,13 @@ use std;
  *   * Find the right stack trace function for the Ruby version we found
  *   * Package all that up into a struct that the user can use to get stack traces.
  */
-pub fn initialize(pid: pid_t) -> Result<StackTraceGetter, Error> {
+pub fn initialize(pid: pid_t) -> Result<StackTraceGetter<ProcessHandle>, Error> {
     let version = get_ruby_version_retry(pid).context("Couldn't determine Ruby version")?;
     let is_maybe_thread = is_maybe_thread_function(&version);
 
     debug!("version: {}", version);
     Ok(StackTraceGetter {
-        process_handle: pid.try_into_process_handle()?,
+        process: Process{pid: Some(pid), source: pid.try_into_process_handle()?},
         current_thread_addr_location: address_finder::current_thread_address(
             pid,
             &version,
@@ -76,12 +76,24 @@ impl PartialOrd for StackFrame {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
+pub struct StackTrace {
+    pub trace: Vec<StackFrame>,
+    pub pid: Option<pid_t>,
+}
+
+impl StackTrace {
+    pub fn iter(&self) ->  std::slice::Iter<StackFrame> {
+        self.trace.iter()
+    }
+}
+
 // Use a StackTraceGetter to get stack traces
-pub struct StackTraceGetter {
-    process_handle: ProcessHandle,
+pub struct StackTraceGetter<T> where T: CopyAddress {
+    process: Process<T>,
     current_thread_addr_location: usize,
     stack_trace_function:
-        Box<Fn(usize, &ProcessHandle) -> Result<Vec<StackFrame>, MemoryCopyError>>,
+        Box<Fn(usize, &Process<T>) -> Result<StackTrace, MemoryCopyError>>,
 }
 
 impl fmt::Display for StackFrame {
@@ -90,14 +102,19 @@ impl fmt::Display for StackFrame {
     }
 }
 
-impl StackTraceGetter {
-    pub fn get_trace(&self) -> Result<Vec<StackFrame>, MemoryCopyError> {
+impl<T> StackTraceGetter<T> where T: CopyAddress {
+    pub fn get_trace(&self) -> Result<StackTrace, MemoryCopyError> {
         let stack_trace_function = &self.stack_trace_function;
         stack_trace_function(
             self.current_thread_addr_location,
-            &self.process_handle,
+            &self.process,
         )
     }
+}
+
+pub struct Process<T> where T: CopyAddress {
+    pub pid: Option<pid_t>,
+    pub source: T,
 }
 
 // Everything below here is private
@@ -276,7 +293,7 @@ where
 
 fn get_stack_trace_function<T: 'static>(
     version: &str,
-) -> Box<Fn(usize, &T) -> Result<Vec<StackFrame>, copy::MemoryCopyError>>
+) -> Box<Fn(usize, &Process<T>) -> Result<StackTrace, copy::MemoryCopyError>>
 where
     T: CopyAddress,
 {

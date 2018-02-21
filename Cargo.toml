@@ -43,7 +43,7 @@ object = "0.1.0"
 
 [dev-dependencies]
 byteorder = "0.5"
-rbspy-testdata = "0.1.1"
+rbspy-testdata = "0.1.2"
 tempdir = "0.3.4"
 
 [build-dependencies]

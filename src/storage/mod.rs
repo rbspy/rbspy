@@ -18,13 +18,14 @@ use std::io::prelude::*;
 use std::fs::File;
 use std::path::Path;
 
-use core::initialize::StackFrame;
+use core::initialize::StackTrace;
 
 use self::flate2::Compression;
 use failure::Error;
 use serde_json;
 
 mod v0;
+mod v1;
 
 pub struct Store {
     encoder: flate2::write::GzEncoder<File>,
@@ -34,11 +35,11 @@ impl Store {
     pub fn new(out_path: &Path) -> Result<Store, io::Error> {
         let file = File::create(out_path)?;
         let mut encoder = flate2::write::GzEncoder::new(file, Compression::default());
-        encoder.write("rbspy00\n".as_bytes())?;
+        encoder.write("rbspy01\n".as_bytes())?;
         Ok(Store { encoder })
     }
 
-    pub fn write(&mut self, trace: &Vec<StackFrame>) -> Result<(), Error> {
+    pub fn write(&mut self, trace: &StackTrace) -> Result<(), Error> {
         let json = serde_json::to_string(trace)?;
         writeln!(&mut self.encoder, "{}", json)?;
         Ok(())
@@ -51,15 +52,6 @@ impl Store {
 
 #[derive(Clone, Debug, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) struct Version(u64);
-
-// Write impls like this for every storage version (no need for the internal
-// one, since `impl<T> From<T> for T` exists.
-//
-// impl From<v7::Data> for JuliaData {
-//     fn from(d: v7::Data) -> JuliaData {
-//         unimplemented!();
-//     }
-// }
 
 
 impl ::std::fmt::Display for Version {
@@ -77,6 +69,8 @@ impl Version {
     fn try_from(b: &[u8]) -> Result<Version, StorageError> {
         if &b[0..3] == "00\n".as_bytes() {
             Ok(Version(0))
+        } else if &b[0..3] == "01\n".as_bytes() {
+            Ok(Version(1))
         } else {
             Err(StorageError::Invalid)
         }
@@ -98,7 +92,7 @@ pub(crate) enum StorageError {
 
 /// Types that can be deserialized from an `io::Read` into something convertible
 /// to the current internal form.
-pub(crate) trait Storage: Into<v0::Data> {
+pub(crate) trait Storage: Into<v1::Data> {
     fn from_reader<R: Read>(r: R) -> Result<Self, Error>;
     fn version() -> Version;
 }
@@ -113,7 +107,7 @@ fn read_version(r: &mut Read) -> Result<Version, StorageError> {
     }
 }
 
-pub(crate) fn from_reader<R: Read>(r: R) -> Result<Vec<Vec<StackFrame>>, Error> {
+pub(crate) fn from_reader<R: Read>(r: R) -> Result<v1::Data, Error> {
     // This will read 8 bytes, leaving the reader's cursor at the start of the
     // "real" data.
     let mut reader = flate2::read::GzDecoder::new(r);
@@ -121,6 +115,10 @@ pub(crate) fn from_reader<R: Read>(r: R) -> Result<Vec<Vec<StackFrame>>, Error> 
     match version {
         Version(0) => {
             let intermediate = v0::Data::from_reader(reader)?;
+            Ok(intermediate.into())
+        }
+        Version(1) => {
+            let intermediate = v1::Data::from_reader(reader)?;
             Ok(intermediate.into())
         }
         v => Err(StorageError::UnknownVersion(v).into()),

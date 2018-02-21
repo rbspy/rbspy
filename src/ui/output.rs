@@ -7,10 +7,10 @@ use std::fs::File;
 use ui::callgrind;
 use ui::summary;
 use ui::flamegraph;
-use core::initialize::StackFrame;
+use core::initialize::StackTrace;
 
 pub trait Outputter {
-    fn record(&mut self, stack: &Vec<StackFrame>) -> Result<(), Error>;
+    fn record(&mut self, stack: &StackTrace) -> Result<(), Error>;
     fn complete(&mut self, file: File) -> Result<(), Error>;
 }
 
@@ -18,8 +18,8 @@ pub trait Outputter {
 pub struct Flamegraph(pub flamegraph::Stats);
 
 impl Outputter for Flamegraph {
-    fn record(&mut self, stack: &Vec<StackFrame>) -> Result<(), Error> {
-        self.0.record(stack)?;
+    fn record(&mut self, stack: &StackTrace) -> Result<(), Error> {
+        self.0.record(&stack.trace)?;
         Ok(())
     }
 
@@ -32,8 +32,8 @@ impl Outputter for Flamegraph {
 pub struct Callgrind(pub callgrind::Stats);
 
 impl Outputter for Callgrind {
-    fn record(&mut self, stack: &Vec<StackFrame>) -> Result<(), Error> {
-        self.0.add(stack);
+    fn record(&mut self, stack: &StackTrace) -> Result<(), Error> {
+        self.0.add(&stack.trace);
         Ok(())
     }
 
@@ -47,8 +47,8 @@ impl Outputter for Callgrind {
 pub struct Summary(pub summary::Stats);
 
 impl Outputter for Summary {
-    fn record(&mut self, stack: &Vec<StackFrame>) -> Result<(), Error> {
-        self.0.add_function_name(stack);
+    fn record(&mut self, stack: &StackTrace) -> Result<(), Error> {
+        self.0.add_function_name(&stack.trace);
         Ok(())
     }
 
@@ -61,8 +61,8 @@ impl Outputter for Summary {
 pub struct SummaryLine(pub summary::Stats);
 
 impl Outputter for SummaryLine {
-    fn record(&mut self, stack: &Vec<StackFrame>) -> Result<(), Error> {
-        self.0.add_lineno(stack);
+    fn record(&mut self, stack: &StackTrace) -> Result<(), Error> {
+        self.0.add_lineno(&stack.trace);
         Ok(())
     }
 
