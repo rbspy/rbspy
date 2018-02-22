@@ -46,7 +46,7 @@ pub fn initialize(pid: pid_t) -> Result<StackTraceGetter<ProcessHandle>, Error> 
 // Use a StackTraceGetter to get stack traces
 pub struct StackTraceGetter<T> where T: CopyAddress {
     process: Process<T>,
-    current_thread_addr_location: usize,
+    pub current_thread_addr_location: usize,
     stack_trace_function:
         Box<Fn(usize, &Process<T>) -> Result<StackTrace, MemoryCopyError>>,
 }
@@ -164,6 +164,19 @@ fn test_current_thread_address() {
     process.kill().unwrap();
 }
 
+#[test]
+#[cfg(target_os = "linux")]
+fn test_get_trace() {
+    // Test getting a stack trace from a real running program using system Ruby
+    let mut process = std::process::Command::new("/usr/bin/ruby").arg("./ci/ruby-programs/infinite.rb").spawn().unwrap();
+    let pid = process.id() as pid_t;
+    let getter = initialize(pid).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    let trace = getter.get_trace();
+    assert!(trace.is_ok());
+    assert_eq!(trace.unwrap().pid, Some(pid));
+    process.kill().unwrap();
+}
 
 #[test]
 #[cfg(target_os = "macos")]
@@ -188,7 +201,7 @@ fn test_get_disallowed_process() {
 
 fn is_maybe_thread_function<T: 'static>(
     version: &str,
-) -> Box<Fn(usize, &T, &Vec<MapRange>) -> bool>
+) -> Box<Fn(usize, usize, T, &Vec<MapRange>) -> bool>
 where
     T: CopyAddress,
 {
