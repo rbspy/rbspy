@@ -300,6 +300,7 @@ fn record(
     }).expect("Error setting Ctrl-C handler");
 
     let mut sample_time = SampleTime::new(sample_rate);
+    let start_time = Instant::now();
     while !done.load(Ordering::Relaxed) {
         total += 1;
         let trace = getter.get_trace();
@@ -322,7 +323,7 @@ fn record(
         }
         // Print a summary every second
         if total % (sample_rate as usize) == 0 {
-            print_summary(&summary_out)?;
+            print_summary(&summary_out, &start_time)?;
         }
         if let Some(stop_time) = maybe_stop_time {
             if std::time::Instant::now() > stop_time {
@@ -361,13 +362,14 @@ fn report(format: OutputFormat, input: PathBuf, output: PathBuf) -> Result<(), E
     Ok(())
 }
 
-fn print_summary(summary_out: &ui::summary::Stats) -> Result<(), Error> {
+fn print_summary(summary_out: &ui::summary::Stats, start_time: &Instant) -> Result<(), Error> {
     let width = match term_size::dimensions() {
         Some((w, _)) => Some(w as usize),
         None => None,
     };
     println!("{}[2J", 27 as char); // clear screen
     println!("{}[0;0H", 27 as char); // go to 0,0
+    eprintln!("Time since start: {}s. Press Ctrl+C to stop.", start_time.elapsed().as_secs());
     eprintln!("Summary of profiling data so far:");
     summary_out.print_top_n(20, width)?;
     Ok(())
