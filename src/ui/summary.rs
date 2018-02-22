@@ -42,7 +42,11 @@ impl Stats {
     // Aggregate by function name
     pub fn add_function_name(&mut self, stack: &Vec<StackFrame>) {
         self.total_traces += 1;
-        self.inc_self(Stats::name_function(&stack[0]));
+        let unknown = StackFrame::unknown_c_function();
+        match stack.iter().find(|&x| x != &unknown) {
+            Some(x) => self.inc_self(Stats::name_function(x)),
+            None => self.inc_self(Stats::name_function(&unknown))
+        }
         let mut set: HashSet<String> = HashSet::new();
         for frame in stack {
             set.insert(Stats::name_function(frame));
@@ -55,7 +59,13 @@ impl Stats {
     // Aggregate by function name + line number
     pub fn add_lineno(&mut self, stack: &Vec<StackFrame>) {
         self.total_traces += 1;
-        self.inc_self(Stats::name_lineno(&stack[0]));
+        let unknown = StackFrame::unknown_c_function();
+        // ignore C functions at the top of the stack because it's not really helpful to include
+        // them
+        match stack.iter().find(|&x| x != &unknown) {
+            Some(x) => self.inc_self(Stats::name_lineno(x)),
+            None => self.inc_self(Stats::name_lineno(&unknown))
+        }
         let mut set: HashSet<&StackFrame> = HashSet::new();
         for frame in stack { set.insert(&frame); }
         for frame in set {
