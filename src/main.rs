@@ -48,6 +48,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 use std::os::unix::prelude::*;
+use std::sync::mpsc::{sync_channel, SyncSender};
 
 pub mod proc_maps;
 #[cfg(target_os = "macos")]
@@ -150,11 +151,8 @@ fn do_main() -> Result<(), Error> {
                      Ok(result) => { result }
                  }
             } else {
-                let mut pids = Vec::new();
-                pids.push(pid);
-                pids
+                vec![pid]
             };
-
 
             parallel_record(
                 format,
@@ -203,7 +201,7 @@ fn main() {
 fn snapshot(pid: pid_t) -> Result<(), Error> {
     let getter = initialize::initialize(pid)?;
     let trace = getter.get_trace()?;
-    for x in trace.iter().rev() {
+    for x in trace.trace.iter().rev() {
         println!("{}", x);
     }
     Ok(())
@@ -265,7 +263,6 @@ fn parallel_record(
 
     let home_path = std::env::var("HOME").unwrap_or("".to_string());
 
-    let mut recorders = Vec::new();
     let done = Arc::new(AtomicBool::new(false));
     let done_clone = done.clone();
 
@@ -279,48 +276,73 @@ fn parallel_record(
         done_clone.store(true, Ordering::Relaxed);
     }).expect("Error setting Ctrl-C handler");
 
-    for pid in pids {
-        let format = format.clone();
-        let home_path = home_path.clone();
-        let maybe_filename = maybe_filename.clone();
-        let done = done.clone();
+    // Create the sender/receiver channels and start the child threads off collecting stack traces
+    // from each target process.
+    // Give the child threads a buffer in case we fall behind with aggregating the stack traces,
+    // but not an unbounded buffer (no memory explosions!)
+    let (trace_sender, trace_receiver) = sync_channel(100);
+    let (error_sender, error_receiver) = sync_channel(100);
 
-        let child_pid = std::thread::spawn(move || {
-            record(
-                format.outputter(),
-                &output_filename(&home_path, maybe_filename).expect("Error with output file"),
+    for pid in pids {
+        let trace_sender = trace_sender.clone();
+        let error_sender = error_sender.clone();
+        let done = done.clone();
+        std::thread::spawn(move || {
+            let result = record(
                 pid,
                 sample_rate,
                 maybe_duration,
-                done
-            ).expect("Failure in record");
+                done,
+                trace_sender
+                );
+            error_sender.send(result).unwrap();
         });
-
-        recorders.push(child_pid);
     }
 
-    for recorder in recorders {
-        if let Err(e) = recorder.join() {
-            eprintln!("Error joining recorder: {:?}", e);
+    // Aggregate stack traces as we receive them from the threads that are collecting them
+    let mut out = format.outputter();
+    let out_path = &output_filename(&home_path, maybe_filename).expect("Error with output file");
+
+    eprintln!("Recording data to {}", out_path.display());
+    let mut out_file = File::create(&out_path).context(format!(
+        "Failed to create output file {}",
+        &out_path.display()
+    ))?;
+
+    for trace in trace_receiver.iter() {
+        out.record(&mut out_file, &trace)?;
+    }
+    out.complete(out_path, out_file)?;
+
+    // Check for errors from the child threads. Ignore errors unless every single thread
+    // returned an error. If that happens, return the last error. This lets rbspy successfully
+    // record processes even if the parent thread isn't a Ruby process.
+    let mut num_ok = 0;
+    let mut last_result = Ok(());
+    for result in error_receiver.iter() {
+        if let Ok(_) = result {
+            num_ok += 1;
         }
+        last_result = result;
     }
+
+    if num_ok == 0 {
+        return last_result;
+    }
+
 
     Ok(())
 }
 
+/// Records stack traces and sends them to a channel in another thread where they can be aggregated
 fn record(
-    mut out: Box<output::Outputter>,
-    out_path: &Path,
     pid: pid_t,
     sample_rate: u32,
     maybe_duration: Option<std::time::Duration>,
     done: Arc<AtomicBool>,
+    sender: SyncSender<initialize::StackTrace>
 ) -> Result<(), Error> {
-    // This gets a stack trace and then just prints it out
-    // in a format that Brendan Gregg's stackcollapse.pl script understands
     let getter = initialize::initialize(pid)?;
-
-    eprintln!("Recording data to {}", out_path.display());
 
     let maybe_stop_time = match maybe_duration {
         Some(duration) => Some(std::time::Instant::now() + duration),
@@ -330,10 +352,6 @@ fn record(
     let mut total = 0;
     let mut errors = 0;
 
-    let mut out_file = File::create(&out_path).context(format!(
-        "Failed to create output file {}",
-        &out_path.display()
-    ))?;
     let mut sample_time = SampleTime::new(sample_rate);
     while !done.load(Ordering::Relaxed) {
         total += 1;
@@ -342,8 +360,8 @@ fn record(
             Err(copy::MemoryCopyError::ProcessEnded) => {
                 break;
             }
-            Ok(ref ok_trace) => {
-                out.record(&mut out_file, ok_trace)?;
+            Ok(ok_trace) => {
+                sender.send(ok_trace)?;
             }
             Err(x) => {
                 errors += 1;
@@ -366,7 +384,6 @@ fn record(
         }
     }
 
-    out.complete(out_path, out_file)?;
     Ok(())
 }
 
