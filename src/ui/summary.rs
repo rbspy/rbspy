@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::io;
 
-use core::initialize::StackFrame;
+use core::types::StackFrame;
 
 struct Counts {
     self_: u64,

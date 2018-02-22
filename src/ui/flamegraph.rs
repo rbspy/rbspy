@@ -5,7 +5,7 @@ use std::fs::File;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use core::initialize::StackFrame;
+use core::types::StackFrame;
 
 use failure::{Error, ResultExt};
 use tempdir;

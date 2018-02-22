@@ -7,19 +7,6 @@
  *
  * Defines a bunch of submodules, one per Ruby version (`ruby_1_9_3`, `ruby_2_2_0`, etc.)
  */
-use core::initialize::StackFrame;
-
-
-// we use this stack frame when there's a C function that we don't recognize in the stack. This
-// would be a constant but it has strings in it so it can't be.
-fn unknown_c_function() -> StackFrame {
-    StackFrame {
-        name: "<c function>".to_string(),
-        relative_path: "unknown".to_string(),
-        absolute_path: None,
-        lineno: 0
-    }
-}
 
 macro_rules! ruby_version_v_1_9_1(
     ($ruby_version:ident) => (
@@ -135,8 +122,8 @@ macro_rules! ruby_version_v2_5_x(
 macro_rules! get_stack_trace(
     ($thread_type:ident) => (
 
-        use core::initialize::{StackFrame, Process, StackTrace};
-        use core::ruby_version::unknown_c_function;
+        use core::types::*;
+        use core::types::StackFrame;
 
         pub fn get_stack_trace<T>(
             ruby_current_thread_address_location: usize,
@@ -147,7 +134,7 @@ macro_rules! get_stack_trace(
                 copy_struct(ruby_current_thread_address_location, source)?;
             let thread: $thread_type = copy_struct(current_thread_addr, source)?;
             if stack_field(&thread) as usize == 0 {
-                return Ok(StackTrace{pid: process.pid, trace: vec!(unknown_c_function())});
+                return Ok(StackTrace{pid: process.pid, trace: vec!(StackFrame::unknown_c_function())});
             }
             let mut trace = Vec::new();
             let cfps = get_cfps(thread.cfp as usize, stack_base(&thread) as usize, source)?;
@@ -161,7 +148,7 @@ macro_rules! get_stack_trace(
                      * code and saw that all of those call sites use the VM_FRAME_FLAG_CFRAME
                      * argument. Also checked `git grep vm_push_frame(th, NULL`.
                      */
-                    trace.push(unknown_c_function());
+                    trace.push(StackFrame::unknown_c_function());
                     continue;
                 }
                 if cfp.pc as usize == 0 {
@@ -579,12 +566,11 @@ mod tests {
     use rbspy_testdata::*;
 
     use core::ruby_version;
-    use core::ruby_version::unknown_c_function;
-    use core::initialize::{StackFrame, Process};
+    use core::types::{StackFrame, Process};
 
     fn real_stack_trace_1_9_3() -> Vec<StackFrame> {
         vec![
-            unknown_c_function(),
+            StackFrame::unknown_c_function(),
             StackFrame {
                 name: "aaa".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
@@ -609,20 +595,20 @@ mod tests {
                 absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
                 lineno: 14,
             },
-            unknown_c_function(),
-            unknown_c_function(),
+            StackFrame::unknown_c_function(),
+            StackFrame::unknown_c_function(),
             StackFrame {
                 name: "<main>".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
                 absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
                 lineno: 13,
             },
-            unknown_c_function(),
+            StackFrame::unknown_c_function(),
             ]
     }
     fn real_stack_trace_main() -> Vec<StackFrame> {
         vec![
-            unknown_c_function(),
+            StackFrame::unknown_c_function(),
             StackFrame {
                 name: "aaa".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
@@ -647,7 +633,7 @@ mod tests {
                 absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
                 lineno: 14,
             },
-            unknown_c_function(),
+            StackFrame::unknown_c_function(),
             StackFrame {
                 name: "<main>".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
@@ -659,7 +645,7 @@ mod tests {
 
     fn real_stack_trace() -> Vec<StackFrame> {
         vec![
-            unknown_c_function(),
+            StackFrame::unknown_c_function(),
             StackFrame {
                 name: "aaa".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
@@ -684,7 +670,7 @@ mod tests {
                 absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
                 lineno: 14,
             },
-            unknown_c_function(),
+            StackFrame::unknown_c_function(),
             ]
     }
 
@@ -731,6 +717,6 @@ mod tests {
         let stack_trace =
             ruby_version::ruby_2_1_6::get_stack_trace(current_thread_addr, &Process{pid: None, source: coredump_2_1_6_c_function()})
             .unwrap();
-        assert_eq!(vec!(unknown_c_function()), stack_trace.trace);
+        assert_eq!(vec!(StackFrame::unknown_c_function()), stack_trace.trace);
     }
 }

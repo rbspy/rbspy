@@ -18,7 +18,7 @@ use std::io::prelude::*;
 use std::fs::File;
 use std::path::Path;
 
-use core::initialize::StackTrace;
+use core::types::StackTrace;
 
 use self::flate2::Compression;
 use failure::Error;

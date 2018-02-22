@@ -1,6 +1,6 @@
 use std::io::prelude::*;
 use std::io::BufReader;
-use core::initialize::StackTrace;
+use core::types::StackTrace;
 
 use failure::Error;
 use serde_json;
