@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::collections::{BTreeMap, HashMap};
 use std::io;
 
-use core::initialize::StackFrame;
+use core::types::StackFrame;
 
 /*
  * **Notes about the overall design**

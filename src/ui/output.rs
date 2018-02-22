@@ -7,7 +7,7 @@ use std::fs::File;
 use ui::callgrind;
 use ui::summary;
 use ui::flamegraph;
-use core::initialize::StackTrace;
+use core::types::StackTrace;
 
 pub trait Outputter {
     fn record(&mut self, stack: &StackTrace) -> Result<(), Error>;
