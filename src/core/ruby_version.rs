@@ -204,12 +204,14 @@ fn stack_base(thread: &$thread_type) -> i64 {
     stack_field(thread) + stack_size_field(thread) * std::mem::size_of::<VALUE>() as i64 - 1 * std::mem::size_of::<rb_control_frame_t>() as i64
 }
 
-pub fn is_maybe_thread<T>(x: usize, source: &T, all_maps: &Vec<MapRange>) -> bool where T: CopyAddress{
+pub fn is_maybe_thread<T>(x: usize, x_addr: usize, source: T, all_maps: &Vec<MapRange>) -> bool where T: CopyAddress{
     if !maps_contain_addr(x, all_maps) {
         return false;
     }
 
-    let thread: $thread_type = match copy_struct(x, source) {
+    let process = Process{pid: None, source: source};
+
+    let thread: $thread_type = match copy_struct(x, &process.source) {
         Ok(x) => x,
         _ => { return false; },
     };
@@ -218,13 +220,8 @@ pub fn is_maybe_thread<T>(x: usize, source: &T, all_maps: &Vec<MapRange>) -> boo
         return false;
     }
 
-    let stack_base = stack_base(&thread);
-    let diff = stack_base - thread.cfp as i64;
-    if diff < 0 || diff > 3000000 {
-        return false;
-    }
-
-    return true;
+    // finally, try to get an actual stack trace from the process and see if it works
+    get_stack_trace(x_addr, &process).is_ok()
 }
 ));
 

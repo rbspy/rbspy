@@ -37,7 +37,7 @@ mod os_impl {
     pub fn current_thread_address(
         pid: pid_t,
         version: &str,
-        _is_maybe_thread: Box<Fn(usize, &ProcessHandle, &Vec<MapRange>) -> bool>,
+        _is_maybe_thread: Box<Fn(usize, usize, ProcessHandle, &Vec<MapRange>) -> bool>,
     ) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
         if version >= "2.5.0" {
@@ -155,7 +155,7 @@ mod os_impl {
     pub fn current_thread_address(
         pid: pid_t,
         version: &str,
-        is_maybe_thread: Box<Fn(usize, &ProcessHandle, &Vec<MapRange>) -> bool>,
+        is_maybe_thread: Box<Fn(usize, usize, ProcessHandle, &Vec<MapRange>) -> bool>,
     ) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
         match current_thread_address_symbol_table(proginfo, version) {
@@ -225,7 +225,7 @@ mod os_impl {
 
     fn current_thread_address_search_bss(
         proginfo: &ProgramInfo,
-        is_maybe_thread: Box<Fn(usize, &ProcessHandle, &Vec<MapRange>) -> bool>,
+        is_maybe_thread: Box<Fn(usize, usize, ProcessHandle, &Vec<MapRange>) -> bool>,
     ) -> Result<usize, Error> {
         // Used when there's no symbol table. Looks through the .bss and uses a search_bss (found in
         // `is_maybe_thread`) to find the address of the current thread.
@@ -243,8 +243,8 @@ mod os_impl {
         let read_addr = map.range_start + bss_section.addr as usize - load_header.vaddr as usize;
 
         debug!("read_addr: {:x}", read_addr);
-        let source = &proginfo.pid.try_into_process_handle().unwrap();
-        let mut data = copy_address_raw(read_addr as usize, bss_section.size as usize, source)?;
+        let source = proginfo.pid.try_into_process_handle().unwrap();
+        let mut data = copy_address_raw(read_addr as usize, bss_section.size as usize, &source)?;
         debug!("successfully read data");
         let slice: &[usize] = unsafe {
             std::slice::from_raw_parts(
@@ -254,8 +254,8 @@ mod os_impl {
         };
 
         let i = slice
-            .iter()
-            .position({ |&x| is_maybe_thread(x, source, &proginfo.all_maps) })
+            .iter().enumerate()
+            .position({ |(i, &x)| is_maybe_thread(x, (i as usize) * (std::mem::size_of::<usize>() as usize) + read_addr, source, &proginfo.all_maps) })
             .ok_or(format_err!(
                 "Current thread address not found in process {}",
                 &proginfo.pid
