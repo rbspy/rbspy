@@ -38,7 +38,6 @@ mach = "0.1.2"
 regex = "0.2.3"
 libproc = "0.2.0"
 lazy_static = "1.0.0"
-goblin = "0.0.14"
 object = "0.1.0"
 
 [dev-dependencies]
