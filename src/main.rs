@@ -122,9 +122,10 @@ fn do_main() -> Result<(), Error> {
     let args = Args::from_args()?;
 
     if cfg!(target_os = "macos") {
-        let ok = sudo_if_not_root();
-        if !ok {
-            return Err(format_err!("rbspy needs to run as root on mac"));
+        match (&args.cmd, check_root_user()) {
+            (&Snapshot{..}, false) => { return Err(format_err!("rbspy snapshot needs to run as root on Mac")) },
+            (&Record{..}, false) => { return Err(format_err!("rbspy record needs to run as root on mac")) },
+            _ => {},
         }
     }
 
@@ -178,7 +179,7 @@ fn do_main() -> Result<(), Error> {
     }
 }
 
-fn sudo_if_not_root() -> bool {
+fn check_root_user() -> bool {
     let euid = nix::unistd::Uid::effective();
     if euid.is_root() {
         return true;
