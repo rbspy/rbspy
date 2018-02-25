@@ -51,8 +51,8 @@ install:
   - bash ci/install.sh
 
 script:
-  - bash ci/script.sh
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker build -t travis-rbspy-test -f ci/Dockerfile.localtest . && docker run travis-rbspy-test ; fi
+  - bash ci/script.sh
 
 before_deploy:
   - bash ci/before_deploy.sh
