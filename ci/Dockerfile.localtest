@@ -1,0 +1,32 @@
+# Run this from the top level folder
+# docker build -t rbspy -f ci/Dockerfile.localtest . && docker run rbspy
+
+# FROM rust:1.24.0-stretch as builder
+FROM clux/muslrust as builder
+RUN mkdir /src
+ADD ruby-structs /src/ruby-structs
+ADD vendor /src/vendor
+ADD Cargo.* /src/
+
+WORKDIR /src
+
+# Hack to make it go faster for multiple runs
+# Run once with an empty implementation to load all the dependencies
+RUN mkdir src
+RUN touch src/main.rs
+# Failures here are ok since it's just an optimization
+RUN cargo build || true
+RUN rm -rf src
+
+# Run the build for real
+ADD src /src/src
+RUN cargo build
+
+
+FROM ruby:2.3.6-jessie
+
+ADD ci/ruby-programs/*.rb /
+ADD ci/localtest.sh /
+# COPY --from=builder /src/target/debug/rbspy /
+COPY --from=builder /src/target/x86_64-unknown-linux-musl/debug/rbspy /
+CMD /bin/bash localtest.sh

@@ -203,7 +203,7 @@ mod os_impl {
                 .expect("Failed to get symbols from section")
             {
                 if sym.name == symbol_name {
-                    debug!("symbol: {}", sym);
+                    debug!("elf_symbol_value: symbol: {}", sym);
                     return Some(sym.value as usize);
                 }
             }
@@ -288,7 +288,8 @@ mod os_impl {
     fn get_symbol_addr(map: &MapRange, elf_file: &elf::File, symbol_name: &str) -> Option<usize> {
         elf_symbol_value(elf_file, symbol_name).map(|addr| {
             let load_header = elf_load_header(elf_file);
-            debug!("load header: {}", load_header);
+            debug!("get_symbol_addr: addr: {:x} range_start: {:x} load header: {}",
+                   addr, map.range_start, load_header);
             map.range_start + addr - load_header.vaddr as usize
         })
     }
@@ -361,6 +362,10 @@ mod os_impl {
                     false
                 }
             })
-            .map(|x| x.clone())
+            .map(|x| {
+                debug!("Found path: {:?}", x.pathname);
+                x.clone()
+              }
+            )
     }
 }

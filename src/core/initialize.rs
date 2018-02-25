@@ -116,6 +116,7 @@ fn get_ruby_version_retry(pid: pid_t) -> Result<String, Error> {
 
 pub fn get_ruby_version(pid: pid_t, source: &ProcessHandle) -> Result<String, Error> {
     let addr = address_finder::get_ruby_version_address(pid)?;
+    debug!("pub get_ruby_version: address: {:x} process {:?}", addr as usize, source);
     let x: [c_char; 15] = copy_struct(addr, source)?;
     Ok(unsafe {
         std::ffi::CStr::from_ptr(x.as_ptr() as *mut c_char)
