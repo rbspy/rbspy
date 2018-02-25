@@ -50,8 +50,10 @@ where
             // On Mac code 60 seems to more or less correspond to "process ended"
             MemoryCopyError::ProcessEnded
         } else if x.kind() == std::io::ErrorKind::PermissionDenied {
+            debug!("permission_denied_error: details: {:?}", x);
             MemoryCopyError::PermissionDenied
         } else {
+            debug!("unknown_copy_error: details: {:?}", x);
             MemoryCopyError::Io(addr, x)
         }
     })?;
