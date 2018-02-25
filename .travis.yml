@@ -52,7 +52,7 @@ install:
 
 script:
   - bash ci/script.sh
-  - docker build -t travis-rbspy-test -f ci/Dockerfile.localtest . && docker run travis-rbspy-test
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker build -t travis-rbspy-test -f ci/Dockerfile.localtest . && docker run travis-rbspy-test ; fi
 
 before_deploy:
   - bash ci/before_deploy.sh
