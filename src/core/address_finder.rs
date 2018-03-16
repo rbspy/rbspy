@@ -23,7 +23,7 @@ pub enum AddressFinderError {
 #[cfg(target_os = "macos")]
 mod os_impl {
     use crate::core::address_finder::AddressFinderError;
-    use crate::core::initialize::IsMaybeThreadFn;
+    use crate::core::initialize::IsMaybeVmFn;
     use proc_maps::{get_process_maps, MapRange};
     use proc_maps::mac_maps::{get_symbols, Symbol};
 
@@ -36,17 +36,12 @@ mod os_impl {
         proginfo.symbol_addr("_ruby_version")
     }
 
-    pub fn current_thread_address(
+    pub fn current_vm_address(
         pid: pid_t,
-        version: &str,
-        _is_maybe_thread: IsMaybeThreadFn,
+        _is_maybe_vm: IsMaybeVmFn,
     ) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
-        if version >= "2.5.0" {
-            proginfo.symbol_addr("_ruby_current_execution_context_ptr")
-        } else {
-            proginfo.symbol_addr("_ruby_current_thread")
-        }
+        proginfo.symbol_addr("_ruby_current_vm")
     }
 
     struct Binary {
@@ -144,7 +139,7 @@ mod os_impl {
 #[cfg(target_os = "linux")]
 mod os_impl {
     use crate::core::address_finder::AddressFinderError;
-    use crate::core::initialize::IsMaybeThreadFn;
+    use crate::core::initialize::IsMaybeVmFn;
     use crate::core::copy::*;
     use proc_maps::{MapRange, get_process_maps};
 
@@ -154,19 +149,18 @@ mod os_impl {
     use std;
     use read_process_memory::*;
 
-    pub fn current_thread_address(
+    pub fn current_vm_address(
         pid: pid_t,
-        version: &str,
-        is_maybe_thread: IsMaybeThreadFn,
+        is_maybe_vm: IsMaybeVmFn,
     ) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
-        match current_thread_address_symbol_table(proginfo, version) {
+        match current_vm_address_symbol_table(proginfo) {
             Some(addr) => Ok(addr),
             None => {
                 debug!("Trying to find address location another way");
-                Ok(current_thread_address_search_bss(
+                Ok(current_vm_address_search_bss(
                     proginfo,
-                    is_maybe_thread,
+                    is_maybe_vm,
                 )?)
             }
         }
@@ -222,12 +216,12 @@ mod os_impl {
         None
     }
 
-    fn current_thread_address_search_bss(
+    fn current_vm_address_search_bss(
         proginfo: &ProgramInfo,
-        is_maybe_thread: IsMaybeThreadFn,
+        is_maybe_vm: IsMaybeVmFn,
     ) -> Result<usize, Error> {
         // Used when there's no symbol table. Looks through the .bss and uses a search_bss (found in
-        // `is_maybe_thread`) to find the address of the current thread.
+        // `is_maybe_vm`) to find the address of the current thread.
         let map = (*proginfo.libruby_map).as_ref().expect(
             "No libruby map: symbols are stripped so we expected to have one. Please report this!",
         );
@@ -254,7 +248,7 @@ mod os_impl {
 
         let i = slice
             .iter().enumerate()
-            .position({ |(i, &x)| is_maybe_thread(x, (i as usize) * (std::mem::size_of::<usize>() as usize) + read_addr, source, &proginfo.all_maps) })
+            .position({ |(i, &_)| is_maybe_vm((i as usize) * (std::mem::size_of::<usize>() as usize) + read_addr, source) })
             .ok_or_else(|| format_err!(
                 "Current thread address not found in process {}",
                 &proginfo.pid
@@ -262,26 +256,15 @@ mod os_impl {
         Ok((i as usize) * (std::mem::size_of::<usize>() as usize) + read_addr)
     }
 
-    fn current_thread_address_symbol_table(
+    fn current_vm_address_symbol_table(
         // Uses the symbol table to get the address of the current thread
         proginfo: &ProgramInfo,
-        version: &str,
     ) -> Option<usize> {
-        // TODO: comment this somewhere
-        if version >= "2.5.0" {
-            // TODO: make this more robust
-            get_symbol_addr(
-                &proginfo.ruby_map,
-                &proginfo.ruby_elf,
-                "ruby_current_execution_context_ptr",
-            )
-        } else {
-            get_symbol_addr(
-                &proginfo.ruby_map,
-                &proginfo.ruby_elf,
-                "ruby_current_thread",
-            )
-        }
+        get_symbol_addr(
+            &proginfo.ruby_map,
+            &proginfo.ruby_elf,
+            "ruby_current_vm",
+        )
     }
 
     fn get_symbol_addr(map: &MapRange, elf_file: &elf::File, symbol_name: &str) -> Option<usize> {

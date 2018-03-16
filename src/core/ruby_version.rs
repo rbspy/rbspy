@@ -67,7 +67,7 @@ macro_rules! ruby_version_v_2_0_to_2_2(
             // except without using gdb!!
             //
             // `get_cfps` corresponds to
-            // (* const rb_thread_struct *(ruby_current_thread_address_location))->cfp
+            // (* const rb_thread_struct *(ruby_current_vm_address_location))->cfp
             //
             // `get_ruby_string` is doing ((Struct RString *) address) and then
             // trying one of two ways to get the actual Ruby string out depending
@@ -145,6 +145,19 @@ macro_rules! ruby_version_v2_6_x(
         }
         ));
 
+macro_rules! get_thread(
+    /* 
+     * basically what's going on here is that 
+     * `thread->ec` in Ruby 2.5.0+ is the same as `thread` in Ruby < 2.5.0
+     *  (most of the fields on rb_thread_struct were moved to rb_execution_context_struct)
+     */
+    (rb_thread_struct, $thread: ident, $source: ident) => ($thread);
+    (rb_execution_context_struct, $thread: ident, $source: ident) => ({
+        let x: rb_execution_context_struct = copy_struct($thread.ec as usize, $source)?;
+        x
+    });
+);
+
 macro_rules! get_stack_trace(
     ($thread_type:ident) => (
 
@@ -152,13 +165,19 @@ macro_rules! get_stack_trace(
         use crate::core::types::StackFrame;
 
         pub fn get_stack_trace<T>(
-            ruby_current_thread_address_location: usize,
+            ruby_current_vm_address_location: usize,
             process: &Process<T>,
             ) -> Result<StackTrace, MemoryCopyError> where T: CopyAddress {
             let source = &process.source;
-            let current_thread_addr: usize =
-                copy_struct(ruby_current_thread_address_location, source)?;
-            let thread: $thread_type = copy_struct(current_thread_addr, source)?;
+            let current_vm_addr: usize = copy_struct(ruby_current_vm_address_location, source)?;
+            let vm: rb_vm_t = copy_struct(current_vm_addr, source)?;
+            if vm.running_thread as usize == 0 {
+                // Not 100% sure what this means, but we can't really continue so we just record
+                // "unknown C function" and move on.
+                return Ok(StackTrace{pid: process.pid, thread_id: None, trace: vec!(StackFrame::unknown_c_function())});
+            }
+            let thread: rb_thread_struct = copy_struct(vm.running_thread as usize, source)?;
+            let thread: $thread_type = get_thread!($thread_type, thread, source);
             if stack_field(&thread) as usize == 0 {
                 return Ok(StackTrace {
                     pid: process.pid,
@@ -167,7 +186,8 @@ macro_rules! get_stack_trace(
                 });
             }
             let mut trace = Vec::new();
-            let cfps = get_cfps(thread.cfp as usize, stack_base(&thread) as usize, source)?;
+            let stack_base = stack_base(&thread).ok_or(MemoryCopyError::InvalidStackSize)?;
+            let cfps = get_cfps(thread.cfp as usize, stack_base as usize, source)?;
             for cfp in cfps.iter() {
                 if cfp.iseq as usize == 0 {
                     /*
@@ -206,62 +226,44 @@ macro_rules! get_stack_trace(
             Ok(StackTrace{trace, pid: process.pid, thread_id: Some(get_thread_id(&thread, source)?)})
         }
 
-use proc_maps::{maps_contain_addr, MapRange};
-
-// Checks whether the address looks even vaguely like a thread struct, mostly by making sure its
-// addresses are reasonable
-fn could_be_thread(thread: &$thread_type, all_maps: &[MapRange]) -> bool {
-    maps_contain_addr(thread.tag as usize, all_maps) &&
-        maps_contain_addr(thread.cfp as usize, all_maps) &&
-        maps_contain_addr(stack_field(thread) as usize, all_maps) &&
-        stack_size_field(thread) < 3_000_000
+// thread.stack_size * sizeof(VALUE) + thread.stack - sizeof(rb_control_frame_t)
+fn stack_base(thread: &$thread_type) -> Option<u64> {
+    stack_size_field(thread).checked_mul(std::mem::size_of::<VALUE>() as u64)?
+        .checked_add(stack_field(thread))?
+        .checked_sub(std::mem::size_of::<rb_control_frame_t>() as u64)
 }
 
-fn stack_base(thread: &$thread_type) -> i64 {
-    stack_field(thread) + stack_size_field(thread) * std::mem::size_of::<VALUE>() as i64 - 1 * std::mem::size_of::<rb_control_frame_t>() as i64
-}
-
-pub fn is_maybe_thread<T>(x: usize, x_addr: usize, source: T, all_maps: &[MapRange]) -> bool where T: CopyAddress{
-    if !maps_contain_addr(x, all_maps) {
-        return false;
-    }
-
+pub fn is_maybe_vm<T>(addr: usize, source: T) -> bool where T: CopyAddress{
     let process = Process{pid: None, source: source};
-
-    let thread: $thread_type = match copy_struct(x, &process.source) {
-        Ok(x) => x,
-        _ => { return false; },
-    };
-
-    if !could_be_thread(&thread, &all_maps) {
-        return false;
+    match get_stack_trace(addr, &process) {
+        Err(_) => false,
+        Ok(x) => {
+            x.trace.len() != 1
+        },
     }
-
-    // finally, try to get an actual stack trace from the process and see if it works
-    get_stack_trace(x_addr, &process).is_ok()
 }
 ));
 
 macro_rules! stack_field_1_9_0(
     () => (
-        fn stack_field(thread: &rb_thread_struct) -> i64 {
-            thread.stack as i64
+        fn stack_field(thread: &rb_thread_struct) -> u64 {
+            thread.stack as u64
         }
 
-        fn stack_size_field(thread: &rb_thread_struct) -> i64 {
-            thread.stack_size as i64
+        fn stack_size_field(thread: &rb_thread_struct) -> u64 {
+            thread.stack_size as u64
         }
         ));
 
 macro_rules! stack_field_2_5_0(
     () => (
 
-        fn stack_field(thread: &rb_execution_context_struct) -> i64 {
-            thread.vm_stack as i64
+        fn stack_field(thread: &rb_execution_context_struct) -> u64 {
+            thread.vm_stack as u64
         }
 
-        fn stack_size_field(thread: &rb_execution_context_struct) -> i64 {
-            thread.vm_stack_size as i64
+        fn stack_size_field(thread: &rb_execution_context_struct) -> u64 {
+            thread.vm_stack_size as u64
         }
         ));
 
@@ -770,9 +772,9 @@ mod tests {
     #[cfg(target_pointer_width="64")]
     #[test]
     fn test_get_ruby_stack_trace_2_1_6() {
-        let current_thread_addr = 0x562658abd7f0;
+        let current_vm_addr = 0x562658abd7e0;
         let stack_trace =
-            ruby_version::ruby_2_1_6::get_stack_trace::<CoreDump>(current_thread_addr, &Process{pid: None, source: coredump_2_1_6()})
+            ruby_version::ruby_2_1_6::get_stack_trace(current_vm_addr, &Process{pid: None, source: coredump_2_1_6()})
             .unwrap();
         assert_eq!(real_stack_trace_main(), stack_trace.trace);
     }
@@ -780,9 +782,9 @@ mod tests {
     #[cfg(target_pointer_width="64")]
     #[test]
     fn test_get_ruby_stack_trace_1_9_3() {
-        let current_thread_addr = 0x823930;
+        let current_vm_addr = 0x823920;
         let stack_trace =
-            ruby_version::ruby_1_9_3_0::get_stack_trace::<CoreDump>(current_thread_addr, &Process{pid: None, source: coredump_1_9_3()})
+            ruby_version::ruby_1_9_3_0::get_stack_trace(current_vm_addr, &Process{pid: None, source: coredump_1_9_3()})
             .unwrap();
         assert_eq!(real_stack_trace_1_9_3(), stack_trace.trace);
     }
@@ -790,9 +792,9 @@ mod tests {
     #[cfg(target_pointer_width="64")]
     #[test]
     fn test_get_ruby_stack_trace_2_5_0() {
-        let current_thread_addr = 0x55dd8c3b7758;
+        let current_vm_addr = 0x55dd8c3b7760;
         let stack_trace =
-            ruby_version::ruby_2_5_0::get_stack_trace::<CoreDump>(current_thread_addr, &Process{pid: None, source: coredump_2_5_0()})
+            ruby_version::ruby_2_5_0::get_stack_trace(current_vm_addr, &Process{pid: None, source: coredump_2_5_0()})
             .unwrap();
         assert_eq!(real_stack_trace(), stack_trace.trace);
     }
@@ -800,9 +802,9 @@ mod tests {
     #[cfg(target_pointer_width="64")]
     #[test]
     fn test_get_ruby_stack_trace_2_4_0() {
-        let current_thread_addr = 0x55df44959920;
+        let current_vm_addr = 0x55df44959918;
         let stack_trace =
-            ruby_version::ruby_2_4_0::get_stack_trace::<CoreDump>(current_thread_addr, &Process{pid: None, source: coredump_2_4_0()})
+            ruby_version::ruby_2_4_0::get_stack_trace(current_vm_addr, &Process{pid: None, source: coredump_2_4_0()})
             .unwrap();
         assert_eq!(real_stack_trace(), stack_trace.trace);
     }
@@ -811,9 +813,9 @@ mod tests {
     #[test]
     fn test_get_ruby_stack_trace_2_1_6_2() {
         // this stack is from a ruby program that is just running `select`
-        let current_thread_addr = 0x562efcd577f0;
+        let current_vm_addr = 0x562efcd577e0;
         let stack_trace =
-            ruby_version::ruby_2_1_6::get_stack_trace(current_thread_addr, &Process{pid: None, source: coredump_2_1_6_c_function()})
+            ruby_version::ruby_2_1_6::get_stack_trace(current_vm_addr, &Process{pid: None, source: coredump_2_1_6_c_function()})
             .unwrap();
         assert_eq!(vec!(StackFrame::unknown_c_function()), stack_trace.trace);
     }
