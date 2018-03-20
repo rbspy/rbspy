@@ -58,8 +58,6 @@ before_deploy:
 
 deploy:
   provider: releases
-  # *REALLY* not production ready!
-  prerelease: true
   # To generate key:
   # - Go to 'https://github.com/settings/tokens/new' and generate a Token with only the
   # `public_repo` scope enabled
