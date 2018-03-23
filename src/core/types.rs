@@ -23,8 +23,11 @@ pub struct StackFrame {
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct StackTrace {
     pub trace: Vec<StackFrame>,
+    // these are both options for backwards compatibility with older rbspy saved data that didn't
+    // have PID / cpu data
     pub pid: Option<pid_t>,
     pub thread_id: Option<usize>,
+    pub on_cpu: Option<bool>,
 }
 
 pub struct Process<T> where T: CopyAddress {

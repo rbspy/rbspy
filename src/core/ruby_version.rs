@@ -150,21 +150,50 @@ macro_rules! get_stack_trace(
 
         use crate::core::types::*;
         use crate::core::types::StackFrame;
+        use failure::Error;
+        use libc::pid_t;
 
         pub fn get_stack_trace<T>(
             ruby_current_thread_address_location: usize,
             process: &Process<T>,
             ) -> Result<StackTrace, MemoryCopyError> where T: CopyAddress {
+            let trace = get_stack_frames(ruby_current_thread_address_location, process)?;
+            let pid = process.pid;
+            let on_cpu = get_cpu(pid).ok();
+            Ok(StackTrace{on_cpu, trace, pid, thread_id: None})
+        }
+
+        fn get_cpu(maybe_pid: Option<pid_t>) -> Result<bool, Error> {
+            match maybe_pid {
+                None => Err(format_err!("no pid given")),
+                Some(pid) => on_cpu(pid),
+            }
+        }
+
+        #[cfg(target_os = "linux")]
+        fn on_cpu(pid: pid_t) -> Result<bool, Error> {
+            use std::fs::File;
+            use std::io::Read;
+            let mut contents = String::new();
+            File::open(format!("/proc/{}/status", pid))?.read_to_string(&mut contents)?;
+            Ok(contents.contains("State:\tR"))
+        }
+
+        #[cfg(target_os = "macos")]
+        fn on_cpu(pid: pid_t) -> Result<bool, Error>{
+            Err(format_err!("Checking CPU status of process not supported on Mac"))
+        }
+
+        fn get_stack_frames<T>(
+            ruby_current_thread_address_location: usize,
+            process: &Process<T>,
+            ) -> Result<Vec<StackFrame>, MemoryCopyError> where T: CopyAddress {
             let source = &process.source;
             let current_thread_addr: usize =
                 copy_struct(ruby_current_thread_address_location, source)?;
             let thread: $thread_type = copy_struct(current_thread_addr, source)?;
             if stack_field(&thread) as usize == 0 {
-                return Ok(StackTrace {
-                    pid: process.pid,
-                    trace: vec!(StackFrame::unknown_c_function()),
-                    thread_id: Some(get_thread_id(&thread, source)?)
-                });
+                return Ok(vec!(StackFrame::unknown_c_function()));
             }
             let mut trace = Vec::new();
             let cfps = get_cfps(thread.cfp as usize, stack_base(&thread) as usize, source)?;
@@ -203,7 +232,7 @@ macro_rules! get_stack_trace(
                     }
                 }
             }
-            Ok(StackTrace{trace, pid: process.pid, thread_id: Some(get_thread_id(&thread, source)?)})
+            Ok(trace)
         }
 
 use proc_maps::{maps_contain_addr, MapRange};

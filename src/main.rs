@@ -433,7 +433,7 @@ fn parallel_record(
 
     for trace in trace_receiver.iter() {
         out.record(&trace)?;
-        summary_out.add_function_name(&trace.trace);
+        summary_out.add_function_name(&trace);
         raw_store.write(&trace)?;
 
         if !silent {
@@ -563,10 +563,13 @@ fn print_summary(summary_out: &ui::summary::Stats, start_time: &Instant, sample_
     println!("{}[2J", 27 as char); // clear screen
     println!("{}[0;0H", 27 as char); // go to 0,0
     eprintln!("Time since start: {}s. Press Ctrl+C to stop.", start_time.elapsed().as_secs());
-    let percent_timing_error = (timing_error_traces as f64) / (total_traces as f64) * 100.0;
+    if let Some(cpu_percent) = summary_out.cpu_percent() {
+        eprintln!("% of time spent on CPU: {:.2}", cpu_percent * (100 as f64));
+    }
     eprintln!("Summary of profiling data so far:");
     summary_out.print_top_n(20, width)?;
 
+    let percent_timing_error = (timing_error_traces as f64) / (total_traces as f64) * 100.0;
     if total_traces > 100 && percent_timing_error > 0.5 {
         // Only print if timing errors are more than 0.5% of total traces -- it's a statistical
         // profiler so smaller differences don't really matter

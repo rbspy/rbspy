@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::io;
 
-use crate::core::types::StackFrame;
+use crate::core::types::{StackFrame, StackTrace};
 
 struct Counts {
     self_: u64,
@@ -10,6 +10,8 @@ struct Counts {
 
 pub struct Stats {
     counts: HashMap<String, Counts>,
+    total_cpu: u32, // total number of stack traces that were on the CPU
+    cpu_defined: bool, // do we have *any* CPU counts, or is it always undefined?
     total_traces: u32,
 }
 
@@ -18,7 +20,7 @@ impl Stats {
     const HEADER: &'static str = "% self  % total  name";
 
     pub fn new() -> Stats {
-        Stats { counts: HashMap::new(), total_traces: 0}
+        Stats { counts: HashMap::new(), total_traces: 0, cpu_defined: false, total_cpu: 0}
     }
 
     fn inc_self(&mut self, name: String) {
@@ -39,15 +41,30 @@ impl Stats {
         format!("{}", frame)
     }
 
-    // Aggregate by function name
-    pub fn add_function_name(&mut self, stack: &[StackFrame]) {
-        if stack.is_empty() {
-            return;
+    fn inc_cpu(&mut self, stack: &StackTrace) {
+        if stack.on_cpu != None {
+            self.cpu_defined = true;
         }
+        if stack.on_cpu == Some(true) {
+            self.total_cpu += 1;
+        }
+    }
+
+    pub fn cpu_percent(&self) -> Option<f64> {
+        match self.cpu_defined {
+            false => None,
+            true => Some((self.total_cpu as f64) / (self.total_traces as f64)),
+        }
+    }
+
+    // Aggregate by function name
+    pub fn add_function_name(&mut self, stack: &StackTrace) {
+        self.inc_cpu(stack);
+        let trace = &stack.trace;
         self.total_traces += 1;
-        self.inc_self(Stats::name_function(&stack[0]));
+        self.inc_self(Stats::name_function(&trace[0]));
         let mut set: HashSet<String> = HashSet::new();
-        for frame in stack {
+        for frame in trace {
             set.insert(Stats::name_function(frame));
         }
         for name in set.into_iter() {
@@ -56,14 +73,13 @@ impl Stats {
     }
 
     // Aggregate by function name + line number
-    pub fn add_lineno(&mut self, stack: &[StackFrame]) {
-        if stack.is_empty() {
-            return;
-        }
+    pub fn add_lineno(&mut self, stack: &StackTrace) {
+        self.inc_cpu(stack);
+        let trace = &stack.trace;
         self.total_traces += 1;
-        self.inc_self(Stats::name_lineno(&stack[0]));
+        self.inc_self(Stats::name_lineno(&trace[0]));
         let mut set: HashSet<&StackFrame> = HashSet::new();
-        for frame in stack { set.insert(&frame); }
+        for frame in trace { set.insert(&frame); }
         for frame in set {
             self.inc_tot(Stats::name_lineno(frame));
         }
