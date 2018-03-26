@@ -27,6 +27,11 @@ rbspy runs on Linux\* and Mac.
 * kernel version 3.2+ required. For Ubuntu, this means Ubuntu 12.04 or newer.
 </small>
 
+## Add a testimonial
+
+Did rbspy help you make your program faster? An awesome way to thank the project is to add a [success story to this GitHub issue](https://github.com/rbspy/rbspy/issues/62) 
+where people talk about ways rbspy has helped them! Hearing that rbspy is working for people is good
+motivation :)
 
 ## Installing
 
