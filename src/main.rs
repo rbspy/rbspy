@@ -47,7 +47,7 @@ use std::fs::{DirBuilder, File};
 use std::path::{Path, PathBuf};
 use std::env;
 use std::process::Command;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering, AtomicUsize};
 use std::sync::Arc;
 use std::time::{Instant, Duration};
 use std::os::unix::prelude::*;
@@ -270,8 +270,12 @@ impl SampleTime {
 
 /// Start thread(s) recording a PID and possibly its children. Tracks new processes
 /// Returns a pair of Receivers from which you can consume recorded stacktraces and errors
-fn spawn_recorder_children(pid: pid_t, with_subprocesses: bool, sample_rate: u32, maybe_stop_time: Option<Instant>) -> Result<(Receiver<StackTrace>, Receiver<Result<(), Error>>), Error> {
+fn spawn_recorder_children(pid: pid_t, with_subprocesses: bool, sample_rate: u32, maybe_stop_time: Option<Instant>) -> Result<(Receiver<StackTrace>, Receiver<Result<(), Error>>, Arc<AtomicUsize>, Arc<AtomicUsize>), Error> {
     let done = Arc::new(AtomicBool::new(false));
+    let total_traces = Arc::new(AtomicUsize::new(0));
+    let timing_error_traces = Arc::new(AtomicUsize::new(0));
+    let total_traces_clone = total_traces.clone();
+    let timing_error_traces_clone = timing_error_traces.clone();
 
     // Set up the Ctrl+C handler + the done mutex that we send to each recorder so that it knows
     // when to stop
@@ -299,12 +303,16 @@ fn spawn_recorder_children(pid: pid_t, with_subprocesses: bool, sample_rate: u32
         false => {
             // Start a single recorder thread
             let done = done.clone();
+            let timing_error_traces = timing_error_traces.clone();
+            let total_traces = total_traces.clone();
             std::thread::spawn(move || {
                 let result = record(
                     pid,
                     sample_rate,
                     maybe_stop_time,
                     done,
+                    timing_error_traces,
+                    total_traces,
                     trace_sender
                     );
                 error_sender.send(result).unwrap();
@@ -332,12 +340,16 @@ fn spawn_recorder_children(pid: pid_t, with_subprocesses: bool, sample_rate: u32
                         let trace_sender = trace_sender.clone();
                         let error_sender = error_sender.clone();
                         let done = done.clone();
+                        let timing_error_traces = timing_error_traces.clone();
+                        let total_traces = total_traces.clone();
                         std::thread::spawn(move || {
                             let result = record(
                                 pid,
                                 sample_rate,
                                 maybe_stop_time,
                                 done,
+                                timing_error_traces,
+                                total_traces,
                                 trace_sender
                                 );
                             error_sender.send(result).expect("couldn't send error");
@@ -349,7 +361,7 @@ fn spawn_recorder_children(pid: pid_t, with_subprocesses: bool, sample_rate: u32
             });
         }
     }
-    Ok((trace_receiver, result_receiver))
+    Ok((trace_receiver, result_receiver, total_traces_clone, timing_error_traces_clone))
 }
 
 #[test]
@@ -360,7 +372,7 @@ fn test_spawn_record_children_subprocesses() {
     // We only run this test on linux because the subprocess code doesn't work on Mac yet
     let mut process = std::process::Command::new("/usr/bin/ruby").arg("ci/ruby-programs/ruby_forks.rb").spawn().unwrap();
     let pid = process.id() as pid_t;
-    let (trace_receiver, result_receiver) = spawn_recorder_children(pid, true, 10, None).unwrap();
+    let (trace_receiver, result_receiver, _, _) = spawn_recorder_children(pid, true, 10, None).unwrap();
     process.wait().unwrap();
     let results: Vec<_> = result_receiver.iter().take(4).collect();
     // check that there are 4 distinct PIDs in the stack traces
@@ -386,7 +398,7 @@ fn parallel_record(
         None => None
     };
 
-    let (trace_receiver, result_receiver) = spawn_recorder_children(pid, with_subprocesses, sample_rate, maybe_stop_time)?;
+    let (trace_receiver, result_receiver, total_traces, timing_error_traces) = spawn_recorder_children(pid, with_subprocesses, sample_rate, maybe_stop_time)?;
 
     // Aggregate stack traces as we receive them from the threads that are collecting them
     // Aggregate to 3 places: the raw output (`.raw.gz`), some summary statistics we display live,
@@ -404,7 +416,7 @@ fn parallel_record(
 
         // Print a summary every second
         if std::time::Instant::now() > summary_time {
-            print_summary(&summary_out, &start_time)?;
+            print_summary(&summary_out, &start_time, timing_error_traces.load(Ordering::Relaxed), total_traces.load(Ordering::Relaxed))?;
             summary_time = std::time::Instant::now() + Duration::from_secs(1);
         }
     }
@@ -441,6 +453,8 @@ fn record(
     sample_rate: u32,
     maybe_stop_time: Option<Instant>,
     done: Arc<AtomicBool>,
+    timing_error_traces: Arc<AtomicUsize>,
+    total_traces: Arc<AtomicUsize>,
     sender: SyncSender<StackTrace>
 ) -> Result<(), Error> {
     let getter = core::initialize::initialize(pid)?;
@@ -478,10 +492,10 @@ fn record(
             }
         }
         // Sleep until the next expected sample time
-        //
+        total_traces.fetch_add(1, Ordering::Relaxed);
         match sample_time.get_sleep_time() {
             Ok(sleep_time) => {std::thread::sleep(std::time::Duration::new(0, sleep_time));},
-            Err(behind_time) => {eprintln!("Behind expected sample time by {} nanoseconds, results may be inaccurate. Try sampling at a lower rate with `--rate`. Current rate: {}.", behind_time, sample_rate);},
+            Err(_) => { timing_error_traces.fetch_add(1, Ordering::Relaxed); },
         }
     }
 
@@ -499,7 +513,7 @@ fn report(format: OutputFormat, input: PathBuf, output: PathBuf) -> Result<(), E
     Ok(())
 }
 
-fn print_summary(summary_out: &ui::summary::Stats, start_time: &Instant) -> Result<(), Error> {
+fn print_summary(summary_out: &ui::summary::Stats, start_time: &Instant, timing_error_traces: usize, total_traces: usize) -> Result<(), Error> {
     let width = match term_size::dimensions() {
         Some((w, _)) => Some(w as usize),
         None => None,
@@ -507,8 +521,15 @@ fn print_summary(summary_out: &ui::summary::Stats, start_time: &Instant) -> Resu
     println!("{}[2J", 27 as char); // clear screen
     println!("{}[0;0H", 27 as char); // go to 0,0
     eprintln!("Time since start: {}s. Press Ctrl+C to stop.", start_time.elapsed().as_secs());
+    let percent_timing_error = (timing_error_traces as f64) / (total_traces as f64) * 100.0;
     eprintln!("Summary of profiling data so far:");
     summary_out.print_top_n(20, width)?;
+
+    if total_traces > 100 && percent_timing_error > 0.5 {
+        // Only print if timing errors are more than 0.5% of total traces -- it's a statistical
+        // profiler so smaller differences don't really matter
+        eprintln!("{:.1}% ({}/{}) of stack traces were sampled late because we couldn't sample at expected rate, results may be inaccurate. Try sampling at a lower rate with `--rate`.", percent_timing_error, timing_error_traces, total_traces);
+    }
     Ok(())
 }
 
@@ -609,7 +630,7 @@ fn arg_parser() -> App<'static, 'static> {
                 )
                 .arg(
                     Arg::from_usage("-r --rate=[RATE] 'Samples per second collected'")
-                        .required(false),
+                        .default_value("100"),
                 )
                 .arg(
                     Arg::from_usage("--no-drop-root 'Don't drop root privileges when running a Ruby program as a subprocess'")
@@ -684,7 +705,7 @@ impl Args {
                 let no_drop_root = submatches.occurrences_of("no-drop-root") == 1;
                 let with_subprocesses = submatches.is_present("subprocesses");
 
-                let sample_rate = value_t!(submatches, "rate", u32).unwrap_or(100);
+                let sample_rate = value_t!(submatches, "rate", u32).unwrap();
                 let target = if let Some(pid) = get_pid(submatches) {
                     Pid { pid }
                 } else {
