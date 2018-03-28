@@ -595,6 +595,7 @@ fn validate_filename(s: String) -> Result<(), String> {
 
 fn arg_parser() -> App<'static, 'static> {
     App::new("rbspy")
+        .version(env!("CARGO_PKG_VERSION"))
         .about("Sampling profiler for Ruby programs")
         .setting(AppSettings::SubcommandRequired)
         .subcommand(
