@@ -242,8 +242,9 @@ where
         "2.4.1" => ruby_version::ruby_2_4_1::is_maybe_thread,
         "2.4.2" => ruby_version::ruby_2_4_2::is_maybe_thread,
         "2.4.3" => ruby_version::ruby_2_4_3::is_maybe_thread,
-        "2.5.0" => ruby_version::ruby_2_5_0_rc1::is_maybe_thread,
-        _ => panic!("oh no"),
+        "2.5.0" => ruby_version::ruby_2_5_0::is_maybe_thread,
+        "2.5.1" => ruby_version::ruby_2_5_1::is_maybe_thread,
+        _ => panic!("Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!", version),
     };
     Box::new(function)
 }
@@ -291,8 +292,9 @@ where
         "2.4.1" => ruby_version::ruby_2_4_1::get_stack_trace,
         "2.4.2" => ruby_version::ruby_2_4_2::get_stack_trace,
         "2.4.3" => ruby_version::ruby_2_4_3::get_stack_trace,
-        "2.5.0" => ruby_version::ruby_2_5_0_rc1::get_stack_trace,
-        _ => panic!("oh no"),
+        "2.5.0" => ruby_version::ruby_2_5_0::get_stack_trace,
+        "2.5.1" => ruby_version::ruby_2_5_1::get_stack_trace,
+        _ => panic!("Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!", version),
     };
     Box::new(stack_trace_function)
 }
