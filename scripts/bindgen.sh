@@ -11,7 +11,7 @@ then
     cp -R ccan /tmp/headers/$1
 fi
 cp *.h /tmp/headers/$1
-OUT=ruby-bindings/src/ruby_${1}.rs
+OUT=ruby-structs/src/ruby_${1}.rs
 bindgen /tmp/wrapper.h \
     -o /tmp/bindings.rs \
     --impl-debug true \

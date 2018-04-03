@@ -556,7 +556,8 @@ ruby_version_v_2_3_to_2_4!(ruby_2_4_0);
 ruby_version_v_2_3_to_2_4!(ruby_2_4_1);
 ruby_version_v_2_3_to_2_4!(ruby_2_4_2);
 ruby_version_v_2_3_to_2_4!(ruby_2_4_3);
-ruby_version_v2_5_x!(ruby_2_5_0_rc1);
+ruby_version_v2_5_x!(ruby_2_5_0);
+ruby_version_v2_5_x!(ruby_2_5_1);
 
 #[cfg(test)]
 mod tests {
@@ -693,7 +694,7 @@ mod tests {
     fn test_get_ruby_stack_trace_2_5_0() {
         let current_thread_addr = 0x55dd8c3b7758;
         let stack_trace =
-            ruby_version::ruby_2_5_0_rc1::get_stack_trace::<CoreDump>(current_thread_addr, &Process{pid: None, source: coredump_2_5_0()})
+            ruby_version::ruby_2_5_0::get_stack_trace::<CoreDump>(current_thread_addr, &Process{pid: None, source: coredump_2_5_0()})
             .unwrap();
         assert_eq!(real_stack_trace(), stack_trace.trace);
     }
