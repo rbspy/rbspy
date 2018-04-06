@@ -552,10 +552,12 @@ ruby_version_v_2_3_to_2_4!(ruby_2_3_3);
 ruby_version_v_2_3_to_2_4!(ruby_2_3_4);
 ruby_version_v_2_3_to_2_4!(ruby_2_3_5);
 ruby_version_v_2_3_to_2_4!(ruby_2_3_6);
+ruby_version_v_2_3_to_2_4!(ruby_2_3_7);
 ruby_version_v_2_3_to_2_4!(ruby_2_4_0);
 ruby_version_v_2_3_to_2_4!(ruby_2_4_1);
 ruby_version_v_2_3_to_2_4!(ruby_2_4_2);
 ruby_version_v_2_3_to_2_4!(ruby_2_4_3);
+ruby_version_v_2_3_to_2_4!(ruby_2_4_4);
 ruby_version_v2_5_x!(ruby_2_5_0);
 ruby_version_v2_5_x!(ruby_2_5_1);
 
