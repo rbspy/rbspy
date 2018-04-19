@@ -41,6 +41,9 @@ impl Stats {
 
     // Aggregate by function name
     pub fn add_function_name(&mut self, stack: &Vec<StackFrame>) {
+        if stack.len() == 0 {
+            return;
+        }
         self.total_traces += 1;
         self.inc_self(Stats::name_function(&stack[0]));
         let mut set: HashSet<String> = HashSet::new();
@@ -54,6 +57,9 @@ impl Stats {
 
     // Aggregate by function name + line number
     pub fn add_lineno(&mut self, stack: &Vec<StackFrame>) {
+        if stack.len() == 0 {
+            return;
+        }
         self.total_traces += 1;
         self.inc_self(Stats::name_lineno(&stack[0]));
         let mut set: HashSet<&StackFrame> = HashSet::new();
