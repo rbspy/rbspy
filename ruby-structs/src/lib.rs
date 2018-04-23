@@ -23,6 +23,7 @@ pub mod ruby_2_2_6;
 pub mod ruby_2_2_7;
 pub mod ruby_2_2_8;
 pub mod ruby_2_2_9;
+pub mod ruby_2_2_10;
 pub mod ruby_2_3_0;
 pub mod ruby_2_3_1;
 pub mod ruby_2_3_2;
