@@ -14,8 +14,6 @@ pub enum AddressFinderError {
     #[fail(display = "No process with PID: {}", _0)] NoSuchProcess(pid_t),
     #[fail(display = "Permission denied when reading from process {}. Try again with sudo and check sys_ptrace capability?", _0)]
     PermissionDenied(pid_t),
-    #[fail(display = "Couldn't get port for PID {}. Possibilities: that process doesn't exist or you have SIP enabled and you're trying to profile system Ruby (try rbenv instead).", _0)]
-    MacPermissionDenied(pid_t),
     #[fail(display = "Error reading /proc/{}/maps", _0)] ProcMapsError(pid_t),
 }
 
@@ -100,9 +98,7 @@ mod os_impl {
     }
 
     fn get_program_info(pid: pid_t) -> Result<ProgramInfo, Error> {
-        let task = task_for_pid(pid).map_err(|_| {
-            AddressFinderError::MacPermissionDenied(pid)
-        })?;
+        let task = task_for_pid(pid)?;
         let maps = get_process_maps(pid, task);
         let ruby_binary = get_ruby_binary(&maps)?;
         let libruby_binary = get_libruby_binary(&maps);
