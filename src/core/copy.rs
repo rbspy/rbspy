@@ -9,7 +9,8 @@ const MAX_COPY_LENGTH: usize = 20000000;
 
 #[derive(Fail, Debug)]
 pub enum MemoryCopyError {
-    #[fail(display = "Permission denied when reading from process. Try again with sudo and check sys_ptrace capability?")]
+    #[fail(display = "Permission denied when reading from process. If you're not running as root, try again with sudo. If you're using Docker, try passing `--cap-add=SYS_PTRACE` to `docker run`")]
+
     PermissionDenied,
     #[fail(display = "Failed to copy memory address {:x}", _0)] Io(usize, #[cause] std::io::Error),
     #[fail(display = "Process isn't running")] ProcessEnded,
