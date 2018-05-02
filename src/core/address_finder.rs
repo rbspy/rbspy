@@ -15,6 +15,7 @@ pub enum AddressFinderError {
     #[fail(display = "Permission denied when reading from process {}. If you're not running as root, try again with sudo. If you're using Docker, try passing `--cap-add=SYS_PTRACE` to `docker run`", _0)]
     PermissionDenied(pid_t),
     #[fail(display = "Couldn't get port for PID {}. Possibilities: that process doesn't exist or you have SIP enabled and you're trying to profile system Ruby (try rbenv instead).", _0)]
+    #[cfg(target_os = "macos")]
     MacPermissionDenied(pid_t),
     #[fail(display = "Error reading /proc/{}/maps", _0)] ProcMapsError(pid_t),
 }
