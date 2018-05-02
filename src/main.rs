@@ -536,7 +536,7 @@ fn print_summary(summary_out: &ui::summary::Stats, start_time: &Instant, timing_
 fn print_errors(errors: usize, total: usize) {
     if errors > 0 {
         eprintln!(
-            "Dropped {}/{} stack traces because of errors.",
+            "Dropped {}/{} stack traces because of errors. Please consider reporting a GitHub issue -- this isn't normal.",
             errors,
             total
         );
