@@ -89,6 +89,7 @@ fn get_ruby_version_retry(pid: pid_t) -> Result<String, Error> {
                     Some(&AddressFinderError::PermissionDenied(_)) => {
                         return Err(err.into());
                     }
+                    #[cfg(target_os = "macos")]
                     Some(&AddressFinderError::MacPermissionDenied(_)) => {
                         return Err(err.into());
                     }
