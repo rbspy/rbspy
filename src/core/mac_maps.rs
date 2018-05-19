@@ -135,10 +135,10 @@ fn mach_vm_region(
 
 pub fn task_for_pid(pid: pid_t) -> io::Result<mach_port_name_t> {
     let mut task: mach_port_name_t = MACH_PORT_NULL;
-    // sleep for 5ms to make sure we don't get into a race between `task_for_pid` and execing a new
+    // sleep for 10ms to make sure we don't get into a race between `task_for_pid` and execing a new
     // process. Races here can freeze the OS because of a Mac kernel bug on High Sierra.
     // See https://jvns.ca/blog/2018/01/28/mac-freeze/ for more.
-    std::thread::sleep(std::time::Duration::from_millis(5));
+    std::thread::sleep(std::time::Duration::from_millis(10));
     unsafe {
         let result =
             mach::traps::task_for_pid(mach::traps::mach_task_self(), pid as c_int, &mut task);

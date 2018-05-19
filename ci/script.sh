@@ -10,7 +10,12 @@ set -ex
 # `before_deploy`/packaging phase
 run_test_suite() {
     cargo build --target $TARGET --verbose
-    cargo test --target $TARGET
+    if [[ "$TRAVIS_OS_NAME" == "linux" ]]
+    then
+        cargo test --target $TARGET
+    else
+        sudo cargo test --target $TARGET
+    fi
 
     # sanity check the file type
     file target/$TARGET/debug/rbspy

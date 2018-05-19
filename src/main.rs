@@ -365,12 +365,15 @@ fn spawn_recorder_children(pid: pid_t, with_subprocesses: bool, sample_rate: u32
 }
 
 #[test]
-#[cfg(target_os = "linux")]
 fn test_spawn_record_children_subprocesses() {
-    // Test that when we spawn a bunch of child threads to record subprocesses that we actually
-    // record stack traces for different PIDs
-    // We only run this test on linux because the subprocess code doesn't work on Mac yet
-    let mut process = std::process::Command::new("/usr/bin/ruby").arg("ci/ruby-programs/ruby_forks.rb").spawn().unwrap();
+    let output = Command::new("/usr/bin/which")
+        .arg("ruby")
+        .output()
+        .expect("failed to execute process");
+
+    let ruby_binary_path = String::from_utf8(output.stdout).unwrap();
+
+    let mut process = std::process::Command::new(ruby_binary_path.trim()).arg("ci/ruby-programs/ruby_forks.rb").spawn().unwrap();
     let pid = process.id() as pid_t;
     let (trace_receiver, result_receiver, _, _) = spawn_recorder_children(pid, true, 10, None).unwrap();
     process.wait().unwrap();

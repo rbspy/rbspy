@@ -36,7 +36,7 @@ tempdir = "0.3"
 [target.'cfg(target_os="macos")'.dependencies]
 mach = "0.1.2"
 regex = "0.2.3"
-libproc = "0.2.0"
+libproc = "0.3.1"
 lazy_static = "1.0.0"
 object = "0.1.0"
 

@@ -103,6 +103,21 @@ fn get_proc_children() -> Result<Vec<(pid_t, pid_t)>, Error> {
 
 #[cfg(target_os = "macos")]
 fn get_proc_children() -> Result<Vec<(pid_t, pid_t)>, Error> {
-    // TODO
-    panic!("--subprocesses flag isn't implemented on Mac OS yet, sorry!")
+    use libproc::libproc::proc_pid::{listpids, pidinfo, BSDInfo, ProcType};
+
+    let convert_error = |err| {
+        format_err!("Unable to retrieve process parent PID ({})", err)
+    };
+
+    let pids = listpids(ProcType::ProcAllPIDS).map_err(convert_error)?;
+
+    let ppids = pids
+        .iter()
+        .map(|&pid| {
+            pidinfo::<BSDInfo>(pid as pid_t, 1).map(|res| res.pbi_ppid as pid_t)
+        })
+        .collect::<Result<Vec<pid_t>, String>>()
+        .map_err(convert_error)?;
+
+    Ok(pids.iter().map(|&pid| pid as pid_t).zip(ppids).collect())
 }
