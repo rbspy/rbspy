@@ -7,6 +7,7 @@ use std::fs::File;
 use ui::callgrind;
 use ui::summary;
 use ui::flamegraph;
+use ui::speedscope;
 use core::types::{StackTrace, StackFrame};
 
 pub trait Outputter {
@@ -68,6 +69,20 @@ impl Outputter for SummaryLine {
 
     fn complete(&mut self, mut file: File) -> Result<(), Error> {
         self.0.write(&mut file)?;
+        Ok(())
+    }
+}
+
+pub struct Speedscope(pub speedscope::Stats);
+
+impl Outputter for Speedscope {
+    fn record(&mut self, stack: &StackTrace) -> Result<(), Error> {
+        self.0.record(&stack.trace)?;
+        Ok(())
+    }
+
+    fn complete(&mut self, file: File) -> Result<(), Error> {
+        self.0.write(file)?;
         Ok(())
     }
 }

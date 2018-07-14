@@ -112,6 +112,12 @@ fn get_proc_children() -> Result<Vec<(pid_t, pid_t)>, Error> {
 
     let pids = listpids(ProcType::ProcAllPIDS).map_err(convert_error)?;
 
+    // I had to make this modification to fix a cargo build error!
+    // I should figure out a better fix before trying to land this as a PR.
+    let convert_error = |err| {
+        format_err!("Unable to retrieve process parent PID ({})", err)
+    };
+
     let ppids = pids
         .iter()
         .map(|&pid| {
