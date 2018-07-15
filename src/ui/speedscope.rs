@@ -1,11 +1,17 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io;
+use std::io::Write;
+use std::fs::File;
 
 use core::types::StackFrame;
+
+use failure::{Error, ResultExt};
 
 use serde_json;
 
 /*
+ * This file contains code to export rbspy profiles for use in https://speedscope.app
+ *
  * The speedscope file format is specified via a JSON schema.
  * The latest schema can be found here: https://speedscope.app/file-format-schema.json
  *
@@ -18,63 +24,48 @@ use serde_json;
  * structure.
  */
 
-// Modifications to generated code
-// - renamed Frame to Frame
-// - made Frame derive Hash
-// START OF GENERATED TYPED BINDINGS
 #[derive(Debug, Serialize, Deserialize)]
-pub struct SpeedscopeFile {
+struct SpeedscopeFile {
     #[serde(rename = "$schema")]
-    schema: Schema,
+    schema: String,
     profiles: Vec<Profile>,
     shared: Shared,
     version: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Profile {
-    #[serde(rename = "endValue")]
-    end_value: f64,
-    events: Option<Vec<Event>>,
-    name: String,
-    #[serde(rename = "startValue")]
-    start_value: f64,
+struct Profile {
     #[serde(rename = "type")]
     profile_type: ProfileType,
-    unit: ValueUnit,
-    samples: Option<Vec<Vec<f64>>>,
-    weights: Option<Vec<f64>>,
-}
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Event {
-    at: f64,
-    frame: f64,
-    #[serde(rename = "type")]
-    event_type: EventType,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Shared {
-    frames: Vec<FormatFrame>,
-}
-
-#[derive(Hash, Debug, Serialize, Deserialize)]
-pub struct Frame {
-    col: Option<f64>,
-    file: Option<String>,
-    line: Option<f64>,
     name: String,
+    unit: ValueUnit,
+
+    #[serde(rename = "startValue")]
+    start_value: f64,
+
+    #[serde(rename = "endValue")]
+    end_value: f64,
+
+    samples: Vec<Vec<usize>>,
+    weights: Vec<f64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum EventType {
-    C,
-    O,
+struct Shared {
+    frames: Vec<Frame>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum ProfileType {
+struct Frame {
+    name: String,
+    file: Option<String>,
+    line: Option<u32>,
+    col: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+enum ProfileType {
     #[serde(rename = "evented")]
     Evented,
     #[serde(rename = "sampled")]
@@ -82,7 +73,7 @@ pub enum ProfileType {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum ValueUnit {
+enum ValueUnit {
     #[serde(rename = "bytes")]
     Bytes,
     #[serde(rename = "microseconds")]
@@ -97,21 +88,14 @@ pub enum ValueUnit {
     Seconds,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub enum Schema {
-    #[serde(rename = "https://www.speedscope.app/file-format-schema.json")]
-    HttpsWwwSpeedscopeAppSchemaJson,
-}
-// END OF GENERATED TYPED BINDINGS
-
 impl SpeedscopeFile {
-  pub fn new(profile: Sampled, frames: HashSet<Frame>) -> SpeedscopeFile {
+  pub fn new(profile: Profile, frames: Vec<Frame>) -> SpeedscopeFile {
     SpeedscopeFile {
       // This is always the same
-      schema: HttpsWwwSpeedscopeAppSchemaJson,
+      schema: "https://www.speedscope.app/file-format-schema.json".to_string(),
 
       // This is the version of the file format we're targeting
-      version: "0.2.0",
+      version: "0.2.0".to_string(),
 
       profiles: vec![profile],
 
@@ -122,22 +106,55 @@ impl SpeedscopeFile {
   }
 }
 
+impl Profile {
+    pub fn new() -> Profile {
+        Profile {
+            profile_type: ProfileType::Sampled,
+
+            name: "".to_string(),
+            unit: ValueUnit::None,
+
+            start_value: 0.0,
+            end_value: 0.0,
+
+            samples: vec![],
+            weights: vec![],
+        }
+    }
+}
+
 pub struct Stats {
-  pub profile: Sampled
-  pub frames: Vec<Frame>
-  pub frameToIndex: HashMap<Frame, u32>
+    pub samples: Vec<Vec<usize>>,
+    pub frames: Vec<Frame>,
+    pub frameToIndex: HashMap<StackFrame, usize>
 }
 
 impl Stats {
-  pub fn new() -> Stats {
-    Stats {
-      file: SpeedscopeFile
+    pub fn new() -> Stats {
+        Stats {
+            samples: vec![],
+            frames: vec![],
+            frameToIndex: HashMap::new()
+        }
     }
-  }
 
-  pub fn record(&mut self, stack: &Vec<StackFrame>) -> Result<(), io::Error> {
-  }
+    pub fn record(&mut self, stack: &Vec<StackFrame>) -> Result<(), io::Error> {
+        let frameIndices = stack.into_iter().map(|frame| {
+            match self.frameToIndex.get(frame) {
+                Some(index) => index,
+                None => {
+                    let index = self.frames.len();
+                    self.frameToIndex.insert(*frame, index);
+                    self.frames.push(Frame::new(frame.name, frame.relative_path, frame.lineno));
+                    index
+                }
+            }
+        });
+        self.samples.push(frameIndices);
+        Ok(())
+    }
 
-  pub fn write(&self, w: File) -> Result<(), Error> {
-  }
+    pub fn write(&self, w: File) -> Result<(), Error> {
+        Ok(())
+    }
 }
