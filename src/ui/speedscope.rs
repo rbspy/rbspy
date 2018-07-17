@@ -147,7 +147,7 @@ impl Stats {
     }
 
     pub fn record(&mut self, stack: &Vec<StackFrame>) -> Result<(), io::Error> {
-        let frame_indices: Vec<usize> = stack.into_iter().map(|frame| {
+        let mut frame_indices: Vec<usize> = stack.into_iter().map(|frame| {
             let frames = &mut self.frames;
             self.frame_to_index.entry(frame.clone()).or_insert_with(|| {
                 let len = frames.len();
@@ -155,6 +155,7 @@ impl Stats {
                 len
             }).clone()
         }).collect();
+        frame_indices.reverse();
         self.samples.push(frame_indices);
         Ok(())
     }
