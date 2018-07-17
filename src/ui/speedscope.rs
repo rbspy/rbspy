@@ -1,12 +1,11 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 use std::io;
 use std::io::Write;
 use std::fs::File;
 
 use core::types::StackFrame;
 
-use failure::{Error, ResultExt};
-
+use failure::{Error};
 use serde_json;
 
 /*
@@ -56,7 +55,7 @@ struct Shared {
     frames: Vec<Frame>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct Frame {
     name: String,
     file: Option<String>,
@@ -89,7 +88,11 @@ enum ValueUnit {
 }
 
 impl SpeedscopeFile {
-  pub fn new(profile: Profile, frames: Vec<Frame>) -> SpeedscopeFile {
+  pub fn new(samples: Vec<Vec<usize>>, frames: Vec<Frame>) -> SpeedscopeFile {
+    let end_value = samples.len().clone();
+
+    let weights: Vec<f64> = (&samples).into_iter().map(|_s| 1 as f64).collect();
+
     SpeedscopeFile {
       // This is always the same
       schema: "https://www.speedscope.app/file-format-schema.json".to_string(),
@@ -97,36 +100,41 @@ impl SpeedscopeFile {
       // This is the version of the file format we're targeting
       version: "0.2.0".to_string(),
 
-      profiles: vec![profile],
+      profiles: vec![Profile {
+        profile_type: ProfileType::Sampled,
+
+        name: "".to_string(),
+        unit: ValueUnit::None,
+
+        start_value: 0.0,
+        end_value: end_value as f64,
+
+        samples: samples,
+        weights: weights
+      }],
 
       shared: Shared {
-        frames
+          frames: frames
       }
     }
   }
 }
 
-impl Profile {
-    pub fn new() -> Profile {
-        Profile {
-            profile_type: ProfileType::Sampled,
-
-            name: "".to_string(),
-            unit: ValueUnit::None,
-
-            start_value: 0.0,
-            end_value: 0.0,
-
-            samples: vec![],
-            weights: vec![],
+impl Frame {
+    pub fn new(stack_frame: &StackFrame) -> Frame {
+        Frame {
+            name: stack_frame.name.clone(),
+            file: Some(stack_frame.relative_path.clone()),
+            line: None,
+            col: None
         }
     }
 }
 
 pub struct Stats {
-    pub samples: Vec<Vec<usize>>,
-    pub frames: Vec<Frame>,
-    pub frameToIndex: HashMap<StackFrame, usize>
+    samples: Vec<Vec<usize>>,
+    frames: Vec<Frame>,
+    frame_to_index: HashMap<StackFrame, usize>
 }
 
 impl Stats {
@@ -134,27 +142,26 @@ impl Stats {
         Stats {
             samples: vec![],
             frames: vec![],
-            frameToIndex: HashMap::new()
+            frame_to_index: HashMap::new()
         }
     }
 
     pub fn record(&mut self, stack: &Vec<StackFrame>) -> Result<(), io::Error> {
-        let frameIndices = stack.into_iter().map(|frame| {
-            match self.frameToIndex.get(frame) {
-                Some(index) => index,
-                None => {
-                    let index = self.frames.len();
-                    self.frameToIndex.insert(*frame, index);
-                    self.frames.push(Frame::new(frame.name, frame.relative_path, frame.lineno));
-                    index
-                }
-            }
-        });
-        self.samples.push(frameIndices);
+        let frame_indices: Vec<usize> = stack.into_iter().map(|frame| {
+            let frames = &mut self.frames;
+            self.frame_to_index.entry(frame.clone()).or_insert_with(|| {
+                let len = frames.len();
+                frames.push(Frame::new(frame));
+                len
+            }).clone()
+        }).collect();
+        self.samples.push(frame_indices);
         Ok(())
     }
 
-    pub fn write(&self, w: File) -> Result<(), Error> {
+    pub fn write(&self, mut w: File) -> Result<(), Error> {
+        let json = serde_json::to_string(&SpeedscopeFile::new(self.samples.clone(), self.frames.clone()))?;
+        writeln!(&mut w, "{}", json)?;
         Ok(())
     }
 }
