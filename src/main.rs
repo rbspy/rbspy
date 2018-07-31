@@ -18,6 +18,7 @@ extern crate libproc;
 #[cfg(target_os = "macos")]
 extern crate mach;
 extern crate nix;
+extern crate proc_maps;
 #[macro_use]
 extern crate log;
 extern crate rand;
@@ -38,7 +39,10 @@ extern crate term_size;
 
 use chrono::prelude::*;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
+#[cfg(unix)]
 use libc::pid_t;
+#[cfg(windows)]
+type pid_t = u32;
 use failure::Error;
 use failure::ResultExt;
 
@@ -50,6 +54,7 @@ use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering, AtomicUsize};
 use std::sync::Arc;
 use std::time::{Instant, Duration};
+#[cfg(unix)]
 use std::os::unix::prelude::*;
 use std::sync::mpsc::{sync_channel, channel, SyncSender, Receiver};
 
@@ -119,7 +124,8 @@ fn do_main() -> Result<(), Error> {
 
     let args = Args::from_args()?;
 
-    if cfg!(target_os = "macos") {
+    #[cfg(target_os="macos")]
+    {
         match (&args.cmd, check_root_user()) {
             (&Snapshot{..}, false) => { return Err(format_err!("rbspy snapshot needs to run as root on Mac")) },
             (&Record{..}, false) => { return Err(format_err!("rbspy record needs to run as root on mac")) },
@@ -142,24 +148,30 @@ fn do_main() -> Result<(), Error> {
             let pid = match target {
                 Pid { pid } => pid,
                 Subprocess { prog, args } => {
-                    let uid_str = std::env::var("SUDO_UID");
                     if cfg!(target_os = "macos") {
                         // sleep to prevent freezes (because of High Sierra kernel bug)
                         // TODO: figure out how to work around this race in a cleaner way
                         std::thread::sleep(std::time::Duration::from_millis(10));
                     }
-                    if nix::unistd::Uid::effective().is_root() && !no_drop_root && uid_str.is_ok() {
-                        let uid: u32 = uid_str.unwrap().parse::<u32>().context(
-                            "Failed to parse UID",
-                        )?;
-                        eprintln!(
-                            "Dropping permissions: running Ruby command as user {}",
-                            std::env::var("SUDO_USER")?
-                        );
-                        Command::new(prog).uid(uid).args(args).spawn()?.id() as pid_t
-                    } else {
-                        Command::new(prog).args(args).spawn()?.id() as pid_t
+
+                    #[cfg(unix)]
+                    {
+                        let uid_str = std::env::var("SUDO_UID");
+                        if nix::unistd::Uid::effective().is_root() && !no_drop_root && uid_str.is_ok() {
+                            let uid: u32 = uid_str.unwrap().parse::<u32>().context(
+                                "Failed to parse UID",
+                            )?;
+                            eprintln!(
+                                "Dropping permissions: running Ruby command as user {}",
+                                std::env::var("SUDO_USER")?
+                            );
+                            Command::new(prog).uid(uid).args(args).spawn()?.id() as pid_t
+                        } else {
+                            Command::new(prog).args(args).spawn()?.id() as pid_t
+                        }
                     }
+                    #[cfg(windows)]
+                    { Command::new(prog).args(args).spawn()?.id() as pid_t }
                 }
             };
 
@@ -177,6 +189,7 @@ fn do_main() -> Result<(), Error> {
     }
 }
 
+#[cfg(unix)]
 fn check_root_user() -> bool {
     let euid = nix::unistd::Uid::effective();
     if euid.is_root() {
@@ -364,6 +377,7 @@ fn spawn_recorder_children(pid: pid_t, with_subprocesses: bool, sample_rate: u32
     Ok((trace_receiver, result_receiver, total_traces_clone, timing_error_traces_clone))
 }
 
+#[cfg(unix)]
 #[test]
 fn test_spawn_record_children_subprocesses() {
     let output = Command::new("/usr/bin/which")
@@ -552,10 +566,17 @@ fn test_output_filename() {
     let dirname = d.path().to_str().unwrap();
     assert_eq!(output_filename("", Some("foo"), "txt").unwrap(), Path::new("foo"));
     let generated_filename = output_filename(dirname, None, "txt").unwrap();
+
+    let filename_pattern = if cfg!(target_os = "windows") {
+        ".cache\\rbspy\\records\\rbspy-"
+    } else {
+        ".cache/rbspy/records/rbspy-"
+    };
+
     assert!(
         generated_filename
             .to_string_lossy()
-            .contains(".cache/rbspy/records/rbspy-")
+            .contains(filename_pattern)
     );
 }
 
@@ -570,7 +591,7 @@ fn output_filename(base_dir: &str, maybe_filename: Option<&str>, extension: &str
                 .take(10)
                 .collect::<String>();
             let filename = format!("{}-{}-{}.{}", "rbspy", Utc::now().format("%Y-%m-%d"), s, extension);
-            let dirname = Path::new(base_dir).join(".cache/rbspy/records");
+            let dirname = Path::new(base_dir).join(".cache").join("rbspy").join("records");
             DirBuilder::new().recursive(true).create(&dirname)?;
             dirname.join(&filename)
         }
@@ -698,9 +719,14 @@ impl Args {
             },
             ("record", Some(submatches)) => {
                 let format = value_t!(submatches, "format", OutputFormat).unwrap();
-                let raw_path = output_filename(&std::env::var("HOME")?, submatches.value_of("raw-file"), "raw.gz")?;
-                let out_path =
-                    output_filename(&std::env::var("HOME")?, submatches.value_of("file"), &format.extension())?;
+
+                #[cfg(unix)]
+                let home = &std::env::var("HOME")?;
+                #[cfg(windows)]
+                let home = &std::env::var("userprofile")?;
+
+                let raw_path = output_filename(home, submatches.value_of("raw-file"), "raw.gz")?;
+                let out_path = output_filename(home, submatches.value_of("file"), &format.extension())?;
                 let maybe_duration = match value_t!(submatches, "duration", u64) {
                     Err(_) => None,
                     Ok(integer_duration) => Some(std::time::Duration::from_secs(integer_duration)),

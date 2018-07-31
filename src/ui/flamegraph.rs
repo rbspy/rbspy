@@ -82,6 +82,7 @@ mod tests {
     }
 }
 
+#[cfg(unix)]
 #[test]
 fn test_write_flamegraph() {
     let tempdir = tempdir::TempDir::new("flamegraph").unwrap();
