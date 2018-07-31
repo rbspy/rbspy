@@ -2,7 +2,7 @@ use core::address_finder::*;
 use core::address_finder;
 use core::copy::*;
 use core::copy;
-use core::proc_maps::*;
+use proc_maps::MapRange;
 use core::ruby_version;
 use core::types::{StackTrace, Process};
 
@@ -10,7 +10,11 @@ use failure::Error;
 use failure::ResultExt;
 use failure::Fail;
 use read_process_memory::*;
-use libc::{c_char, pid_t};
+use libc::c_char;
+#[cfg(unix)]
+use libc::pid_t;
+#[cfg(windows)]
+type pid_t = u32;
 
 use std::time::Duration;
 use std;

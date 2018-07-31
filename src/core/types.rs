@@ -4,7 +4,12 @@ use std::cmp::Ordering;
 use std::fmt;
 use std;
 
+#[cfg(unix)]
 use libc::pid_t;
+
+#[cfg(windows)]
+type pid_t = u32;
+
 use read_process_memory::*;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
