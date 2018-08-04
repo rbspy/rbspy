@@ -23,7 +23,7 @@ pub enum AddressFinderError {
 #[cfg(target_os = "macos")]
 mod os_impl {
     use core::address_finder::AddressFinderError;
-    use core::proc_maps::{MapRange, get_process_maps};
+    use core::proc_maps::*;
     use core::proc_maps::mac_maps::{Symbol, get_symbols};
 
     use failure::Error;

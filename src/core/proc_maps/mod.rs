@@ -1,3 +1,12 @@
+pub trait IMapRange {
+    fn size(&self) -> usize;
+    fn start(&self) -> usize;
+    fn filename(&self) -> &Option<String>;
+    fn is_read(&self) -> bool;
+    fn is_write(&self) -> bool;
+    fn is_exec(&self) -> bool;
+}
+
 #[cfg(target_os = "macos")]
 pub mod mac_maps;
 #[cfg(target_os = "macos")]

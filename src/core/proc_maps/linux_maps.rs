@@ -2,6 +2,7 @@ use libc;
 use std;
 use std::fs::File;
 use std::io::Read;
+use core::proc_maps::IMapRange;
 
 pub type Pid = libc::pid_t;
 
@@ -17,13 +18,13 @@ pub struct MapRange {
     pathname: Option<String>,
 }
 
-impl MapRange {
-    pub fn size(&self) -> usize { self.range_end - self.range_start }
-    pub fn start(&self) -> usize { self.range_start }
-    pub fn filename(&self) -> &Option<String> { &self.pathname }
-    pub fn is_exec(&self) -> bool { &self.flags[2..3] == "x" }
-    pub fn is_write(&self) -> bool { &self.flags[1..2] == "w" }
-    pub fn is_read(&self) -> bool { &self.flags[0..1] == "r" }
+impl IMapRange for MapRange {
+    fn size(&self) -> usize { self.range_end - self.range_start }
+    fn start(&self) -> usize { self.range_start }
+    fn filename(&self) -> &Option<String> { &self.pathname }
+    fn is_exec(&self) -> bool { &self.flags[2..3] == "x" }
+    fn is_write(&self) -> bool { &self.flags[1..2] == "w" }
+    fn is_read(&self) -> bool { &self.flags[0..1] == "r" }
 }
 
 pub fn get_process_maps(pid: Pid) -> std::io::Result<Vec<MapRange>> {

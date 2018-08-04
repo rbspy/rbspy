@@ -12,6 +12,7 @@ use mach::vm_region::{vm_region_basic_info_data_t, vm_region_info_t,
 use mach::types::vm_task_entry_t;
 use libproc::libproc::proc_pid::regionfilename;
 use mach;
+use core::proc_maps::IMapRange;
 
 pub type Pid = pid_t;
 
@@ -61,21 +62,17 @@ pub fn get_symbols(filename: &str) -> Result<Vec<Symbol>, Error> {
     Ok(parse_nm_output(&String::from_utf8_lossy(&output.stdout)))
 }
 
-impl MapRange {
-    pub fn size(&self) -> usize { self.size as usize }
-    pub fn start(&self) -> usize { self.start as usize }
-    pub fn filename(&self) -> &Option<String> { &self.filename }
-    pub fn end(&self) -> mach_vm_address_t {
-        self.start + self.size as mach_vm_address_t
-    }
-
-    pub fn is_read(&self) -> bool {
+impl IMapRange for MapRange {
+    fn size(&self) -> usize { self.size as usize }
+    fn start(&self) -> usize { self.start as usize }
+    fn filename(&self) -> &Option<String> { &self.filename }
+    fn is_read(&self) -> bool {
         self.info.protection & mach::vm_prot::VM_PROT_READ != 0
     }
-    pub fn is_write(&self) -> bool {
+    fn is_write(&self) -> bool {
         self.info.protection & mach::vm_prot::VM_PROT_WRITE != 0
     }
-    pub fn is_exec(&self) -> bool {
+    fn is_exec(&self) -> bool {
         self.info.protection & mach::vm_prot::VM_PROT_EXECUTE != 0
     }
 }
@@ -93,7 +90,7 @@ pub fn get_process_maps(pid: Pid) -> io::Result<Vec<MapRange>> {
     let mut region = init_region.clone();
     vec.push(init_region);
     loop {
-        match mach_vm_region(pid, task, region.end()) {
+        match mach_vm_region(pid, task, (region.start() + region.size()) as mach_vm_address_t) {
             Some(r) => {
                 vec.push(r.clone());
                 region = r;
