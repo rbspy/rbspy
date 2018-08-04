@@ -13,13 +13,15 @@ use mach::types::vm_task_entry_t;
 use libproc::libproc::proc_pid::regionfilename;
 use mach;
 
+pub type Pid = pid_t;
+
 #[derive(Debug, Clone)]
-pub struct MacMapRange {
-    pub size: mach_vm_size_t,
-    pub info: vm_region_basic_info_data_t,
-    pub start: mach_vm_address_t,
-    pub count: mach_msg_type_number_t,
-    pub filename: Option<String>,
+pub struct MapRange {
+    size: mach_vm_size_t,
+    info: vm_region_basic_info_data_t,
+    start: mach_vm_address_t,
+    count: mach_msg_type_number_t,
+    filename: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -59,7 +61,10 @@ pub fn get_symbols(filename: &str) -> Result<Vec<Symbol>, Error> {
     Ok(parse_nm_output(&String::from_utf8_lossy(&output.stdout)))
 }
 
-impl MacMapRange {
+impl MapRange {
+    pub fn size(&self) -> usize { self.size as usize }
+    pub fn start(&self) -> usize { self.start as usize }
+    pub fn filename(&self) -> &Option<String> { &self.filename }
     pub fn end(&self) -> mach_vm_address_t {
         self.start + self.size as mach_vm_address_t
     }
@@ -81,7 +86,8 @@ impl MacMapRange {
  * to get the first memory map in the process, pass the end of that memory map to get the second
  * memory map, etc.
  */
-pub fn get_process_maps(pid: pid_t, task: mach_port_name_t) -> Vec<MacMapRange> {
+pub fn get_process_maps(pid: Pid) -> io::Result<Vec<MapRange>> {
+    let task = task_for_pid(pid)?;
     let init_region = mach_vm_region(pid, task, 1).unwrap();
     let mut vec = vec![];
     let mut region = init_region.clone();
@@ -92,16 +98,16 @@ pub fn get_process_maps(pid: pid_t, task: mach_port_name_t) -> Vec<MacMapRange> 
                 vec.push(r.clone());
                 region = r;
             }
-            _ => return vec,
+            _ => return Ok(vec),
         }
     }
 }
 
 fn mach_vm_region(
-    pid: pid_t,
+    pid: Pid,
     target_task: mach_port_name_t,
     mut address: mach_vm_address_t,
-) -> Option<MacMapRange> {
+) -> Option<MapRange> {
     let mut count = mem::size_of::<vm_region_basic_info_data_64_t>() as mach_msg_type_number_t;
     let mut object_name: mach_port_t = 0;
     let mut size = unsafe { mem::zeroed::<mach_vm_size_t>() };
@@ -124,16 +130,10 @@ fn mach_vm_region(
         Ok(x) => Some(x),
         _ => None,
     };
-    Some(MacMapRange {
-        size: size,
-        info: info,
-        start: address,
-        count: count,
-        filename: filename,
-    })
+    Some(MapRange{size, info, start: address, count, filename})
 }
 
-pub fn task_for_pid(pid: pid_t) -> io::Result<mach_port_name_t> {
+pub fn task_for_pid(pid: Pid) -> io::Result<mach_port_name_t> {
     let mut task: mach_port_name_t = MACH_PORT_NULL;
     // sleep for 10ms to make sure we don't get into a race between `task_for_pid` and execing a new
     // process. Races here can freeze the OS because of a Mac kernel bug on High Sierra.

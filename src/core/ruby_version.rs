@@ -298,7 +298,7 @@ macro_rules! get_stack_frame_1_9_1(
             Ok(StackFrame{
                 name: get_ruby_string(iseq_struct.name as usize, source)?,
                 relative_path: get_ruby_string(iseq_struct.filename as usize, source)?,
-                absolute_path: None, 
+                absolute_path: None,
                 lineno: get_lineno(iseq_struct, cfp, source)?,
             })
         }

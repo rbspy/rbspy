@@ -1,32 +1,33 @@
+use libc;
 use std;
 use std::fs::File;
 use std::io::Read;
-use libc::pid_t;
+
+pub type Pid = libc::pid_t;
+
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MapRange {
-    pub range_start: usize,
-    pub range_end: usize,
-    pub offset: usize,
-    pub dev: String,
-    pub flags: String,
-    pub inode: usize,
-    pub pathname: Option<String>,
+    range_start: usize,
+    range_end: usize,
+    offset: usize,
+    dev: String,
+    flags: String,
+    inode: usize,
+    pathname: Option<String>,
 }
 
 impl MapRange {
-    pub fn contains_addr(&self, addr: usize) -> bool {
-        addr >= self.range_start && addr <= self.range_end
-    }
+    pub fn size(&self) -> usize { self.range_end - self.range_start }
+    pub fn start(&self) -> usize { self.range_start }
+    pub fn filename(&self) -> &Option<String> { &self.pathname }
+    pub fn is_exec(&self) -> bool { &self.flags[2..3] == "x" }
+    pub fn is_write(&self) -> bool { &self.flags[1..2] == "w" }
+    pub fn is_read(&self) -> bool { &self.flags[0..1] == "r" }
 }
 
-pub fn maps_contain_addr(addr: usize, maps: &Vec<MapRange>) -> bool {
-    maps.iter().any({ |map| map.contains_addr(addr) })
-}
-
-pub fn get_proc_maps(pid: pid_t) -> Result<Vec<MapRange>, std::io::Error> {
+pub fn get_process_maps(pid: Pid) -> std::io::Result<Vec<MapRange>> {
     // Parses /proc/PID/maps into a Vec<MapRange>
-    // TODO: factor this out into a crate and make it work on Mac too
     let maps_file = format!("/proc/{}/maps", pid);
     let mut file = File::open(maps_file)?;
     let mut contents = String::new();
@@ -65,7 +66,7 @@ fn parse_proc_maps(contents: &str) -> Vec<MapRange> {
 
 #[test]
 fn test_parse_maps() {
-    let contents = include_str!("../../ci/testdata/map.txt");
+    let contents = include_str!("../../../ci/testdata/map.txt");
     let vec = parse_proc_maps(contents);
     let expected = vec![
         MapRange {
