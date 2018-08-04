@@ -176,10 +176,14 @@ macro_rules! get_stack_trace(
             Ok(StackTrace{trace, pid: process.pid})
         }
 
-use core::proc_maps::{maps_contain_addr, MapRange};
+use core::proc_maps::maps_contain_addr;
+
+#[cfg(target_os = "linux")]
+use core::proc_maps::linux_maps::MapRange;
 
 // Checks whether the address looks even vaguely like a thread struct, mostly by making sure its
 // addresses are reasonable
+#[cfg(target_os = "linux")]
 fn could_be_thread(thread: &$thread_type, all_maps: &Vec<MapRange>) -> bool {
     maps_contain_addr(thread.tag as usize, all_maps) &&
         maps_contain_addr(thread.cfp as usize, all_maps) &&
@@ -191,6 +195,7 @@ fn stack_base(thread: &$thread_type) -> i64 {
     stack_field(thread) + stack_size_field(thread) * std::mem::size_of::<VALUE>() as i64 - 1 * std::mem::size_of::<rb_control_frame_t>() as i64
 }
 
+#[cfg(target_os = "linux")]
 pub fn is_maybe_thread<T>(x: usize, x_addr: usize, source: T, all_maps: &Vec<MapRange>) -> bool where T: CopyAddress{
     if !maps_contain_addr(x, all_maps) {
         return false;
