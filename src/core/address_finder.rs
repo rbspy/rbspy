@@ -23,8 +23,8 @@ pub enum AddressFinderError {
 #[cfg(target_os = "macos")]
 mod os_impl {
     use core::address_finder::AddressFinderError;
-    use core::proc_maps::MapRange;
-    use core::mac_maps::*;
+    use core::proc_maps::*;
+    use core::proc_maps::mac_maps::{Symbol, get_symbols};
 
     use failure::Error;
     use libc::pid_t;
@@ -101,10 +101,9 @@ mod os_impl {
     }
 
     fn get_program_info(pid: pid_t) -> Result<ProgramInfo, Error> {
-        let task = task_for_pid(pid).map_err(|_| {
+        let maps = get_process_maps(pid).map_err(|_| {
             AddressFinderError::MacPermissionDenied(pid)
         })?;
-        let maps = get_process_maps(pid, task);
         let ruby_binary = get_ruby_binary(&maps)?;
         let libruby_binary = get_libruby_binary(&maps);
         Ok(ProgramInfo {
@@ -113,20 +112,20 @@ mod os_impl {
         })
     }
 
-    fn get_ruby_binary(maps: &Vec<MacMapRange>) -> Result<Binary, Error> {
-        let map: &MacMapRange = maps.iter()
-            .find(|ref m| if let Some(ref pathname) = m.filename {
+    fn get_ruby_binary(maps: &[MapRange]) -> Result<Binary, Error> {
+        let map: &MapRange = maps.iter()
+            .find(|ref m| if let Some(ref pathname) = m.filename() {
                 pathname.contains("bin/ruby") && m.is_exec()
             } else {
                 false
             })
             .ok_or(format_err!("Couldn't find ruby map"))?;
-        Binary::from(map.start as usize, map.filename.as_ref().unwrap())
+        Binary::from(map.start() as usize, map.filename().as_ref().unwrap())
     }
 
-    fn get_libruby_binary(maps: &Vec<MacMapRange>) -> Option<Binary> {
+    fn get_libruby_binary(maps: &[MapRange]) -> Option<Binary> {
         let maybe_map = maps.iter().find(
-            |ref m| if let Some(ref pathname) = m.filename {
+            |ref m| if let Some(ref pathname) = m.filename() {
                 pathname.contains("libruby") && m.is_exec()
             } else {
                 false
@@ -134,7 +133,7 @@ mod os_impl {
         );
         match maybe_map.as_ref() {
             Some(map) => Some(
-                Binary::from(map.start as usize, map.filename.as_ref().unwrap()).unwrap(),
+                Binary::from(map.start() as usize, map.filename().as_ref().unwrap()).unwrap(),
             ),
             None => None,
         }
@@ -241,7 +240,7 @@ mod os_impl {
         );
         let load_header = elf_load_header(libruby_elf);
         debug!("bss_section header: {:?}", bss_section);
-        let read_addr = map.range_start + bss_section.addr as usize - load_header.vaddr as usize;
+        let read_addr = map.start() + bss_section.addr as usize - load_header.vaddr as usize;
 
         debug!("read_addr: {:x}", read_addr);
         let source = proginfo.pid.try_into_process_handle().unwrap();
@@ -290,7 +289,7 @@ mod os_impl {
         elf_symbol_value(elf_file, symbol_name).map(|addr| {
             let load_header = elf_load_header(elf_file);
             debug!("load header: {}", load_header);
-            map.range_start + addr - load_header.vaddr as usize
+            map.start() + addr - load_header.vaddr as usize
         })
     }
 
@@ -320,23 +319,23 @@ mod os_impl {
         // mount namespace. /proc/PID/root is the view of the filesystem that the target process
         // has. (see the proc man page for more)
         // So we read /usr/bin/ruby from /proc/PID/root/usr/bin/ruby
-        let map_path = map.pathname.as_ref().expect("map's pathname shouldn't be None");
+        let map_path = map.filename().as_ref().expect("map's pathname shouldn't be None");
         let elf_path = format!("/proc/{}/root{}", pid, map_path);
         elf::File::open_path(&elf_path)
             .map_err(|_| format_err!("Couldn't open ELF file: {:?}", elf_path))
     }
 
     pub fn get_program_info(pid: pid_t) -> Result<ProgramInfo, Error> {
-        let all_maps = get_proc_maps(pid).map_err(|x| match x.kind() {
+        let all_maps = get_process_maps(pid).map_err(|x| match x.kind() {
             std::io::ErrorKind::NotFound => AddressFinderError::NoSuchProcess(pid),
             std::io::ErrorKind::PermissionDenied => AddressFinderError::PermissionDenied(pid),
             _ => AddressFinderError::ProcMapsError(pid),
         })?;
-        let ruby_map = Box::new(get_map(&all_maps, "bin/ruby", "r-xp")
+        let ruby_map = Box::new(get_map(&all_maps, "bin/ruby")
             .ok_or(format_err!("Ruby map not found for PID: {}", pid))?);
-        let all_maps = get_proc_maps(pid).unwrap();
+        let all_maps = get_process_maps(pid).unwrap();
         let ruby_elf = open_elf_file(pid, &ruby_map)?;
-        let libruby_map = Box::new(get_map(&all_maps, "libruby", "r-xp"));
+        let libruby_map = Box::new(get_map(&all_maps, "libruby"));
         let libruby_elf = match *libruby_map {
             Some(ref map) => {
                 Some(open_elf_file(pid, &map)?)
@@ -353,11 +352,11 @@ mod os_impl {
         })
     }
 
-    fn get_map(maps: &Vec<MapRange>, contains: &str, flags: &str) -> Option<MapRange> {
+    fn get_map(maps: &[MapRange], contains: &str) -> Option<MapRange> {
         maps.iter()
             .find(|ref m| {
-                if let Some(ref pathname) = m.pathname {
-                    pathname.contains(contains) && &m.flags == flags
+                if let Some(ref pathname) = m.filename() {
+                    pathname.contains(contains) && m.is_exec()
                 } else {
                     false
                 }
