@@ -87,7 +87,7 @@ pub type clockid_t = __clockid_t;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct __sigset_t {
-    pub __val: [::std::os::raw::c_ulong; 16usize],
+    pub __val: [usize; 16usize],
 }
 #[test]
 fn bindgen_test_layout___sigset_t() {
@@ -112,7 +112,7 @@ fn bindgen_test_layout___sigset_t() {
         )
     );
 }
-pub type pthread_t = ::std::os::raw::c_ulong;
+pub type pthread_t = usize;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct __pthread_internal_list {
@@ -522,8 +522,8 @@ impl ::std::fmt::Debug for pthread_cond_t {
         write!(f, "pthread_cond_t {{ union }}")
     }
 }
-pub type VALUE = ::std::os::raw::c_ulong;
-pub type ID = ::std::os::raw::c_ulong;
+pub type VALUE = usize;
+pub type ID = usize;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct RBasic {
@@ -1010,7 +1010,7 @@ impl ::std::fmt::Debug for RArray {
 pub struct rb_global_variable {
     _unused: [u8; 0],
 }
-pub type st_data_t = ::std::os::raw::c_ulong;
+pub type st_data_t = usize;
 pub type st_index_t = st_data_t;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
