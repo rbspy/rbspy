@@ -41,3 +41,6 @@ echo "#![allow(non_upper_case_globals)]" > $OUT
 echo "#![allow(non_camel_case_types)]" >> $OUT
 echo "#![allow(non_snake_case)]" >> $OUT
 cat /tmp/bindings.rs >> $OUT
+
+# fix up generated bindings so that they compile/work on windows
+perl -pi -e "s/::std::os::raw::c_ulong;/usize;/g" $OUT
