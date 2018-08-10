@@ -1,8 +1,5 @@
 pub use self::os_impl::*;
-#[cfg(unix)]
-use libc::pid_t;
-#[cfg(windows)]
-type pid_t = u32;
+use core::types::pid_t;
 
 /*
  * Operating-system specific code for getting

@@ -82,7 +82,10 @@ mod tests {
     }
 }
 
-#[cfg(unix)]
+// We're not running this test on windows right now for two reasons:
+//  1) perl isn't installed by the appveyor CI scripts (yet)
+//  2) 'tempdir.close().unwrap()' panics with 'the directory is not empty'
+#[cfg(not(windows))]
 #[test]
 fn test_write_flamegraph() {
     let tempdir = tempdir::TempDir::new("flamegraph").unwrap();

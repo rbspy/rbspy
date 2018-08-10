@@ -4,10 +4,8 @@ use std::fs::File;
 use std::io::Read;
 
 use failure::Error;
-#[cfg(unix)]
-use libc::pid_t;
-#[cfg(windows)]
-type pid_t = u32;
+
+use core::types::pid_t;
 
 pub fn descendents_of(parent_pid: pid_t) -> Result<Vec<pid_t>, Error> {
     let parents_to_children = map_parents_to_children()?;
@@ -130,5 +128,5 @@ fn get_proc_children() -> Result<Vec<(pid_t, pid_t)>, Error> {
     // TODO: this isn't currently implemented, but can be done
     // using the tlhelp32 Process32First/Process32Next api from the
     // winapi-rs crate: https://github.com/retep998/winapi-rs/blob/0.3/src/um/tlhelp32.rs#L94
-    Err(format_err!("--subprocesses option is not yet supported on windows"))
+    unimplemented!("--subprocesses option is not yet supported on windows")
 }
