@@ -4,17 +4,13 @@ use core::copy::*;
 use core::copy;
 use proc_maps::MapRange;
 use core::ruby_version;
-use core::types::{StackTrace, Process};
+use core::types::{StackTrace, Process, pid_t};
 
 use failure::Error;
 use failure::ResultExt;
 use failure::Fail;
 use read_process_memory::*;
 use libc::c_char;
-#[cfg(unix)]
-use libc::pid_t;
-#[cfg(windows)]
-type pid_t = u32;
 
 use std::time::Duration;
 use std;

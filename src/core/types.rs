@@ -5,10 +5,10 @@ use std::fmt;
 use std;
 
 #[cfg(unix)]
-use libc::pid_t;
+pub use libc::pid_t;
 
 #[cfg(windows)]
-type pid_t = u32;
+pub type pid_t = u32;
 
 use read_process_memory::*;
 
