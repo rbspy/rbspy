@@ -21,7 +21,7 @@ a variety of different ways later on.
 
 ## Requirements
 
-rbspy runs on Linux\* and Mac.
+rbspy supports Linux\*, Mac, and Windows.
 
 <small>
 * kernel version 3.2+ required. For Ubuntu, this means Ubuntu 12.04 or newer.
