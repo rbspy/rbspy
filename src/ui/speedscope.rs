@@ -125,7 +125,7 @@ impl Frame {
         Frame {
             name: stack_frame.name.clone(),
             file: Some(stack_frame.relative_path.clone()),
-            line: None,
+            line: Some(stack_frame.lineno),
             col: None
         }
     }
