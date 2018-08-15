@@ -107,7 +107,7 @@ impl SpeedscopeFile {
 
       active_profile_index: None,
 
-      name: None,
+      name: "rbspy profile",
 
       exporter: Some(format!("rbspy@{}", env!("CARGO_PKG_VERSION"))),
 
@@ -117,7 +117,7 @@ impl SpeedscopeFile {
         return Profile {
             profile_type: ProfileType::Sampled,
 
-            name: option_pid.map_or("".to_string(), |pid| format!("pid {}", pid)),
+            name: option_pid.map_or("rbspy profile".to_string(), |pid| format!("rbspy profile - pid {}", pid)),
 
             unit: ValueUnit::None,
 
