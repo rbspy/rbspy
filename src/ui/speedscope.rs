@@ -3,8 +3,7 @@ use std::io;
 use std::io::Write;
 use std::fs::File;
 
-use libc::pid_t;
-use core::types::{StackTrace, StackFrame};
+use core::types::{pid_t, StackTrace, StackFrame};
 
 use failure::{Error};
 use serde_json;
