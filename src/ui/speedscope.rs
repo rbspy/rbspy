@@ -3,7 +3,8 @@ use std::io;
 use std::io::Write;
 use std::fs::File;
 
-use core::types::StackFrame;
+use libc::pid_t;
+use core::types::{StackTrace, StackFrame};
 
 use failure::{Error};
 use serde_json;
@@ -97,10 +98,8 @@ enum ValueUnit {
 }
 
 impl SpeedscopeFile {
-  pub fn new(samples: Vec<Vec<usize>>, frames: Vec<Frame>) -> SpeedscopeFile {
+  pub fn new(samples: HashMap<Option<pid_t>, Vec<Vec<usize>>>, frames: Vec<Frame>) -> SpeedscopeFile {
     let end_value = samples.len().clone();
-
-    let weights: Vec<f64> = (&samples).into_iter().map(|_s| 1 as f64).collect();
 
     SpeedscopeFile {
       // This is always the same
@@ -112,18 +111,23 @@ impl SpeedscopeFile {
 
       exporter: Some(format!("rbspy@{}", env!("CARGO_PKG_VERSION"))),
 
-      profiles: vec![Profile {
-        profile_type: ProfileType::Sampled,
+      profiles: samples.iter().map(|(option_pid, samples)| {
+        let weights: Vec<f64> = (&samples).into_iter().map(|_s| 1 as f64).collect();
 
-        name: "".to_string(),
-        unit: ValueUnit::None,
+        return Profile {
+            profile_type: ProfileType::Sampled,
 
-        start_value: 0.0,
-        end_value: end_value as f64,
+            name: option_pid.map_or("".to_string(), |pid| format!("pid {}", pid)),
 
-        samples: samples,
-        weights: weights
-      }],
+            unit: ValueUnit::None,
+
+            start_value: 0.0,
+            end_value: end_value as f64,
+
+            samples: samples.clone(),
+            weights: weights
+        }
+      }).collect(),
 
       shared: Shared {
           frames: frames
@@ -144,7 +148,7 @@ impl Frame {
 }
 
 pub struct Stats {
-    samples: Vec<Vec<usize>>,
+    samples: HashMap<Option<pid_t>, Vec<Vec<usize>>>,
     frames: Vec<Frame>,
     frame_to_index: HashMap<StackFrame, usize>
 }
@@ -152,23 +156,26 @@ pub struct Stats {
 impl Stats {
     pub fn new() -> Stats {
         Stats {
-            samples: vec![],
+            samples: HashMap::new(),
             frames: vec![],
             frame_to_index: HashMap::new()
         }
     }
 
-    pub fn record(&mut self, stack: &Vec<StackFrame>) -> Result<(), io::Error> {
-        let mut frame_indices: Vec<usize> = stack.into_iter().map(|frame| {
+    pub fn record(&mut self, stack: &StackTrace) -> Result<(), io::Error> {
+        let mut frame_indices: Vec<usize> = stack.trace.iter().map(|frame| {
             let frames = &mut self.frames;
             self.frame_to_index.entry(frame.clone()).or_insert_with(|| {
                 let len = frames.len();
-                frames.push(Frame::new(frame));
+                frames.push(Frame::new(&frame));
                 len
             }).clone()
         }).collect();
         frame_indices.reverse();
-        self.samples.push(frame_indices);
+
+        self.samples.entry(stack.pid.clone()).or_insert_with(|| {
+            vec![]
+        }).push(frame_indices);
         Ok(())
     }
 

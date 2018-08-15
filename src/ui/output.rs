@@ -77,7 +77,7 @@ pub struct Speedscope(pub speedscope::Stats);
 
 impl Outputter for Speedscope {
     fn record(&mut self, stack: &StackTrace) -> Result<(), Error> {
-        self.0.record(&stack.trace)?;
+        self.0.record(&stack)?;
         Ok(())
     }
 
