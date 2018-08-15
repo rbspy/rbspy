@@ -107,7 +107,7 @@ impl SpeedscopeFile {
 
       active_profile_index: None,
 
-      name: "rbspy profile",
+      name: Some("rbspy profile".to_string()),
 
       exporter: Some(format!("rbspy@{}", env!("CARGO_PKG_VERSION"))),
 
