@@ -11,8 +11,11 @@ use serde_json;
 /*
  * This file contains code to export rbspy profiles for use in https://speedscope.app
  *
- * The speedscope file format is specified via a JSON schema.
- * The latest schema can be found here: https://speedscope.app/file-format-schema.json
+ * The TypeScript definitions that define this file format can be found here:
+ * https://github.com/jlfwong/speedscope/blob/9d13d9/src/lib/file-format-spec.ts
+ *
+ * From the TypeScript definition, a JSON schema is generated. The latest
+ * schema can be found here: https://speedscope.app/file-format-schema.json
  *
  * This JSON schema conveniently allows to generate type bindings for generating JSON.
  * You can use https://app.quicktype.io/ to generate serde_json Rust bindings for the
@@ -29,7 +32,13 @@ struct SpeedscopeFile {
     schema: String,
     profiles: Vec<Profile>,
     shared: Shared,
-    version: String,
+
+    #[serde(rename = "activeProfileIndex")]
+    active_profile_index: Option<f64>,
+
+    exporter: Option<String>,
+
+    name: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -97,8 +106,11 @@ impl SpeedscopeFile {
       // This is always the same
       schema: "https://www.speedscope.app/file-format-schema.json".to_string(),
 
-      // This is the version of the file format we're targeting
-      version: "0.2.0".to_string(),
+      active_profile_index: None,
+
+      name: None,
+
+      exporter: Some(format!("rbspy@{}", env!("CARGO_PKG_VERSION"))),
 
       profiles: vec![Profile {
         profile_type: ProfileType::Sampled,
