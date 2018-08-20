@@ -83,6 +83,7 @@ arg_enum!{
     pub enum OutputFormat {
         flamegraph,
         callgrind,
+        speedscope,
         summary,
         summary_by_line,
     }
@@ -227,6 +228,7 @@ impl OutputFormat {
         match self {
             OutputFormat::flamegraph => Box::new(output::Flamegraph(ui::flamegraph::Stats::new())),
             OutputFormat::callgrind => Box::new(output::Callgrind(ui::callgrind::Stats::new())),
+            OutputFormat::speedscope => Box::new(output::Speedscope(ui::speedscope::Stats::new())),
             OutputFormat::summary => Box::new(output::Summary(ui::summary::Stats::new())),
             OutputFormat::summary_by_line => Box::new(output::SummaryLine(ui::summary::Stats::new())),
         }
@@ -236,6 +238,7 @@ impl OutputFormat {
         match self {
             &OutputFormat::flamegraph => "flamegraph.svg",
             &OutputFormat::callgrind => "callgrind.txt",
+            &OutputFormat::speedscope => "speedscope.json",
             &OutputFormat::summary => "summary.txt",
             &OutputFormat::summary_by_line => "summary_by_line.txt",
         }.to_string()
