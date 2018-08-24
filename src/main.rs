@@ -220,7 +220,7 @@ fn main() {
 }
 
 fn snapshot(pid: pid_t) -> Result<(), Error> {
-    let getter = initialize(pid)?;
+    let mut getter = initialize(pid)?;
     let trace = getter.get_trace()?;
     for x in trace.iter().rev() {
         println!("{}", x);
@@ -478,7 +478,7 @@ fn record(
     total_traces: Arc<AtomicUsize>,
     sender: SyncSender<StackTrace>
 ) -> Result<(), Error> {
-    let getter = core::initialize::initialize(pid)?;
+    let mut getter = core::initialize::initialize(pid)?;
 
     let mut total = 0;
     let mut errors = 0;
@@ -499,16 +499,18 @@ fn record(
         total += 1;
         let trace = getter.get_trace();
         match trace {
-            Err(MemoryCopyError::ProcessEnded) => {
-                // we need to store done = true here to signal the other threads here that we
-                // should stop profiling
-                done.store(true, Ordering::Relaxed);
-                break;
-            }
             Ok(ok_trace) => {
                 sender.send(ok_trace)?;
             }
             Err(x) => {
+                if let Some(MemoryCopyError::ProcessEnded) = x.downcast_ref() {
+                    // we need to store done = true here to signal the other threads here that we
+                    // should stop profiling
+                    done.store(true, Ordering::Relaxed);
+                    debug!("Process ended");
+                    break;
+                }
+
                 errors += 1;
                 if errors > 20 && (errors as f64) / (total as f64) > 0.5 {
                     print_errors(errors, total);

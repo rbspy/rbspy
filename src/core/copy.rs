@@ -18,6 +18,8 @@ pub enum MemoryCopyError {
     #[fail(display = "Too much memory requested when copying: {}", _0)] RequestTooLarge(usize),
     #[fail(display = "Tried to read invalid string")]
     InvalidStringError(#[cause] std::string::FromUtf8Error),
+    #[fail(display = "Tried to read invalid memory address {:x}", _0)]
+    InvalidAddressError(usize),
 }
 
 pub fn copy_vec<U, T>(addr: usize, length: usize, source: &T) -> Result<Vec<U>, MemoryCopyError>
@@ -47,6 +49,9 @@ where
     source.copy_address(addr as usize, &mut copy).map_err(|x| {
         if x.raw_os_error() == Some(3) {
             MemoryCopyError::ProcessEnded
+        } else if x.raw_os_error() == Some(14) {
+            // On *nix EFAULT means that the address was invalid
+            MemoryCopyError::InvalidAddressError(addr)
         } else if x.raw_os_error() == Some(60) {
             // On Mac code 60 seems to more or less correspond to "process ended"
             MemoryCopyError::ProcessEnded

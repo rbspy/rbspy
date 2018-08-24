@@ -28,40 +28,82 @@ use std;
  *   * Package all that up into a struct that the user can use to get stack traces.
  */
 pub fn initialize(pid: pid_t) -> Result<StackTraceGetter<ProcessHandle>, Error> {
-    let version = get_ruby_version_retry(pid).context("Couldn't determine Ruby version")?;
-    let is_maybe_thread = is_maybe_thread_function(&version);
+    let (current_thread_addr_location, stack_trace_function) = get_process_ruby_state(pid)?;
 
-    debug!("version: {}", version);
     Ok(StackTraceGetter {
         process: Process{pid: Some(pid), source: pid.try_into_process_handle()?},
-        current_thread_addr_location: address_finder::current_thread_address(
-            pid,
-            &version,
-            is_maybe_thread,
-        )?,
-        stack_trace_function: get_stack_trace_function(&version),
+        current_thread_addr_location,
+        stack_trace_function,
+        reinit_count: 0,
     })
 }
 
 // Use a StackTraceGetter to get stack traces
 pub struct StackTraceGetter<T> where T: CopyAddress {
     process: Process<T>,
-    pub current_thread_addr_location: usize,
+    current_thread_addr_location: usize,
     stack_trace_function:
         Box<Fn(usize, &Process<T>) -> Result<StackTrace, MemoryCopyError>>,
+    reinit_count: u32,
 }
 
-impl<T> StackTraceGetter<T> where T: CopyAddress {
-    pub fn get_trace(&self) -> Result<StackTrace, MemoryCopyError> {
+impl StackTraceGetter<ProcessHandle> {
+    pub fn get_trace(&mut self) -> Result<StackTrace, Error> {
+        match self.get_trace_from_current_thread() {
+            Ok(trace) => return Ok(trace),
+            Err(MemoryCopyError::InvalidAddressError(addr))
+                if addr == self.current_thread_addr_location => {}
+            Err(e) => Err(e)?,
+        }
+        debug!("Thread address location invalid, reinitializing");
+        self.reinitialize()?;
+        Ok(self.get_trace_from_current_thread()?)
+    }
+
+    fn get_trace_from_current_thread(&self) -> Result<StackTrace, MemoryCopyError> {
         let stack_trace_function = &self.stack_trace_function;
         stack_trace_function(
             self.current_thread_addr_location,
             &self.process,
         )
     }
+
+    fn reinitialize(&mut self) -> Result<(), Error> {
+        let pid = self.process.pid.expect("Get StackTraceGetter pid");
+        let (current_thread_addr_location, stack_trace_function) = get_process_ruby_state(pid)?;
+
+        self.current_thread_addr_location = current_thread_addr_location;
+        self.stack_trace_function = stack_trace_function;
+        self.reinit_count += 1;
+
+        Ok(())
+    }
 }
 
 // Everything below here is private
+
+fn get_process_ruby_state(
+    pid: pid_t,
+) -> Result<
+    (
+        usize,
+        Box<Fn(usize, &Process<ProcessHandle>) -> Result<StackTrace, MemoryCopyError>>,
+    ),
+    Error,
+> {
+    let version = get_ruby_version_retry(pid).context("Couldn't determine Ruby version")?;
+    let is_maybe_thread = is_maybe_thread_function(&version);
+
+    debug!("version: {}", version);
+    Ok((
+        address_finder::current_thread_address(
+            pid,
+            &version,
+            is_maybe_thread,
+        )?,
+        get_stack_trace_function(&version),
+    ))
+}
 
 fn get_ruby_version_retry(pid: pid_t) -> Result<String, Error> {
     /* This exists because:
@@ -171,12 +213,55 @@ fn test_get_trace() {
     // Test getting a stack trace from a real running program using system Ruby
     let mut process = std::process::Command::new("/usr/bin/ruby").arg("./ci/ruby-programs/infinite.rb").spawn().unwrap();
     let pid = process.id() as pid_t;
-    let getter = initialize(pid).unwrap();
+    let mut getter = initialize(pid).unwrap();
     std::thread::sleep(std::time::Duration::from_millis(50));
     let trace = getter.get_trace();
     assert!(trace.is_ok());
     assert_eq!(trace.unwrap().pid, Some(pid));
     process.kill().unwrap();
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn test_get_exec_trace() {
+    use std::io::Write;
+
+    // Test collecting stack samples across an exec call
+    let mut process = std::process::Command::new("/usr/bin/ruby")
+        .arg("./ci/ruby-programs/ruby_exec.rb")
+        .arg("/usr/bin/ruby")
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    let pid = process.id() as pid_t;
+    let mut getter = initialize(pid).expect("initialize");
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    let trace1 = getter.get_trace();
+
+    assert!(trace1.is_ok(), "initial trace failed: {:?}", trace1.unwrap_err());
+    assert_eq!(trace1.unwrap().pid, Some(pid));
+
+    // Trigger the exec
+    write!(process.stdin.as_mut().unwrap(), "\n").expect("write to exec");
+
+    let allowed_attempts = 20;
+    for _ in 0..allowed_attempts {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        let trace2 = getter.get_trace();
+
+        if getter.reinit_count == 0 {
+            continue
+        }
+
+        assert!(trace2.is_ok(), "post-exec trace failed: {:?}", trace2.unwrap_err());
+        assert_eq!(trace2.unwrap().pid, Some(pid));
+    }
+
+    process.kill().unwrap();
+
+    assert_eq!(getter.reinit_count, 1, "Trace getter should have detected one reinit");
 }
 
 #[test]
