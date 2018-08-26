@@ -15,6 +15,7 @@ extern crate failure_derive;
 extern crate libc;
 #[cfg(target_os = "macos")]
 extern crate libproc;
+#[cfg(unix)]
 extern crate nix;
 extern crate proc_maps;
 #[macro_use]
