@@ -15,8 +15,6 @@ extern crate failure_derive;
 extern crate libc;
 #[cfg(target_os = "macos")]
 extern crate libproc;
-#[cfg(target_os = "macos")]
-extern crate mach;
 extern crate nix;
 extern crate proc_maps;
 #[macro_use]
@@ -25,10 +23,6 @@ extern crate rand;
 #[cfg(test)]
 extern crate rbspy_testdata;
 extern crate read_process_memory;
-#[cfg(target_os = "macos")]
-extern crate regex;
-#[cfg(target_os = "macos")]
-extern crate lazy_static;
 extern crate rbspy_ruby_structs as bindings;
 extern crate serde;
 #[macro_use]
