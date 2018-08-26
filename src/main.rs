@@ -192,8 +192,8 @@ fn check_root_user() -> bool {
     if euid.is_root() {
         return true;
     } else {
-        println!("rbspy only works as root on Mac. Try rerunning with `sudo --preserve-env !!`.");
-        println!(
+        eprintln!("rbspy only works as root on Mac. Try rerunning with `sudo --preserve-env !!`.");
+        eprintln!(
             "If you run `sudo rbspy record ruby your-program.rb`, rbspy will drop privileges when running `ruby your-program.rb`. If you want the Ruby program to run as root, use `rbspy --no-drop-root`."
         );
         return false;
