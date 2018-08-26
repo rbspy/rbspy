@@ -118,10 +118,15 @@ fn do_main() -> Result<(), Error> {
 
     #[cfg(target_os="macos")]
     {
-        match (&args.cmd, check_root_user()) {
-            (&Snapshot{..}, false) => { return Err(format_err!("rbspy snapshot needs to run as root on Mac")) },
-            (&Record{..}, false) => { return Err(format_err!("rbspy record needs to run as root on mac")) },
-            _ => {},
+        let root_cmd = match args.cmd {
+            Snapshot{..} => Some("snapshot"),
+            Record{..} => Some("record"),
+            _ => None,
+        };
+        if let Some(root_cmd) = root_cmd {
+            if !check_root_user() {
+                return Err(format_err!("rbspy {} needs to run as root on Mac", root_cmd))
+            }
         }
     }
 
@@ -181,7 +186,7 @@ fn do_main() -> Result<(), Error> {
     }
 }
 
-#[cfg(unix)]
+#[cfg(target_os="macos")]
 fn check_root_user() -> bool {
     let euid = nix::unistd::Uid::effective();
     if euid.is_root() {
