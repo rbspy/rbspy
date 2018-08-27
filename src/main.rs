@@ -15,8 +15,7 @@ extern crate failure_derive;
 extern crate libc;
 #[cfg(target_os = "macos")]
 extern crate libproc;
-#[cfg(target_os = "macos")]
-extern crate mach;
+#[cfg(unix)]
 extern crate nix;
 extern crate proc_maps;
 #[macro_use]
@@ -25,10 +24,6 @@ extern crate rand;
 #[cfg(test)]
 extern crate rbspy_testdata;
 extern crate read_process_memory;
-#[cfg(target_os = "macos")]
-extern crate regex;
-#[cfg(target_os = "macos")]
-extern crate lazy_static;
 extern crate rbspy_ruby_structs as bindings;
 extern crate serde;
 #[macro_use]
@@ -123,10 +118,15 @@ fn do_main() -> Result<(), Error> {
 
     #[cfg(target_os="macos")]
     {
-        match (&args.cmd, check_root_user()) {
-            (&Snapshot{..}, false) => { return Err(format_err!("rbspy snapshot needs to run as root on Mac")) },
-            (&Record{..}, false) => { return Err(format_err!("rbspy record needs to run as root on mac")) },
-            _ => {},
+        let root_cmd = match args.cmd {
+            Snapshot{..} => Some("snapshot"),
+            Record{..} => Some("record"),
+            _ => None,
+        };
+        if let Some(root_cmd) = root_cmd {
+            if !check_root_user() {
+                return Err(format_err!("rbspy {} needs to run as root on Mac", root_cmd))
+            }
         }
     }
 
@@ -186,14 +186,14 @@ fn do_main() -> Result<(), Error> {
     }
 }
 
-#[cfg(unix)]
+#[cfg(target_os="macos")]
 fn check_root_user() -> bool {
     let euid = nix::unistd::Uid::effective();
     if euid.is_root() {
         return true;
     } else {
-        println!("rbspy only works as root on Mac. Try rerunning with `sudo --preserve-env !!`.");
-        println!(
+        eprintln!("rbspy only works as root on Mac. Try rerunning with `sudo --preserve-env !!`.");
+        eprintln!(
             "If you run `sudo rbspy record ruby your-program.rb`, rbspy will drop privileges when running `ruby your-program.rb`. If you want the Ruby program to run as root, use `rbspy --no-drop-root`."
         );
         return false;
