@@ -682,8 +682,8 @@ fn arg_parser() -> App<'static, 'static> {
         .subcommand(
             SubCommand::with_name("report")
                 .about("Generate visualization from raw data recorded by `rbspy record`")
-                .arg(Arg::from_usage("-i --input=[FILE] 'Input raw data to use'"))
-                .arg(Arg::from_usage("-o --output=[FILE] 'Output file'"))
+                .arg(Arg::from_usage("-i --input=<FILE> 'Input raw data to use'"))
+                .arg(Arg::from_usage("-o --output=<FILE> 'Output file'"))
                 .arg(
                     Arg::from_usage("-f --format=[FORMAT] 'Output format to write'")
                         .possible_values(&OutputFormat::variants())
@@ -935,5 +935,22 @@ mod tests {
                 }
             );
         }
+    }
+
+    #[test]
+    fn test_report_arg_parsing() {
+        let args = Args::from(make_args(
+            "rbspy report --input xyz.raw.gz --output xyz",
+        )).unwrap();
+        assert_eq!(
+            args,
+            Args {
+                cmd: Report {
+                    format: OutputFormat::flamegraph,
+                    input: PathBuf::from("xyz.raw.gz"),
+                    output: PathBuf::from("xyz"),
+                },
+            }
+        );
     }
 }
