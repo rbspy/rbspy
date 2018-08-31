@@ -25,7 +25,7 @@ failure = "0.1.1"
 failure_derive = "0.1.1"
 flate2 = "1"
 libc = "0.2.34"
-proc-maps = "0.1"
+proc-maps = "0.1.4"
 rbspy-ruby-structs = { path = "ruby-structs", version="0.1.0" }
 serde = "1"
 serde_derive = "1"
