@@ -35,6 +35,10 @@ motivation :)
 
 ## Installing
 
+On Mac, you can install with Homebrew: `brew install rbspy`.
+
+On Linux:
+
 1. Download recent release of `rbspy` from [the github releases page](https://github.com/rbspy/rbspy/releases)
 2. Unpack it
 3. Move the `rbspy` binary to `/usr/local/bin`
