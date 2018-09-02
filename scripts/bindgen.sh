@@ -44,3 +44,6 @@ cat /tmp/bindings.rs >> $OUT
 
 # fix up generated bindings so that they compile/work on windows
 perl -pi -e "s/::std::os::raw::c_ulong;/usize;/g" $OUT
+perl -pi -e "s/63u8\) as u64/63u8\) as usize/g" $OUT
+perl -pi -e "s/let val: u64 =/let val: usize =/g" $OUT
+perl -pi -e "s/let num_entries: u64 =/let num_entries: usize =/g" $OUT

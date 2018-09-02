@@ -675,6 +675,10 @@ mod tests {
             ]
     }
 
+    // These tests on core dumps don't work on 32bit platforms (error is
+    // "Not enough memory resources are available to complete this operation.")
+    // disable.
+    #[cfg(target_pointer_width="64")]
     #[test]
     fn test_get_ruby_stack_trace_2_1_6() {
         let current_thread_addr = 0x562658abd7f0;
@@ -684,6 +688,7 @@ mod tests {
         assert_eq!(real_stack_trace_main(), stack_trace.trace);
     }
 
+    #[cfg(target_pointer_width="64")]
     #[test]
     fn test_get_ruby_stack_trace_1_9_3() {
         let current_thread_addr = 0x823930;
@@ -693,6 +698,7 @@ mod tests {
         assert_eq!(real_stack_trace_1_9_3(), stack_trace.trace);
     }
 
+    #[cfg(target_pointer_width="64")]
     #[test]
     fn test_get_ruby_stack_trace_2_5_0() {
         let current_thread_addr = 0x55dd8c3b7758;
@@ -702,6 +708,7 @@ mod tests {
         assert_eq!(real_stack_trace(), stack_trace.trace);
     }
 
+    #[cfg(target_pointer_width="64")]
     #[test]
     fn test_get_ruby_stack_trace_2_4_0() {
         let current_thread_addr = 0x55df44959920;
@@ -711,6 +718,7 @@ mod tests {
         assert_eq!(real_stack_trace(), stack_trace.trace);
     }
 
+    #[cfg(target_pointer_width="64")]
     #[test]
     fn test_get_ruby_stack_trace_2_1_6_2() {
         // this stack is from a ruby program that is just running `select`

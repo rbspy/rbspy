@@ -1282,12 +1282,12 @@ impl st_table {
     }
     #[inline]
     pub fn num_entries(&self) -> st_index_t {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(1usize, 63u8) as u64) }
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(1usize, 63u8) as usize) }
     }
     #[inline]
     pub fn set_num_entries(&mut self, val: st_index_t) {
         unsafe {
-            let val: u64 = ::std::mem::transmute(val);
+            let val: usize = ::std::mem::transmute(val);
             self._bitfield_1.set(1usize, 63u8, val as u64)
         }
     }
@@ -1303,7 +1303,7 @@ impl st_table {
             entries_packed as u64
         });
         __bindgen_bitfield_unit.set(1usize, 63u8, {
-            let num_entries: u64 = unsafe { ::std::mem::transmute(num_entries) };
+            let num_entries: usize = unsafe { ::std::mem::transmute(num_entries) };
             num_entries as u64
         });
         __bindgen_bitfield_unit
