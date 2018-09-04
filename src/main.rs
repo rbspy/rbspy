@@ -31,6 +31,9 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate tempdir;
 extern crate term_size;
+#[cfg(windows)]
+extern crate winapi;
+
 
 use chrono::prelude::*;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
@@ -48,6 +51,8 @@ use std::time::{Instant, Duration};
 #[cfg(unix)]
 use std::os::unix::prelude::*;
 use std::sync::mpsc::{sync_channel, channel, SyncSender, Receiver};
+#[cfg(windows)]
+use winapi::um::timeapi;
 
 pub mod core;
 pub mod ui;
@@ -479,6 +484,17 @@ fn record(
     let mut errors = 0;
 
     let mut sample_time = SampleTime::new(sample_rate);
+    #[cfg(windows)]
+    {
+        // This changes a system-wide setting on Windows so that the OS wakes up every 1ms
+        // instead of the default 15.6ms. This is required to have a sleep call
+        // take less than 15ms, which we need since we usually profile at more than 64hz.
+        // The downside is that this will increase power usage: good discussions are:
+        // https://randomascii.wordpress.com/2013/07/08/windows-timer-resolution-megawatts-wasted/
+        // and http://www.belshe.com/2010/06/04/chrome-cranking-up-the-clock/
+        unsafe { timeapi::timeBeginPeriod(1); }
+    }
+
     while !done.load(Ordering::Relaxed) {
         total += 1;
         let trace = getter.get_trace();
@@ -515,6 +531,11 @@ fn record(
         }
     }
 
+   // reset time period calls
+    #[cfg(windows)]
+    {
+        unsafe { timeapi::timeEndPeriod(1); }
+    }
     Ok(())
 }
 
