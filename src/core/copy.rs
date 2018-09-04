@@ -50,6 +50,10 @@ where
         } else if x.raw_os_error() == Some(60) {
             // On Mac code 60 seems to more or less correspond to "process ended"
             MemoryCopyError::ProcessEnded
+        } else if x.raw_os_error() == Some(299) {
+            // On Windows code 299 seems to only happen when the process ended
+            // (though technically indicates only part of the copy succeeded)
+            MemoryCopyError::ProcessEnded
         } else if x.kind() == std::io::ErrorKind::PermissionDenied {
             MemoryCopyError::PermissionDenied
         } else {
