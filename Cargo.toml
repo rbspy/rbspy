@@ -39,6 +39,9 @@ nix = "0.10.0"
 [target.'cfg(target_os="macos")'.dependencies]
 libproc = "0.3.1"
 
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["timeapi"] }
+
 [dev-dependencies]
 byteorder = "0.5"
 rbspy-testdata = "0.1.2"
