@@ -1,7 +1,6 @@
 # rbspy
 
 <a href="https://travis-ci.org/rbspy/rbspy"><img src="https://travis-ci.org/rbspy/rbspy.svg"></a>
-[![Join the chat at https://gitter.im/rbspy/rbspy](https://badges.gitter.im/rbspy/rbspy.svg)](https://gitter.im/rbspy/rbspy?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 <img src="https://rbspy.github.io/rbspy.jpg" width="128px">
 
@@ -46,7 +45,7 @@ On Linux:
 ## Contributing
 
 Pull requests that improve usability, fix bugs, or help rbspy support more operating systems are
-very welcome. If you have questions about contributing come chat [on gitter](https://gitter.im/rbspy/rbspy) or email rbspy-users@googlegroups.com.
+very welcome. If you have a question, the best way to ask is to create a Github issue!
 
 If you're not a very experienced Rust programmer, you're very welcome to contribute. A major reason
 rbspy is written in Rust is that Rust is more approachable for beginners than C/C++.
