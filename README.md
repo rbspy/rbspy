@@ -4,9 +4,6 @@
 
 <img src="https://rbspy.github.io/rbspy.jpg" width="128px">
 
-**Documentation**: https://rbspy.github.io
-----
-
 Have a running Ruby program that you want to profile without restarting it? Want to profile a Ruby
 command line program really easily? You want `rbspy`! rbspy can profile any Ruby program just by
 running 1 simple command.
@@ -17,6 +14,10 @@ production**.
 
 `rbspy` lets you record profiling data, save the raw profiling data to disk, and then analyze it in
 a variety of different ways later on.
+
+## Documentation
+
+=> https://rbspy.github.io
 
 ## Requirements
 
@@ -42,10 +43,12 @@ On Linux:
 2. Unpack it
 3. Move the `rbspy` binary to `/usr/local/bin`
 
+Or have a look at [Installing rbspy](https://rbspy.github.io/installing/) on our documentation.
+
 ## Contributing
 
 Pull requests that improve usability, fix bugs, or help rbspy support more operating systems are
-very welcome. If you have a question, the best way to ask is to create a Github issue!
+very welcome. If you have a question, the best way to ask is to [create a Github issue](https://github.com/rbspy/rbspy/issues/new)!
 
 If you're not a very experienced Rust programmer, you're very welcome to contribute. A major reason
 rbspy is written in Rust is that Rust is more approachable for beginners than C/C++.
