@@ -437,7 +437,7 @@ fn parallel_record(
 
         // Print a summary every second
         if std::time::Instant::now() > summary_time {
-            print_summary(&summary_out, &start_time, timing_error_traces.load(Ordering::Relaxed), total_traces.load(Ordering::Relaxed))?;
+            print_summary(&summary_out, &start_time, sample_rate, timing_error_traces.load(Ordering::Relaxed), total_traces.load(Ordering::Relaxed))?;
             summary_time = std::time::Instant::now() + Duration::from_secs(1);
         }
     }
@@ -550,7 +550,7 @@ fn report(format: OutputFormat, input: PathBuf, output: PathBuf) -> Result<(), E
     Ok(())
 }
 
-fn print_summary(summary_out: &ui::summary::Stats, start_time: &Instant, timing_error_traces: usize, total_traces: usize) -> Result<(), Error> {
+fn print_summary(summary_out: &ui::summary::Stats, start_time: &Instant, sample_rate: u32, timing_error_traces: usize, total_traces: usize) -> Result<(), Error> {
     let width = match term_size::dimensions() {
         Some((w, _)) => Some(w as usize),
         None => None,
@@ -565,7 +565,7 @@ fn print_summary(summary_out: &ui::summary::Stats, start_time: &Instant, timing_
     if total_traces > 100 && percent_timing_error > 0.5 {
         // Only print if timing errors are more than 0.5% of total traces -- it's a statistical
         // profiler so smaller differences don't really matter
-        eprintln!("{:.1}% ({}/{}) of stack traces were sampled late because we couldn't sample at expected rate, results may be inaccurate. Try sampling at a lower rate with `--rate`.", percent_timing_error, timing_error_traces, total_traces);
+        eprintln!("{:.1}% ({}/{}) of stack traces were sampled late because we couldn't sample at expected rate, results may be inaccurate. Current rate: {}. Try sampling at a lower rate with `--rate`.", percent_timing_error, timing_error_traces, total_traces, sample_rate);
     }
     Ok(())
 }
