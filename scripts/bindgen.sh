@@ -30,7 +30,7 @@ bindgen /tmp/wrapper.h \
     --whitelist-type VALUE \
     -- \
     -I/tmp/headers/$1/include \
-    -I/home/bork/scratch/ruby-header-files/general -I/tmp/headers/$1/ \
+    -I/home/bork/monorepo/ruby-header-files -I/tmp/headers/$1/ \
     -I/usr/lib/llvm-3.8/lib/clang/3.8.0/include/
 
 #rustfmt --force src/bindings/ruby_${1}.rs
