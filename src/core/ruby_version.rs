@@ -554,6 +554,7 @@ ruby_version_v_2_3_to_2_4!(ruby_2_3_4);
 ruby_version_v_2_3_to_2_4!(ruby_2_3_5);
 ruby_version_v_2_3_to_2_4!(ruby_2_3_6);
 ruby_version_v_2_3_to_2_4!(ruby_2_3_7);
+ruby_version_v_2_3_to_2_4!(ruby_2_3_8);
 ruby_version_v_2_3_to_2_4!(ruby_2_4_0);
 ruby_version_v_2_3_to_2_4!(ruby_2_4_1);
 ruby_version_v_2_3_to_2_4!(ruby_2_4_2);
