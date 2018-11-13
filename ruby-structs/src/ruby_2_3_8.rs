@@ -87,7 +87,7 @@ pub type clockid_t = __clockid_t;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct __sigset_t {
-    pub __val: [::std::os::raw::c_ulong; 16usize],
+    pub __val: [usize; 16usize],
 }
 #[test]
 fn bindgen_test_layout___sigset_t() {
@@ -112,7 +112,7 @@ fn bindgen_test_layout___sigset_t() {
         )
     );
 }
-pub type pthread_t = ::std::os::raw::c_ulong;
+pub type pthread_t = usize;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct __pthread_internal_list {
@@ -522,8 +522,8 @@ impl ::std::fmt::Debug for pthread_cond_t {
         write!(f, "pthread_cond_t {{ union }}")
     }
 }
-pub type VALUE = ::std::os::raw::c_ulong;
-pub type ID = ::std::os::raw::c_ulong;
+pub type VALUE = usize;
+pub type ID = usize;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct RBasic {
@@ -1005,7 +1005,7 @@ impl ::std::fmt::Debug for RArray {
         )
     }
 }
-pub type st_data_t = ::std::os::raw::c_ulong;
+pub type st_data_t = usize;
 pub type st_index_t = st_data_t;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -1263,12 +1263,12 @@ impl st_table {
     }
     #[inline]
     pub fn num_entries(&self) -> st_index_t {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(1usize, 63u8) as u64) }
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(1usize, 63u8) as usize) }
     }
     #[inline]
     pub fn set_num_entries(&mut self, val: st_index_t) {
         unsafe {
-            let val: u64 = ::std::mem::transmute(val);
+            let val: usize = ::std::mem::transmute(val);
             self._bitfield_1.set(1usize, 63u8, val as u64)
         }
     }
@@ -1284,7 +1284,7 @@ impl st_table {
             entries_packed as u64
         });
         __bindgen_bitfield_unit.set(1usize, 63u8, {
-            let num_entries: u64 = unsafe { ::std::mem::transmute(num_entries) };
+            let num_entries: usize = unsafe { ::std::mem::transmute(num_entries) };
             num_entries as u64
         });
         __bindgen_bitfield_unit
