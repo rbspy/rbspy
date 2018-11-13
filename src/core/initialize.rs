@@ -241,6 +241,7 @@ where
         "2.3.5" => ruby_version::ruby_2_3_5::is_maybe_thread,
         "2.3.6" => ruby_version::ruby_2_3_6::is_maybe_thread,
         "2.3.7" => ruby_version::ruby_2_3_7::is_maybe_thread,
+        "2.3.8" => ruby_version::ruby_2_3_8::is_maybe_thread,
         "2.4.0" => ruby_version::ruby_2_4_0::is_maybe_thread,
         "2.4.1" => ruby_version::ruby_2_4_1::is_maybe_thread,
         "2.4.2" => ruby_version::ruby_2_4_2::is_maybe_thread,
@@ -249,6 +250,7 @@ where
         "2.4.5" => ruby_version::ruby_2_4_5::is_maybe_thread,
         "2.5.0" => ruby_version::ruby_2_5_0::is_maybe_thread,
         "2.5.1" => ruby_version::ruby_2_5_1::is_maybe_thread,
+        "2.5.3" => ruby_version::ruby_2_5_3::is_maybe_thread,
         _ => panic!("Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!", version),
     };
     Box::new(function)
