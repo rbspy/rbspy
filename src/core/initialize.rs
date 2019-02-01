@@ -1,7 +1,6 @@
 use core::address_finder::*;
 use core::address_finder;
 use core::copy::*;
-use core::copy;
 use proc_maps::MapRange;
 use core::ruby_version;
 use core::types::{StackTrace, Process, pid_t};
@@ -27,7 +26,7 @@ use std;
  *   * Find the right stack trace function for the Ruby version we found
  *   * Package all that up into a struct that the user can use to get stack traces.
  */
-pub fn initialize(pid: pid_t) -> Result<StackTraceGetter<ProcessHandle>, Error> {
+pub fn initialize(pid: pid_t) -> Result<StackTraceGetter, Error> {
     let (current_thread_addr_location, stack_trace_function) = get_process_ruby_state(pid)?;
 
     Ok(StackTraceGetter {
@@ -39,15 +38,14 @@ pub fn initialize(pid: pid_t) -> Result<StackTraceGetter<ProcessHandle>, Error> 
 }
 
 // Use a StackTraceGetter to get stack traces
-pub struct StackTraceGetter<T> where T: CopyAddress {
-    process: Process<T>,
+pub struct StackTraceGetter {
+    process: Process<ProcessHandle>,
     current_thread_addr_location: usize,
-    stack_trace_function:
-        Box<Fn(usize, &Process<T>) -> Result<StackTrace, MemoryCopyError>>,
+    stack_trace_function: StackTraceFn<ProcessHandle>,
     reinit_count: u32,
 }
 
-impl StackTraceGetter<ProcessHandle> {
+impl StackTraceGetter {
     pub fn get_trace(&mut self) -> Result<StackTrace, Error> {
         match self.get_trace_from_current_thread() {
             Ok(trace) => return Ok(trace),
@@ -82,15 +80,9 @@ impl StackTraceGetter<ProcessHandle> {
 
 // Everything below here is private
 
-fn get_process_ruby_state(
-    pid: pid_t,
-) -> Result<
-    (
-        usize,
-        Box<Fn(usize, &Process<ProcessHandle>) -> Result<StackTrace, MemoryCopyError>>,
-    ),
-    Error,
-> {
+type StackTraceFn<T = ProcessHandle> = Box<Fn(usize, &Process<T>) -> Result<StackTrace, MemoryCopyError>>;
+
+fn get_process_ruby_state(pid: pid_t) -> Result<(usize, StackTraceFn), Error> {
     let version = get_ruby_version_retry(pid).context("Couldn't determine Ruby version")?;
     let is_maybe_thread = is_maybe_thread_function(&version);
 
@@ -341,12 +333,7 @@ where
     Box::new(function)
 }
 
-fn get_stack_trace_function<T: 'static>(
-    version: &str,
-) -> Box<Fn(usize, &Process<T>) -> Result<StackTrace, copy::MemoryCopyError>>
-where
-    T: CopyAddress,
-{
+fn get_stack_trace_function<T: 'static>(version: &str) -> StackTraceFn<T> where T: CopyAddress {
     let stack_trace_function = match version {
         "1.9.1" => ruby_version::ruby_1_9_1_0::get_stack_trace,
         "1.9.2" => ruby_version::ruby_1_9_2_0::get_stack_trace,
