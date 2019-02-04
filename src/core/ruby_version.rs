@@ -24,6 +24,7 @@ macro_rules! ruby_version_v_1_9_1(
             get_lineno_1_9_0!();
             get_stack_frame_1_9_1!();
             stack_field_1_9_0!();
+            get_thread_id_1_9_0!();
         }
         ));
 
@@ -45,6 +46,7 @@ macro_rules! ruby_version_v_1_9_2_to_3(
             get_lineno_1_9_0!();
             get_stack_frame_1_9_2!();
             stack_field_1_9_0!();
+            get_thread_id_1_9_0!();
         }
         ));
 
@@ -77,6 +79,7 @@ macro_rules! ruby_version_v_2_0_to_2_2(
             get_lineno_2_0_0!();
             get_stack_frame_2_0_0!();
             stack_field_1_9_0!();
+            get_thread_id_1_9_0!();
         }
 ));
 
@@ -96,6 +99,7 @@ macro_rules! ruby_version_v_2_3_to_2_4(
             get_lineno_2_3_0!();
             get_stack_frame_2_3_0!();
             stack_field_1_9_0!();
+            get_thread_id_1_9_0!();
         }
         ));
 
@@ -116,6 +120,7 @@ macro_rules! ruby_version_v2_5_x(
             get_stack_frame_2_5_0!();
             stack_field_2_5_0!();
             get_ruby_string_array_2_5_0!();
+            get_thread_id_2_5_0!();
         }
         ));
 
@@ -134,7 +139,11 @@ macro_rules! get_stack_trace(
                 copy_struct(ruby_current_thread_address_location, source)?;
             let thread: $thread_type = copy_struct(current_thread_addr, source)?;
             if stack_field(&thread) as usize == 0 {
-                return Ok(StackTrace{pid: process.pid, trace: vec!(StackFrame::unknown_c_function())});
+                return Ok(StackTrace {
+                    pid: process.pid,
+                    trace: vec!(StackFrame::unknown_c_function()),
+                    thread_id: Some(get_thread_id(&thread, source)?)
+                });
             }
             let mut trace = Vec::new();
             let cfps = get_cfps(thread.cfp as usize, stack_base(&thread) as usize, source)?;
@@ -173,7 +182,7 @@ macro_rules! get_stack_trace(
                     }
                 }
             }
-            Ok(StackTrace{trace, pid: process.pid})
+            Ok(StackTrace{trace, pid: process.pid, thread_id: Some(get_thread_id(&thread, source)?)})
         }
 
 use proc_maps::{maps_contain_addr, MapRange};
@@ -233,6 +242,25 @@ macro_rules! stack_field_2_5_0(
         fn stack_size_field(thread: &rb_execution_context_struct) -> i64 {
             thread.vm_stack_size as i64
         }
+        ));
+
+macro_rules! get_thread_id_1_9_0(
+    () => (
+
+        fn get_thread_id<T: CopyAddress>(thread_struct: &rb_thread_struct, _source: &T) -> Result<usize, MemoryCopyError> {
+            Ok(thread_struct.thread_id as usize)
+        }
+
+        ));
+
+macro_rules! get_thread_id_2_5_0(
+    () => (
+
+        fn get_thread_id<T: CopyAddress>(thread_struct: &rb_execution_context_struct, source: &T) -> Result<usize, MemoryCopyError> {
+            let thread: rb_thread_struct = copy_struct(thread_struct.thread_ptr as usize, source)?;
+            Ok(thread.thread_id as usize)
+        }
+
         ));
 
 macro_rules! get_ruby_string_array_2_5_0(
