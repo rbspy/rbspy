@@ -24,6 +24,7 @@ pub struct StackFrame {
 pub struct StackTrace {
     pub trace: Vec<StackFrame>,
     pub pid: Option<pid_t>,
+    pub thread_id: Option<usize>,
 }
 
 pub struct Process<T> where T: CopyAddress {
