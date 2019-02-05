@@ -40,7 +40,7 @@ run_docker_tests() {
 
 main() {
     run_test_suite
-    run_docker_tests
+    #run_docker_tests
 }
 
 main
