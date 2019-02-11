@@ -101,7 +101,8 @@ enum SubCmd {
         maybe_duration: Option<std::time::Duration>,
         format: OutputFormat,
         no_drop_root: bool,
-        with_subprocesses: bool
+        with_subprocesses: bool,
+        silent: bool
     },
     /// Capture and print a stacktrace snapshot of process `pid`.
     Snapshot { pid: pid_t },
@@ -146,6 +147,7 @@ fn do_main() -> Result<(), Error> {
             format,
             no_drop_root,
             with_subprocesses,
+            silent,
         } => {
             let pid = match target {
                 Pid { pid } => pid,
@@ -183,6 +185,7 @@ fn do_main() -> Result<(), Error> {
                 &out_path,
                 pid,
                 with_subprocesses,
+                silent,
                 sample_rate,
                 maybe_duration,
             )
@@ -410,6 +413,7 @@ fn parallel_record(
     out_path: &PathBuf,
     pid: pid_t,
     with_subprocesses: bool,
+    silent: bool,
     sample_rate: u32,
     maybe_duration: Option<std::time::Duration>,
 ) -> Result<(), Error> {
@@ -435,10 +439,12 @@ fn parallel_record(
         summary_out.add_function_name(&trace.trace);
         raw_store.write(&trace)?;
 
-        // Print a summary every second
-        if std::time::Instant::now() > summary_time {
-            print_summary(&summary_out, &start_time, sample_rate, timing_error_traces.load(Ordering::Relaxed), total_traces.load(Ordering::Relaxed))?;
-            summary_time = std::time::Instant::now() + Duration::from_secs(1);
+        if !silent {
+            // Print a summary every second
+            if std::time::Instant::now() > summary_time {
+                print_summary(&summary_out, &start_time, sample_rate, timing_error_traces.load(Ordering::Relaxed), total_traces.load(Ordering::Relaxed))?;
+                summary_time = std::time::Instant::now() + Duration::from_secs(1);
+            }
         }
     }
 
@@ -698,6 +704,10 @@ fn arg_parser() -> App<'static, 'static> {
                         .required(false)
                         .hidden(cfg!(target_os = "windows"))
                 )
+                .arg(
+                    Arg::from_usage( "--silent='Don't print the summary profiling data every second'")
+                        .required(false)
+                )
                 .arg(Arg::from_usage("<cmd>... 'command to run'").required(false)),
         )
         .subcommand(
@@ -754,6 +764,7 @@ impl Args {
                 };
 
                 let no_drop_root = submatches.occurrences_of("no-drop-root") == 1;
+                let silent = submatches.is_present("silent");
                 let with_subprocesses = submatches.is_present("subprocesses");
                 if with_subprocesses && cfg!(target_os = "windows") {
                     return Err(format_err!("--subprocesses option is not available on windows"));
@@ -780,6 +791,7 @@ impl Args {
                     format,
                     no_drop_root,
                     with_subprocesses,
+                    silent,
                 }
             }
             ("report", Some(submatches)) => Report {
@@ -855,6 +867,7 @@ mod tests {
                     format: OutputFormat::flamegraph,
                     no_drop_root: false,
                     with_subprocesses: false,
+                    silent: false,
                 },
             }
         );
@@ -874,6 +887,7 @@ mod tests {
                     format: OutputFormat::flamegraph,
                     no_drop_root: false,
                     with_subprocesses: false,
+                    silent: false,
                 },
             }
         );
@@ -893,6 +907,7 @@ mod tests {
                     format: OutputFormat::flamegraph,
                     no_drop_root: false,
                     with_subprocesses: false,
+                    silent: false,
                 },
             }
         );
@@ -912,6 +927,7 @@ mod tests {
                     format: OutputFormat::callgrind,
                     no_drop_root: false,
                     with_subprocesses: false,
+                    silent: false,
                 },
             }
         );
@@ -931,6 +947,7 @@ mod tests {
                     format: OutputFormat::flamegraph,
                     no_drop_root: true,
                     with_subprocesses: false,
+                    silent: false,
                 },
             }
         );
@@ -952,6 +969,7 @@ mod tests {
                         format: OutputFormat::flamegraph,
                         no_drop_root: false,
                         with_subprocesses: true,
+                        silent: false,
                     },
                 }
             );
