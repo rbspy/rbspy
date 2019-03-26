@@ -8,6 +8,8 @@ if [ ! -d "$ruby_src_dir" ]; then
    exit 1
 fi
 
+ruby_header_dir="$(ruby -rrbconfig -e 'puts RbConfig::CONFIG["rubyarchhdrdir"]')"
+
 echo "#include </tmp/headers/$1/vm_core.h>" > /tmp/wrapper.h
 echo "#include </tmp/headers/$1/iseq.h>" >> /tmp/wrapper.h
 rm -rf /tmp/headers/$1
@@ -41,7 +43,8 @@ bindgen /tmp/wrapper.h \
     -- \
     -I/tmp/headers/$1/include \
     -I/home/bork/monorepo/ruby-header-files -I/tmp/headers/$1/ \
-    -I/usr/lib/llvm-3.8/lib/clang/3.8.0/include/
+    -I/usr/lib/llvm-3.8/lib/clang/3.8.0/include/ \
+    "-I$ruby_header_dir"
 
 #rustfmt --force src/bindings/ruby_${1}.rs
 
