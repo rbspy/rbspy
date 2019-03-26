@@ -24,7 +24,7 @@ cp "$ruby_src_dir"/*.h /tmp/headers/$1
 OUT=ruby-structs/src/ruby_${1}.rs
 bindgen /tmp/wrapper.h \
     -o /tmp/bindings.rs \
-    --impl-debug true \
+    --impl-debug \
     --no-doc-comments \
     --whitelist-type rb_iseq_constant_body \
     --whitelist-type rb_iseq_location_struct \
