@@ -42,3 +42,6 @@ pub mod ruby_2_4_5;
 pub mod ruby_2_5_0;
 pub mod ruby_2_5_1;
 pub mod ruby_2_5_3;
+pub mod ruby_2_5_4;
+pub mod ruby_2_5_5;
+
