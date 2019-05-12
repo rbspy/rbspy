@@ -592,6 +592,8 @@ ruby_version_v_2_3_to_2_4!(ruby_2_4_5);
 ruby_version_v2_5_x!(ruby_2_5_0);
 ruby_version_v2_5_x!(ruby_2_5_1);
 ruby_version_v2_5_x!(ruby_2_5_3);
+ruby_version_v2_5_x!(ruby_2_5_4);
+ruby_version_v2_5_x!(ruby_2_5_5);
 
 #[cfg(test)]
 mod tests {
