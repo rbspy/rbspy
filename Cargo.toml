@@ -17,12 +17,12 @@ chrono = "0.4"
 clap = "2"
 ctrlc = "3.1.0"
 elf = "0.0.10"
-log = "0.3.6"
-env_logger = "0.3.4"
-rand = "0.4"
+log = "0.4.6"
+env_logger = "0.6.1"
+rand = "0.6"
 read-process-memory = "0.1.0"
-failure = "0.1.1"
-failure_derive = "0.1.1"
+failure = "0.1.5"
+failure_derive = "0.1.5"
 flate2 = "1"
 libc = "0.2.34"
 proc-maps = "0.1.4"
@@ -34,18 +34,18 @@ term_size = "0.3"
 tempdir = "0.3"
 
 [target.'cfg(unix)'.dependencies]
-nix = "0.10.0"
+nix = "0.13.0"
 
 [target.'cfg(target_os="macos")'.dependencies]
-libproc = "0.3.1"
+libproc = "0.4.0"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["timeapi"] }
 
 [dev-dependencies]
-byteorder = "0.5"
+byteorder = "1.3.1"
 rbspy-testdata = "0.1.2"
 tempdir = "0.3.4"
 
 [build-dependencies]
-rustc_version = "0.1.7"
+rustc_version = "0.2.3"
