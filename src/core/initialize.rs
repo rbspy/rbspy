@@ -98,15 +98,13 @@ fn get_ruby_version_retry(pid: pid_t) -> Result<String, Error> {
                     }
                     _ => {}
                 }
-                match err.root_cause().downcast_ref::<MemoryCopyError>() {
-                    Some(&MemoryCopyError::PermissionDenied) => {
+                if let Some(&MemoryCopyError::PermissionDenied) =
+                    err.root_cause().downcast_ref::<MemoryCopyError>() {
                         return Err(err.into());
-                    }
-                    _ => {}
                 }
             }
             Ok(x) => {
-                return Ok(x.into());
+                return Ok(x);
             }
         }
         // if it doesn't work, sleep for 1ms and try again
@@ -206,7 +204,7 @@ fn is_maybe_thread_function<T: 'static>(
 where
     T: CopyAddress,
 {
-    let function = match version.as_ref() {
+    let function = match version {
         "1.9.1" => ruby_version::ruby_1_9_1_0::is_maybe_thread,
         "1.9.2" => ruby_version::ruby_1_9_2_0::is_maybe_thread,
         "1.9.3" => ruby_version::ruby_1_9_3_0::is_maybe_thread,

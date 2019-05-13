@@ -26,11 +26,10 @@ fn get_descendents(
                 return Ok(result);
             }
             Some(current_pid) => {
-                match parents_to_children.get(&current_pid) {
-                    Some(children) => for child in children {
+                if let Some(children) = parents_to_children.get(&current_pid) {
+                    for child in children {
                         queue.push(*child);
-                    },
-                    None => (),
+                    }
                 }
                 result.push(current_pid);
             }
@@ -42,9 +41,9 @@ fn map_parents_to_children() -> Result<HashMap<pid_t, Vec<pid_t>>, Error> {
     let mut pid_map: HashMap<pid_t, Vec<pid_t>> = HashMap::new();
 
     for (pid, ppid) in get_proc_children()? {
-        pid_map.entry(ppid).or_insert(vec![]).push(pid);
+        pid_map.entry(ppid).or_insert_with(|| vec![]).push(pid);
     }
-    return Ok(pid_map);
+    Ok(pid_map)
 }
 
 #[test]
@@ -66,10 +65,10 @@ fn test_get_descendents_depth_2() {
 
 // parses /proc/<pid>/status format
 fn status_file_ppid(status: &str) -> Result<pid_t, Error> {
-    let ppid_line = status.split("\n").find(|x| x.starts_with("PPid:"));
+    let ppid_line = status.split('\n').find(|x| x.starts_with("PPid:"));
     match ppid_line {
         Some(line) => {
-            let parts: Vec<&str> = line.split("\t").collect();
+            let parts: Vec<&str> = line.split('\t').collect();
             Ok(parts[1].parse::<pid_t>()?)
         }
         None => Err(format_err!("PPid: line not found in {}", status)),

@@ -193,7 +193,7 @@ fn could_be_thread(thread: &$thread_type, all_maps: &Vec<MapRange>) -> bool {
     maps_contain_addr(thread.tag as usize, all_maps) &&
         maps_contain_addr(thread.cfp as usize, all_maps) &&
         maps_contain_addr(stack_field(thread) as usize, all_maps) &&
-        stack_size_field(thread) < 3000000
+        stack_size_field(thread) < 3_000_000
 }
 
 fn stack_base(thread: &$thread_type) -> i64 {

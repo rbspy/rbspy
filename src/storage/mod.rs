@@ -35,7 +35,7 @@ impl Store {
     pub fn new(out_path: &Path) -> Result<Store, io::Error> {
         let file = File::create(out_path)?;
         let mut encoder = flate2::write::GzEncoder::new(file, Compression::default());
-        encoder.write("rbspy01\n".as_bytes())?;
+        encoder.write_all("rbspy01\n".as_bytes())?;
         Ok(Store { encoder })
     }
 
@@ -119,7 +119,7 @@ pub(crate) fn from_reader<R: Read>(r: R) -> Result<v1::Data, Error> {
         }
         Version(1) => {
             let intermediate = v1::Data::from_reader(reader)?;
-            Ok(intermediate.into())
+            Ok(intermediate)
         }
         v => Err(StorageError::UnknownVersion(v).into()),
     }
