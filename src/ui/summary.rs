@@ -40,8 +40,8 @@ impl Stats {
     }
 
     // Aggregate by function name
-    pub fn add_function_name(&mut self, stack: &Vec<StackFrame>) {
-        if stack.len() == 0 {
+    pub fn add_function_name(&mut self, stack: &[StackFrame]) {
+        if stack.is_empty() {
             return;
         }
         self.total_traces += 1;
@@ -56,8 +56,8 @@ impl Stats {
     }
 
     // Aggregate by function name + line number
-    pub fn add_lineno(&mut self, stack: &Vec<StackFrame>) {
-        if stack.len() == 0 {
+    pub fn add_lineno(&mut self, stack: &[StackFrame]) {
+        if stack.is_empty() {
             return;
         }
         self.total_traces += 1;
@@ -85,7 +85,7 @@ impl Stats {
         let counts = sorted.iter().rev().take(top);
         writeln!(w, "{}", Stats::HEADER)?;
         for &(self_, total, name) in counts {
-            writeln!(w, "{:>6.2} {:>8.2}  {:.*}", 100.0 * (self_ as f64) / (self.total_traces as f64), 100.0 * (total as f64) / (self.total_traces as f64), truncate - 14 - 3, name)?;
+            writeln!(w, "{:>6.2} {:>8.2}  {:.*}", 100.0 * (self_ as f64) / f64::from(self.total_traces), 100.0 * (total as f64) / f64::from(self.total_traces), truncate - 14 - 3, name)?;
         }
         Ok(())
     }

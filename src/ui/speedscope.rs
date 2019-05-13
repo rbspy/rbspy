@@ -98,7 +98,7 @@ enum ValueUnit {
 
 impl SpeedscopeFile {
   pub fn new(samples: HashMap<Option<pid_t>, Vec<Vec<usize>>>, frames: Vec<Frame>) -> SpeedscopeFile {
-    let end_value = samples.len().clone();
+    let end_value = samples.len();
 
     SpeedscopeFile {
       // This is always the same
@@ -111,9 +111,9 @@ impl SpeedscopeFile {
       exporter: Some(format!("rbspy@{}", env!("CARGO_PKG_VERSION"))),
 
       profiles: samples.iter().map(|(option_pid, samples)| {
-        let weights: Vec<f64> = (&samples).into_iter().map(|_s| 1 as f64).collect();
+        let weights: Vec<f64> = (&samples).iter().map(|_s| 1_f64).collect();
 
-        return Profile {
+        Profile {
             profile_type: ProfileType::Sampled,
 
             name: option_pid.map_or("rbspy profile".to_string(), |pid| format!("rbspy profile - pid {}", pid)),
@@ -124,12 +124,12 @@ impl SpeedscopeFile {
             end_value: end_value as f64,
 
             samples: samples.clone(),
-            weights: weights
+            weights
         }
       }).collect(),
 
       shared: Shared {
-          frames: frames
+          frames
       }
     }
   }
@@ -164,15 +164,15 @@ impl Stats {
     pub fn record(&mut self, stack: &StackTrace) -> Result<(), io::Error> {
         let mut frame_indices: Vec<usize> = stack.trace.iter().map(|frame| {
             let frames = &mut self.frames;
-            self.frame_to_index.entry(frame.clone()).or_insert_with(|| {
+            *self.frame_to_index.entry(frame.clone()).or_insert_with(|| {
                 let len = frames.len();
                 frames.push(Frame::new(&frame));
                 len
-            }).clone()
+            })
         }).collect();
         frame_indices.reverse();
 
-        self.samples.entry(stack.pid.clone()).or_insert_with(|| {
+        self.samples.entry(stack.pid).or_insert_with(|| {
             vec![]
         }).push(frame_indices);
         Ok(())

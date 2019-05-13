@@ -209,16 +209,13 @@ fn check_root_user() -> bool {
 }
 
 fn main() {
-    match do_main() {
-        Err(x) => {
-            eprintln!("Error. Causes: ");
-            for c in x.causes() {
-                eprintln!("- {}", c);
-            }
-            eprintln!("{}", x.backtrace());
-            std::process::exit(1);
+    if let Err(x) = do_main() {
+        eprintln!("Error. Causes: ");
+        for c in x.iter_chain() {
+            eprintln!("- {}", c);
         }
-        _ => {}
+        eprintln!("{}", x.backtrace());
+        std::process::exit(1);
     }
 }
 
@@ -243,12 +240,12 @@ impl OutputFormat {
     }
 
     fn extension(&self) -> String {
-        match self {
-            &OutputFormat::flamegraph => "flamegraph.svg",
-            &OutputFormat::callgrind => "callgrind.txt",
-            &OutputFormat::speedscope => "speedscope.json",
-            &OutputFormat::summary => "summary.txt",
-            &OutputFormat::summary_by_line => "summary_by_line.txt",
+        match *self {
+            OutputFormat::flamegraph => "flamegraph.svg",
+            OutputFormat::callgrind => "callgrind.txt",
+            OutputFormat::speedscope => "speedscope.json",
+            OutputFormat::summary => "summary.txt",
+            OutputFormat::summary_by_line => "summary_by_line.txt",
         }.to_string()
     }
 }
@@ -268,7 +265,7 @@ impl SampleTime {
     pub fn new(rate: u32) -> SampleTime {
         SampleTime{
             start_time: Instant::now(),
-            nanos_between_samples: BILLION / (rate as u64),
+            nanos_between_samples: BILLION / u64::from(rate),
             num_samples: 0,
         }
     }
@@ -278,7 +275,7 @@ impl SampleTime {
         // how far we're behind if we're behind the expected next sample time
         self.num_samples += 1;
         let elapsed = self.start_time.elapsed();
-        let nanos_elapsed = elapsed.as_secs() * BILLION + elapsed.subsec_nanos() as u64;
+        let nanos_elapsed = elapsed.as_secs() * BILLION + u64::from(elapsed.subsec_nanos());
         let target_elapsed = self.num_samples * self.nanos_between_samples;
         if target_elapsed < nanos_elapsed {
             Err((nanos_elapsed - target_elapsed) as u32)
@@ -462,7 +459,7 @@ fn parallel_record(
     let mut num_ok = 0;
     let mut last_result = Ok(());
     for result in result_receiver.iter() {
-        if let Ok(_) = result {
+        if result.is_ok() {
             num_ok += 1;
         }
         last_result = result;
