@@ -124,6 +124,27 @@ macro_rules! ruby_version_v2_5_x(
         }
         ));
 
+macro_rules! ruby_version_v2_6_x(
+    ($ruby_version:ident) => (
+       pub mod $ruby_version {
+            use std;
+            use core::copy::*;
+            use core::copy::MemoryCopyError;
+            use bindings::$ruby_version::*;
+            use read_process_memory::CopyAddress;
+
+            get_stack_trace!(rb_execution_context_struct);
+            get_ruby_string!();
+            get_cfps!();
+            get_pos!(rb_iseq_constant_body);
+            get_lineno_2_6_0!();
+            get_stack_frame_2_5_0!();
+            stack_field_2_5_0!();
+            get_ruby_string_array_2_5_0!();
+            get_thread_id_2_5_0!();
+        }
+        ));
+
 macro_rules! get_stack_trace(
     ($thread_type:ident) => (
 
@@ -476,6 +497,35 @@ macro_rules! get_lineno_2_5_0(
         }
 ));
 
+macro_rules! get_lineno_2_6_0(
+    () => (
+        fn get_lineno<T>(
+            iseq_struct: &rb_iseq_constant_body,
+            cfp: &rb_control_frame_t,
+            source: &T,
+            ) -> Result<u32, MemoryCopyError> where T: CopyAddress{
+            let pos = get_pos(iseq_struct, cfp)?;
+            let t_size = iseq_struct.insns_info.size as usize;
+            if t_size == 0 {
+                Ok(0) //TODO: really?
+            } else if t_size == 1 {
+                let table: [iseq_insn_info_entry; 1] = copy_struct(iseq_struct.insns_info.body as usize, source)?;
+                Ok(table[0].line_no as u32)
+            } else {
+                let table: Vec<iseq_insn_info_entry> = copy_vec(iseq_struct.insns_info.body as usize, t_size as usize, source)?;
+                let positions: Vec<usize> = copy_vec(iseq_struct.insns_info.positions as usize, t_size as usize, source)?;
+                for i in 0..t_size {
+                    if pos == positions[i] as usize {
+                        return Ok(table[i].line_no as u32)
+                    } else if positions[i] as usize > pos {
+                        return Ok(table[i-1].line_no as u32)
+                    }
+                }
+                Ok(table[t_size-1].line_no as u32)
+            }
+        }
+));
+
 macro_rules! get_stack_frame_2_0_0(
     () => (
         fn get_stack_frame<T>(
@@ -594,6 +644,10 @@ ruby_version_v2_5_x!(ruby_2_5_1);
 ruby_version_v2_5_x!(ruby_2_5_3);
 ruby_version_v2_5_x!(ruby_2_5_4);
 ruby_version_v2_5_x!(ruby_2_5_5);
+ruby_version_v2_6_x!(ruby_2_6_0);
+ruby_version_v2_6_x!(ruby_2_6_1);
+ruby_version_v2_6_x!(ruby_2_6_2);
+ruby_version_v2_6_x!(ruby_2_6_3);
 
 #[cfg(test)]
 mod tests {
