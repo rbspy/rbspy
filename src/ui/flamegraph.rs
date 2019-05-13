@@ -8,9 +8,8 @@ use std::process::{Command, Stdio};
 use core::types::StackFrame;
 
 use failure::{Error, ResultExt};
+use inferno::flamegraph::{Direction, Options};
 use tempdir;
-
-const FLAMEGRAPH_SCRIPT: &'static [u8] = include_bytes!("../../vendor/flamegraph/flamegraph.pl");
 
 pub struct Stats {
     pub counts: HashMap<Vec<u8>, usize>,
@@ -39,10 +38,18 @@ impl Stats {
         let stacks_file = tempdir.path().join("stacks.txt");
         let mut file = File::create(&stacks_file).expect("couldn't create file");
         for (k, v) in self.counts.iter() {
-            file.write(&k)?;
+            file.write_all(&k)?;
             writeln!(file, " {}", v)?;
         }
-        write_flamegraph(stacks_file, w)
+
+        let mut opts =  Options {
+            direction: Direction::Inverted,
+            min_width: 2_f64,
+            ..Default::default()
+        };
+
+        inferno::flamegraph::from_files(&mut opts, &[stacks_file], w).unwrap();
+        Ok(())
     }
 }
 
@@ -99,23 +106,4 @@ fn test_write_flamegraph() {
     let target = File::create(tempdir.path().join("graph.svg")).expect("couldn't create file");
     write_flamegraph(stacks_file, target).expect("Couldn't write flamegraph");
     tempdir.close().unwrap();
-}
-
-fn write_flamegraph<P: AsRef<Path>>(source: P, target: File) -> Result<(), Error> {
-    let mut child = Command::new("perl")
-        .arg("-")
-        .arg("--inverted") // icicle graphs are easier to read
-        .arg("--minwidth").arg("2") // min width 2 pixels saves on disk space
-        .arg(source.as_ref())
-        .stdin(Stdio::piped()) // pipe in the flamegraph.pl script to stdin
-        .stdout(target)
-        .spawn()
-        .context("Couldn't execute perl")?;
-    // TODO(nll): Remove this silliness after non-lexical lifetimes land.
-    {
-        let stdin = child.stdin.as_mut().expect("failed to write to stdin");
-        stdin.write_all(FLAMEGRAPH_SCRIPT)?;
-    }
-    child.wait()?;
-    Ok(())
 }
