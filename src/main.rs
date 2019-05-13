@@ -39,6 +39,8 @@ use chrono::prelude::*;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use failure::Error;
 use failure::ResultExt;
+use rand::{thread_rng, Rng};
+use rand::distributions::Alphanumeric;
 
 use std::collections::HashSet;
 use std::fs::{DirBuilder, File};
@@ -118,7 +120,7 @@ struct Args {
 
 
 fn do_main() -> Result<(), Error> {
-    env_logger::init().unwrap();
+    env_logger::init();
 
     let args = Args::from_args()?;
 
@@ -601,13 +603,12 @@ fn test_output_filename() {
 }
 
 fn output_filename(base_dir: &str, maybe_filename: Option<&str>, extension: &str) -> Result<PathBuf, Error> {
-    use rand::{self, Rng};
+    let mut rng = thread_rng();
 
     let path = match maybe_filename {
         Some(filename) => filename.into(),
         None => {
-            let s = rand::thread_rng()
-                .gen_ascii_chars()
+            let s = ::std::iter::repeat(()).map(|()| rng.sample(Alphanumeric))
                 .take(10)
                 .collect::<String>();
             let filename = format!("{}-{}-{}.{}", "rbspy", Utc::now().format("%Y-%m-%d"), s, extension);
