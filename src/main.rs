@@ -316,67 +316,64 @@ fn spawn_recorder_children(pid: pid_t, with_subprocesses: bool, sample_rate: u32
     let (trace_sender, trace_receiver) = sync_channel(100);
     let (error_sender, result_receiver) = channel();
 
-    match with_subprocesses {
-        false => {
-            // Start a single recorder thread
+    if with_subprocesses {
+        // Start a thread which watches for new descendents and starts new recorders when they
+        // appear
+        let done_clone = done.clone();
+        std::thread::spawn(move || {
+            let mut pids: HashSet<pid_t> = HashSet::new();
             let done = done.clone();
-            let timing_error_traces = timing_error_traces.clone();
-            let total_traces = total_traces.clone();
-            std::thread::spawn(move || {
-                let result = record(
-                    pid,
-                    sample_rate,
-                    maybe_stop_time,
-                    done,
-                    timing_error_traces,
-                    total_traces,
-                    trace_sender
-                    );
-                error_sender.send(result).unwrap();
-                drop(error_sender);
-            });
-        },
-        true => {
-            // Start a thread which watches for new descendents and starts new recorders when they
-            // appear
-            let done_clone = done.clone();
-            std::thread::spawn(move || {
-                let mut pids: HashSet<pid_t> = HashSet::new();
-                let done = done.clone();
-                // we need to exit this loop when the process we're monitoring exits, otherwise the
-                // sender channels won't get closed and rbspy will hang. So we check the done
-                // mutex.
-                while !done_clone.load(Ordering::Relaxed) {
-                    let descendents = descendents_of(pid).expect("Error finding descendents of pid");
-                    for pid in descendents {
-                        if pids.contains(&pid) {
-                            // already recording it, no need to start a new recording thread
-                            continue;
-                        }
-                        pids.insert(pid);
-                        let trace_sender = trace_sender.clone();
-                        let error_sender = error_sender.clone();
-                        let done = done.clone();
-                        let timing_error_traces = timing_error_traces.clone();
-                        let total_traces = total_traces.clone();
-                        std::thread::spawn(move || {
-                            let result = record(
-                                pid,
-                                sample_rate,
-                                maybe_stop_time,
-                                done,
-                                timing_error_traces,
-                                total_traces,
-                                trace_sender
-                                );
-                            error_sender.send(result).expect("couldn't send error");
-                            drop(error_sender);
-                        });
+            // we need to exit this loop when the process we're monitoring exits, otherwise the
+            // sender channels won't get closed and rbspy will hang. So we check the done
+            // mutex.
+            while !done_clone.load(Ordering::Relaxed) {
+                let descendents = descendents_of(pid).expect("Error finding descendents of pid");
+                for pid in descendents {
+                    if pids.contains(&pid) {
+                        // already recording it, no need to start a new recording thread
+                        continue;
                     }
-                    std::thread::sleep(Duration::from_secs(1));
+                    pids.insert(pid);
+                    let trace_sender = trace_sender.clone();
+                    let error_sender = error_sender.clone();
+                    let done = done.clone();
+                    let timing_error_traces = timing_error_traces.clone();
+                    let total_traces = total_traces.clone();
+                    std::thread::spawn(move || {
+                        let result = record(
+                            pid,
+                            sample_rate,
+                            maybe_stop_time,
+                            done,
+                            timing_error_traces,
+                            total_traces,
+                            trace_sender
+                            );
+                        error_sender.send(result).expect("couldn't send error");
+                        drop(error_sender);
+                    });
                 }
-            });
-        }
+                std::thread::sleep(Duration::from_secs(1));
+            }
+        });
+    } else {
+        // Start a single recorder thread
+        let done = done.clone();
+        let timing_error_traces = timing_error_traces.clone();
+        let total_traces = total_traces.clone();
+        std::thread::spawn(move || {
+            let result = record(
+                pid,
+                sample_rate,
+                maybe_stop_time,
+                done,
+                timing_error_traces,
+                total_traces,
+                trace_sender
+                );
+            error_sender.send(result).unwrap();
+            drop(error_sender);
+        });
     }
     Ok((trace_receiver, result_receiver, total_traces_clone, timing_error_traces_clone))
 }
