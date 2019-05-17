@@ -504,7 +504,7 @@ macro_rules! get_lineno_2_6_0(
             cfp: &rb_control_frame_t,
             source: &T,
             ) -> Result<u32, MemoryCopyError> where T: CopyAddress{
-            let pos = get_pos(iseq_struct, cfp)?;
+            //let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.insns_info.size as usize;
             if t_size == 0 {
                 Ok(0) //TODO: really?
@@ -513,14 +513,15 @@ macro_rules! get_lineno_2_6_0(
                 Ok(table[0].line_no as u32)
             } else {
                 let table: Vec<iseq_insn_info_entry> = copy_vec(iseq_struct.insns_info.body as usize, t_size as usize, source)?;
-                let positions: Vec<usize> = copy_vec(iseq_struct.insns_info.positions as usize, t_size as usize, source)?;
+                // TODO: fix this. I'm not sure why it doesn't extract the table properly.
+                /*let positions: Vec<usize> = copy_vec(iseq_struct.insns_info.positions as usize, t_size as usize, source)?;
                 for i in 0..t_size {
                     if pos == positions[i] as usize {
                         return Ok(table[i].line_no as u32)
                     } else if positions[i] as usize > pos {
                         return Ok(table[i-1].line_no as u32)
                     }
-                }
+                }*/
                 Ok(table[t_size-1].line_no as u32)
             }
         }
