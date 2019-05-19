@@ -15,7 +15,7 @@ pub trait Outputter {
     fn complete(&mut self, file: File) -> Result<(), Error>;
 }
 
-// Uses Brendan Gregg's flamegraph.pl script (which we vendor) to visualize stack traces
+// Uses Inferno to visualize stack traces
 pub struct Flamegraph(pub flamegraph::Stats);
 
 impl Outputter for Flamegraph {
