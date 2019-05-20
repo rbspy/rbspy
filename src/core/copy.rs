@@ -5,7 +5,7 @@ use read_process_memory::*;
  * Utility functions for copying memory out of a process
  */
 
-const MAX_COPY_LENGTH: usize = 20000000;
+const MAX_COPY_LENGTH: usize = 20_000_000;
 
 #[derive(Fail, Debug)]
 pub enum MemoryCopyError {

@@ -149,7 +149,7 @@ impl Stats {
     }
 
     // Add a single stack sample to this Stats.
-    pub fn add(&mut self, stack: &Vec<StackFrame>) {
+    pub fn add(&mut self, stack: &[StackFrame]) {
         // The input sample has the root function at the end. Reverse that!
         let rev: Vec<_> = stack.iter().rev().collect();
 
@@ -221,9 +221,9 @@ impl Stats {
         // popped all the old ones.
 
         // 3. Add new stack frames to our stored stack.
-        for i in common..rev.len() {
+        for item in rev.iter().skip(common) {
             self.stack.push(StackEntry {
-                frame: rev[i].clone(),
+                frame: (*item).clone(),
                 exclusive: 0,
                 inclusive: 0,
             })
@@ -246,7 +246,7 @@ impl Stats {
         // To handle whatever remains on the stored stack, we can just add
         // an empty stack. This causes us to integrate info for each of those
         // frames--see step 2 in add().
-        self.add(&vec![]);
+        self.add(&[]);
     }
 
     // Write a callgrind file based on the stats collected.
@@ -262,7 +262,7 @@ impl Stats {
         // Sort first, for consistent ordering.
         let sorted: BTreeMap<_, _> = self.locations.0.iter().collect();
         for (frame, loc) in sorted.iter() {
-            writeln!(w, "")?;
+            writeln!(w)?;
             // Exclusive info, along with filename and function name.
             writeln!(w, "fl={}", frame.path())?;
             writeln!(w, "fn={}", &frame.name)?;

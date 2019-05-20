@@ -1,20 +1,32 @@
 set -eux
+
+error() { echo "$@" 1>&2; }
+
+ruby_src_dir=~/clones/ruby
+if [ ! -d "$ruby_src_dir" ]; then
+   error "In order to use a few private header files, Ruby's source code (https://github.com/ruby/ruby.git) must be cloned as $ruby_src_dir."
+   exit 1
+fi
+
+ruby_header_dir="$(ruby -rrbconfig -e 'puts RbConfig::CONFIG["rubyarchhdrdir"]')"
+
 echo "#include </tmp/headers/$1/vm_core.h>" > /tmp/wrapper.h
 echo "#include </tmp/headers/$1/iseq.h>" >> /tmp/wrapper.h
 rm -rf /tmp/headers/$1
 mkdir -p /tmp/headers/$1
-cd ~/clones/ruby
-git checkout v$1
-cp -R include /tmp/headers/$1
-if [ -e ccan ]
+
+(cd $ruby_src_dir && git checkout v$1)
+cp -R "$ruby_src_dir/include" /tmp/headers/$1
+if [ -e "$ruby_src_dir/ccan" ]
 then
-    cp -R ccan /tmp/headers/$1
+    cp -R "$ruby_src_dir/ccan" /tmp/headers/$1
 fi
-cp *.h /tmp/headers/$1
+cp "$ruby_src_dir"/*.h /tmp/headers/$1
+
 OUT=ruby-structs/src/ruby_${1}.rs
 bindgen /tmp/wrapper.h \
     -o /tmp/bindings.rs \
-    --impl-debug true \
+    --impl-debug \
     --no-doc-comments \
     --whitelist-type rb_iseq_constant_body \
     --whitelist-type rb_iseq_location_struct \
@@ -31,11 +43,10 @@ bindgen /tmp/wrapper.h \
     -- \
     -I/tmp/headers/$1/include \
     -I/home/bork/monorepo/ruby-header-files -I/tmp/headers/$1/ \
-    -I/usr/lib/llvm-3.8/lib/clang/3.8.0/include/
+    -I/usr/lib/llvm-3.8/lib/clang/3.8.0/include/ \
+    "-I$ruby_header_dir"
 
 #rustfmt --force src/bindings/ruby_${1}.rs
-
-cd ~/work/rbspy
 
 echo "#![allow(non_upper_case_globals)]" > $OUT
 echo "#![allow(non_camel_case_types)]" >> $OUT

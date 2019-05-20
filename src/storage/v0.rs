@@ -26,7 +26,7 @@ impl Storage for Data {
 
 impl From<Data> for v1::Data {
     fn from(d: Data) -> v1::Data {
-        let x: Vec<StackTrace> = d.0.into_iter().map(|x| x.into()).collect();
+        let x: Vec<StackTrace> = d.0.into_iter().map(std::convert::Into::into).collect();
         v1::Data(x)
     }
 }

@@ -132,15 +132,13 @@ fn get_ruby_version_retry(pid: pid_t) -> Result<String, Error> {
                     }
                     _ => {}
                 }
-                match err.root_cause().downcast_ref::<MemoryCopyError>() {
-                    Some(&MemoryCopyError::PermissionDenied) => {
+                if let Some(&MemoryCopyError::PermissionDenied) =
+                    err.root_cause().downcast_ref::<MemoryCopyError>() {
                         return Err(err.into());
-                    }
-                    _ => {}
                 }
             }
             Ok(x) => {
-                return Ok(x.into());
+                return Ok(x);
             }
         }
         // if it doesn't work, sleep for 1ms and try again
@@ -283,7 +281,7 @@ fn is_maybe_thread_function<T: 'static>(
 where
     T: CopyAddress,
 {
-    let function = match version.as_ref() {
+    let function = match version {
         "1.9.1" => ruby_version::ruby_1_9_1_0::is_maybe_thread,
         "1.9.2" => ruby_version::ruby_1_9_2_0::is_maybe_thread,
         "1.9.3" => ruby_version::ruby_1_9_3_0::is_maybe_thread,
@@ -328,6 +326,12 @@ where
         "2.5.0" => ruby_version::ruby_2_5_0::is_maybe_thread,
         "2.5.1" => ruby_version::ruby_2_5_1::is_maybe_thread,
         "2.5.3" => ruby_version::ruby_2_5_3::is_maybe_thread,
+        "2.5.4" => ruby_version::ruby_2_5_4::is_maybe_thread,
+        "2.5.5" => ruby_version::ruby_2_5_5::is_maybe_thread,
+        "2.6.0" => ruby_version::ruby_2_6_0::is_maybe_thread,
+        "2.6.1" => ruby_version::ruby_2_6_1::is_maybe_thread,
+        "2.6.2" => ruby_version::ruby_2_6_2::is_maybe_thread,
+        "2.6.3" => ruby_version::ruby_2_6_3::is_maybe_thread,
         _ => panic!("Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!", version),
     };
     Box::new(function)
@@ -379,6 +383,12 @@ fn get_stack_trace_function<T: 'static>(version: &str) -> StackTraceFn<T> where 
         "2.5.0" => ruby_version::ruby_2_5_0::get_stack_trace,
         "2.5.1" => ruby_version::ruby_2_5_1::get_stack_trace,
         "2.5.3" => ruby_version::ruby_2_5_3::get_stack_trace,
+        "2.5.4" => ruby_version::ruby_2_5_4::get_stack_trace,
+        "2.5.5" => ruby_version::ruby_2_5_5::get_stack_trace,
+        "2.6.0" => ruby_version::ruby_2_6_0::get_stack_trace,
+        "2.6.1" => ruby_version::ruby_2_6_1::get_stack_trace,
+        "2.6.2" => ruby_version::ruby_2_6_2::get_stack_trace,
+        "2.6.3" => ruby_version::ruby_2_6_3::get_stack_trace,
         _ => panic!("Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!", version),
     };
     Box::new(stack_trace_function)

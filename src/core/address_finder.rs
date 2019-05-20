@@ -73,7 +73,7 @@ mod os_impl {
     impl Binary {
         pub fn from(start_addr: usize, filename: &str) -> Result<Binary, Error> {
             Ok(Binary {
-                start_addr: start_addr,
+                start_addr,
                 symbols: get_symbols(filename)?,
             })
         }
@@ -183,13 +183,13 @@ mod os_impl {
                     // a libruby map. If that's not true, that's a bug.
                     (*proginfo.libruby_map)
                         .as_ref()
-                        .ok_or(format_err!("Missing libruby map. Please report this!"))?,
+                        .ok_or_else(|| format_err!("Missing libruby map. Please report this!"))?,
                     proginfo
                         .libruby_elf
                         .as_ref()
-                        .ok_or(format_err!("Missing libruby ELF. Please report this!"))?,
+                        .ok_or_else(|| format_err!("Missing libruby ELF. Please report this!"))?,
                     ruby_version_symbol,
-                ).ok_or(format_err!("Couldn't find ruby version."))
+                ).ok_or_else(|| format_err!("Couldn't find ruby version."))
             }
         }
     }
@@ -213,11 +213,8 @@ mod os_impl {
 
     fn get_bss_section(elf_file: &elf::File) -> Option<elf::types::SectionHeader> {
         for s in &elf_file.sections {
-            match s.shdr.name.as_ref() {
-                ".bss" => {
-                    return Some(s.shdr.clone());
-                }
-                _ => {}
+            if s.shdr.name == ".bss" {
+                return Some(s.shdr.clone());
             }
         }
         None
@@ -256,7 +253,7 @@ mod os_impl {
         let i = slice
             .iter().enumerate()
             .position({ |(i, &x)| is_maybe_thread(x, (i as usize) * (std::mem::size_of::<usize>() as usize) + read_addr, source, &proginfo.all_maps) })
-            .ok_or(format_err!(
+            .ok_or_else(|| format_err!(
                 "Current thread address not found in process {}",
                 &proginfo.pid
             ))?;
@@ -294,14 +291,13 @@ mod os_impl {
     }
 
     fn elf_load_header(elf_file: &elf::File) -> elf::types::ProgramHeader {
-        elf_file
+        *elf_file
             .phdrs
             .iter()
             .find(|ref ph| {
                 ph.progtype == elf::types::PT_LOAD && (ph.flags.0 & elf::types::PF_X.0) != 0
             })
             .expect("No executable LOAD header found in ELF file. Please report this!")
-            .clone()
     }
 
     // struct to hold everything we know about the program
@@ -332,7 +328,7 @@ mod os_impl {
             _ => AddressFinderError::ProcMapsError(pid),
         })?;
         let ruby_map = Box::new(get_map(&all_maps, "bin/ruby")
-            .ok_or(format_err!("Ruby map not found for PID: {}", pid))?);
+            .ok_or_else(|| format_err!("Ruby map not found for PID: {}", pid))?);
         let all_maps = get_process_maps(pid).unwrap();
         let ruby_elf = open_elf_file(pid, &ruby_map)?;
         let libruby_map = Box::new(get_map(&all_maps, "libruby"));
@@ -343,12 +339,12 @@ mod os_impl {
             _ => None,
         };
         Ok(ProgramInfo {
-            pid: pid,
-            all_maps: all_maps,
-            ruby_map: ruby_map,
-            libruby_map: libruby_map,
-            ruby_elf: ruby_elf,
-            libruby_elf: libruby_elf,
+            pid,
+            all_maps,
+            ruby_map,
+            libruby_map,
+            ruby_elf,
+            libruby_elf,
         })
     }
 
@@ -361,7 +357,7 @@ mod os_impl {
                     false
                 }
             })
-            .map(|x| x.clone())
+            .map(std::clone::Clone::clone)
     }
 }
 

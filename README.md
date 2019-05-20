@@ -29,7 +29,7 @@ rbspy supports Linux\*, Mac, and Windows.
 
 ## Add a testimonial
 
-Did rbspy help you make your program faster? An awesome way to thank the project is to add a [success story to this GitHub issue](https://github.com/rbspy/rbspy/issues/62) 
+Did rbspy help you make your program faster? An awesome way to thank the project is to add a [success story to this GitHub issue](https://github.com/rbspy/rbspy/issues/62)
 where people talk about ways rbspy has helped them! Hearing that rbspy is working for people is good
 motivation :)
 
@@ -39,7 +39,7 @@ On Mac, you can install with Homebrew: `brew install rbspy`.
 
 On Linux:
 
-1. Download recent release of `rbspy` from [the github releases page](https://github.com/rbspy/rbspy/releases)
+1. Download recent release of `rbspy` from [the GitHub releases page](https://github.com/rbspy/rbspy/releases)
 2. Unpack it
 3. Move the `rbspy` binary to `/usr/local/bin`
 
@@ -48,11 +48,11 @@ Or have a look at [Installing rbspy](https://rbspy.github.io/installing/) on our
 ## Contributing
 
 Pull requests that improve usability, fix bugs, or help rbspy support more operating systems are
-very welcome. If you have a question, the best way to ask is to [create a Github issue](https://github.com/rbspy/rbspy/issues/new)!
+very welcome. If you have a question, the best way to ask is to [create a GitHub issue](https://github.com/rbspy/rbspy/issues/new)!
 
 If you're not a very experienced Rust programmer, you're very welcome to contribute. A major reason
 rbspy is written in Rust is that Rust is more approachable for beginners than C/C++.
-https://www.rust-lang.org/en-US/ has great resources for learning Rust.
+https://www.rust-lang.org/ has great resources for learning Rust.
 
 ## Building rbspy
 

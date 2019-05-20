@@ -15,7 +15,7 @@ pub trait Outputter {
     fn complete(&mut self, file: File) -> Result<(), Error>;
 }
 
-// Uses Brendan Gregg's flamegraph.pl script (which we vendor) to visualize stack traces
+// Uses Inferno to visualize stack traces
 pub struct Flamegraph(pub flamegraph::Stats);
 
 impl Outputter for Flamegraph {
@@ -89,10 +89,10 @@ impl Outputter for Speedscope {
 
 /// Filter out unknown functions from stack trace before reporting.
 /// Most of the time it isn't useful to include the "unknown C function" stacks.
-fn filter_unknown(trace: &Vec<StackFrame>) -> Vec<StackFrame> {
+fn filter_unknown(trace: &[StackFrame]) -> Vec<StackFrame> {
     let unknown = StackFrame::unknown_c_function();
-    let vec: Vec<StackFrame> = trace.iter().filter(|&x| x != &unknown).map(|x| x.clone()).collect();
-    if vec.len() == 0 {
+    let vec: Vec<StackFrame> = trace.iter().filter(|&x| x != &unknown).cloned().collect();
+    if vec.is_empty() {
         vec!(unknown)
     } else {
         vec

@@ -8,6 +8,7 @@ extern crate clap;
 extern crate ctrlc;
 extern crate elf;
 extern crate env_logger;
+extern crate inferno;
 #[macro_use]
 extern crate failure;
 #[macro_use]
@@ -39,6 +40,8 @@ use chrono::prelude::*;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use failure::Error;
 use failure::ResultExt;
+use rand::{thread_rng, Rng};
+use rand::distributions::Alphanumeric;
 
 use std::collections::HashSet;
 use std::fs::{DirBuilder, File};
@@ -101,7 +104,8 @@ enum SubCmd {
         maybe_duration: Option<std::time::Duration>,
         format: OutputFormat,
         no_drop_root: bool,
-        with_subprocesses: bool
+        with_subprocesses: bool,
+        silent: bool
     },
     /// Capture and print a stacktrace snapshot of process `pid`.
     Snapshot { pid: pid_t },
@@ -117,7 +121,7 @@ struct Args {
 
 
 fn do_main() -> Result<(), Error> {
-    env_logger::init().unwrap();
+    env_logger::init();
 
     let args = Args::from_args()?;
 
@@ -146,6 +150,7 @@ fn do_main() -> Result<(), Error> {
             format,
             no_drop_root,
             with_subprocesses,
+            silent,
         } => {
             let pid = match target {
                 Pid { pid } => pid,
@@ -183,6 +188,7 @@ fn do_main() -> Result<(), Error> {
                 &out_path,
                 pid,
                 with_subprocesses,
+                silent,
                 sample_rate,
                 maybe_duration,
             )
@@ -206,16 +212,13 @@ fn check_root_user() -> bool {
 }
 
 fn main() {
-    match do_main() {
-        Err(x) => {
-            eprintln!("Error. Causes: ");
-            for c in x.causes() {
-                eprintln!("- {}", c);
-            }
-            eprintln!("{}", x.backtrace());
-            std::process::exit(1);
+    if let Err(x) = do_main() {
+        eprintln!("Error. Causes: ");
+        for c in x.iter_chain() {
+            eprintln!("- {}", c);
         }
-        _ => {}
+        eprintln!("{}", x.backtrace());
+        std::process::exit(1);
     }
 }
 
@@ -240,12 +243,12 @@ impl OutputFormat {
     }
 
     fn extension(&self) -> String {
-        match self {
-            &OutputFormat::flamegraph => "flamegraph.svg",
-            &OutputFormat::callgrind => "callgrind.txt",
-            &OutputFormat::speedscope => "speedscope.json",
-            &OutputFormat::summary => "summary.txt",
-            &OutputFormat::summary_by_line => "summary_by_line.txt",
+        match *self {
+            OutputFormat::flamegraph => "flamegraph.svg",
+            OutputFormat::callgrind => "callgrind.txt",
+            OutputFormat::speedscope => "speedscope.json",
+            OutputFormat::summary => "summary.txt",
+            OutputFormat::summary_by_line => "summary_by_line.txt",
         }.to_string()
     }
 }
@@ -265,7 +268,7 @@ impl SampleTime {
     pub fn new(rate: u32) -> SampleTime {
         SampleTime{
             start_time: Instant::now(),
-            nanos_between_samples: BILLION / (rate as u64),
+            nanos_between_samples: BILLION / u64::from(rate),
             num_samples: 0,
         }
     }
@@ -275,7 +278,7 @@ impl SampleTime {
         // how far we're behind if we're behind the expected next sample time
         self.num_samples += 1;
         let elapsed = self.start_time.elapsed();
-        let nanos_elapsed = elapsed.as_secs() * BILLION + elapsed.subsec_nanos() as u64;
+        let nanos_elapsed = elapsed.as_secs() * BILLION + u64::from(elapsed.subsec_nanos());
         let target_elapsed = self.num_samples * self.nanos_between_samples;
         if target_elapsed < nanos_elapsed {
             Err((nanos_elapsed - target_elapsed) as u32)
@@ -316,67 +319,64 @@ fn spawn_recorder_children(pid: pid_t, with_subprocesses: bool, sample_rate: u32
     let (trace_sender, trace_receiver) = sync_channel(100);
     let (error_sender, result_receiver) = channel();
 
-    match with_subprocesses {
-        false => {
-            // Start a single recorder thread
+    if with_subprocesses {
+        // Start a thread which watches for new descendents and starts new recorders when they
+        // appear
+        let done_clone = done.clone();
+        std::thread::spawn(move || {
+            let mut pids: HashSet<pid_t> = HashSet::new();
             let done = done.clone();
-            let timing_error_traces = timing_error_traces.clone();
-            let total_traces = total_traces.clone();
-            std::thread::spawn(move || {
-                let result = record(
-                    pid,
-                    sample_rate,
-                    maybe_stop_time,
-                    done,
-                    timing_error_traces,
-                    total_traces,
-                    trace_sender
-                    );
-                error_sender.send(result).unwrap();
-                drop(error_sender);
-            });
-        },
-        true => {
-            // Start a thread which watches for new descendents and starts new recorders when they
-            // appear
-            let done_clone = done.clone();
-            std::thread::spawn(move || {
-                let mut pids: HashSet<pid_t> = HashSet::new();
-                let done = done.clone();
-                // we need to exit this loop when the process we're monitoring exits, otherwise the
-                // sender channels won't get closed and rbspy will hang. So we check the done
-                // mutex.
-                while !done_clone.load(Ordering::Relaxed) {
-                    let descendents = descendents_of(pid).expect("Error finding descendents of pid");
-                    for pid in descendents {
-                        if pids.contains(&pid) {
-                            // already recording it, no need to start a new recording thread
-                            continue;
-                        }
-                        pids.insert(pid);
-                        let trace_sender = trace_sender.clone();
-                        let error_sender = error_sender.clone();
-                        let done = done.clone();
-                        let timing_error_traces = timing_error_traces.clone();
-                        let total_traces = total_traces.clone();
-                        std::thread::spawn(move || {
-                            let result = record(
-                                pid,
-                                sample_rate,
-                                maybe_stop_time,
-                                done,
-                                timing_error_traces,
-                                total_traces,
-                                trace_sender
-                                );
-                            error_sender.send(result).expect("couldn't send error");
-                            drop(error_sender);
-                        });
+            // we need to exit this loop when the process we're monitoring exits, otherwise the
+            // sender channels won't get closed and rbspy will hang. So we check the done
+            // mutex.
+            while !done_clone.load(Ordering::Relaxed) {
+                let descendents = descendents_of(pid).expect("Error finding descendents of pid");
+                for pid in descendents {
+                    if pids.contains(&pid) {
+                        // already recording it, no need to start a new recording thread
+                        continue;
                     }
-                    std::thread::sleep(Duration::from_secs(1));
+                    pids.insert(pid);
+                    let trace_sender = trace_sender.clone();
+                    let error_sender = error_sender.clone();
+                    let done = done.clone();
+                    let timing_error_traces = timing_error_traces.clone();
+                    let total_traces = total_traces.clone();
+                    std::thread::spawn(move || {
+                        let result = record(
+                            pid,
+                            sample_rate,
+                            maybe_stop_time,
+                            done,
+                            timing_error_traces,
+                            total_traces,
+                            trace_sender
+                            );
+                        error_sender.send(result).expect("couldn't send error");
+                        drop(error_sender);
+                    });
                 }
-            });
-        }
+                std::thread::sleep(Duration::from_secs(1));
+            }
+        });
+    } else {
+        // Start a single recorder thread
+        let done = done.clone();
+        let timing_error_traces = timing_error_traces.clone();
+        let total_traces = total_traces.clone();
+        std::thread::spawn(move || {
+            let result = record(
+                pid,
+                sample_rate,
+                maybe_stop_time,
+                done,
+                timing_error_traces,
+                total_traces,
+                trace_sender
+                );
+            error_sender.send(result).unwrap();
+            drop(error_sender);
+        });
     }
     Ok((trace_receiver, result_receiver, total_traces_clone, timing_error_traces_clone))
 }
@@ -410,6 +410,7 @@ fn parallel_record(
     out_path: &PathBuf,
     pid: pid_t,
     with_subprocesses: bool,
+    silent: bool,
     sample_rate: u32,
     maybe_duration: Option<std::time::Duration>,
 ) -> Result<(), Error> {
@@ -435,10 +436,12 @@ fn parallel_record(
         summary_out.add_function_name(&trace.trace);
         raw_store.write(&trace)?;
 
-        // Print a summary every second
-        if std::time::Instant::now() > summary_time {
-            print_summary(&summary_out, &start_time, sample_rate, timing_error_traces.load(Ordering::Relaxed), total_traces.load(Ordering::Relaxed))?;
-            summary_time = std::time::Instant::now() + Duration::from_secs(1);
+        if !silent {
+            // Print a summary every second
+            if std::time::Instant::now() > summary_time {
+                print_summary(&summary_out, &start_time, sample_rate, timing_error_traces.load(Ordering::Relaxed), total_traces.load(Ordering::Relaxed))?;
+                summary_time = std::time::Instant::now() + Duration::from_secs(1);
+            }
         }
     }
 
@@ -456,7 +459,7 @@ fn parallel_record(
     let mut num_ok = 0;
     let mut last_result = Ok(());
     for result in result_receiver.iter() {
-        if let Ok(_) = result {
+        if result.is_ok() {
             num_ok += 1;
         }
         last_result = result;
@@ -603,13 +606,12 @@ fn test_output_filename() {
 }
 
 fn output_filename(base_dir: &str, maybe_filename: Option<&str>, extension: &str) -> Result<PathBuf, Error> {
-    use rand::{self, Rng};
+    let mut rng = thread_rng();
 
     let path = match maybe_filename {
         Some(filename) => filename.into(),
         None => {
-            let s = rand::thread_rng()
-                .gen_ascii_chars()
+            let s = ::std::iter::repeat(()).map(|()| rng.sample(Alphanumeric))
                 .take(10)
                 .collect::<String>();
             let filename = format!("{}-{}-{}.{}", "rbspy", Utc::now().format("%Y-%m-%d"), s, extension);
@@ -700,6 +702,10 @@ fn arg_parser() -> App<'static, 'static> {
                         .required(false)
                         .hidden(cfg!(target_os = "windows"))
                 )
+                .arg(
+                    Arg::from_usage( "--silent='Don't print the summary profiling data every second'")
+                        .required(false)
+                )
                 .arg(Arg::from_usage("<cmd>... 'command to run'").required(false)),
         )
         .subcommand(
@@ -756,6 +762,7 @@ impl Args {
                 };
 
                 let no_drop_root = submatches.occurrences_of("no-drop-root") == 1;
+                let silent = submatches.is_present("silent");
                 let with_subprocesses = submatches.is_present("subprocesses");
                 if with_subprocesses && cfg!(target_os = "windows") {
                     return Err(format_err!("--subprocesses option is not available on windows"));
@@ -782,6 +789,7 @@ impl Args {
                     format,
                     no_drop_root,
                     with_subprocesses,
+                    silent,
                 }
             }
             ("report", Some(submatches)) => Report {
@@ -857,6 +865,7 @@ mod tests {
                     format: OutputFormat::flamegraph,
                     no_drop_root: false,
                     with_subprocesses: false,
+                    silent: false,
                 },
             }
         );
@@ -876,6 +885,7 @@ mod tests {
                     format: OutputFormat::flamegraph,
                     no_drop_root: false,
                     with_subprocesses: false,
+                    silent: false,
                 },
             }
         );
@@ -895,6 +905,7 @@ mod tests {
                     format: OutputFormat::flamegraph,
                     no_drop_root: false,
                     with_subprocesses: false,
+                    silent: false,
                 },
             }
         );
@@ -914,6 +925,7 @@ mod tests {
                     format: OutputFormat::callgrind,
                     no_drop_root: false,
                     with_subprocesses: false,
+                    silent: false,
                 },
             }
         );
@@ -933,6 +945,7 @@ mod tests {
                     format: OutputFormat::flamegraph,
                     no_drop_root: true,
                     with_subprocesses: false,
+                    silent: false,
                 },
             }
         );
@@ -954,6 +967,7 @@ mod tests {
                         format: OutputFormat::flamegraph,
                         no_drop_root: false,
                         with_subprocesses: true,
+                        silent: false,
                     },
                 }
             );

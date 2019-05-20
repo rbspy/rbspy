@@ -40,8 +40,8 @@ impl Stats {
     }
 
     // Aggregate by function name
-    pub fn add_function_name(&mut self, stack: &Vec<StackFrame>) {
-        if stack.len() == 0 {
+    pub fn add_function_name(&mut self, stack: &[StackFrame]) {
+        if stack.is_empty() {
             return;
         }
         self.total_traces += 1;
@@ -56,8 +56,8 @@ impl Stats {
     }
 
     // Aggregate by function name + line number
-    pub fn add_lineno(&mut self, stack: &Vec<StackFrame>) {
-        if stack.len() == 0 {
+    pub fn add_lineno(&mut self, stack: &[StackFrame]) {
+        if stack.is_empty() {
             return;
         }
         self.total_traces += 1;
@@ -85,7 +85,7 @@ impl Stats {
         let counts = sorted.iter().rev().take(top);
         writeln!(w, "{}", Stats::HEADER)?;
         for &(self_, total, name) in counts {
-            writeln!(w, "{:>6.2} {:>8.2}  {:.*}", 100.0 * (self_ as f64) / (self.total_traces as f64), 100.0 * (total as f64) / (self.total_traces as f64), truncate - 14 - 3, name)?;
+            writeln!(w, "{:>6.2} {:>8.2}  {:.*}", 100.0 * (self_ as f64) / f64::from(self.total_traces), 100.0 * (total as f64) / f64::from(self.total_traces), truncate - 14 - 3, name)?;
         }
         Ok(())
     }
@@ -140,9 +140,9 @@ mod tests {
         stats.add_lineno(&vec![f(2), f(3), f(1)]);
 
         let expected = "% self  % total  name
- 40.00    60.00  func3 - file3.rb line 3
- 40.00    60.00  func2 - file2.rb line 2
- 20.00   100.00  func1 - file1.rb line 1
+ 40.00    60.00  func3 - file3.rb:3
+ 40.00    60.00  func2 - file2.rb:2
+ 20.00   100.00  func1 - file1.rb:1
 ";
 
         let mut buf: Vec<u8> = Vec::new();
