@@ -140,9 +140,9 @@ mod tests {
         stats.add_lineno(&vec![f(2), f(3), f(1)]);
 
         let expected = "% self  % total  name
- 40.00    60.00  func3 - file3.rb line 3
- 40.00    60.00  func2 - file2.rb line 2
- 20.00   100.00  func1 - file1.rb line 1
+ 40.00    60.00  func3 - file3.rb:3
+ 40.00    60.00  func2 - file2.rb:2
+ 20.00   100.00  func1 - file1.rb:1
 ";
 
         let mut buf: Vec<u8> = Vec::new();

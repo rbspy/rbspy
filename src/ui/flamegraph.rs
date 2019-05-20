@@ -71,9 +71,9 @@ mod tests {
         stats.record(&vec![f(2), f(3), f(1)])?;
 
         let counts = &stats.counts;
-        assert_contains(counts, "func1 - file1.rb line 1", 1);
-        assert_contains(counts, "func1 - file1.rb line 1;func3 - file3.rb line 3;func2 - file2.rb line 2", 3);
-        assert_contains(counts, "func1 - file1.rb line 1;func2 - file2.rb line 2", 2);
+        assert_contains(counts, "func1 - file1.rb:1", 1);
+        assert_contains(counts, "func1 - file1.rb:1;func3 - file3.rb:3;func2 - file2.rb:2", 3);
+        assert_contains(counts, "func1 - file1.rb:1;func2 - file2.rb:2", 2);
 
         Ok(())
     }
