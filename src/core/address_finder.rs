@@ -38,7 +38,7 @@ mod os_impl {
     pub fn current_thread_address(
         pid: pid_t,
         version: &str,
-        _is_maybe_thread: Box<Fn(usize, usize, ProcessHandle, &Vec<MapRange>) -> bool>,
+        _is_maybe_thread: Box<Fn(usize, usize, ProcessHandle, &[MapRange]) -> bool>,
     ) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
         if version >= "2.5.0" {
@@ -155,7 +155,7 @@ mod os_impl {
     pub fn current_thread_address(
         pid: pid_t,
         version: &str,
-        is_maybe_thread: Box<Fn(usize, usize, ProcessHandle, &Vec<MapRange>) -> bool>,
+        is_maybe_thread: Box<Fn(usize, usize, ProcessHandle, &[MapRange]) -> bool>,
     ) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
         match current_thread_address_symbol_table(proginfo, version) {
@@ -222,7 +222,7 @@ mod os_impl {
 
     fn current_thread_address_search_bss(
         proginfo: &ProgramInfo,
-        is_maybe_thread: Box<Fn(usize, usize, ProcessHandle, &Vec<MapRange>) -> bool>,
+        is_maybe_thread: Box<Fn(usize, usize, ProcessHandle, &[MapRange]) -> bool>,
     ) -> Result<usize, Error> {
         // Used when there's no symbol table. Looks through the .bss and uses a search_bss (found in
         // `is_maybe_thread`) to find the address of the current thread.
@@ -348,7 +348,7 @@ mod os_impl {
         })
     }
 
-    fn get_map(maps: &Vec<MapRange>, contains: &str) -> Option<MapRange> {
+    fn get_map(maps: &[MapRange], contains: &str) -> Option<MapRange> {
         maps.iter()
             .find(|ref m| {
                 if let Some(ref pathname) = m.filename() {
@@ -375,7 +375,7 @@ mod os_impl {
     pub fn current_thread_address(
         pid: u32,
         version: &str,
-        _is_maybe_thread: Box<Fn(usize, usize, ProcessHandle, &Vec<MapRange>) -> bool>,
+        _is_maybe_thread: Box<Fn(usize, usize, ProcessHandle, &[MapRange]) -> bool>,
     ) -> Result<usize, Error> {
         let symbol_name = if version >= "2.5.0" {
             "ruby_current_execution_context_ptr"
