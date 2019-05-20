@@ -234,7 +234,7 @@ fn test_get_exec_trace() {
     assert_eq!(trace1.unwrap().pid, Some(pid));
 
     // Trigger the exec
-    write!(process.stdin.as_mut().unwrap(), "\n").expect("write to exec");
+    writeln!(process.stdin.as_mut().unwrap()).expect("write to exec");
 
     let allowed_attempts = 20;
     for _ in 0..allowed_attempts {
