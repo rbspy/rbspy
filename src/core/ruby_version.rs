@@ -210,7 +210,7 @@ use proc_maps::{maps_contain_addr, MapRange};
 
 // Checks whether the address looks even vaguely like a thread struct, mostly by making sure its
 // addresses are reasonable
-fn could_be_thread(thread: &$thread_type, all_maps: &Vec<MapRange>) -> bool {
+fn could_be_thread(thread: &$thread_type, all_maps: &[MapRange]) -> bool {
     maps_contain_addr(thread.tag as usize, all_maps) &&
         maps_contain_addr(thread.cfp as usize, all_maps) &&
         maps_contain_addr(stack_field(thread) as usize, all_maps) &&
@@ -221,7 +221,7 @@ fn stack_base(thread: &$thread_type) -> i64 {
     stack_field(thread) + stack_size_field(thread) * std::mem::size_of::<VALUE>() as i64 - 1 * std::mem::size_of::<rb_control_frame_t>() as i64
 }
 
-pub fn is_maybe_thread<T>(x: usize, x_addr: usize, source: T, all_maps: &Vec<MapRange>) -> bool where T: CopyAddress{
+pub fn is_maybe_thread<T>(x: usize, x_addr: usize, source: T, all_maps: &[MapRange]) -> bool where T: CopyAddress{
     if !maps_contain_addr(x, all_maps) {
         return false;
     }
@@ -233,7 +233,7 @@ pub fn is_maybe_thread<T>(x: usize, x_addr: usize, source: T, all_maps: &Vec<Map
         _ => { return false; },
     };
 
-    if !could_be_thread(&thread, all_maps) {
+    if !could_be_thread(&thread, &all_maps) {
         return false;
     }
 

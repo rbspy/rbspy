@@ -111,7 +111,7 @@ fn get_ruby_version_retry(pid: pid_t) -> Result<String, Error> {
     loop {
         let maybe_source = pid.try_into_process_handle();
         let version = match maybe_source {
-            Ok(source) => get_ruby_version(pid, &source),
+            Ok(source) => get_ruby_version(pid, source),
             Err(x) => Err(x.into()),
         }.context("Couldn't create process handle for PID");
         if i > 100 {
@@ -147,9 +147,9 @@ fn get_ruby_version_retry(pid: pid_t) -> Result<String, Error> {
     }
 }
 
-pub fn get_ruby_version(pid: pid_t, source: &ProcessHandle) -> Result<String, Error> {
+pub fn get_ruby_version(pid: pid_t, source: ProcessHandle) -> Result<String, Error> {
     let addr = address_finder::get_ruby_version_address(pid)?;
-    let x: [c_char; 15] = copy_struct(addr, source)?;
+    let x: [c_char; 15] = copy_struct(addr, &source)?;
     Ok(unsafe {
         std::ffi::CStr::from_ptr(x.as_ptr() as *mut c_char)
             .to_str()?
@@ -277,7 +277,7 @@ fn test_get_disallowed_process() {
 
 fn is_maybe_thread_function<T: 'static>(
     version: &str,
-) -> Box<Fn(usize, usize, T, &Vec<MapRange>) -> bool>
+) -> Box<Fn(usize, usize, T, &[MapRange]) -> bool>
 where
     T: CopyAddress,
 {
