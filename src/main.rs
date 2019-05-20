@@ -8,6 +8,7 @@ extern crate clap;
 extern crate ctrlc;
 extern crate elf;
 extern crate env_logger;
+extern crate inferno;
 #[macro_use]
 extern crate failure;
 #[macro_use]
