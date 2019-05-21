@@ -333,7 +333,7 @@ macro_rules! get_ruby_string(
                     }
                 }
             };
-            Ok(String::from_utf8(vec).map_err(|x| {MemoryCopyError::InvalidStringError(x)})?)
+            Ok(String::from_utf8(vec).map_err(MemoryCopyError::InvalidStringError)?)
         }
 ));
 
