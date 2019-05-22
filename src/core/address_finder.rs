@@ -23,6 +23,7 @@ pub enum AddressFinderError {
 #[cfg(target_os = "macos")]
 mod os_impl {
     use core::address_finder::AddressFinderError;
+    use core::initialize::IsMaybeThreadFn;
     use proc_maps::{get_process_maps, MapRange};
     use proc_maps::mac_maps::{get_symbols, Symbol};
 
@@ -38,7 +39,7 @@ mod os_impl {
     pub fn current_thread_address(
         pid: pid_t,
         version: &str,
-        _is_maybe_thread: Box<Fn(usize, usize, ProcessHandle, &[MapRange]) -> bool>,
+        _is_maybe_thread: IsMaybeThreadFn,
     ) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
         if version >= "2.5.0" {
@@ -143,6 +144,7 @@ mod os_impl {
 #[cfg(target_os = "linux")]
 mod os_impl {
     use core::address_finder::AddressFinderError;
+    use core::initialize::IsMaybeThreadFn;
     use core::copy::*;
     use proc_maps::{MapRange, get_process_maps};
 
@@ -155,7 +157,7 @@ mod os_impl {
     pub fn current_thread_address(
         pid: pid_t,
         version: &str,
-        is_maybe_thread: Box<Fn(usize, usize, ProcessHandle, &[MapRange]) -> bool>,
+        is_maybe_thread: IsMaybeThreadFn,
     ) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
         match current_thread_address_symbol_table(proginfo, version) {
@@ -222,7 +224,7 @@ mod os_impl {
 
     fn current_thread_address_search_bss(
         proginfo: &ProgramInfo,
-        is_maybe_thread: Box<Fn(usize, usize, ProcessHandle, &[MapRange]) -> bool>,
+        is_maybe_thread: IsMaybeThreadFn,
     ) -> Result<usize, Error> {
         // Used when there's no symbol table. Looks through the .bss and uses a search_bss (found in
         // `is_maybe_thread`) to find the address of the current thread.
@@ -364,6 +366,7 @@ mod os_impl {
 #[cfg(windows)]
 mod os_impl {
     use failure::Error;
+    use core::initialize::IsMaybeThreadFn;
     use read_process_memory::ProcessHandle;
     use proc_maps::{get_process_maps, MapRange, Pid};
     use proc_maps::win_maps::SymbolLoader;
@@ -375,7 +378,7 @@ mod os_impl {
     pub fn current_thread_address(
         pid: u32,
         version: &str,
-        _is_maybe_thread: Box<Fn(usize, usize, ProcessHandle, &[MapRange]) -> bool>,
+        _is_maybe_thread: IsMaybeThreadFn,
     ) -> Result<usize, Error> {
         let symbol_name = if version >= "2.5.0" {
             "ruby_current_execution_context_ptr"
