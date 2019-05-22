@@ -78,6 +78,8 @@ impl StackTraceGetter {
     }
 }
 
+pub type IsMaybeThreadFn<T = ProcessHandle> = Box<Fn(usize, usize, T, &[MapRange]) -> bool>;
+
 // Everything below here is private
 
 type StackTraceFn<T = ProcessHandle> = Box<Fn(usize, &Process<T>) -> Result<StackTrace, MemoryCopyError>>;
@@ -275,12 +277,7 @@ fn test_get_disallowed_process() {
     process.kill().unwrap();
 }
 
-fn is_maybe_thread_function<T: 'static>(
-    version: &str,
-) -> Box<Fn(usize, usize, T, &[MapRange]) -> bool>
-where
-    T: CopyAddress,
-{
+fn is_maybe_thread_function<T: 'static>(version: &str) -> IsMaybeThreadFn<T> where T: CopyAddress {
     let function = match version {
         "1.9.1" => ruby_version::ruby_1_9_1_0::is_maybe_thread,
         "1.9.2" => ruby_version::ruby_1_9_2_0::is_maybe_thread,
