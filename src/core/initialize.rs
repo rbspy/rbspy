@@ -190,7 +190,7 @@ fn test_get_disallowed_process() {
 #[test]
 #[cfg(target_os = "linux")]
 fn test_current_thread_address() {
-    let mut process = std::process::Command::new("/usr/bin/ruby").arg("./ci/ruby-programs/infinite.rb").spawn().unwrap();
+    let mut process = std::process::Command::new("ruby").arg("./ci/ruby-programs/infinite.rb").spawn().unwrap();
     let pid = process.id() as pid_t;
     let version = get_ruby_version_retry(pid).expect("version should exist");
     let is_maybe_thread = is_maybe_thread_function(&version);
@@ -203,7 +203,7 @@ fn test_current_thread_address() {
 #[cfg(target_os = "linux")]
 fn test_get_trace() {
     // Test getting a stack trace from a real running program using system Ruby
-    let mut process = std::process::Command::new("/usr/bin/ruby").arg("./ci/ruby-programs/infinite.rb").spawn().unwrap();
+    let mut process = std::process::Command::new("ruby").arg("./ci/ruby-programs/infinite.rb").spawn().unwrap();
     let pid = process.id() as pid_t;
     let mut getter = initialize(pid).unwrap();
     std::thread::sleep(std::time::Duration::from_millis(50));
@@ -219,9 +219,9 @@ fn test_get_exec_trace() {
     use std::io::Write;
 
     // Test collecting stack samples across an exec call
-    let mut process = std::process::Command::new("/usr/bin/ruby")
+    let mut process = std::process::Command::new("ruby")
         .arg("./ci/ruby-programs/ruby_exec.rb")
-        .arg("/usr/bin/ruby")
+        .arg("ruby")
         .stdin(std::process::Stdio::piped())
         .spawn()
         .unwrap();
