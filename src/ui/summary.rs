@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::io;
 
-use core::types::StackFrame;
+use crate::core::types::StackFrame;
 
 struct Counts {
     self_: u64,
@@ -69,7 +69,7 @@ impl Stats {
         }
     }
 
-    pub fn write(&self, w: &mut io::Write) -> io::Result<()> {
+    pub fn write(&self, w: &mut dyn io::Write) -> io::Result<()> {
         self.write_counts(w, None, None)
     }
 
@@ -77,7 +77,7 @@ impl Stats {
         self.write_counts(&mut ::std::io::stdout(), Some(n), truncate)
     }
 
-    fn write_counts(&self, w: &mut io::Write, top: Option<usize>, truncate: Option<usize>) -> io::Result<()> {
+    fn write_counts(&self, w: &mut dyn io::Write, top: Option<usize>, truncate: Option<usize>) -> io::Result<()> {
         let top = top.unwrap_or(::std::usize::MAX);
         let truncate = truncate.unwrap_or(::std::usize::MAX);
         let mut sorted: Vec<(u64, u64, &str)> = self.counts.iter().map(|(x,y)| (y.self_, y.total, x.as_ref())).collect();
@@ -93,7 +93,7 @@ impl Stats {
 
 #[cfg(test)]
 mod tests {
-    use ui::summary::*;
+    use crate::ui::summary::*;
 
     // Build a test stackframe
     fn f(i: u32) -> StackFrame {

@@ -13,8 +13,8 @@ macro_rules! ruby_version_v_1_9_1(
         pub mod $ruby_version {
             use std;
             use bindings::$ruby_version::*;
-            use core::copy::*;
-            use core::copy::MemoryCopyError;
+            use crate::core::copy::*;
+            use crate::core::copy::MemoryCopyError;
             use read_process_memory::CopyAddress;
 
             get_stack_trace!(rb_thread_struct);
@@ -34,8 +34,8 @@ macro_rules! ruby_version_v_1_9_2_to_3(
     ($ruby_version:ident) => (
         pub mod $ruby_version {
             use std;
-            use core::copy::*;
-            use core::copy::MemoryCopyError;
+            use crate::core::copy::*;
+            use crate::core::copy::MemoryCopyError;
             use bindings::$ruby_version::*;
             use read_process_memory::CopyAddress;
 
@@ -54,8 +54,8 @@ macro_rules! ruby_version_v_2_0_to_2_2(
     ($ruby_version:ident) => (
        pub mod $ruby_version {
             use std;
-            use core::copy::*;
-            use core::copy::MemoryCopyError;
+            use crate::core::copy::*;
+            use crate::core::copy::MemoryCopyError;
             use bindings::$ruby_version::*;
             use read_process_memory::CopyAddress;
 
@@ -87,8 +87,8 @@ macro_rules! ruby_version_v_2_3_to_2_4(
     ($ruby_version:ident) => (
        pub mod $ruby_version {
             use std;
-            use core::copy::*;
-            use core::copy::MemoryCopyError;
+            use crate::core::copy::*;
+            use crate::core::copy::MemoryCopyError;
             use bindings::$ruby_version::*;
             use read_process_memory::CopyAddress;
 
@@ -107,8 +107,8 @@ macro_rules! ruby_version_v2_5_x(
     ($ruby_version:ident) => (
        pub mod $ruby_version {
             use std;
-            use core::copy::*;
-            use core::copy::MemoryCopyError;
+            use crate::core::copy::*;
+            use crate::core::copy::MemoryCopyError;
             use bindings::$ruby_version::*;
             use read_process_memory::CopyAddress;
 
@@ -128,8 +128,8 @@ macro_rules! ruby_version_v2_6_x(
     ($ruby_version:ident) => (
        pub mod $ruby_version {
             use std;
-            use core::copy::*;
-            use core::copy::MemoryCopyError;
+            use crate::core::copy::*;
+            use crate::core::copy::MemoryCopyError;
             use bindings::$ruby_version::*;
             use read_process_memory::CopyAddress;
 
@@ -148,8 +148,8 @@ macro_rules! ruby_version_v2_6_x(
 macro_rules! get_stack_trace(
     ($thread_type:ident) => (
 
-        use core::types::*;
-        use core::types::StackFrame;
+        use crate::core::types::*;
+        use crate::core::types::StackFrame;
 
         pub fn get_stack_trace<T>(
             ruby_current_thread_address_location: usize,
@@ -655,8 +655,8 @@ ruby_version_v2_6_x!(ruby_2_6_3);
 mod tests {
     use rbspy_testdata::*;
 
-    use core::ruby_version;
-    use core::types::{StackFrame, Process};
+    use crate::core::ruby_version;
+    use crate::core::types::{StackFrame, Process};
 
     fn real_stack_trace_1_9_3() -> Vec<StackFrame> {
         vec![

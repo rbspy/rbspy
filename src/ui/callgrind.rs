@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::collections::{BTreeMap, HashMap};
 use std::io;
 
-use core::types::StackFrame;
+use crate::core::types::StackFrame;
 
 /*
  * **Notes about the overall design**
@@ -251,7 +251,7 @@ impl Stats {
 
     // Write a callgrind file based on the stats collected.
     // SEe the format docs here: http://kcachegrind.sourceforge.net/html/CallgrindFormat.html
-    pub fn write(&self, w: &mut io::Write) -> io::Result<()> {
+    pub fn write(&self, w: &mut dyn io::Write) -> io::Result<()> {
         // Write a header.
         writeln!(w, "# callgrind format")?;
         writeln!(w, "version: 1")?;
@@ -284,7 +284,7 @@ impl Stats {
 
 #[cfg(test)]
 mod tests {
-    use ui::callgrind::*;
+    use crate::ui::callgrind::*;
 
     // Build a test stackframe
     fn f(i: u32) -> StackFrame {

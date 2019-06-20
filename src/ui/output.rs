@@ -4,11 +4,8 @@ extern crate tempdir;
 use failure::Error;
 use std::fs::File;
 
-use ui::callgrind;
-use ui::summary;
-use ui::flamegraph;
-use ui::speedscope;
-use core::types::{StackTrace, StackFrame};
+use crate::ui::{callgrind, flamegraph, speedscope, summary};
+use crate::core::types::{StackTrace, StackFrame};
 
 pub trait Outputter {
     fn record(&mut self, stack: &StackTrace) -> Result<(), Error>;

@@ -61,9 +61,9 @@ pub mod core;
 pub mod ui;
 pub(crate) mod storage;
 
-use core::initialize::initialize;
-use core::types::{StackTrace, pid_t};
-use core::copy::MemoryCopyError;
+use crate::core::initialize::initialize;
+use crate::core::types::{StackTrace, pid_t};
+use crate::core::copy::MemoryCopyError;
 use ui::output;
 use ui::descendents::descendents_of;
 
@@ -232,7 +232,7 @@ fn snapshot(pid: pid_t) -> Result<(), Error> {
 }
 
 impl OutputFormat {
-    fn outputter(self) -> Box<ui::output::Outputter> {
+    fn outputter(self) -> Box<dyn ui::output::Outputter> {
         match self {
             OutputFormat::flamegraph => Box::new(output::Flamegraph(ui::flamegraph::Stats::new())),
             OutputFormat::callgrind => Box::new(output::Callgrind(ui::callgrind::Stats::new())),
@@ -517,7 +517,7 @@ fn record(
                 errors += 1;
                 if errors > 20 && (errors as f64) / (total as f64) > 0.5 {
                     print_errors(errors, total);
-                    return Err(x.into());
+                    return Err(x);
                 }
             }
         }

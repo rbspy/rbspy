@@ -1,9 +1,9 @@
-use core::address_finder::*;
-use core::address_finder;
-use core::copy::*;
+use crate::core::address_finder::*;
+use crate::core::address_finder;
+use crate::core::copy::*;
 use proc_maps::MapRange;
-use core::ruby_version;
-use core::types::{StackTrace, Process, pid_t};
+use crate::core::ruby_version;
+use crate::core::types::{StackTrace, Process, pid_t};
 
 use failure::Error;
 use failure::ResultExt;
@@ -78,11 +78,11 @@ impl StackTraceGetter {
     }
 }
 
-pub type IsMaybeThreadFn<T = ProcessHandle> = Box<Fn(usize, usize, T, &[MapRange]) -> bool>;
+pub type IsMaybeThreadFn<T = ProcessHandle> = Box<dyn Fn(usize, usize, T, &[MapRange]) -> bool>;
 
 // Everything below here is private
 
-type StackTraceFn<T = ProcessHandle> = Box<Fn(usize, &Process<T>) -> Result<StackTrace, MemoryCopyError>>;
+type StackTraceFn<T = ProcessHandle> = Box<dyn Fn(usize, &Process<T>) -> Result<StackTrace, MemoryCopyError>>;
 
 fn get_process_ruby_state(pid: pid_t) -> Result<(usize, StackTraceFn), Error> {
     let version = get_ruby_version_retry(pid).context("Couldn't determine Ruby version")?;

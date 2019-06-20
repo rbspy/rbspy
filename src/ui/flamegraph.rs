@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io;
 use std::fs::File;
 
-use core::types::StackFrame;
+use crate::core::types::StackFrame;
 
 use failure::Error;
 use inferno::flamegraph::{Direction, Options};
@@ -43,7 +43,7 @@ impl Stats {
 
 #[cfg(test)]
 mod tests {
-    use ui::flamegraph::*;
+    use crate::ui::flamegraph::*;
 
     // Build a test stackframe
     fn f(i: u32) -> StackFrame {

@@ -18,7 +18,7 @@ use std::io::prelude::*;
 use std::fs::File;
 use std::path::Path;
 
-use core::types::StackTrace;
+use crate::core::types::StackTrace;
 
 use self::flate2::Compression;
 use failure::Error;
@@ -97,7 +97,7 @@ pub(crate) trait Storage: Into<v1::Data> {
     fn version() -> Version;
 }
 
-fn read_version(r: &mut Read) -> Result<Version, StorageError> {
+fn read_version(r: &mut dyn Read) -> Result<Version, StorageError> {
     let mut buf = [0u8; 8];
     // TODO: I don't know how to failure good, so this doesn't work.
     r.read(&mut buf).map_err(StorageError::Io)?;
