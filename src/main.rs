@@ -232,7 +232,7 @@ fn snapshot(pid: pid_t) -> Result<(), Error> {
 }
 
 impl OutputFormat {
-    fn outputter(self) -> Box<ui::output::Outputter> {
+    fn outputter(self) -> Box<dyn ui::output::Outputter> {
         match self {
             OutputFormat::flamegraph => Box::new(output::Flamegraph(ui::flamegraph::Stats::new())),
             OutputFormat::callgrind => Box::new(output::Callgrind(ui::callgrind::Stats::new())),

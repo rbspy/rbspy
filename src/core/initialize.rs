@@ -78,11 +78,11 @@ impl StackTraceGetter {
     }
 }
 
-pub type IsMaybeThreadFn<T = ProcessHandle> = Box<Fn(usize, usize, T, &[MapRange]) -> bool>;
+pub type IsMaybeThreadFn<T = ProcessHandle> = Box<dyn Fn(usize, usize, T, &[MapRange]) -> bool>;
 
 // Everything below here is private
 
-type StackTraceFn<T = ProcessHandle> = Box<Fn(usize, &Process<T>) -> Result<StackTrace, MemoryCopyError>>;
+type StackTraceFn<T = ProcessHandle> = Box<dyn Fn(usize, &Process<T>) -> Result<StackTrace, MemoryCopyError>>;
 
 fn get_process_ruby_state(pid: pid_t) -> Result<(usize, StackTraceFn), Error> {
     let version = get_ruby_version_retry(pid).context("Couldn't determine Ruby version")?;
