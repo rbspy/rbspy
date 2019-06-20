@@ -24,6 +24,10 @@ do
 
    echo -n "subprocess identification"
    docker run -v=/tmp/artifacts:/stuff rb-stacktrace-$distro env RUST_BACKTRACE=1 /stuff/rbspy record --subprocesses /usr/bin/ruby /stuff/ruby_forks.rb
+
+   echo -n "unicode test"
+   docker run -v=/tmp/artifacts:/stuff rb-stacktrace-$distro env RUST_BACKTRACE=1 /stuff/rbspy record --file /tmp/stacks.txt /usr/bin/ruby /stuff/unicode_stack.rb
+   grep € /tmp/stacks.txt
 done
 
 echo "=================="
