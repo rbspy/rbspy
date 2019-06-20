@@ -29,7 +29,6 @@ mod os_impl {
 
     use failure::Error;
     use libc::pid_t;
-    use read_process_memory::*;
 
     pub fn get_ruby_version_address(pid: pid_t) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;

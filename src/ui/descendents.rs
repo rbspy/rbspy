@@ -1,7 +1,4 @@
 use std::collections::HashMap;
-use std::fs::read_dir;
-use std::fs::File;
-use std::io::Read;
 
 use failure::Error;
 
@@ -134,6 +131,10 @@ fn test_status_file_ppid() {
 /// Returns pairs of <pid, parent pid>
 #[cfg(target_os = "linux")]
 fn get_proc_children() -> Result<Vec<(pid_t, pid_t)>, Error> {
+    use std::fs::read_dir;
+    use std::fs::File;
+    use std::io::Read;
+
     let mut process_pairs = vec![];
     for entry in read_dir("/proc")? {
         let entry = entry?;
