@@ -93,7 +93,7 @@ impl Stats {
 
 #[cfg(test)]
 mod tests {
-    use ui::summary::*;
+    use crate::ui::summary::*;
 
     // Build a test stackframe
     fn f(i: u32) -> StackFrame {

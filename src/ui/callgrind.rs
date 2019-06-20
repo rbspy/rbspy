@@ -284,7 +284,7 @@ impl Stats {
 
 #[cfg(test)]
 mod tests {
-    use ui::callgrind::*;
+    use crate::ui::callgrind::*;
 
     // Build a test stackframe
     fn f(i: u32) -> StackFrame {

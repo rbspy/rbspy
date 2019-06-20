@@ -43,7 +43,7 @@ impl Stats {
 
 #[cfg(test)]
 mod tests {
-    use ui::flamegraph::*;
+    use crate::ui::flamegraph::*;
 
     // Build a test stackframe
     fn f(i: u32) -> StackFrame {

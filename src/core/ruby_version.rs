@@ -655,8 +655,8 @@ ruby_version_v2_6_x!(ruby_2_6_3);
 mod tests {
     use rbspy_testdata::*;
 
-    use core::ruby_version;
-    use core::types::{StackFrame, Process};
+    use crate::core::ruby_version;
+    use crate::core::types::{StackFrame, Process};
 
     fn real_stack_trace_1_9_3() -> Vec<StackFrame> {
         vec![
