@@ -5,7 +5,7 @@ use std::io::Read;
 
 use failure::Error;
 
-use core::types::pid_t;
+use crate::core::types::pid_t;
 
 pub fn descendents_of(parent_pid: pid_t) -> Result<Vec<pid_t>, Error> {
     let parents_to_children = map_parents_to_children()?;

@@ -9,6 +9,7 @@ repository = "https://github.com/rbspy/rbspy"
 readme = "README.md"
 documentation = "https://github.com/rbspy/rbspy"
 homepage = "https://github.com/rbspy/rbspy"
+edition = "2018"
 
 [workspace]
 

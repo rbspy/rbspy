@@ -1,5 +1,5 @@
 pub use self::os_impl::*;
-use core::types::pid_t;
+use crate::core::types::pid_t;
 
 /*
  * Operating-system specific code for getting
@@ -22,8 +22,8 @@ pub enum AddressFinderError {
 
 #[cfg(target_os = "macos")]
 mod os_impl {
-    use core::address_finder::AddressFinderError;
-    use core::initialize::IsMaybeThreadFn;
+    use crate::core::address_finder::AddressFinderError;
+    use crate::core::initialize::IsMaybeThreadFn;
     use proc_maps::{get_process_maps, MapRange};
     use proc_maps::mac_maps::{get_symbols, Symbol};
 
@@ -143,9 +143,9 @@ mod os_impl {
 
 #[cfg(target_os = "linux")]
 mod os_impl {
-    use core::address_finder::AddressFinderError;
-    use core::initialize::IsMaybeThreadFn;
-    use core::copy::*;
+    use crate::core::address_finder::AddressFinderError;
+    use crate::core::initialize::IsMaybeThreadFn;
+    use crate::core::copy::*;
     use proc_maps::{MapRange, get_process_maps};
 
     use elf;
@@ -366,7 +366,7 @@ mod os_impl {
 #[cfg(windows)]
 mod os_impl {
     use failure::Error;
-    use core::initialize::IsMaybeThreadFn;
+    use crate::core::initialize::IsMaybeThreadFn;
     use read_process_memory::ProcessHandle;
     use proc_maps::{get_process_maps, MapRange, Pid};
     use proc_maps::win_maps::SymbolLoader;

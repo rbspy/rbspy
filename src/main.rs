@@ -61,9 +61,9 @@ pub mod core;
 pub mod ui;
 pub(crate) mod storage;
 
-use core::initialize::initialize;
-use core::types::{StackTrace, pid_t};
-use core::copy::MemoryCopyError;
+use crate::core::initialize::initialize;
+use crate::core::types::{StackTrace, pid_t};
+use crate::core::copy::MemoryCopyError;
 use ui::output;
 use ui::descendents::descendents_of;
 

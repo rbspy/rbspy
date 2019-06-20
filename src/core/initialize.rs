@@ -1,9 +1,9 @@
-use core::address_finder::*;
-use core::address_finder;
-use core::copy::*;
+use crate::core::address_finder::*;
+use crate::core::address_finder;
+use crate::core::copy::*;
 use proc_maps::MapRange;
-use core::ruby_version;
-use core::types::{StackTrace, Process, pid_t};
+use crate::core::ruby_version;
+use crate::core::types::{StackTrace, Process, pid_t};
 
 use failure::Error;
 use failure::ResultExt;
