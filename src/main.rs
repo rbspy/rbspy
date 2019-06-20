@@ -517,7 +517,7 @@ fn record(
                 errors += 1;
                 if errors > 20 && (errors as f64) / (total as f64) > 0.5 {
                     print_errors(errors, total);
-                    return Err(x.into());
+                    return Err(x);
                 }
             }
         }
