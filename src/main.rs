@@ -381,10 +381,15 @@ fn spawn_recorder_children(pid: pid_t, with_subprocesses: bool, sample_rate: u32
     Ok((trace_receiver, result_receiver, total_traces_clone, timing_error_traces_clone))
 }
 
-#[cfg(unix)]
 #[test]
 fn test_spawn_record_children_subprocesses() {
-    let output = Command::new("/usr/bin/which")
+    let which = if cfg!(target_os = "windows") {
+        "C:\\Windows\\System32\\WHERE.exe"
+    } else {
+        "/usr/bin/which"
+    };
+
+    let output = Command::new(which)
         .arg("ruby")
         .output()
         .expect("failed to execute process");
@@ -700,7 +705,6 @@ fn arg_parser() -> App<'static, 'static> {
                 .arg(
                     Arg::from_usage( "-s --subprocesses='Record all subprocesses of the given PID or command'")
                         .required(false)
-                        .hidden(cfg!(target_os = "windows"))
                 )
                 .arg(
                     Arg::from_usage( "--silent='Don't print the summary profiling data every second'")
@@ -764,9 +768,6 @@ impl Args {
                 let no_drop_root = submatches.occurrences_of("no-drop-root") == 1;
                 let silent = submatches.is_present("silent");
                 let with_subprocesses = submatches.is_present("subprocesses");
-                if with_subprocesses && cfg!(target_os = "windows") {
-                    return Err(format_err!("--subprocesses option is not available on windows"));
-                }
 
                 let sample_rate = value_t!(submatches, "rate", u32).unwrap();
                 let target = if let Some(pid) = get_pid(submatches) {
@@ -950,28 +951,25 @@ mod tests {
             }
         );
 
-        #[cfg(not(windows))]
-        {
-            let args = Args::from(make_args(
-                "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --subprocesses",
-            )).unwrap();
-            assert_eq!(
-                args,
-                Args {
-                    cmd: Record {
-                        target: Pid { pid: 1234 },
-                        out_path: "foo.txt".into(),
-                        raw_path: "raw.gz".into(),
-                        sample_rate: 100,
-                        maybe_duration: None,
-                        format: OutputFormat::flamegraph,
-                        no_drop_root: false,
-                        with_subprocesses: true,
-                        silent: false,
+        let args = Args::from(make_args(
+            "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --subprocesses",
+        )).unwrap();
+        assert_eq!(
+            args,
+            Args {
+                cmd: Record {
+                    target: Pid { pid: 1234 },
+                    out_path: "foo.txt".into(),
+                    raw_path: "raw.gz".into(),
+                    sample_rate: 100,
+                    maybe_duration: None,
+                    format: OutputFormat::flamegraph,
+                    no_drop_root: false,
+                    with_subprocesses: true,
+                    silent: false,
                     },
-                }
-            );
-        }
+            }
+        );
     }
 
     #[test]
