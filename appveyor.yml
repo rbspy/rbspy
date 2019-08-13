@@ -39,9 +39,11 @@ environment:
   # Stable 64-bit MSVC
     - channel: stable
       target: x86_64-pc-windows-msvc
+      RUBY_VERSION: 25-x64
   # Stable 32-bit MSVC
     - channel: stable
       target: i686-pc-windows-msvc
+      RUBY_VERSION: 25
 
 ## Install Script ##
 
@@ -54,7 +56,8 @@ environment:
 install:
   - appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
   - rustup-init -yv --default-toolchain %channel% --default-host %target%
-  - set PATH=%PATH%;%USERPROFILE%\.cargo\bin
+  - set PATH=C:\Ruby%RUBY_VERSION%\bin;%PATH%;%USERPROFILE%\.cargo\bin
+  - ruby -v
   - rustc -vV
   - cargo -vV
 

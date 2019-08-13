@@ -7,11 +7,56 @@ use failure::Error;
 
 use crate::core::types::pid_t;
 
+#[cfg(unix)]
 pub fn descendents_of(parent_pid: pid_t) -> Result<Vec<pid_t>, Error> {
     let parents_to_children = map_parents_to_children()?;
     get_descendents(parent_pid, parents_to_children)
 }
 
+#[cfg(windows)]
+pub fn descendents_of(parent_pid: pid_t) -> Result<Vec<pid_t>, Error> {
+    use std::os::windows::io::RawHandle;
+    use winapi::um::processthreadsapi::{GetProcessId, OpenProcess};
+    use winapi::um::winnt::{ACCESS_MASK, MAXIMUM_ALLOWED, HANDLE, PROCESS_QUERY_INFORMATION};
+    use winapi::um::handleapi::CloseHandle;
+    use winapi::shared::minwindef::{FALSE, ULONG};
+    use winapi::shared::ntdef::NTSTATUS;
+
+    #[link(name="ntdll")]
+    extern "system" {
+        // (Vista and above) enumerate process children.
+        fn NtGetNextProcess(process: HANDLE, access: ACCESS_MASK, attritubes: ULONG, flags: ULONG, new_process: *mut HANDLE) -> NTSTATUS;
+    }
+
+    let mut handle = unsafe {
+        OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, parent_pid)
+    };
+
+    let mut pids = vec![parent_pid];
+
+    if handle == (0 as RawHandle) {
+        return Err(format_err!(
+            "Unable to fetch process handle for process {}", parent_pid
+        ));
+    }
+
+    let old_handle = handle;
+
+    unsafe {
+        while NtGetNextProcess(handle, MAXIMUM_ALLOWED, 0, 0,
+                               &mut handle) == 0 {
+            let pid = GetProcessId(handle);
+
+            pids.push(pid);
+        }
+
+        CloseHandle(old_handle);
+    }
+
+    Ok(pids)
+}
+
+#[cfg(unix)]
 fn get_descendents(
     parent_pid: pid_t,
     parents_to_children: HashMap<pid_t, Vec<pid_t>>,
@@ -37,6 +82,7 @@ fn get_descendents(
     }
 }
 
+#[cfg(unix)]
 fn map_parents_to_children() -> Result<HashMap<pid_t, Vec<pid_t>>, Error> {
     let mut pid_map: HashMap<pid_t, Vec<pid_t>> = HashMap::new();
 
@@ -46,6 +92,7 @@ fn map_parents_to_children() -> Result<HashMap<pid_t, Vec<pid_t>>, Error> {
     Ok(pid_map)
 }
 
+#[cfg(unix)]
 #[test]
 fn test_get_descendents() {
     let mut map = HashMap::new();
@@ -54,6 +101,7 @@ fn test_get_descendents() {
     assert_eq!(desc, vec![1, 2]);
 }
 
+#[cfg(unix)]
 #[test]
 fn test_get_descendents_depth_2() {
     let mut map = HashMap::new();
@@ -64,6 +112,7 @@ fn test_get_descendents_depth_2() {
 }
 
 // parses /proc/<pid>/status format
+#[cfg(target_os = "linux")]
 fn status_file_ppid(status: &str) -> Result<pid_t, Error> {
     let ppid_line = status.split('\n').find(|x| x.starts_with("PPid:"));
     match ppid_line {
@@ -75,6 +124,7 @@ fn status_file_ppid(status: &str) -> Result<pid_t, Error> {
     }
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn test_status_file_ppid() {
     let status = "Name:	kthreadd\nState:	S (sleeping)\nTgid:	2\nNgid:	0\nPid:	0\nPPid:	1234\n";
@@ -120,12 +170,4 @@ fn get_proc_children() -> Result<Vec<(pid_t, pid_t)>, Error> {
         .map_err(convert_error)?;
 
     Ok(pids.iter().map(|&pid| pid as pid_t).zip(ppids).collect())
-}
-
-#[cfg(windows)]
-fn get_proc_children() -> Result<Vec<(pid_t, pid_t)>, Error> {
-    // TODO: this isn't currently implemented, but can be done
-    // using the tlhelp32 Process32First/Process32Next api from the
-    // winapi-rs crate: https://github.com/retep998/winapi-rs/blob/0.3/src/um/tlhelp32.rs#L94
-    unimplemented!("--subprocesses option is not yet supported on windows")
 }

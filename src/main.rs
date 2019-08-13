@@ -140,7 +140,12 @@ fn do_main() -> Result<(), Error> {
     }
 
     match args.cmd {
-        Snapshot { pid } => snapshot(pid),
+        Snapshot { pid } => {
+            #[cfg(all(windows, target_arch = "x86_64"))]
+            check_wow64_process(pid);
+
+            snapshot(pid)
+        },
         Record {
             target,
             out_path,
@@ -182,6 +187,9 @@ fn do_main() -> Result<(), Error> {
                 }
             };
 
+            #[cfg(all(windows, target_arch = "x86_64"))]
+            check_wow64_process(pid);
+
             parallel_record(
                 format,
                 &raw_path,
@@ -209,6 +217,66 @@ fn check_root_user() -> bool {
         );
         return false;
     }
+}
+
+#[cfg(all(windows, target_arch = "x86_64"))]
+fn check_wow64_process(pid: pid_t) {
+    if is_wow64_process(pid).unwrap() {
+        eprintln!("Unable to profile 32-bit Ruby with 64-bit rbspy.");
+        std::process::exit(1);
+    }
+}
+
+#[cfg(all(windows, target_arch = "x86_64"))]
+fn is_wow64_process(pid: pid_t) -> Result<bool, Error> {
+    use std::os::windows::io::RawHandle;
+    use winapi::um::wow64apiset::IsWow64Process;
+    use winapi::um::processthreadsapi::OpenProcess;
+    use winapi::um::winnt::PROCESS_QUERY_INFORMATION;
+    use winapi::shared::minwindef::{BOOL, FALSE, PBOOL};
+
+    let handle = unsafe {
+        OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid)
+    };
+
+    if handle == (0 as RawHandle) {
+        return Err(format_err!(
+            "Unable to fetch process handle for process {}", pid
+        ));
+    }
+
+    let mut is_wow64: BOOL = 0;
+
+    if unsafe { IsWow64Process(handle, &mut is_wow64 as PBOOL) } == FALSE {
+        return Err(format_err!(
+            "Could not determine process bitness! {}", pid
+        ))
+    }
+
+    Ok(is_wow64 != 0)
+}
+
+#[test]
+#[cfg(all(windows, target_arch = "x86_64"))]
+fn test_is_wow64_process() {
+    let programs = vec![
+        "C:\\Program Files (x86)\\Internet Explorer\\iexplore.exe",
+        "C:\\Program Files\\Internet Explorer\\iexplore.exe",
+    ];
+
+    let results: Vec<bool> = programs.iter().map(|path| {
+        let mut cmd = Command::new(path)
+            .spawn()
+            .expect("ls command failed to start");
+
+        let result = is_wow64_process(cmd.id());
+
+        cmd.kill();
+
+        result.unwrap()
+    }).collect();
+
+    assert_eq!(results, vec![true, false]);
 }
 
 fn main() {
@@ -381,17 +449,26 @@ fn spawn_recorder_children(pid: pid_t, with_subprocesses: bool, sample_rate: u32
     Ok((trace_receiver, result_receiver, total_traces_clone, timing_error_traces_clone))
 }
 
-#[cfg(unix)]
 #[test]
 fn test_spawn_record_children_subprocesses() {
-    let output = Command::new("/usr/bin/which")
+    let which = if cfg!(target_os = "windows") {
+        "C:\\Windows\\System32\\WHERE.exe"
+    } else {
+        "/usr/bin/which"
+    };
+
+    let output = Command::new(which)
         .arg("ruby")
         .output()
         .expect("failed to execute process");
 
     let ruby_binary_path = String::from_utf8(output.stdout).unwrap();
 
-    let mut process = std::process::Command::new(ruby_binary_path.trim()).arg("ci/ruby-programs/ruby_forks.rb").spawn().unwrap();
+    let ruby_binary_path_str = ruby_binary_path.lines()
+        .next()
+        .expect("failed to execute ruby process");
+
+    let mut process = std::process::Command::new(ruby_binary_path_str).arg("ci/ruby-programs/ruby_forks.rb").spawn().unwrap();
     let pid = process.id() as pid_t;
     let (trace_receiver, result_receiver, _, _) = spawn_recorder_children(pid, true, 10, None).unwrap();
     process.wait().unwrap();
@@ -700,7 +777,6 @@ fn arg_parser() -> App<'static, 'static> {
                 .arg(
                     Arg::from_usage( "-s --subprocesses='Record all subprocesses of the given PID or command'")
                         .required(false)
-                        .hidden(cfg!(target_os = "windows"))
                 )
                 .arg(
                     Arg::from_usage( "--silent='Don't print the summary profiling data every second'")
@@ -764,9 +840,6 @@ impl Args {
                 let no_drop_root = submatches.occurrences_of("no-drop-root") == 1;
                 let silent = submatches.is_present("silent");
                 let with_subprocesses = submatches.is_present("subprocesses");
-                if with_subprocesses && cfg!(target_os = "windows") {
-                    return Err(format_err!("--subprocesses option is not available on windows"));
-                }
 
                 let sample_rate = value_t!(submatches, "rate", u32).unwrap();
                 let target = if let Some(pid) = get_pid(submatches) {
@@ -950,28 +1023,25 @@ mod tests {
             }
         );
 
-        #[cfg(not(windows))]
-        {
-            let args = Args::from(make_args(
-                "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --subprocesses",
-            )).unwrap();
-            assert_eq!(
-                args,
-                Args {
-                    cmd: Record {
-                        target: Pid { pid: 1234 },
-                        out_path: "foo.txt".into(),
-                        raw_path: "raw.gz".into(),
-                        sample_rate: 100,
-                        maybe_duration: None,
-                        format: OutputFormat::flamegraph,
-                        no_drop_root: false,
-                        with_subprocesses: true,
-                        silent: false,
+        let args = Args::from(make_args(
+            "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --subprocesses",
+        )).unwrap();
+        assert_eq!(
+            args,
+            Args {
+                cmd: Record {
+                    target: Pid { pid: 1234 },
+                    out_path: "foo.txt".into(),
+                    raw_path: "raw.gz".into(),
+                    sample_rate: 100,
+                    maybe_duration: None,
+                    format: OutputFormat::flamegraph,
+                    no_drop_root: false,
+                    with_subprocesses: true,
+                    silent: false,
                     },
-                }
-            );
-        }
+            }
+        );
     }
 
     #[test]

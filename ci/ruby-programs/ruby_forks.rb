@@ -1,11 +1,17 @@
 SLEEP_TIME = 2
 
-pid1 = fork do
-  pid1_1 = fork { sleep SLEEP_TIME }
+suprocess_cmd = <<-CMD
+  pid1_1 = spawn(ENV, RbConfig.ruby, "-esleep(#{SLEEP_TIME})")
 
-  sleep SLEEP_TIME
-end
+  sleep #{SLEEP_TIME}
+  Process.wait(pid1_1)
+CMD
 
-pid2 = fork { sleep SLEEP_TIME }
+pid1 = spawn(ENV, RbConfig.ruby, "-e#{suprocess_cmd}")
+
+pid2 = spawn(ENV, RbConfig.ruby, "-esleep(#{SLEEP_TIME})")
 
 sleep SLEEP_TIME
+
+Process.wait(pid1)
+Process.wait(pid2)
