@@ -641,15 +641,18 @@ ruby_version_v_2_3_to_2_4!(ruby_2_4_3);
 ruby_version_v_2_3_to_2_4!(ruby_2_4_4);
 ruby_version_v_2_3_to_2_4!(ruby_2_4_5);
 ruby_version_v_2_3_to_2_4!(ruby_2_4_6);
+ruby_version_v_2_3_to_2_4!(ruby_2_4_7);
 ruby_version_v2_5_x!(ruby_2_5_0);
 ruby_version_v2_5_x!(ruby_2_5_1);
 ruby_version_v2_5_x!(ruby_2_5_3);
 ruby_version_v2_5_x!(ruby_2_5_4);
 ruby_version_v2_5_x!(ruby_2_5_5);
+ruby_version_v2_5_x!(ruby_2_5_6);
 ruby_version_v2_6_x!(ruby_2_6_0);
 ruby_version_v2_6_x!(ruby_2_6_1);
 ruby_version_v2_6_x!(ruby_2_6_2);
 ruby_version_v2_6_x!(ruby_2_6_3);
+ruby_version_v2_6_x!(ruby_2_6_4);
 
 #[cfg(test)]
 mod tests {
