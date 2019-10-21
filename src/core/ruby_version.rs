@@ -136,7 +136,7 @@ macro_rules! ruby_version_v2_6_x(
             get_stack_trace!(rb_execution_context_struct);
             get_ruby_string!();
             get_cfps!();
-            get_pos!(rb_iseq_constant_body);
+            //get_pos!(rb_iseq_constant_body);
             get_lineno_2_6_0!();
             get_stack_frame_2_5_0!();
             stack_field_2_5_0!();
@@ -501,7 +501,7 @@ macro_rules! get_lineno_2_6_0(
     () => (
         fn get_lineno<T>(
             iseq_struct: &rb_iseq_constant_body,
-            cfp: &rb_control_frame_t,
+            _cfp: &rb_control_frame_t,
             source: &T,
             ) -> Result<u32, MemoryCopyError> where T: CopyAddress{
             //let pos = get_pos(iseq_struct, cfp)?;
