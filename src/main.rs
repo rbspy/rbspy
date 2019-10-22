@@ -429,9 +429,6 @@ fn spawn_recorder_children(pid: pid_t, with_subprocesses: bool, sample_rate: u32
         });
     } else {
         // Start a single recorder thread
-        let done = done.clone();
-        let timing_error_traces = timing_error_traces.clone();
-        let total_traces = total_traces.clone();
         std::thread::spawn(move || {
             let result = record(
                 pid,
