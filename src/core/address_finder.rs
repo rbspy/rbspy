@@ -1,5 +1,5 @@
 pub use self::os_impl::*;
-use crate::core::types::pid_t;
+use crate::core::types::Pid;
 
 /*
  * Operating-system specific code for getting
@@ -11,33 +11,33 @@ use crate::core::types::pid_t;
 
 #[derive(Fail, Debug)]
 pub enum AddressFinderError {
-    #[fail(display = "No process with PID: {}", _0)] NoSuchProcess(pid_t),
+    #[fail(display = "No process with PID: {}", _0)] NoSuchProcess(Pid),
     #[fail(display = "Permission denied when reading from process {}. If you're not running as root, try again with sudo. If you're using Docker, try passing `--cap-add=SYS_PTRACE` to `docker run`", _0)]
-    PermissionDenied(pid_t),
+    PermissionDenied(Pid),
     #[fail(display = "Couldn't get port for PID {}. Possibilities: that process doesn't exist or you have SIP enabled and you're trying to profile system Ruby (try rbenv instead).", _0)]
     #[cfg(target_os = "macos")]
-    MacPermissionDenied(pid_t),
-    #[fail(display = "Error reading /proc/{}/maps", _0)] ProcMapsError(pid_t),
+    MacPermissionDenied(Pid),
+    #[fail(display = "Error reading /proc/{}/maps", _0)] ProcMapsError(Pid),
 }
 
 #[cfg(target_os = "macos")]
 mod os_impl {
     use crate::core::address_finder::AddressFinderError;
     use crate::core::initialize::IsMaybeThreadFn;
+    use crate::core::types::Pid;
+
     use proc_maps::{get_process_maps, MapRange};
     use proc_maps::mac_maps::{get_symbols, Symbol};
 
     use failure::Error;
-    use libc::pid_t;
-    use read_process_memory::*;
 
-    pub fn get_ruby_version_address(pid: pid_t) -> Result<usize, Error> {
+    pub fn get_ruby_version_address(pid: Pid) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
         proginfo.symbol_addr("_ruby_version")
     }
 
     pub fn current_thread_address(
-        pid: pid_t,
+        pid: Pid,
         version: &str,
         _is_maybe_thread: IsMaybeThreadFn,
     ) -> Result<usize, Error> {
@@ -101,7 +101,7 @@ mod os_impl {
         libruby_binary: Option<Binary>,
     }
 
-    fn get_program_info(pid: pid_t) -> Result<ProgramInfo, Error> {
+    fn get_program_info(pid: Pid) -> Result<ProgramInfo, Error> {
         let maps = get_process_maps(pid).map_err(|_| {
             AddressFinderError::MacPermissionDenied(pid)
         })?;
@@ -141,21 +141,20 @@ mod os_impl {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 mod os_impl {
     use crate::core::address_finder::AddressFinderError;
     use crate::core::initialize::IsMaybeThreadFn;
-    use crate::core::copy::*;
+    use crate::core::types::{Process, Pid};
     use proc_maps::{MapRange, get_process_maps};
+    use remoteprocess::ProcessMemory;
 
     use elf;
-    use failure::Error;
-    use libc::pid_t;
+    use failure::{Error, ResultExt};
     use std;
-    use read_process_memory::*;
 
     pub fn current_thread_address(
-        pid: pid_t,
+        pid: Pid,
         version: &str,
         is_maybe_thread: IsMaybeThreadFn,
     ) -> Result<usize, Error> {
@@ -172,7 +171,7 @@ mod os_impl {
         }
     }
 
-    pub fn get_ruby_version_address(pid: pid_t) -> Result<usize, Error> {
+    pub fn get_ruby_version_address(pid: Pid) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
         let ruby_version_symbol = "ruby_version";
         let symbol_addr =
@@ -242,8 +241,9 @@ mod os_impl {
         let read_addr = map.start() + bss_section.addr as usize - load_header.vaddr as usize;
 
         debug!("read_addr: {:x}", read_addr);
-        let source = proginfo.pid.try_into_process_handle().unwrap();
-        let mut data = copy_address_raw(read_addr as usize, bss_section.size as usize, &source)?;
+        let process = Process::new(proginfo.pid).unwrap();
+        let mut data = process.copy(read_addr as usize, bss_section.size as usize)
+            .context(read_addr as usize)?;
         debug!("successfully read data");
         let slice: &[usize] = unsafe {
             std::slice::from_raw_parts(
@@ -254,7 +254,7 @@ mod os_impl {
 
         let i = slice
             .iter().enumerate()
-            .position({ |(i, &x)| is_maybe_thread(x, (i as usize) * (std::mem::size_of::<usize>() as usize) + read_addr, source, &proginfo.all_maps) })
+            .position({ |(i, &x)| is_maybe_thread(x, (i as usize) * (std::mem::size_of::<usize>() as usize) + read_addr, &process, &proginfo.all_maps) })
             .ok_or_else(|| format_err!(
                 "Current thread address not found in process {}",
                 &proginfo.pid
@@ -304,7 +304,7 @@ mod os_impl {
 
     // struct to hold everything we know about the program
     pub struct ProgramInfo {
-        pub pid: pid_t,
+        pub pid: Pid,
         pub all_maps: Vec<MapRange>,
         pub ruby_map: Box<MapRange>,
         pub libruby_map: Box<Option<MapRange>>,
@@ -312,18 +312,22 @@ mod os_impl {
         pub libruby_elf: Option<elf::File>,
     }
 
-    fn open_elf_file(pid: pid_t, map: &MapRange) -> Result<elf::File, Error> {
+    fn open_elf_file(pid: Pid, map: &MapRange) -> Result<elf::File, Error> {
         // Read binaries from `/proc/PID/root` because the target process might be in a different
         // mount namespace. /proc/PID/root is the view of the filesystem that the target process
         // has. (see the proc man page for more)
         // So we read /usr/bin/ruby from /proc/PID/root/usr/bin/ruby
         let map_path = map.filename().as_ref().expect("map's pathname shouldn't be None");
+        #[cfg(target_os = "linux")]
         let elf_path = format!("/proc/{}/root{}", pid, map_path);
+        #[cfg(target_os = "freebsd")]
+        let elf_path = map_path;
+
         elf::File::open_path(&elf_path)
             .map_err(|_| format_err!("Couldn't open ELF file: {:?}", elf_path))
     }
 
-    pub fn get_program_info(pid: pid_t) -> Result<ProgramInfo, Error> {
+    pub fn get_program_info(pid: Pid) -> Result<ProgramInfo, Error> {
         let all_maps = get_process_maps(pid).map_err(|x| match x.kind() {
             std::io::ErrorKind::NotFound => AddressFinderError::NoSuchProcess(pid),
             std::io::ErrorKind::PermissionDenied => AddressFinderError::PermissionDenied(pid),
@@ -367,7 +371,6 @@ mod os_impl {
 mod os_impl {
     use failure::Error;
     use crate::core::initialize::IsMaybeThreadFn;
-    use read_process_memory::ProcessHandle;
     use proc_maps::{get_process_maps, MapRange, Pid};
     use proc_maps::win_maps::SymbolLoader;
 
