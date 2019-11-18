@@ -28,7 +28,7 @@ flate2 = "1"
 libc = "0.2.34"
 proc-maps = "0.1.4"
 rbspy-ruby-structs = { path = "ruby-structs", version="0.1.0" }
-remoteprocess = { git = "https://github.com/akhramov/py-spy.git", branch = "feature/copy-vec" }
+remoteprocess = "0.3.1"
 serde = "1"
 serde_derive = "1"
 serde_json = "1"

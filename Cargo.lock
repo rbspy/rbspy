@@ -862,7 +862,7 @@ dependencies = [
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "rbspy-ruby-structs 0.1.0",
  "rbspy-testdata 0.1.2 (git+https://github.com/akhramov/rbspy-testdata)",
- "remoteprocess 0.3.0 (git+https://github.com/akhramov/py-spy.git?branch=feature/copy-vec)",
+ "remoteprocess 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.92 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.92 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -879,14 +879,14 @@ version = "0.1.0"
 [[package]]
 name = "rbspy-testdata"
 version = "0.1.2"
-source = "git+https://github.com/akhramov/rbspy-testdata#05dda431c5d0a7c67c30d382b6ac40a96ba01773"
+source = "git+https://github.com/akhramov/rbspy-testdata#1cfab9b5c44df9e6b75a7c173a744140c81ecea0"
 dependencies = [
  "byteorder 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "elf 0.0.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "flate2 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.58 (registry+https://github.com/rust-lang/crates.io-index)",
- "remoteprocess 0.3.0 (git+https://github.com/akhramov/py-spy.git?branch=feature/copy-vec)",
+ "remoteprocess 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -932,8 +932,8 @@ dependencies = [
 
 [[package]]
 name = "remoteprocess"
-version = "0.3.0"
-source = "git+https://github.com/akhramov/py-spy.git?branch=feature/copy-vec#3bf02c46c81880ccc04cf65f3770c93d85f81936"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "addr2line 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "benfred-read-process-memory 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1377,7 +1377,7 @@ dependencies = [
 "checksum redox_termios 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7e891cfe48e9100a70a3b6eb652fef28920c117d366339687bd5576160db0f76"
 "checksum regex 1.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "0b2f0808e7d7e4fb1cb07feb6ff2f4bc827938f24f8c2e6a3beb7370af544bdd"
 "checksum regex-syntax 0.6.7 (registry+https://github.com/rust-lang/crates.io-index)" = "9d76410686f9e3a17f06128962e0ecc5755870bb890c34820c7af7f1db2e1d48"
-"checksum remoteprocess 0.3.0 (git+https://github.com/akhramov/py-spy.git?branch=feature/copy-vec)" = "<none>"
+"checksum remoteprocess 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "96f6bf9c8c768384bbb2c21e80db598b6197da15c34f73dc8ec6b9c4924c7b4e"
 "checksum remove_dir_all 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "4a83fa3702a688b9359eccba92d153ac33fd2e8462f9e0e3fdf155239ea7792e"
 "checksum rgb 0.8.13 (registry+https://github.com/rust-lang/crates.io-index)" = "4f089652ca87f5a82a62935ec6172a534066c7b97be003cc8f702ee9a7a59c92"
 "checksum rustc-demangle 0.1.15 (registry+https://github.com/rust-lang/crates.io-index)" = "a7f4dccf6f4891ebcc0c39f9b6eb1a83b9bf5d747cb439ec6fba4f3b977038af"
