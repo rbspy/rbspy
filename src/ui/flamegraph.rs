@@ -32,7 +32,6 @@ impl Stats {
 
         let mut opts =  Options {
             direction: Direction::Inverted,
-            min_width: 2_f64,
             ..Default::default()
         };
 
