@@ -84,6 +84,18 @@ impl Outputter for Speedscope {
     }
 }
 
+pub struct NoStats;
+
+impl Outputter for NoStats {
+    fn record(&mut self, _stack: &StackTrace) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn complete(&mut self, _file: File) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
 /// Filter out unknown functions from stack trace before reporting.
 /// Most of the time it isn't useful to include the "unknown C function" stacks.
 fn filter_unknown(trace: &[StackFrame]) -> Vec<StackFrame> {

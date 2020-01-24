@@ -79,7 +79,7 @@ enum Target {
 arg_enum!{
     // The values of this enum get translated directly to command line arguments. Make them
     // lowercase so that we don't have camelcase command line arguments
-    #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
     #[allow(non_camel_case_types)]
     pub enum OutputFormat {
         flamegraph,
@@ -87,6 +87,7 @@ arg_enum!{
         speedscope,
         summary,
         summary_by_line,
+        raw,
     }
 }
 
@@ -103,11 +104,16 @@ enum SubCmd {
         format: OutputFormat,
         no_drop_root: bool,
         with_subprocesses: bool,
-        silent: bool
+        silent: bool,
     },
     /// Capture and print a stacktrace snapshot of process `pid`.
     Snapshot { pid: Pid },
-    Report { format: OutputFormat, input: PathBuf, output: PathBuf, },
+    Report {
+        formats: Vec<OutputFormat>,
+        input: Vec<PathBuf>,
+        output: Option<PathBuf>,
+        merge: bool,
+    },
 }
 use SubCmd::*;
 
@@ -199,7 +205,7 @@ fn do_main() -> Result<(), Error> {
                 maybe_duration,
             )
         },
-        Report{format, input, output} => report(format, input, output),
+        Report{formats, input, output, merge} => generate_report(formats, input, output, merge),
     }
 }
 
@@ -298,25 +304,106 @@ fn snapshot(pid: Pid) -> Result<(), Error> {
 }
 
 impl OutputFormat {
-    fn outputter(self) -> Box<dyn ui::output::Outputter> {
+    fn outputter(&self) -> Box<dyn ui::output::Outputter> {
         match self {
             OutputFormat::flamegraph => Box::new(output::Flamegraph(ui::flamegraph::Stats::new())),
             OutputFormat::callgrind => Box::new(output::Callgrind(ui::callgrind::Stats::new())),
             OutputFormat::speedscope => Box::new(output::Speedscope(ui::speedscope::Stats::new())),
             OutputFormat::summary => Box::new(output::Summary(ui::summary::Stats::new())),
             OutputFormat::summary_by_line => Box::new(output::SummaryLine(ui::summary::Stats::new())),
+            OutputFormat::raw => Box::new(output::NoStats),
         }
     }
 
     fn extension(&self) -> String {
         match *self {
-            OutputFormat::flamegraph => "flamegraph.svg",
-            OutputFormat::callgrind => "callgrind.txt",
-            OutputFormat::speedscope => "speedscope.json",
-            OutputFormat::summary => "summary.txt",
-            OutputFormat::summary_by_line => "summary_by_line.txt",
+            OutputFormat::flamegraph => "svg",
+            OutputFormat::callgrind => "txt",
+            OutputFormat::speedscope => "json",
+            OutputFormat::summary => "txt",
+            OutputFormat::summary_by_line => "txt",
+            OutputFormat::raw => "raw.gz",
         }.to_string()
     }
+
+    // fn suffix(&self) -> String {
+    //     format!("{}.{}", self, self.extension()).to_string()
+    // }
+
+    fn filename(&self, dir: &str, maybe_name: Option<PathBuf>) -> Result<PathBuf, Error> {
+        match maybe_name {
+            Some(name) => {
+                if let Some(dirname) = Path::new(&name).parent() {
+                    DirBuilder::new().recursive(true).create(&dirname)?;
+                }
+                Ok(self.filename_from(&PathBuf::from(name)))
+            },
+            None => self.random_name(dir)
+        }
+    }
+
+    fn random_name(&self, dir: &str) -> Result<PathBuf, Error> {
+        let mut rng = thread_rng();
+        let s = ::std::iter::repeat(()).map(|()| rng.sample(Alphanumeric))
+            .take(10)
+            .collect::<String>();
+
+        let name = format!("{}-{}-{}.{}", "rbspy", Utc::now().format("%Y-%m-%d"), s, self.extension());
+        let dirname = Path::new(dir).join(".cache").join("rbspy").join("records");
+        Ok(dirname.join(&name))
+    }
+
+    fn rawpath(&self, dir: &str, maybe_name: Option<&str>) -> Result<PathBuf, Error> {
+        OutputFormat::raw.outpath(dir, maybe_name)
+    }
+
+    fn outpath(&self, dir: &str, maybe_name: Option<&str>) -> Result<PathBuf, Error> {
+        self.filename(dir, maybe_name.and_then(|name| Some(PathBuf::from(name))))
+
+    }
+
+    fn filename_from(&self, input: &PathBuf) -> PathBuf {
+        let mut input_name = input.to_str().unwrap().to_string();
+        if let Some(extension) = input.extension()  {
+            input_name.truncate(input_name.len() - extension.len() - 1)
+        }
+
+        if input_name.ends_with(".raw") {
+            input_name.truncate(input_name.len() - 4)
+        }
+
+        format!("{}.{}", input_name, self.extension()).into()
+    }
+}
+
+#[test]
+fn test_output_filename() {
+    let d = tempdir::TempDir::new("temp").unwrap();
+    let dirname = d.path().to_str().unwrap();
+    assert_eq!(OutputFormat::callgrind.outpath("", Some("foo")).unwrap(), Path::new("foo.txt"));
+    let generated_filename = OutputFormat::callgrind.outpath(dirname, None).unwrap();
+
+    let filename_pattern = if cfg!(target_os = "windows") {
+        ".cache\\rbspy\\records\\rbspy-"
+    } else {
+        ".cache/rbspy/records/rbspy-"
+    };
+
+    assert!(
+        generated_filename
+            .to_string_lossy()
+            .contains(filename_pattern)
+    );
+}
+
+
+#[test]
+fn test_outputformat_filename_from() {
+    let input = PathBuf::from("rbspy-2019-11-20-lwOWzPTUnS.raw.gz".to_string());
+    assert_eq!(OutputFormat::flamegraph.filename_from(&input).to_str().unwrap(), "rbspy-2019-11-20-lwOWzPTUnS.svg");
+
+    let input = PathBuf::from("/path/to/rbspy-2019-11-20-lwOWzPTUnS.raw.gz".to_string());
+    assert_eq!(OutputFormat::flamegraph.filename_from(&input).to_str().unwrap(), "/path/to/rbspy-2019-11-20-lwOWzPTUnS.svg");
 }
 
 // This SampleTime struct helps us sample on a regular schedule ("exactly" 100 times per second, if
@@ -540,7 +627,9 @@ fn parallel_record(
 
     // Finish writing all data to disk
     eprintln!("Wrote raw data to {}", raw_path.display());
-    eprintln!("Writing formatted output to {}", out_path.display());
+    if format != OutputFormat::raw {
+        eprintln!("Writing formatted output to {}", out_path.display());
+    }
 
     let out_file = File::create(&out_path).context(format!( "Failed to create output file {}", &out_path.display()))?;
     out.complete(out_file)?;
@@ -637,7 +726,37 @@ fn record(
     Ok(())
 }
 
-fn report(format: OutputFormat, input: PathBuf, output: PathBuf) -> Result<(), Error>{
+fn generate_report(formats: Vec<OutputFormat>, inputs: Vec<PathBuf>, output: Option<PathBuf>, merged: bool) -> Result<(), Error> {
+    if merged {
+        let data = storage::from_pathbufs(inputs)?;
+        //let raw_path = output.unwrap_or_else(|| "merged".to_string()).clone();
+        // let mut raw_store = storage::Store::from_header(raw_path, &data.header)?;
+        let stem = output.or_else(|| Some(PathBuf::from("merged")));
+        #[cfg(unix)]
+        let home = &std::env::var("HOME")?;
+        #[cfg(windows)]
+        let home = &std::env::var("userprofile")?;
+
+        for format in formats {
+            let output = format.filename(home, stem.clone())?;
+            let mut outputter = format.outputter();
+            for trace in data.traces.clone() {
+                outputter.record(&trace)?;
+            }
+            outputter.complete(File::create(output)?)?;
+        }
+    } else {
+        for format in formats {
+            for input in inputs.clone() {
+                report(format.clone(), input, output.clone())?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn report(format: OutputFormat, input: PathBuf, output: Option<PathBuf>) -> Result<(), Error> {
+    let output = output.unwrap_or_else(|| format.filename_from(&input));
     let input_file = File::open(input)?;
     let stuff = storage::from_reader(input_file)?.traces;
     let mut outputter = format.outputter();
@@ -676,44 +795,6 @@ fn print_errors(errors: usize, total: usize) {
             total
         );
     }
-}
-
-#[test]
-fn test_output_filename() {
-    let d = tempdir::TempDir::new("temp").unwrap();
-    let dirname = d.path().to_str().unwrap();
-    assert_eq!(output_filename("", Some("foo"), "txt").unwrap(), Path::new("foo"));
-    let generated_filename = output_filename(dirname, None, "txt").unwrap();
-
-    let filename_pattern = if cfg!(target_os = "windows") {
-        ".cache\\rbspy\\records\\rbspy-"
-    } else {
-        ".cache/rbspy/records/rbspy-"
-    };
-
-    assert!(
-        generated_filename
-            .to_string_lossy()
-            .contains(filename_pattern)
-    );
-}
-
-fn output_filename(base_dir: &str, maybe_filename: Option<&str>, extension: &str) -> Result<PathBuf, Error> {
-    let mut rng = thread_rng();
-
-    let path = match maybe_filename {
-        Some(filename) => filename.into(),
-        None => {
-            let s = ::std::iter::repeat(()).map(|()| rng.sample(Alphanumeric))
-                .take(10)
-                .collect::<String>();
-            let filename = format!("{}-{}-{}.{}", "rbspy", Utc::now().format("%Y-%m-%d"), s, extension);
-            let dirname = Path::new(base_dir).join(".cache").join("rbspy").join("records");
-            DirBuilder::new().recursive(true).create(&dirname)?;
-            dirname.join(&filename)
-        }
-    };
-    Ok(path)
 }
 
 /// Check `s` is a positive integer.
@@ -791,11 +872,11 @@ fn arg_parser() -> App<'static, 'static> {
                         .required(false),
                 )
                 .arg(
-                    Arg::from_usage( "-s --subprocesses='Record all subprocesses of the given PID or command'")
+                    Arg::from_usage("-s --subprocesses='Record all subprocesses of the given PID or command'")
                         .required(false)
                 )
                 .arg(
-                    Arg::from_usage( "--silent='Don't print the summary profiling data every second'")
+                    Arg::from_usage("--silent='Don't print the summary profiling data every second'")
                         .required(false)
                 )
                 .arg(Arg::from_usage("<cmd>... 'command to run'").required(false)),
@@ -803,10 +884,11 @@ fn arg_parser() -> App<'static, 'static> {
         .subcommand(
             SubCommand::with_name("report")
                 .about("Generate visualization from raw data recorded by `rbspy record`")
-                .arg(Arg::from_usage("-i --input=<FILE> 'Input raw data to use'"))
-                .arg(Arg::from_usage("-o --output=<FILE> 'Output file'"))
+                .arg(Arg::from_usage("-i --input=<FILE>... 'Input raw.gz file(s) to use'"))
+                .arg(Arg::from_usage("-o --output=[FILE] 'Output /folder/basename. Defaults to ~/.cache/rbspy/input basename. Extension is set automatically.'"))
+                .arg(Arg::from_usage("-m --merge='Merge mulitple input files before generating output").required(false))
                 .arg(
-                    Arg::from_usage("-f --format=[FORMAT] 'Output format to write'")
+                    Arg::from_usage("-f --format=[FORMAT]... 'Output format(s) to write'")
                         .possible_values(&OutputFormat::variants())
                         .case_insensitive(true)
                         .default_value("flamegraph"),
@@ -846,8 +928,8 @@ impl Args {
                 #[cfg(windows)]
                 let home = &std::env::var("userprofile")?;
 
-                let raw_path = output_filename(home, submatches.value_of("raw-file"), "raw.gz")?;
-                let out_path = output_filename(home, submatches.value_of("file"), &format.extension())?;
+                let raw_path = format.rawpath(home, submatches.value_of("raw-file"))?;
+                let out_path = format.outpath(home, submatches.value_of("file"))?;
                 let maybe_duration = match value_t!(submatches, "duration", u64) {
                     Err(_) => None,
                     Ok(integer_duration) => Some(std::time::Duration::from_secs(integer_duration)),
@@ -881,10 +963,18 @@ impl Args {
                     silent,
                 }
             }
-            ("report", Some(submatches)) => Report {
-                format: value_t!(submatches, "format", OutputFormat).unwrap(),
-                input: value_t!(submatches, "input", String).unwrap().into(),
-                output: value_t!(submatches, "output", String).unwrap().into(),
+            ("report", Some(submatches)) => {
+                println!("submatches = {:?}", submatches);
+                let merged = submatches.occurrences_of("merge") > 0;
+                //let home
+                let rep = Report {
+                    formats: values_t!(submatches, "format", OutputFormat).unwrap(),
+                    input: values_t!(submatches, "input", PathBuf).unwrap(),
+                    output: value_t!(submatches, "output", PathBuf).ok(),
+                    merge: merged,
+                };
+                println!("report = {:?}", rep);
+                rep
             },
             _ => panic!("this shouldn't happen, please report the command you ran!"),
         };
@@ -905,19 +995,19 @@ mod tests {
     }
 
     #[test]
-    fn test_arg_parsing() {
-        match Args::from(make_args("rbspy record --pid 1234")).unwrap() {
-            Args {
-                cmd:
-                    Record {
-                        target: Target::Pid { pid: 1234 },
-                        ..
-                    },
+    fn test_record_pid_arg_parsing() {
+        match Args::from(make_args("rbspy record --pid 1234")).unwrap().cmd {
+            Record {
+                target: Target::Pid { pid: 1234 },
+                out_path: _,
+                ..
             } => (),
             x => panic!("Unexpected: {:?}", x),
         };
+    }
 
-        // test snapshot
+    #[test]
+    fn test_snapshot_pid_arg_parsing() {
         let args = Args::from(make_args("rbspy snapshot --pid 1234")).unwrap();
         assert_eq!(
             args,
@@ -925,8 +1015,10 @@ mod tests {
                 cmd: Snapshot { pid: 1234 },
             }
         );
+    }
 
-        // test record with subcommand
+    #[test]
+    fn test_record_subcommand_arg_parsing() {
         match Args::from(make_args("rbspy record ruby blah.rb")).unwrap() {
             Args {
                 cmd:
@@ -940,15 +1032,18 @@ mod tests {
             }
             x => panic!("Unexpected: {:?}", x),
         };
+    }
 
-        let args = Args::from(make_args("rbspy record --pid 1234 --file foo.txt --raw-file raw.gz")).unwrap();
+    #[test]
+    fn test_record_with_raw_file_arg_parsing() {
+        let args = Args::from(make_args("rbspy record --pid 1234 --file foo.txt --raw-file name")).unwrap();
         assert_eq!(
             args,
             Args {
                 cmd: Record {
                     target: Target::Pid { pid: 1234 },
-                    out_path: "foo.txt".into(),
-                    raw_path: "raw.gz".into(),
+                    out_path: "foo.svg".into(),
+                    raw_path: "name.raw.gz".into(),
                     sample_rate: 100,
                     maybe_duration: None,
                     format: OutputFormat::flamegraph,
@@ -958,17 +1053,41 @@ mod tests {
                 },
             }
         );
+    }
 
+    #[test]
+    fn test_record_silent_arg_parsing() {
+        let args = Args::from(make_args("rbspy record --pid 1234 --file foo --raw-file name.raw.gz --silent")).unwrap();
+        assert_eq!(
+            args,
+            Args {
+                cmd: Record {
+                    target: Target::Pid { pid: 1234 },
+                    out_path: "foo.svg".into(),
+                    raw_path: "name.raw.gz".into(),
+                    sample_rate: 100,
+                    maybe_duration: None,
+                    format: OutputFormat::flamegraph,
+                    no_drop_root: false,
+                    with_subprocesses: false,
+                    silent: true,
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn test_record_rate_arg_parsing() {
         let args = Args::from(make_args(
-            "rbspy record --pid 1234 --file foo.txt --raw-file raw.gz --rate 25",
+            "rbspy record --pid 1234 --file foo --raw-file name --rate 25",
         )).unwrap();
         assert_eq!(
             args,
             Args {
                 cmd: Record {
                     target: Target::Pid { pid: 1234 },
-                    out_path: "foo.txt".into(),
-                    raw_path: "raw.gz".into(),
+                    out_path: "foo.svg".into(),
+                    raw_path: "name.raw.gz".into(),
                     sample_rate: 25,
                     maybe_duration: None,
                     format: OutputFormat::flamegraph,
@@ -978,17 +1097,20 @@ mod tests {
                 },
             }
         );
+    }
 
+    #[test]
+    fn test_record_duration_arg_parsing() {
         let args = Args::from(make_args(
-            "rbspy record --pid 1234 --file foo.txt --raw-file raw.gz --duration 60",
+            "rbspy record --pid 1234 --file foo --raw-file name --duration 60",
         )).unwrap();
         assert_eq!(
             args,
             Args {
                 cmd: Record {
                     target: Target::Pid { pid: 1234 },
-                    out_path: "foo.txt".into(),
-                    raw_path: "raw.gz".into(),
+                    out_path: "foo.svg".into(),
+                    raw_path: "name.raw.gz".into(),
                     sample_rate: 100,
                     maybe_duration: Some(std::time::Duration::from_secs(60)),
                     format: OutputFormat::flamegraph,
@@ -998,9 +1120,13 @@ mod tests {
                 },
             }
         );
+    }
 
+
+    #[test]
+    fn test_record_callgrind_format_arg_parsing() {
         let args = Args::from(make_args(
-            "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --format callgrind --duration 60",
+            "rbspy record --pid 1234 --raw-file name --file foo --format callgrind --duration 60",
         )).unwrap();
         assert_eq!(
             args,
@@ -1008,7 +1134,7 @@ mod tests {
                 cmd: Record {
                     target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
-                    raw_path: "raw.gz".into(),
+                    raw_path: "name.raw.gz".into(),
                     sample_rate: 100,
                     maybe_duration: Some(std::time::Duration::from_secs(60)),
                     format: OutputFormat::callgrind,
@@ -1018,17 +1144,21 @@ mod tests {
                 },
             }
         );
+    }
 
+
+    #[test]
+    fn test_record_no_drop_root_arg_parsing() {
         let args = Args::from(make_args(
-            "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --no-drop-root",
+            "rbspy record --pid 1234 --raw-file name --file foo --no-drop-root",
         )).unwrap();
         assert_eq!(
             args,
             Args {
                 cmd: Record {
                     target: Target::Pid { pid: 1234 },
-                    out_path: "foo.txt".into(),
-                    raw_path: "raw.gz".into(),
+                    out_path: "foo.svg".into(),
+                    raw_path: "name.raw.gz".into(),
                     sample_rate: 100,
                     maybe_duration: None,
                     format: OutputFormat::flamegraph,
@@ -1038,30 +1168,33 @@ mod tests {
                 },
             }
         );
+    }
 
+    #[test]
+    fn test_record_subprocesses_arg_parsing() {
         let args = Args::from(make_args(
-            "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --subprocesses",
+            "rbspy record --pid 1234 --raw-file name.raw.gz --file foo --subprocesses",
         )).unwrap();
         assert_eq!(
             args,
             Args {
                 cmd: Record {
                     target: Target::Pid { pid: 1234 },
-                    out_path: "foo.txt".into(),
-                    raw_path: "raw.gz".into(),
+                    out_path: "foo.svg".into(),
+                    raw_path: "name.raw.gz".into(),
                     sample_rate: 100,
                     maybe_duration: None,
                     format: OutputFormat::flamegraph,
                     no_drop_root: false,
                     with_subprocesses: true,
                     silent: false,
-                    },
+                },
             }
         );
     }
 
     #[test]
-    fn test_report_arg_parsing() {
+    fn test_report_input_output_arg_parsing() {
         let args = Args::from(make_args(
             "rbspy report --input xyz.raw.gz --output xyz",
         )).unwrap();
@@ -1069,11 +1202,50 @@ mod tests {
             args,
             Args {
                 cmd: Report {
-                    format: OutputFormat::flamegraph,
-                    input: PathBuf::from("xyz.raw.gz"),
-                    output: PathBuf::from("xyz"),
+                    formats: vec![OutputFormat::flamegraph],
+                    input: vec!["xyz.raw.gz".into()],
+                    output: Some("xyz".into()),
+                    merge: false,
                 },
             }
         );
+    }
+
+    #[test]
+    fn test_report_format_merged_arg_parsing() {
+        let args = Args::from(make_args(
+                "rbspy report -m -f speedscope --input abc.raw.gz xyz.raw.gz"
+        )).unwrap();
+        assert_eq!(
+            args,
+            Args {
+                cmd: Report {
+                    formats: vec![OutputFormat::speedscope],
+                    input: vec![PathBuf::from("abc.raw.gz"), PathBuf::from("xyz.raw.gz")],
+                    output: None,
+                    merge: true,
+                },
+            }
+        );
+    }
+
+
+    #[test]
+    fn test_report_merged_with_named_output_arg_parsing() {
+        let args = Args::from(make_args(
+                "rbspy report --merge -i abc.raw.gz xyz.raw.gz -o merged"
+        )).unwrap();
+        assert_eq!(
+            args,
+            Args {
+                cmd: Report {
+                    formats: vec![OutputFormat::flamegraph],
+                    input: vec![PathBuf::from("abc.raw.gz"), PathBuf::from("xyz.raw.gz")],
+                    output: Some("merged".into()),
+                    merge: true,
+                },
+            }
+        );
+
     }
 }

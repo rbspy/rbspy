@@ -19,6 +19,11 @@ impl Storage for Data {
         }
         Ok(Data(result))
     }
+
+    fn append(mut self, rhs: Self) -> Result<Data, Error> {
+      unimplemented!();
+    }
+
     fn version() -> Version {
         Version(0)
     }

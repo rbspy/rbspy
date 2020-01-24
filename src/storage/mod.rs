@@ -16,7 +16,7 @@ extern crate flate2;
 use std::io;
 use std::io::prelude::*;
 use std::fs::File;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use crate::core::types::Header;
@@ -45,6 +45,16 @@ impl Store {
             rbspy_version: Some(env!("CARGO_PKG_VERSION").to_string()),
             start_time: Some(SystemTime::now()),
         })?;
+        writeln!(&mut encoder, "{}", json)?;
+
+        Ok(Store { encoder })
+    }
+
+    pub fn from_header(out_path: &Path, header: &Header) -> Result<Store, io::Error> {
+        let file = File::create(out_path)?;
+        let mut encoder = flate2::write::GzEncoder::new(file, Compression::default());
+        encoder.write_all("rbspy02\n".as_bytes())?;
+        let json = serde_json::to_string(header)?;
         writeln!(&mut encoder, "{}", json)?;
 
         Ok(Store { encoder })
@@ -105,8 +115,9 @@ pub(crate) enum StorageError {
 
 /// Types that can be deserialized from an `io::Read` into something convertible
 /// to the current internal form.
-pub(crate) trait Storage: Into<v2::Data> {
+pub(crate) trait Storage<Rhs = Self>: Into<v2::Data> {
     fn from_reader<R: Read>(r: R) -> Result<Self, Error>;
+    fn append(self, rhs: Rhs) -> Result<Self, Error>;
     fn version() -> Version;
 }
 
@@ -141,3 +152,19 @@ pub(crate) fn from_reader<R: Read>(r: R) -> Result<v2::Data, Error> {
         v => Err(StorageError::UnknownVersion(v).into()),
     }
 }
+
+
+pub(crate) fn from_pathbufs(paths: Vec<PathBuf>) -> Result<v2::Data, Error> {
+    let mut iter = paths.iter();
+    let mut result = from_reader(File::open(iter.next().unwrap())?)?;
+    iter.map(|path| from_reader(File::open(path)?))
+        .fold(Ok(result), |result, current|
+        result.and_then(|mut inner|
+            match current {
+                Ok(data) => inner.append(data),
+                Err(e) => Err(e)
+            }
+        )
+    )
+}
+
