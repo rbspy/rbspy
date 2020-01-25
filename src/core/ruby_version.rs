@@ -13,9 +13,8 @@ macro_rules! ruby_version_v_1_9_1(
         pub mod $ruby_version {
             use std;
             use bindings::$ruby_version::*;
-            use crate::core::copy::*;
-            use crate::core::copy::MemoryCopyError;
-            use read_process_memory::CopyAddress;
+            use crate::core::types::ProcessMemory;
+            use failure::ResultExt;
 
             get_stack_trace!(rb_thread_struct);
             get_ruby_string!();
@@ -34,10 +33,9 @@ macro_rules! ruby_version_v_1_9_2_to_3(
     ($ruby_version:ident) => (
         pub mod $ruby_version {
             use std;
-            use crate::core::copy::*;
-            use crate::core::copy::MemoryCopyError;
             use bindings::$ruby_version::*;
-            use read_process_memory::CopyAddress;
+            use crate::core::types::ProcessMemory;
+            use failure::ResultExt;
 
             get_stack_trace!(rb_thread_struct);
             get_ruby_string!();
@@ -53,12 +51,10 @@ macro_rules! ruby_version_v_1_9_2_to_3(
 macro_rules! ruby_version_v_2_0_to_2_2(
     ($ruby_version:ident) => (
        pub mod $ruby_version {
-            use std;
-            use crate::core::copy::*;
-            use crate::core::copy::MemoryCopyError;
-            use bindings::$ruby_version::*;
-            use read_process_memory::CopyAddress;
-
+           use std;
+           use bindings::$ruby_version::*;
+           use crate::core::types::ProcessMemory;
+           use failure::ResultExt;
 
             // These 4 functions are the
             // core of how the program works. They're essentially a straight port of
@@ -86,11 +82,10 @@ macro_rules! ruby_version_v_2_0_to_2_2(
 macro_rules! ruby_version_v_2_3_to_2_4(
     ($ruby_version:ident) => (
        pub mod $ruby_version {
-            use std;
-            use crate::core::copy::*;
-            use crate::core::copy::MemoryCopyError;
-            use bindings::$ruby_version::*;
-            use read_process_memory::CopyAddress;
+           use std;
+           use bindings::$ruby_version::*;
+           use crate::core::types::ProcessMemory;
+           use failure::ResultExt;
 
             get_stack_trace!(rb_thread_struct);
             get_ruby_string!();
@@ -106,11 +101,10 @@ macro_rules! ruby_version_v_2_3_to_2_4(
 macro_rules! ruby_version_v2_5_x(
     ($ruby_version:ident) => (
        pub mod $ruby_version {
-            use std;
-            use crate::core::copy::*;
-            use crate::core::copy::MemoryCopyError;
-            use bindings::$ruby_version::*;
-            use read_process_memory::CopyAddress;
+           use std;
+           use bindings::$ruby_version::*;
+           use crate::core::types::ProcessMemory;
+           use failure::ResultExt;
 
             get_stack_trace!(rb_execution_context_struct);
             get_ruby_string!();
@@ -127,11 +121,10 @@ macro_rules! ruby_version_v2_5_x(
 macro_rules! ruby_version_v2_6_x(
     ($ruby_version:ident) => (
        pub mod $ruby_version {
-            use std;
-            use crate::core::copy::*;
-            use crate::core::copy::MemoryCopyError;
-            use bindings::$ruby_version::*;
-            use read_process_memory::CopyAddress;
+           use std;
+           use bindings::$ruby_version::*;
+           use crate::core::types::ProcessMemory;
+           use failure::ResultExt;
 
             get_stack_trace!(rb_execution_context_struct);
             get_ruby_string!();
@@ -151,17 +144,20 @@ macro_rules! get_stack_trace(
         use crate::core::types::*;
         use crate::core::types::StackFrame;
 
-        pub fn get_stack_trace<T>(
+        pub fn get_stack_trace<T: ProcessMemory>(
             ruby_current_thread_address_location: usize,
-            process: &Process<T>,
-            ) -> Result<StackTrace, MemoryCopyError> where T: CopyAddress {
-            let source = &process.source;
-            let current_thread_addr: usize =
-                copy_struct(ruby_current_thread_address_location, source)?;
-            let thread: $thread_type = copy_struct(current_thread_addr, source)?;
+            source: &T,
+            ) -> Result<StackTrace, MemoryCopyError> {
+            let current_thread_addr: usize = source
+                .copy_struct(ruby_current_thread_address_location)
+                .context(ruby_current_thread_address_location)?;
+
+            let thread: $thread_type = source.copy_struct(current_thread_addr)
+                .context(current_thread_addr)?;
+
             if stack_field(&thread) as usize == 0 {
                 return Ok(StackTrace {
-                    pid: process.pid,
+                    pid: None,
                     trace: vec!(StackFrame::unknown_c_function()),
                     thread_id: Some(get_thread_id(&thread, source)?)
                 });
@@ -185,7 +181,9 @@ macro_rules! get_stack_trace(
                     debug!("pc was 0. Not sure what that means, but skipping CFP");
                     continue;
                 }
-                let iseq_struct: rb_iseq_struct = copy_struct(cfp.iseq as usize, source)?;
+                let iseq_struct: rb_iseq_struct = source.copy_struct(cfp.iseq as usize)
+                    .context(cfp.iseq as usize)?;
+
                 let label_path  = get_stack_frame(&iseq_struct, &cfp, source);
                 match label_path {
                     Ok(call)  => trace.push(call),
@@ -203,7 +201,7 @@ macro_rules! get_stack_trace(
                     }
                 }
             }
-            Ok(StackTrace{trace, pid: process.pid, thread_id: Some(get_thread_id(&thread, source)?)})
+            Ok(StackTrace{trace, pid: None, thread_id: Some(get_thread_id(&thread, source)?)})
         }
 
 use proc_maps::{maps_contain_addr, MapRange};
@@ -221,14 +219,12 @@ fn stack_base(thread: &$thread_type) -> i64 {
     stack_field(thread) + stack_size_field(thread) * std::mem::size_of::<VALUE>() as i64 - 1 * std::mem::size_of::<rb_control_frame_t>() as i64
 }
 
-pub fn is_maybe_thread<T>(x: usize, x_addr: usize, source: T, all_maps: &[MapRange]) -> bool where T: CopyAddress{
+pub fn is_maybe_thread<T>(x: usize, x_addr: usize, source: &T, all_maps: &[MapRange]) -> bool where T: ProcessMemory {
     if !maps_contain_addr(x, all_maps) {
         return false;
     }
 
-    let process = Process{pid: None, source: source};
-
-    let thread: $thread_type = match copy_struct(x, &process.source) {
+    let thread: $thread_type = match source.copy_struct(x) {
         Ok(x) => x,
         _ => { return false; },
     };
@@ -237,8 +233,8 @@ pub fn is_maybe_thread<T>(x: usize, x_addr: usize, source: T, all_maps: &[MapRan
         return false;
     }
 
-    // finally, try to get an actual stack trace from the process and see if it works
-    get_stack_trace(x_addr, &process).is_ok()
+    // finally, try to get an actual stack trace from the source and see if it works
+    get_stack_trace(x_addr, source).is_ok()
 }
 ));
 
@@ -268,7 +264,7 @@ macro_rules! stack_field_2_5_0(
 macro_rules! get_thread_id_1_9_0(
     () => (
 
-        fn get_thread_id<T: CopyAddress>(thread_struct: &rb_thread_struct, _source: &T) -> Result<usize, MemoryCopyError> {
+        fn get_thread_id<T>(thread_struct: &rb_thread_struct, _source: &T) -> Result<usize, MemoryCopyError> {
             Ok(thread_struct.thread_id as usize)
         }
 
@@ -277,8 +273,10 @@ macro_rules! get_thread_id_1_9_0(
 macro_rules! get_thread_id_2_5_0(
     () => (
 
-        fn get_thread_id<T: CopyAddress>(thread_struct: &rb_execution_context_struct, source: &T) -> Result<usize, MemoryCopyError> {
-            let thread: rb_thread_struct = copy_struct(thread_struct.thread_ptr as usize, source)?;
+        fn get_thread_id<T>(thread_struct: &rb_execution_context_struct, source: &T)
+                            -> Result<usize, MemoryCopyError> where T: ProcessMemory {
+            let thread: rb_thread_struct = source.copy_struct(thread_struct.thread_ptr as usize)
+                .context(thread_struct.thread_ptr as usize)?;
             Ok(thread.thread_id as usize)
         }
 
@@ -287,15 +285,17 @@ macro_rules! get_thread_id_2_5_0(
 macro_rules! get_ruby_string_array_2_5_0(
     () => (
         // Returns (path, absolute_path)
-        fn get_ruby_string_array<T>(addr: usize, string_class: usize, source: &T) -> Result<(String, String), MemoryCopyError> where T: CopyAddress{
+        fn get_ruby_string_array<T>(addr: usize, string_class: usize, source: &T) -> Result<(String, String), MemoryCopyError> where T: ProcessMemory {
             // todo: we're doing an extra copy here for no reason
-            let rstring: RString = copy_struct(addr, source)?;
+            let rstring: RString = source.copy_struct(addr)
+                .context(addr)?;
             if rstring.basic.klass as usize == string_class {
                 let s = get_ruby_string(addr, source)?;
                 return Ok((s.clone(), s))
             }
             // otherwise it's an RArray
-            let rarray: RArray = copy_struct(addr, source)?;
+            let rarray: RArray = source.copy_struct(addr)
+                .context(addr)?;
             // TODO: this assumes that the array contents are stored inline and not on the heap
             // I think this will always be true but we should check instead
             // the reason I am not checking is that I don't know how to check yet
@@ -309,9 +309,11 @@ macro_rules! get_ruby_string(
     () => (
         use std::ffi::CStr;
 
-        fn get_ruby_string<T>(addr: usize, source: &T) -> Result<String, MemoryCopyError> where T: CopyAddress{
+        fn get_ruby_string<T>(addr: usize, source: &T)
+                              -> Result<String, MemoryCopyError> where T: ProcessMemory {
             let vec = {
-                let rstring: RString = copy_struct(addr, source)?;
+                let rstring: RString = source.copy_struct(addr)
+                    .context(addr)?;
                 let basic = rstring.basic;
                 let is_array = basic.flags & 1 << 13 == 0;
                 if is_array {
@@ -322,18 +324,22 @@ macro_rules! get_ruby_string(
                     unsafe {
                         let addr = rstring.as_.heap.ptr as usize;
                         let len = rstring.as_.heap.len as usize;
-                        let result = copy_address_raw(addr as usize, len, source);
+                        let result = source.copy(addr as usize, len);
                         match result {
                             Err(x) => {
                                 debug!("Error: Failed to get ruby string.\nrstring: {:?}, addr: {}, len: {}", rstring, addr, len);
-                                return Err(x.into());
+                                return Err(x).context(addr)?;
                             }
                             Ok(x) => x
                         }
                     }
                 }
             };
-            Ok(String::from_utf8(vec).map_err(MemoryCopyError::InvalidStringError)?)
+
+            let error =
+                MemoryCopyError::Message("Ruby string is invalid".to_string());
+
+            String::from_utf8(vec).or(Err(error))
         }
 ));
 
@@ -343,7 +349,7 @@ macro_rules! get_stack_frame_1_9_1(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-            ) -> Result<StackFrame, MemoryCopyError> where T: CopyAddress{
+            ) -> Result<StackFrame, MemoryCopyError> where T: ProcessMemory {
             Ok(StackFrame{
                 name: get_ruby_string(iseq_struct.name as usize, source)?,
                 relative_path: get_ruby_string(iseq_struct.filename as usize, source)?,
@@ -360,7 +366,7 @@ macro_rules! get_stack_frame_1_9_2(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-            ) -> Result<StackFrame, MemoryCopyError> where T: CopyAddress{
+            ) -> Result<StackFrame, MemoryCopyError> where T: ProcessMemory {
             Ok(StackFrame{
                 name: get_ruby_string(iseq_struct.name as usize, source)?,
                 relative_path: get_ruby_string(iseq_struct.filename as usize, source)?,
@@ -376,16 +382,18 @@ macro_rules! get_lineno_1_9_0(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-            ) -> Result<u32, MemoryCopyError> where T: CopyAddress{
+            ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
             let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.insn_info_size as usize;
             if t_size == 0 {
                 Ok(0) //TODO: really?
             } else if t_size == 1 {
-                let table: [iseq_insn_info_entry; 1] = copy_struct(iseq_struct.insn_info_table as usize, source)?;
+                let table: [iseq_insn_info_entry; 1] = source.copy_struct(iseq_struct.insn_info_table as usize)
+                    .context(iseq_struct.insn_info_table as usize)?;
                 Ok(table[0].line_no as u32)
             } else {
-                let table: Vec<iseq_insn_info_entry> = copy_vec(iseq_struct.insn_info_table as usize, t_size as usize, source)?;
+                let table: Vec<iseq_insn_info_entry> = source.copy_vec(iseq_struct.insn_info_table as usize, t_size as usize)
+                    .context(iseq_struct.insn_info_table as usize)?;
                 for i in 0..t_size {
                     if pos == table[i].position as usize {
                         return Ok(table[i].line_no as u32)
@@ -405,16 +413,18 @@ macro_rules! get_lineno_2_0_0(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-            ) -> Result<u32, MemoryCopyError> where T: CopyAddress{
+            ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
             let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.line_info_size as usize;
             if t_size == 0 {
                 Ok(0) //TODO: really?
             } else if t_size == 1 {
-                let table: [iseq_line_info_entry; 1] = copy_struct(iseq_struct.line_info_table as usize, source)?;
+                let table: [iseq_line_info_entry; 1] = source.copy_struct(iseq_struct.line_info_table as usize)
+                    .context(iseq_struct.line_info_table as usize)?;
                 Ok(table[0].line_no)
             } else {
-                let table: Vec<iseq_line_info_entry> = copy_vec(iseq_struct.line_info_table as usize, t_size as usize, source)?;
+                let table: Vec<iseq_line_info_entry> = source.copy_vec(iseq_struct.line_info_table as usize, t_size as usize)
+                    .context(iseq_struct.line_info_table as usize)?;
                 for i in 0..t_size {
                     if pos == table[i].position as usize {
                         return Ok(table[i].line_no)
@@ -433,16 +443,18 @@ macro_rules! get_lineno_2_3_0(
             iseq_struct: &rb_iseq_constant_body,
             cfp: &rb_control_frame_t,
             source: &T,
-            ) -> Result<u32, MemoryCopyError> where T: CopyAddress{
+            ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
             let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.line_info_size as usize;
             if t_size == 0 {
                 Ok(0) //TODO: really?
             } else if t_size == 1 {
-                let table: [iseq_line_info_entry; 1] = copy_struct(iseq_struct.line_info_table as usize, source)?;
+                let table: [iseq_line_info_entry; 1] = source.copy_struct(iseq_struct.line_info_table as usize)
+                    .context(iseq_struct.line_info_table as usize)?;
                 Ok(table[0].line_no)
             } else {
-                let table: Vec<iseq_line_info_entry> = copy_vec(iseq_struct.line_info_table as usize, t_size as usize, source)?;
+                let table: Vec<iseq_line_info_entry> = source.copy_vec(iseq_struct.line_info_table as usize, t_size as usize)
+                    .context(iseq_struct.line_info_table as usize)?;
                 for i in 0..t_size {
                     if pos == table[i].position as usize {
                         return Ok(table[i].line_no)
@@ -475,16 +487,18 @@ macro_rules! get_lineno_2_5_0(
             iseq_struct: &rb_iseq_constant_body,
             cfp: &rb_control_frame_t,
             source: &T,
-            ) -> Result<u32, MemoryCopyError> where T: CopyAddress{
+            ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
             let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.insns_info_size as usize;
             if t_size == 0 {
                 Ok(0) //TODO: really?
             } else if t_size == 1 {
-                let table: [iseq_insn_info_entry; 1] = copy_struct(iseq_struct.insns_info as usize, source)?;
+                let table: [iseq_insn_info_entry; 1] = source.copy_struct(iseq_struct.insns_info as usize)
+                    .context(iseq_struct.insns_info as usize)?;
                 Ok(table[0].line_no as u32)
             } else {
-                let table: Vec<iseq_insn_info_entry> = copy_vec(iseq_struct.insns_info as usize, t_size as usize, source)?;
+                let table: Vec<iseq_insn_info_entry> = source.copy_vec(iseq_struct.insns_info as usize, t_size as usize)
+                    .context(iseq_struct.insns_info as usize)?;
                 for i in 0..t_size {
                     if pos == table[i].position as usize {
                         return Ok(table[i].line_no as u32)
@@ -503,18 +517,20 @@ macro_rules! get_lineno_2_6_0(
             iseq_struct: &rb_iseq_constant_body,
             cfp: &rb_control_frame_t,
             source: &T,
-            ) -> Result<u32, MemoryCopyError> where T: CopyAddress{
+            ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
             //let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.insns_info.size as usize;
             if t_size == 0 {
                 Ok(0) //TODO: really?
             } else if t_size == 1 {
-                let table: [iseq_insn_info_entry; 1] = copy_struct(iseq_struct.insns_info.body as usize, source)?;
+                let table: [iseq_insn_info_entry; 1] = source.copy_struct(iseq_struct.insns_info.body as usize)
+                    .context(iseq_struct.insns_info.body as usize)?;
                 Ok(table[0].line_no as u32)
             } else {
-                let table: Vec<iseq_insn_info_entry> = copy_vec(iseq_struct.insns_info.body as usize, t_size as usize, source)?;
+                let table: Vec<iseq_insn_info_entry> = source.copy_vec(iseq_struct.insns_info.body as usize, t_size as usize)
+                    .context(iseq_struct.insns_info.body as usize)?;
                 // TODO: fix this. I'm not sure why it doesn't extract the table properly.
-                /*let positions: Vec<usize> = copy_vec(iseq_struct.insns_info.positions as usize, t_size as usize, source)?;
+                /*let positions: Vec<usize> = source.copy_vec(iseq_struct.insns_info.positions as usize, t_size as usize)?;
                 for i in 0..t_size {
                     if pos == positions[i] as usize {
                         return Ok(table[i].line_no as u32)
@@ -533,7 +549,7 @@ macro_rules! get_stack_frame_2_0_0(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-            ) -> Result<StackFrame, MemoryCopyError> where T: CopyAddress{
+            ) -> Result<StackFrame, MemoryCopyError> where T: ProcessMemory {
             Ok(StackFrame{
                 name: get_ruby_string(iseq_struct.location.label as usize, source)?,
                 relative_path: get_ruby_string(iseq_struct.location.path as usize, source)?,
@@ -549,8 +565,9 @@ macro_rules! get_stack_frame_2_3_0(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-            ) -> Result<StackFrame, MemoryCopyError> where T: CopyAddress{
-            let body: rb_iseq_constant_body = copy_struct(iseq_struct.body as usize, source)?;
+            ) -> Result<StackFrame, MemoryCopyError> where T: ProcessMemory {
+            let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
+                .context(iseq_struct.body as usize)?;
             Ok(StackFrame{
                 name: get_ruby_string(body.location.label as usize, source)?,
                 relative_path: get_ruby_string(body.location.path as usize, source)?,
@@ -566,9 +583,12 @@ macro_rules! get_stack_frame_2_5_0(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-            ) -> Result<StackFrame, MemoryCopyError> where T: CopyAddress{
-            let body: rb_iseq_constant_body = copy_struct(iseq_struct.body as usize, source)?;
-            let rstring: RString = copy_struct(body.location.label as usize, source)?;
+            ) -> Result<StackFrame, MemoryCopyError> where T: ProcessMemory {
+            let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
+                .context(iseq_struct.body as usize)?;
+            let rstring: RString = source.copy_struct(body.location.label as usize)
+                .context(body.location.label as usize)?;
+
             let (path, absolute_path) = get_ruby_string_array(body.location.pathobj as usize, rstring.basic.klass as usize, source)?;
             Ok(StackFrame{
                 name: get_ruby_string(body.location.label as usize, source)?,
@@ -589,13 +609,19 @@ macro_rules! get_cfps(
         // The base of the call stack is therefore at
         //   stack + stack_size * sizeof(VALUE) - sizeof(rb_control_frame_t)
         // (with everything in bytes).
-        fn get_cfps<T>(cfp_address: usize, stack_base: usize, source: &T) -> Result<Vec<rb_control_frame_t>, MemoryCopyError> where T: CopyAddress{
+        fn get_cfps<T>(cfp_address: usize, stack_base: usize, source: &T)
+                       -> Result<Vec<rb_control_frame_t>, MemoryCopyError> where T: ProcessMemory {
             if (stack_base as usize) <= cfp_address {
                 // this probably means we've hit some kind of race, return an error so we can try
                 // again
                 return Err(MemoryCopyError::Message(format!("stack base and cfp address out of sync. stack base: {:x}, cfp address: {:x}", stack_base as usize, cfp_address)));
             }
-            Ok(copy_vec(cfp_address, (stack_base as usize - cfp_address) as usize / std::mem::size_of::<rb_control_frame_t>(), source)?)
+
+            Ok(
+                source
+                    .copy_vec(cfp_address, (stack_base as usize - cfp_address) as usize / std::mem::size_of::<rb_control_frame_t>())
+                    .context(cfp_address)?
+            )
         }
         ));
 
@@ -663,7 +689,7 @@ mod tests {
     use rbspy_testdata::*;
 
     use crate::core::ruby_version;
-    use crate::core::types::{StackFrame, Process};
+    use crate::core::types::StackFrame;
 
     fn real_stack_trace_1_9_3() -> Vec<StackFrame> {
         vec![
@@ -779,7 +805,7 @@ mod tests {
     fn test_get_ruby_stack_trace_2_1_6() {
         let current_thread_addr = 0x562658abd7f0;
         let stack_trace =
-            ruby_version::ruby_2_1_6::get_stack_trace::<CoreDump>(current_thread_addr, &Process{pid: None, source: coredump_2_1_6()})
+            ruby_version::ruby_2_1_6::get_stack_trace::<CoreDump>(current_thread_addr, &coredump_2_1_6())
             .unwrap();
         assert_eq!(real_stack_trace_main(), stack_trace.trace);
     }
@@ -789,7 +815,7 @@ mod tests {
     fn test_get_ruby_stack_trace_1_9_3() {
         let current_thread_addr = 0x823930;
         let stack_trace =
-            ruby_version::ruby_1_9_3_0::get_stack_trace::<CoreDump>(current_thread_addr, &Process{pid: None, source: coredump_1_9_3()})
+            ruby_version::ruby_1_9_3_0::get_stack_trace::<CoreDump>(current_thread_addr, &coredump_1_9_3())
             .unwrap();
         assert_eq!(real_stack_trace_1_9_3(), stack_trace.trace);
     }
@@ -799,7 +825,7 @@ mod tests {
     fn test_get_ruby_stack_trace_2_5_0() {
         let current_thread_addr = 0x55dd8c3b7758;
         let stack_trace =
-            ruby_version::ruby_2_5_0::get_stack_trace::<CoreDump>(current_thread_addr, &Process{pid: None, source: coredump_2_5_0()})
+            ruby_version::ruby_2_5_0::get_stack_trace::<CoreDump>(current_thread_addr, &coredump_2_5_0())
             .unwrap();
         assert_eq!(real_stack_trace(), stack_trace.trace);
     }
@@ -809,7 +835,7 @@ mod tests {
     fn test_get_ruby_stack_trace_2_4_0() {
         let current_thread_addr = 0x55df44959920;
         let stack_trace =
-            ruby_version::ruby_2_4_0::get_stack_trace::<CoreDump>(current_thread_addr, &Process{pid: None, source: coredump_2_4_0()})
+            ruby_version::ruby_2_4_0::get_stack_trace::<CoreDump>(current_thread_addr, &coredump_2_4_0())
             .unwrap();
         assert_eq!(real_stack_trace(), stack_trace.trace);
     }
@@ -820,7 +846,7 @@ mod tests {
         // this stack is from a ruby program that is just running `select`
         let current_thread_addr = 0x562efcd577f0;
         let stack_trace =
-            ruby_version::ruby_2_1_6::get_stack_trace(current_thread_addr, &Process{pid: None, source: coredump_2_1_6_c_function()})
+            ruby_version::ruby_2_1_6::get_stack_trace(current_thread_addr, &coredump_2_1_6_c_function())
             .unwrap();
         assert_eq!(vec!(StackFrame::unknown_c_function()), stack_trace.trace);
     }

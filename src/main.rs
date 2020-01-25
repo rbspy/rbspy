@@ -24,7 +24,8 @@ extern crate log;
 extern crate rand;
 #[cfg(test)]
 extern crate rbspy_testdata;
-extern crate read_process_memory;
+extern crate remoteprocess;
+
 extern crate rbspy_ruby_structs as bindings;
 extern crate serde;
 #[macro_use]
@@ -62,20 +63,17 @@ pub mod ui;
 pub(crate) mod storage;
 
 use crate::core::initialize::initialize;
-use crate::core::types::{StackTrace, pid_t};
-use crate::core::copy::MemoryCopyError;
+use crate::core::types::{MemoryCopyError, Pid, Process, StackTrace};
 use ui::output;
-use ui::descendents::descendents_of;
 
 const BILLION: u64 = 1000 * 1000 * 1000; // for nanosleep
 
 /// The kinds of things we can call `rbspy record` on.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 enum Target {
-    Pid { pid: pid_t },
+    Pid { pid: Pid },
     Subprocess { prog: String, args: Vec<String> },
 }
-use Target::*;
 
 // Formats we can write to
 arg_enum!{
@@ -108,7 +106,7 @@ enum SubCmd {
         silent: bool
     },
     /// Capture and print a stacktrace snapshot of process `pid`.
-    Snapshot { pid: pid_t },
+    Snapshot { pid: Pid },
     Report { format: OutputFormat, input: PathBuf, output: PathBuf, },
 }
 use SubCmd::*;
@@ -158,8 +156,8 @@ fn do_main() -> Result<(), Error> {
             silent,
         } => {
             let pid = match target {
-                Pid { pid } => pid,
-                Subprocess { prog, args } => {
+                Target::Pid { pid } => pid,
+                Target::Subprocess { prog, args } => {
                     if cfg!(target_os = "macos") {
                         // sleep to prevent freezes (because of High Sierra kernel bug)
                         // TODO: figure out how to work around this race in a cleaner way
@@ -177,13 +175,13 @@ fn do_main() -> Result<(), Error> {
                                 "Dropping permissions: running Ruby command as user {}",
                                 std::env::var("SUDO_USER")?
                             );
-                            Command::new(prog).uid(uid).args(args).spawn()?.id() as pid_t
+                            Command::new(prog).uid(uid).args(args).spawn()?.id() as Pid
                         } else {
-                            Command::new(prog).args(args).spawn()?.id() as pid_t
+                            Command::new(prog).args(args).spawn()?.id() as Pid
                         }
                     }
                     #[cfg(windows)]
-                    { Command::new(prog).args(args).spawn()?.id() as pid_t }
+                    { Command::new(prog).args(args).spawn()?.id() as Pid }
                 }
             };
 
@@ -220,7 +218,7 @@ fn check_root_user() -> bool {
 }
 
 #[cfg(all(windows, target_arch = "x86_64"))]
-fn check_wow64_process(pid: pid_t) {
+fn check_wow64_process(pid: Pid) {
     if is_wow64_process(pid).unwrap() {
         eprintln!("Unable to profile 32-bit Ruby with 64-bit rbspy.");
         std::process::exit(1);
@@ -228,7 +226,7 @@ fn check_wow64_process(pid: pid_t) {
 }
 
 #[cfg(all(windows, target_arch = "x86_64"))]
-fn is_wow64_process(pid: pid_t) -> Result<bool, Error> {
+fn is_wow64_process(pid: Pid) -> Result<bool, Error> {
     use std::os::windows::io::RawHandle;
     use winapi::um::wow64apiset::IsWow64Process;
     use winapi::um::processthreadsapi::OpenProcess;
@@ -290,7 +288,7 @@ fn main() {
     }
 }
 
-fn snapshot(pid: pid_t) -> Result<(), Error> {
+fn snapshot(pid: Pid) -> Result<(), Error> {
     let mut getter = initialize(pid)?;
     let trace = getter.get_trace()?;
     for x in trace.iter().rev() {
@@ -358,7 +356,7 @@ impl SampleTime {
 
 /// Start thread(s) recording a PID and possibly its children. Tracks new processes
 /// Returns a pair of Receivers from which you can consume recorded stacktraces and errors
-fn spawn_recorder_children(pid: pid_t, with_subprocesses: bool, sample_rate: u32, maybe_stop_time: Option<Instant>) -> Result<(Receiver<StackTrace>, Receiver<Result<(), Error>>, Arc<AtomicUsize>, Arc<AtomicUsize>), Error> {
+fn spawn_recorder_children(pid: Pid, with_subprocesses: bool, sample_rate: u32, maybe_stop_time: Option<Instant>) -> Result<(Receiver<StackTrace>, Receiver<Result<(), Error>>, Arc<AtomicUsize>, Arc<AtomicUsize>), Error> {
     let done = Arc::new(AtomicBool::new(false));
     let total_traces = Arc::new(AtomicUsize::new(0));
     let timing_error_traces = Arc::new(AtomicUsize::new(0));
@@ -392,13 +390,23 @@ fn spawn_recorder_children(pid: pid_t, with_subprocesses: bool, sample_rate: u32
         // appear
         let done_clone = done.clone();
         std::thread::spawn(move || {
-            let mut pids: HashSet<pid_t> = HashSet::new();
+            let process = Process::new(pid).unwrap();
+            let mut pids: HashSet<Pid> = HashSet::new();
             let done = done.clone();
             // we need to exit this loop when the process we're monitoring exits, otherwise the
             // sender channels won't get closed and rbspy will hang. So we check the done
             // mutex.
             while !done_clone.load(Ordering::Relaxed) {
-                let descendents = descendents_of(pid).expect("Error finding descendents of pid");
+                let descendents = process.child_processes()
+                    .and_then(|tuples| {
+                        let mut children: Vec<Pid> = tuples.into_iter()
+                            .map(|x| x.0).collect();
+
+                        children.push(pid);
+
+                        Ok(children)
+                    }).expect("Error finding descendents of pid");
+
                 for pid in descendents {
                     if pids.contains(&pid) {
                         // already recording it, no need to start a new recording thread
@@ -468,24 +476,32 @@ fn test_spawn_record_children_subprocesses() {
         .next()
         .expect("failed to execute ruby process");
 
-    let mut process = std::process::Command::new(ruby_binary_path_str).arg("ci/ruby-programs/ruby_forks.rb").spawn().unwrap();
-    let pid = process.id() as pid_t;
+    let mut process = std::process::Command::new(ruby_binary_path_str)
+        .arg("ci/ruby-programs/ruby_forks.rb")
+        .spawn()
+        .unwrap();
+
+    let pid = process.id() as Pid;
+
     let (trace_receiver, result_receiver, _, _) = spawn_recorder_children(pid, true, 10, None).unwrap();
-    process.wait().unwrap();
+
     let results: Vec<_> = result_receiver.iter().take(4).collect();
+
     // check that there are 4 distinct PIDs in the stack traces
-    let pids: HashSet<pid_t> = trace_receiver.iter().take(20).map(|x| x.pid.unwrap()).collect();
+    let pids: HashSet<Pid> = trace_receiver.iter().take(20).map(|x| x.pid.unwrap()).collect();
     for r in results {
         assert!(r.is_ok());
     }
+
     assert_eq!(pids.len(), 4);
+    process.wait().unwrap();
 }
 
 fn parallel_record(
     format: OutputFormat,
     raw_path: &PathBuf,
     out_path: &PathBuf,
-    pid: pid_t,
+    pid: Pid,
     with_subprocesses: bool,
     silent: bool,
     sample_rate: u32,
@@ -550,7 +566,7 @@ fn parallel_record(
 
 /// Records stack traces and sends them to a channel in another thread where they can be aggregated
 fn record(
-    pid: pid_t,
+    pid: Pid,
     sample_rate: u32,
     maybe_stop_time: Option<Instant>,
     done: Arc<AtomicBool>,
@@ -703,7 +719,7 @@ fn output_filename(base_dir: &str, maybe_filename: Option<&str>, extension: &str
 /// Check `s` is a positive integer.
 // This assumes a process group isn't a sensible thing to snapshot; could be wrong!
 fn validate_pid(s: String) -> Result<(), String> {
-    let pid: pid_t = s.parse().map_err(|_| "PID must be an integer".to_string())?;
+    let pid: Pid = s.parse().map_err(|_| "PID must be an integer".to_string())?;
     if pid <= 0 {
         return Err("PID must be positive".to_string());
     }
@@ -805,7 +821,7 @@ impl Args {
     fn from<'a, I: IntoIterator<Item = String> + 'a>(args: I) -> Result<Args, Error> {
         let matches: ArgMatches<'a> = arg_parser().get_matches_from(args);
 
-        fn get_pid(matches: &ArgMatches) -> Option<pid_t> {
+        fn get_pid(matches: &ArgMatches) -> Option<Pid> {
             if let Some(pid_str) = matches.value_of("pid") {
                 Some(
                     pid_str
@@ -843,12 +859,12 @@ impl Args {
 
                 let sample_rate = value_t!(submatches, "rate", u32).unwrap();
                 let target = if let Some(pid) = get_pid(submatches) {
-                    Pid { pid }
+                    Target::Pid { pid }
                 } else {
                     let mut cmd = submatches.values_of("cmd").expect("shouldn't happen");
                     let prog = cmd.next().expect("nope");
                     let args = cmd;
-                    Subprocess {
+                    Target::Subprocess {
                         prog: prog.to_string(),
                         args: args.map(String::from).collect(),
                     }
@@ -894,7 +910,7 @@ mod tests {
             Args {
                 cmd:
                     Record {
-                        target: Pid { pid: 1234 },
+                        target: Target::Pid { pid: 1234 },
                         ..
                     },
             } => (),
@@ -915,7 +931,7 @@ mod tests {
             Args {
                 cmd:
                     Record {
-                        target: Subprocess { prog, args },
+                        target: Target::Subprocess { prog, args },
                         ..
                     },
             } => {
@@ -930,7 +946,7 @@ mod tests {
             args,
             Args {
                 cmd: Record {
-                    target: Pid { pid: 1234 },
+                    target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
                     raw_path: "raw.gz".into(),
                     sample_rate: 100,
@@ -950,7 +966,7 @@ mod tests {
             args,
             Args {
                 cmd: Record {
-                    target: Pid { pid: 1234 },
+                    target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
                     raw_path: "raw.gz".into(),
                     sample_rate: 25,
@@ -970,7 +986,7 @@ mod tests {
             args,
             Args {
                 cmd: Record {
-                    target: Pid { pid: 1234 },
+                    target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
                     raw_path: "raw.gz".into(),
                     sample_rate: 100,
@@ -990,7 +1006,7 @@ mod tests {
             args,
             Args {
                 cmd: Record {
-                    target: Pid { pid: 1234 },
+                    target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
                     raw_path: "raw.gz".into(),
                     sample_rate: 100,
@@ -1010,7 +1026,7 @@ mod tests {
             args,
             Args {
                 cmd: Record {
-                    target: Pid { pid: 1234 },
+                    target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
                     raw_path: "raw.gz".into(),
                     sample_rate: 100,
@@ -1030,7 +1046,7 @@ mod tests {
             args,
             Args {
                 cmd: Record {
-                    target: Pid { pid: 1234 },
+                    target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
                     raw_path: "raw.gz".into(),
                     sample_rate: 100,

@@ -3,7 +3,7 @@ use std::io;
 use std::io::Write;
 use std::fs::File;
 
-use crate::core::types::{pid_t, StackTrace, StackFrame};
+use crate::core::types::{Pid, StackTrace, StackFrame};
 
 use failure::{Error};
 use serde_json;
@@ -97,7 +97,7 @@ enum ValueUnit {
 }
 
 impl SpeedscopeFile {
-  pub fn new(samples: HashMap<Option<pid_t>, Vec<Vec<usize>>>, frames: Vec<Frame>) -> SpeedscopeFile {
+  pub fn new(samples: HashMap<Option<Pid>, Vec<Vec<usize>>>, frames: Vec<Frame>) -> SpeedscopeFile {
     let end_value = samples.len();
 
     SpeedscopeFile {
@@ -147,7 +147,7 @@ impl Frame {
 }
 
 pub struct Stats {
-    samples: HashMap<Option<pid_t>, Vec<Vec<usize>>>,
+    samples: HashMap<Option<Pid>, Vec<Vec<usize>>>,
     frames: Vec<Frame>,
     frame_to_index: HashMap<StackFrame, usize>
 }

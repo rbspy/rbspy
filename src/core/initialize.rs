@@ -1,14 +1,13 @@
 use crate::core::address_finder::*;
 use crate::core::address_finder;
-use crate::core::copy::*;
 use proc_maps::MapRange;
 use crate::core::ruby_version;
-use crate::core::types::{StackTrace, Process, pid_t};
+use crate::core::types::{MemoryCopyError, Pid, Process,
+                         ProcessMemory, StackTrace};
 
 use failure::Error;
 use failure::ResultExt;
 use failure::Fail;
-use read_process_memory::*;
 use libc::c_char;
 
 use std::time::Duration;
@@ -17,7 +16,7 @@ use std;
 /**
  * Initialization code for the profiler.
  *
- * The only public function here is `initialize(pid: pid_t)`, which returns a struct which you can
+ * The only public function here is `initialize(pid: Pid)`, which returns a struct which you can
  * call `get_trace()` on to get a stack trace.
  *
  * Core responsibilities of this code:
@@ -26,11 +25,12 @@ use std;
  *   * Find the right stack trace function for the Ruby version we found
  *   * Package all that up into a struct that the user can use to get stack traces.
  */
-pub fn initialize(pid: pid_t) -> Result<StackTraceGetter, Error> {
-    let (current_thread_addr_location, stack_trace_function) = get_process_ruby_state(pid)?;
+pub fn initialize(pid: Pid) -> Result<StackTraceGetter, Error> {
+    let process = Process::new(pid)?;
+    let (current_thread_addr_location, stack_trace_function) = get_process_ruby_state(&process)?;
 
     Ok(StackTraceGetter {
-        process: Process{pid: Some(pid), source: pid.try_into_process_handle()?},
+        process,
         current_thread_addr_location,
         stack_trace_function,
         reinit_count: 0,
@@ -39,16 +39,23 @@ pub fn initialize(pid: pid_t) -> Result<StackTraceGetter, Error> {
 
 // Use a StackTraceGetter to get stack traces
 pub struct StackTraceGetter {
-    process: Process<ProcessHandle>,
+    process: Process,
     current_thread_addr_location: usize,
-    stack_trace_function: StackTraceFn<ProcessHandle>,
+    stack_trace_function: StackTraceFn,
     reinit_count: u32,
 }
 
 impl StackTraceGetter {
     pub fn get_trace(&mut self) -> Result<StackTrace, Error> {
         match self.get_trace_from_current_thread() {
-            Ok(trace) => return Ok(trace),
+            Ok(mut trace) => return {
+                /* This is a spike to enrich the trace with the pid.
+                 * This is needed, because remoteprocess' ProcessMemory
+                 * trait does not expose pid.
+                 */
+                trace.pid = Some(self.process.pid);
+                Ok(trace)
+            },
             Err(MemoryCopyError::InvalidAddressError(addr))
                 if addr == self.current_thread_addr_location => {}
             Err(e) => Err(e)?,
@@ -67,8 +74,8 @@ impl StackTraceGetter {
     }
 
     fn reinitialize(&mut self) -> Result<(), Error> {
-        let pid = self.process.pid.expect("Get StackTraceGetter pid");
-        let (current_thread_addr_location, stack_trace_function) = get_process_ruby_state(pid)?;
+        let (current_thread_addr_location, stack_trace_function) =
+            get_process_ruby_state(&self.process)?;
 
         self.current_thread_addr_location = current_thread_addr_location;
         self.stack_trace_function = stack_trace_function;
@@ -78,20 +85,22 @@ impl StackTraceGetter {
     }
 }
 
-pub type IsMaybeThreadFn<T = ProcessHandle> = Box<dyn Fn(usize, usize, T, &[MapRange]) -> bool>;
+pub type IsMaybeThreadFn = Box<dyn Fn(usize, usize, &Process, &[MapRange]) -> bool>;
 
 // Everything below here is private
 
-type StackTraceFn<T = ProcessHandle> = Box<dyn Fn(usize, &Process<T>) -> Result<StackTrace, MemoryCopyError>>;
+type StackTraceFn = Box<dyn Fn(usize, &Process) -> Result<StackTrace, MemoryCopyError>>;
 
-fn get_process_ruby_state(pid: pid_t) -> Result<(usize, StackTraceFn), Error> {
-    let version = get_ruby_version_retry(pid).context("Couldn't determine Ruby version")?;
+fn get_process_ruby_state(process: &Process) -> Result<(usize, StackTraceFn), Error> {
+    let version = get_ruby_version_retry(process)
+        .context("Couldn't determine Ruby version")?;
+
     let is_maybe_thread = is_maybe_thread_function(&version);
 
     debug!("version: {}", version);
     Ok((
         address_finder::current_thread_address(
-            pid,
+            process.pid,
             &version,
             is_maybe_thread,
         )?,
@@ -99,7 +108,7 @@ fn get_process_ruby_state(pid: pid_t) -> Result<(usize, StackTraceFn), Error> {
     ))
 }
 
-fn get_ruby_version_retry(pid: pid_t) -> Result<String, Error> {
+fn get_ruby_version_retry(process: &Process) -> Result<String, Error> {
     /* This exists because:
      * a) Sometimes rbenv takes a while to exec the right Ruby binary.
      * b) Dynamic linking takes a nonzero amount of time, so even after the right Ruby binary is
@@ -111,11 +120,9 @@ fn get_ruby_version_retry(pid: pid_t) -> Result<String, Error> {
      */
     let mut i = 0;
     loop {
-        let maybe_source = pid.try_into_process_handle();
-        let version = match maybe_source {
-            Ok(source) => get_ruby_version(pid, source),
-            Err(x) => Err(x.into()),
-        }.context("Couldn't create process handle for PID");
+        let version = get_ruby_version(process)
+            .context("Couldn't create process handle for PID");
+
         if i > 100 {
             return Ok(version?);
         }
@@ -149,9 +156,9 @@ fn get_ruby_version_retry(pid: pid_t) -> Result<String, Error> {
     }
 }
 
-pub fn get_ruby_version(pid: pid_t, source: ProcessHandle) -> Result<String, Error> {
-    let addr = address_finder::get_ruby_version_address(pid)?;
-    let x: [c_char; 15] = copy_struct(addr, &source)?;
+fn get_ruby_version(process: &Process) -> Result<String, Error> {
+    let addr = address_finder::get_ruby_version_address(process.pid)?;
+    let x: [c_char; 15] = process.copy_struct(addr)?;
     Ok(unsafe {
         std::ffi::CStr::from_ptr(x.as_ptr() as *mut c_char)
             .to_str()?
@@ -161,8 +168,9 @@ pub fn get_ruby_version(pid: pid_t, source: ProcessHandle) -> Result<String, Err
 
 #[test]
 #[cfg(target_os = "linux")]
-fn test_get_nonexistent_process() {
-    let version = get_ruby_version_retry(10000);
+fn test_initialize_wiith_nonexistent_process() {
+    let process = Process::new(10000).expect("Failed to initialize process");
+    let version = get_ruby_version_retry(&process);
     match version
         .unwrap_err()
         .root_cause()
@@ -175,8 +183,9 @@ fn test_get_nonexistent_process() {
 
 #[test]
 #[cfg(target_os = "linux")]
-fn test_get_disallowed_process() {
-    let version = get_ruby_version_retry(1);
+fn test_initialize_with_disallowed_process() {
+    let process = Process::new(1).expect("Failed to initialize process");
+    let version = get_ruby_version_retry(&process);
     match version
         .unwrap_err()
         .root_cause()
@@ -191,8 +200,11 @@ fn test_get_disallowed_process() {
 #[cfg(target_os = "linux")]
 fn test_current_thread_address() {
     let mut process = std::process::Command::new("ruby").arg("./ci/ruby-programs/infinite.rb").spawn().unwrap();
-    let pid = process.id() as pid_t;
-    let version = get_ruby_version_retry(pid).expect("version should exist");
+    let pid = process.id() as Pid;
+    let remoteprocess = Process::new(pid).expect("Failed to initialize process");
+    let version = get_ruby_version_retry(&remoteprocess)
+        .expect("version should exist");
+
     let is_maybe_thread = is_maybe_thread_function(&version);
     let result = address_finder::current_thread_address(pid, &version, is_maybe_thread);
     assert!(result.is_ok(), format!("result not ok: {:?}", result));
@@ -204,7 +216,7 @@ fn test_current_thread_address() {
 fn test_get_trace() {
     // Test getting a stack trace from a real running program using system Ruby
     let mut process = std::process::Command::new("ruby").arg("./ci/ruby-programs/infinite.rb").spawn().unwrap();
-    let pid = process.id() as pid_t;
+    let pid = process.id() as Pid;
     let mut getter = initialize(pid).unwrap();
     std::thread::sleep(std::time::Duration::from_millis(50));
     let trace = getter.get_trace();
@@ -226,7 +238,7 @@ fn test_get_exec_trace() {
         .spawn()
         .unwrap();
 
-    let pid = process.id() as pid_t;
+    let pid = process.id() as Pid;
     let mut getter = initialize(pid).expect("initialize");
 
     std::thread::sleep(std::time::Duration::from_millis(50));
@@ -248,7 +260,6 @@ fn test_get_exec_trace() {
         }
 
         assert!(trace2.is_ok(), "post-exec trace failed: {:?}", trace2.unwrap_err());
-        assert_eq!(trace2.unwrap().pid, Some(pid));
     }
 
     process.kill().unwrap();
@@ -259,8 +270,7 @@ fn test_get_exec_trace() {
 #[test]
 #[cfg(target_os = "macos")]
 fn test_get_nonexistent_process() {
-    let version = get_ruby_version_retry(10000);
-    assert!(version.is_err());
+    assert!(Process::new(10000).is_err());
 }
 
 #[test]
@@ -268,16 +278,12 @@ fn test_get_nonexistent_process() {
 fn test_get_disallowed_process() {
     // getting the ruby version isn't allowed on Mac if the process isn't running as root
     let mut process = std::process::Command::new("/usr/bin/ruby").spawn().unwrap();
-    let pid = process.id() as pid_t;
-    // sleep to prevent freezes (because of High Sierra kernel bug)
-    // TODO: figure out how to work around this race in a cleaner way
-    std::thread::sleep(std::time::Duration::from_millis(10));
-    let version = get_ruby_version_retry(pid);
-    assert!(version.is_err());
+    let pid = process.id() as Pid;
+    assert!(Process::new(pid).is_err());
     process.kill().unwrap();
 }
 
-fn is_maybe_thread_function<T: 'static>(version: &str) -> IsMaybeThreadFn<T> where T: CopyAddress {
+fn is_maybe_thread_function(version: &str) -> IsMaybeThreadFn {
     let function = match version {
         "1.9.1" => ruby_version::ruby_1_9_1_0::is_maybe_thread,
         "1.9.2" => ruby_version::ruby_1_9_2_0::is_maybe_thread,
@@ -342,7 +348,7 @@ fn is_maybe_thread_function<T: 'static>(version: &str) -> IsMaybeThreadFn<T> whe
     Box::new(function)
 }
 
-fn get_stack_trace_function<T: 'static>(version: &str) -> StackTraceFn<T> where T: CopyAddress {
+fn get_stack_trace_function(version: &str) -> StackTraceFn {
     let stack_trace_function = match version {
         "1.9.1" => ruby_version::ruby_1_9_1_0::get_stack_trace,
         "1.9.2" => ruby_version::ruby_1_9_2_0::get_stack_trace,
