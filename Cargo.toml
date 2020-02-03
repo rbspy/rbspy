@@ -32,6 +32,7 @@ rbspy-ruby-structs = { path = "ruby-structs", version="0.1.0" }
 serde = "1"
 serde_derive = "1"
 serde_json = "1"
+signal-hook = "0.1.12"
 term_size = "0.3"
 tempdir = "0.3"
 

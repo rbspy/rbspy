@@ -35,6 +35,8 @@ extern crate term_size;
 #[cfg(windows)]
 extern crate winapi;
 
+extern crate signal_hook;
+
 
 use chrono::prelude::*;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
@@ -508,10 +510,32 @@ fn parallel_record(
     let mut summary_time = std::time::Instant::now() + Duration::from_secs(1);
     let start_time = Instant::now();
 
+    let mut recording = false;
+
+    let usr1 = Arc::new(AtomicBool::new(false));
+    signal_hook::flag::register(signal_hook::SIGUSR1, Arc::clone(&usr1))?;
+
+    let usr2 = Arc::new(AtomicBool::new(false));
+    signal_hook::flag::register(signal_hook::SIGUSR2, Arc::clone(&usr2))?;
+
     for trace in trace_receiver.iter() {
-        out.record(&trace)?;
-        summary_out.add_function_name(&trace.trace);
-        raw_store.write(&trace)?;
+        if usr1.load(Ordering::Relaxed) {
+            usr1.store(false, Ordering::Relaxed);
+            usr2.store(false, Ordering::Relaxed);
+            recording = true;
+        }
+
+        if usr2.load(Ordering::Relaxed) {
+            usr1.store(false, Ordering::Relaxed);
+            usr2.store(false, Ordering::Relaxed);
+            recording = false;
+        }
+
+        if recording {
+            out.record(&trace)?;
+            summary_out.add_function_name(&trace.trace);
+            raw_store.write(&trace)?;
+        }
 
         if !silent {
             // Print a summary every second
