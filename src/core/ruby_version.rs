@@ -118,7 +118,7 @@ macro_rules! ruby_version_v2_5_x(
         }
         ));
 
-macro_rules! ruby_version_v2_6_x(
+macro_rules! ruby_version_v2_6_to_2_7(
     ($ruby_version:ident) => (
        pub mod $ruby_version {
            use std;
@@ -677,12 +677,13 @@ ruby_version_v2_5_x!(ruby_2_5_4);
 ruby_version_v2_5_x!(ruby_2_5_5);
 ruby_version_v2_5_x!(ruby_2_5_6);
 ruby_version_v2_5_x!(ruby_2_5_7);
-ruby_version_v2_6_x!(ruby_2_6_0);
-ruby_version_v2_6_x!(ruby_2_6_1);
-ruby_version_v2_6_x!(ruby_2_6_2);
-ruby_version_v2_6_x!(ruby_2_6_3);
-ruby_version_v2_6_x!(ruby_2_6_4);
-ruby_version_v2_6_x!(ruby_2_6_5);
+ruby_version_v2_6_to_2_7!(ruby_2_6_0);
+ruby_version_v2_6_to_2_7!(ruby_2_6_1);
+ruby_version_v2_6_to_2_7!(ruby_2_6_2);
+ruby_version_v2_6_to_2_7!(ruby_2_6_3);
+ruby_version_v2_6_to_2_7!(ruby_2_6_4);
+ruby_version_v2_6_to_2_7!(ruby_2_6_5);
+ruby_version_v2_6_to_2_7!(ruby_2_7_0);
 
 #[cfg(test)]
 mod tests {
