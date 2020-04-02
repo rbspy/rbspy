@@ -159,7 +159,8 @@ macro_rules! get_stack_trace(
                 return Ok(StackTrace {
                     pid: None,
                     trace: vec!(StackFrame::unknown_c_function()),
-                    thread_id: Some(get_thread_id(&thread, source)?)
+                    thread_id: Some(get_thread_id(&thread, source)?),
+                    time: Some(SystemTime::now())
                 });
             }
             let mut trace = Vec::new();
@@ -201,10 +202,11 @@ macro_rules! get_stack_trace(
                     }
                 }
             }
-            Ok(StackTrace{trace, pid: None, thread_id: Some(get_thread_id(&thread, source)?)})
+            Ok(StackTrace{trace, pid: None, thread_id: Some(get_thread_id(&thread, source)?), time: Some(SystemTime::now())})
         }
 
 use proc_maps::{maps_contain_addr, MapRange};
+use std::time::SystemTime;
 
 // Checks whether the address looks even vaguely like a thread struct, mostly by making sure its
 // addresses are reasonable
