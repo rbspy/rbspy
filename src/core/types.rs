@@ -3,6 +3,7 @@
 use std::cmp::Ordering;
 use std::fmt;
 use std::{self, convert::From};
+use std::time::SystemTime;
 
 use failure::Context;
 
@@ -21,6 +22,7 @@ pub struct StackTrace {
     pub trace: Vec<StackFrame>,
     pub pid: Option<Pid>,
     pub thread_id: Option<usize>,
+    pub time: Option<SystemTime>,
 }
 
 #[derive(Fail, Debug)]
