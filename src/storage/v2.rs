@@ -7,28 +7,27 @@ use serde_json;
 
 use super::*;
 
-pub(crate) struct Data(pub Vec<StackTrace>);
+pub(crate) struct Data {
+    pub header: Header,
+    pub traces: Vec<StackTrace>,
+}
 
 impl Storage for Data {
     fn from_reader<R: Read>(r: R) -> Result<Data, Error> {
         let reader = BufReader::new(r);
         let mut result = Vec::new();
-        for line in reader.lines() {
+        let mut lines = reader.lines();
+        let mut header_line = lines.next().unwrap().unwrap();
+        for line in lines {
             let trace: StackTrace = serde_json::from_str(&line?)?;
             result.push(trace);
         }
-        Ok(Data(result))
+        Ok(Data {
+            header: serde_json::from_str(&header_line)?,
+            traces: result,
+        })
     }
     fn version() -> Version {
-        Version(1)
-    }
-}
-
-impl From<Data> for v2::Data {
-    fn from(d: Data) -> v2::Data {
-        v2::Data {
-            header: Header {hz: None},
-            traces: d.0,
-        }
+        Version(2)
     }
 }

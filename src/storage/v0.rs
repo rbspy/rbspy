@@ -1,6 +1,6 @@
 use std::io::prelude::*;
 use std::io::BufReader;
-use crate::core::types::{StackTrace, StackFrame};
+use crate::core::types::{Header, StackTrace, StackFrame};
 
 use failure::Error;
 use serde_json;
@@ -24,10 +24,13 @@ impl Storage for Data {
     }
 }
 
-impl From<Data> for v1::Data {
-    fn from(d: Data) -> v1::Data {
+impl From<Data> for v2::Data {
+    fn from(d: Data) -> v2::Data {
         let x: Vec<StackTrace> = d.0.into_iter().map(std::convert::Into::into).collect();
-        v1::Data(x)
+        v2::Data {
+            header: Header {hz: None},
+            traces: x,
+        }
     }
 }
 

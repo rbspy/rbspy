@@ -520,7 +520,7 @@ fn parallel_record(
     // and the formatted output (a flamegraph or something)
     let mut out = format.outputter();
     let mut summary_out = ui::summary::Stats::new();
-    let mut raw_store = storage::Store::new(raw_path)?;
+    let mut raw_store = storage::Store::new(raw_path, sample_rate)?;
     let mut summary_time = std::time::Instant::now() + Duration::from_secs(1);
     let start_time = Instant::now();
 
@@ -639,7 +639,7 @@ fn record(
 
 fn report(format: OutputFormat, input: PathBuf, output: PathBuf) -> Result<(), Error>{
     let input_file = File::open(input)?;
-    let stuff = storage::from_reader(input_file)?.0;
+    let stuff = storage::from_reader(input_file)?.traces;
     let mut outputter = format.outputter();
     for trace in stuff {
         outputter.record(&trace)?;

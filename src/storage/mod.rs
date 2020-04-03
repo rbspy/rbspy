@@ -18,6 +18,7 @@ use std::io::prelude::*;
 use std::fs::File;
 use std::path::Path;
 
+use crate::core::types::Header;
 use crate::core::types::StackTrace;
 
 use self::flate2::Compression;
@@ -26,20 +27,29 @@ use serde_json;
 
 mod v0;
 mod v1;
+mod v2;
 
 pub struct Store {
     encoder: flate2::write::GzEncoder<File>,
 }
 
 impl Store {
-    pub fn new(out_path: &Path) -> Result<Store, io::Error> {
+    pub fn new(out_path: &Path, hz: u32) -> Result<Store, io::Error> {
         let file = File::create(out_path)?;
         let mut encoder = flate2::write::GzEncoder::new(file, Compression::default());
-        encoder.write_all("rbspy01\n".as_bytes())?;
+        encoder.write_all("rbspy02\n".as_bytes())?;
+
+        let json = serde_json::to_string(&Header {
+            hz: Some(hz),
+        })?;
+        writeln!(&mut encoder, "{}", json)?;
+
         Ok(Store { encoder })
     }
 
     pub fn write(&mut self, trace: &StackTrace) -> Result<(), Error> {
+        let json = serde_json::to_string(trace)?;
+        writeln!(&mut self.encoder, "{}", json)?;
         let json = serde_json::to_string(trace)?;
         writeln!(&mut self.encoder, "{}", json)?;
         Ok(())
@@ -71,6 +81,8 @@ impl Version {
             Ok(Version(0))
         } else if &b[0..3] == "01\n".as_bytes() {
             Ok(Version(1))
+        } else if &b[0..3] == "02\n".as_bytes() {
+            Ok(Version(2))
         } else {
             Err(StorageError::Invalid)
         }
@@ -80,7 +92,7 @@ impl Version {
 #[derive(Fail, Debug)]
 pub(crate) enum StorageError {
     /// The file doesn't begin with the magic tag `rbspy` + version number.
-    #[fail(display = "Invalid rbpsy file")]
+    #[fail(display = "Invalid rbspy file")]
     Invalid,
     /// The version of the rbspy file can't be handled by this version of rbspy.
     #[fail(display = "Cannot handle rbspy format {}", _0)]
@@ -92,7 +104,7 @@ pub(crate) enum StorageError {
 
 /// Types that can be deserialized from an `io::Read` into something convertible
 /// to the current internal form.
-pub(crate) trait Storage: Into<v1::Data> {
+pub(crate) trait Storage: Into<v2::Data> {
     fn from_reader<R: Read>(r: R) -> Result<Self, Error>;
     fn version() -> Version;
 }
@@ -107,7 +119,7 @@ fn read_version(r: &mut dyn Read) -> Result<Version, StorageError> {
     }
 }
 
-pub(crate) fn from_reader<R: Read>(r: R) -> Result<v1::Data, Error> {
+pub(crate) fn from_reader<R: Read>(r: R) -> Result<v2::Data, Error> {
     // This will read 8 bytes, leaving the reader's cursor at the start of the
     // "real" data.
     let mut reader = flate2::read::GzDecoder::new(r);
@@ -119,6 +131,10 @@ pub(crate) fn from_reader<R: Read>(r: R) -> Result<v1::Data, Error> {
         }
         Version(1) => {
             let intermediate = v1::Data::from_reader(reader)?;
+            Ok(intermediate.into())
+        }
+        Version(2) => {
+            let intermediate = v2::Data::from_reader(reader)?;
             Ok(intermediate)
         }
         v => Err(StorageError::UnknownVersion(v).into()),
