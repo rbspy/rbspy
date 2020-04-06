@@ -36,6 +36,6 @@ impl From<Data> for v2::Data {
 
 impl From<Vec<StackFrame>> for StackTrace {
     fn from(trace: Vec<StackFrame>) -> StackTrace {
-        StackTrace{pid: None, trace, thread_id: None}
+        StackTrace{pid: None, trace, thread_id: None, time: None}
     }
 }
