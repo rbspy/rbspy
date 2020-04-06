@@ -27,7 +27,11 @@ impl Storage for Data {
 impl From<Data> for v2::Data {
     fn from(d: Data) -> v2::Data {
         v2::Data {
-            header: Header {sample_rate: None},
+            header: Header {
+                sample_rate: None,
+                rbspy_version: None,
+                start_time: None,
+            },
             traces: d.0,
         }
     }

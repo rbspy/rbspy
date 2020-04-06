@@ -17,6 +17,7 @@ use std::io;
 use std::io::prelude::*;
 use std::fs::File;
 use std::path::Path;
+use std::time::SystemTime;
 
 use crate::core::types::Header;
 use crate::core::types::StackTrace;
@@ -41,6 +42,8 @@ impl Store {
 
         let json = serde_json::to_string(&Header {
             sample_rate: Some(sample_rate),
+            rbspy_version: Some(env!("CARGO_PKG_VERSION").to_string()),
+            start_time: Some(SystemTime::now()),
         })?;
         writeln!(&mut encoder, "{}", json)?;
 
