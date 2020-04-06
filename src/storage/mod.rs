@@ -50,8 +50,6 @@ impl Store {
     pub fn write(&mut self, trace: &StackTrace) -> Result<(), Error> {
         let json = serde_json::to_string(trace)?;
         writeln!(&mut self.encoder, "{}", json)?;
-        let json = serde_json::to_string(trace)?;
-        writeln!(&mut self.encoder, "{}", json)?;
         Ok(())
     }
 
