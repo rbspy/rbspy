@@ -34,13 +34,13 @@ pub struct Store {
 }
 
 impl Store {
-    pub fn new(out_path: &Path, hz: u32) -> Result<Store, io::Error> {
+    pub fn new(out_path: &Path, sample_rate: u32) -> Result<Store, io::Error> {
         let file = File::create(out_path)?;
         let mut encoder = flate2::write::GzEncoder::new(file, Compression::default());
         encoder.write_all("rbspy02\n".as_bytes())?;
 
         let json = serde_json::to_string(&Header {
-            hz: Some(hz),
+            sample_rate: Some(sample_rate),
         })?;
         writeln!(&mut encoder, "{}", json)?;
 
