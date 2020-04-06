@@ -12,6 +12,8 @@ pub use remoteprocess::{Error, Process, Pid, ProcessMemory};
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub(crate) struct Header {
     pub sample_rate: Option<u32>,
+    pub rbspy_version: Option<String>,
+    pub start_time: Option<SystemTime>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
