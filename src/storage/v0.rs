@@ -28,7 +28,7 @@ impl From<Data> for v2::Data {
     fn from(d: Data) -> v2::Data {
         let x: Vec<StackTrace> = d.0.into_iter().map(std::convert::Into::into).collect();
         v2::Data {
-            header: Header {hz: None},
+            header: Header {sample_rate: None},
             traces: x,
         }
     }
