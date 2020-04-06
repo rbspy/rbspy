@@ -112,8 +112,6 @@ impl SpeedscopeFile {
       exporter: Some(format!("rbspy@{}", env!("CARGO_PKG_VERSION"))),
 
       profiles: samples.iter().map(|(option_pid, samples)| {
-        let prev: Option<SystemTime> = None;
-
         Profile {
             profile_type: ProfileType::Sampled,
 
