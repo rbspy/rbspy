@@ -28,15 +28,25 @@ impl Stats {
     }
 
     pub fn write(&self, w: File) -> Result<(), Error> {
-        let lines: Vec<String> = self.counts.iter().map(|(k, v)| format!("{} {}", k, v)).collect();
-
         let mut opts =  Options {
             direction: Direction::Inverted,
             ..Default::default()
         };
 
+        let lines = self.get_lines();
         inferno::flamegraph::from_lines(&mut opts, lines.iter().map(|x| x.as_str()), w).unwrap();
         Ok(())
+    }
+
+    pub fn write_stack_lines(&self, w: &mut dyn io::Write) -> Result<(), Error> {
+        for line in self.get_lines() {
+            writeln!(w, "{}", line)?;
+        }
+        Ok(())
+    }
+
+    fn get_lines(&self) -> Vec<String> {
+        self.counts.iter().map(|(k, v)| format!("{} {}", k, v)).collect()
     }
 }
 

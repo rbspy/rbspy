@@ -27,6 +27,20 @@ impl Outputter for Flamegraph {
     }
 }
 
+pub struct FlamegraphStackLines(pub flamegraph::Stats);
+
+impl Outputter for FlamegraphStackLines {
+    fn record(&mut self, stack: &StackTrace) -> Result<(), Error> {
+        self.0.record(&stack.trace)?;
+        Ok(())
+    }
+
+    fn complete(&mut self, mut file: File) -> Result<(), Error> {
+        self.0.write_stack_lines(&mut file)?;
+        Ok(())
+    }
+}
+
 pub struct Callgrind(pub callgrind::Stats);
 
 impl Outputter for Callgrind {
