@@ -10,10 +10,18 @@ running 1 simple command.
 
 `rbspy` lets you profile Ruby processes that are already running. You give it a PID, and it starts
 profiling. It's a sampling profiler, which means it's **low overhead** and **safe to run in
-production**.
+production**. 
 
 `rbspy` lets you record profiling data, save the raw profiling data to disk, and then analyze it in
 a variety of different ways later on.
+
+## only wall-clock profiling
+
+There are 2 main ways to profile code -- you can either profile everything the
+application does (including waiting), or only profile when the application is using the CPU. 
+
+rbspy profiles everything the program does (including waiting) -- there's no
+option to just profile when the program is using the CPU.
 
 ## Documentation
 
