@@ -46,7 +46,7 @@ bindgen /tmp/wrapper.h \
     -I/usr/lib/llvm-3.8/lib/clang/3.8.0/include/ \
     "-I$ruby_header_dir"
 
-#rustfmt --force src/bindings/ruby_${1}.rs
+rustfmt /tmp/bindings.rs
 
 echo "#![allow(non_upper_case_globals)]" > $OUT
 echo "#![allow(non_camel_case_types)]" >> $OUT
