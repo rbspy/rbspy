@@ -2,6 +2,7 @@ use std::collections::{HashMap};
 use std::io;
 use std::io::Write;
 use std::fs::File;
+use std::time::SystemTime;
 
 use crate::core::types::{Pid, StackTrace, StackFrame};
 
@@ -97,7 +98,7 @@ enum ValueUnit {
 }
 
 impl SpeedscopeFile {
-  pub fn new(samples: HashMap<Option<Pid>, Vec<Vec<usize>>>, frames: Vec<Frame>) -> SpeedscopeFile {
+  pub fn new(samples: HashMap<Option<Pid>, Vec<Vec<usize>>>, frames: Vec<Frame>, weights: Vec<f64>) -> SpeedscopeFile {
     let end_value = samples.len();
 
     SpeedscopeFile {
@@ -111,20 +112,18 @@ impl SpeedscopeFile {
       exporter: Some(format!("rbspy@{}", env!("CARGO_PKG_VERSION"))),
 
       profiles: samples.iter().map(|(option_pid, samples)| {
-        let weights: Vec<f64> = (&samples).iter().map(|_s| 1_f64).collect();
-
         Profile {
             profile_type: ProfileType::Sampled,
 
             name: option_pid.map_or("rbspy profile".to_string(), |pid| format!("rbspy profile - pid {}", pid)),
 
-            unit: ValueUnit::None,
+            unit: ValueUnit::Seconds,
 
             start_value: 0.0,
             end_value: end_value as f64,
 
             samples: samples.clone(),
-            weights
+            weights: weights.clone()
         }
       }).collect(),
 
@@ -149,7 +148,9 @@ impl Frame {
 pub struct Stats {
     samples: HashMap<Option<Pid>, Vec<Vec<usize>>>,
     frames: Vec<Frame>,
-    frame_to_index: HashMap<StackFrame, usize>
+    frame_to_index: HashMap<StackFrame, usize>,
+    weights: Vec<f64>,
+    prev_time: Option<SystemTime>
 }
 
 impl Stats {
@@ -157,11 +158,13 @@ impl Stats {
         Stats {
             samples: HashMap::new(),
             frames: vec![],
-            frame_to_index: HashMap::new()
+            frame_to_index: HashMap::new(),
+            weights: vec![],
+            prev_time: None
         }
     }
 
-    pub fn record(&mut self, stack: &StackTrace) -> Result<(), io::Error> {
+    pub fn record(&mut self, stack: &StackTrace) -> Result<(), failure::Error> {
         let mut frame_indices: Vec<usize> = stack.trace.iter().map(|frame| {
             let frames = &mut self.frames;
             *self.frame_to_index.entry(frame.clone()).or_insert_with(|| {
@@ -175,11 +178,26 @@ impl Stats {
         self.samples.entry(stack.pid).or_insert_with(|| {
             vec![]
         }).push(frame_indices);
+
+        if let Some(time) = stack.time {
+            if let Some(prev_time) = self.prev_time {
+                let delta = time.duration_since(prev_time)?;
+                self.weights.push(delta.as_secs_f64());
+            } else {
+                // drop first sample, since we have no delta to compare against
+                self.weights.push(0.0);
+            }
+            self.prev_time = stack.time;
+        } else {
+            // support for import from old profiles that have no timestamps
+            self.weights.push(1.0);
+        }
+
         Ok(())
     }
 
     pub fn write(&self, mut w: File) -> Result<(), Error> {
-        let json = serde_json::to_string(&SpeedscopeFile::new(self.samples.clone(), self.frames.clone()))?;
+        let json = serde_json::to_string(&SpeedscopeFile::new(self.samples.clone(), self.frames.clone(), self.weights.clone()))?;
         writeln!(&mut w, "{}", json)?;
         Ok(())
     }
