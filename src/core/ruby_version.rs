@@ -689,6 +689,7 @@ ruby_version_v2_6_to_2_7!(ruby_2_6_5);
 ruby_version_v2_6_to_2_7!(ruby_2_6_6);
 ruby_version_v2_6_to_2_7!(ruby_2_7_0);
 ruby_version_v2_6_to_2_7!(ruby_2_7_1);
+ruby_version_v2_6_to_2_7!(ruby_2_7_2);
 
 #[cfg(test)]
 mod tests {
