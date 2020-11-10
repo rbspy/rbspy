@@ -14,7 +14,7 @@ You will need to have forked/cloned this repo and have several things in order t
 
 ### Executing the script
 
-Once you have satisfied dependencies. You can run the script (NOTE: you must run the script from the root of the project) like with a single argument wich represents the version you are building for (in this case 2.5.8): 
+Once you have satisfied dependencies. You can run the script (NOTE: you must run the script from the root of the project) like with a single argument wich represents the version you are building for (in this case 2.5.8):
 
 ```
 ./scripts/bindgen.sh 2_5_8
@@ -22,3 +22,15 @@ Once you have satisfied dependencies. You can run the script (NOTE: you must run
 
 This should generate a file `ruby-structs/src/ruby_2_5_8.rs` with the updated bindings. Once you have this you can check it in as part of a PR to point to it (for example: https://github.com/rbspy/rbspy/pull/261)
 
+### Running the script via Docker
+
+There is also a Dockerfile that can be used to run bindgen for individual ruby versions.
+
+Here is an example of how to run it:
+
+```
+docker build -t rbspy-bindgen -f scripts/Dockerfile .
+docker run -v $(pwd)/ruby-structs:/opt/rbspy/ruby-structs rbspy-bindgen
+```
+
+You can patch the `RUBY_VERSION` in the Dockerfile to target different versions.
