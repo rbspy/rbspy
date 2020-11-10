@@ -10,7 +10,7 @@ running 1 simple command.
 
 `rbspy` lets you profile Ruby processes that are already running. You give it a PID, and it starts
 profiling. It's a sampling profiler, which means it's **low overhead** and **safe to run in
-production**. 
+production**.
 
 `rbspy` lets you record profiling data, save the raw profiling data to disk, and then analyze it in
 a variety of different ways later on.
@@ -18,7 +18,7 @@ a variety of different ways later on.
 ## only wall-clock profiling
 
 There are 2 main ways to profile code -- you can either profile everything the
-application does (including waiting), or only profile when the application is using the CPU. 
+application does (including waiting), or only profile when the application is using the CPU.
 
 rbspy profiles everything the program does (including waiting) -- there's no
 option to just profile when the program is using the CPU.
@@ -69,6 +69,15 @@ https://www.rust-lang.org/ has great resources for learning Rust.
 1. `cargo test` to test
 
 The built binary will end up at `target/debug/rbspy`
+
+## Tagging a release
+
+Here are the steps for maintainers to tag a new release:
+
+1. Update `Cargo.toml` with the new version, run `cargo build` to ensure `Cargo.lock` is updated.
+1. Open an MR for the version bump. You can generate a CHANGELOG via `git log --pretty='- %s' v0.3.10...HEAD`.
+1. After the MR was merged, tag the new release, e.g. `git tag v0.3.11`, and push it: `git push --tags`.
+1. Travis will publish the tarballs to GitHub.
 
 ## Contributors
 
