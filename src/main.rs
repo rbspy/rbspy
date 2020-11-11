@@ -483,12 +483,12 @@ fn test_spawn_record_children_subprocesses() {
 
     let pid = process.id() as Pid;
 
-    let (trace_receiver, result_receiver, _, _) = spawn_recorder_children(pid, true, 10, None).unwrap();
+    let (trace_receiver, result_receiver, _, _) = spawn_recorder_children(pid, true, 20, None).unwrap();
 
     let results: Vec<_> = result_receiver.iter().take(4).collect();
 
     // check that there are 4 distinct PIDs in the stack traces
-    let pids: HashSet<Pid> = trace_receiver.iter().take(20).map(|x| x.pid.unwrap()).collect();
+    let pids: HashSet<Pid> = trace_receiver.iter().take(100).map(|x| x.pid.unwrap()).collect();
     for r in results {
         assert!(r.is_ok());
     }
