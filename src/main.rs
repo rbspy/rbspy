@@ -100,7 +100,8 @@ enum SubCmd {
         format: OutputFormat,
         no_drop_root: bool,
         with_subprocesses: bool,
-        silent: bool
+        silent: bool,
+        flamegraph_precision: u32
     },
     /// Capture and print a stacktrace snapshot of process `pid`.
     Snapshot { pid: Pid },
@@ -151,6 +152,7 @@ fn do_main() -> Result<(), Error> {
             no_drop_root,
             with_subprocesses,
             silent,
+            flamegraph_precision,
         } => {
             let pid = match target {
                 Target::Pid { pid } => pid,
@@ -197,6 +199,7 @@ fn do_main() -> Result<(), Error> {
                 silent,
                 sample_rate,
                 maybe_duration,
+                flamegraph_precision,
             )
         },
         Report{format, input, output} => report(format, input, output),
@@ -298,9 +301,9 @@ fn snapshot(pid: Pid) -> Result<(), Error> {
 }
 
 impl OutputFormat {
-    fn outputter(self) -> Box<dyn ui::output::Outputter> {
+    fn outputter(self, flamegraph_precision: u32) -> Box<dyn ui::output::Outputter> {
         match self {
-            OutputFormat::flamegraph => Box::new(output::Flamegraph(ui::flamegraph::Stats::new())),
+            OutputFormat::flamegraph => Box::new(output::Flamegraph(ui::flamegraph::Stats::new(flamegraph_precision))),
             OutputFormat::callgrind => Box::new(output::Callgrind(ui::callgrind::Stats::new())),
             OutputFormat::speedscope => Box::new(output::Speedscope(ui::speedscope::Stats::new())),
             OutputFormat::summary => Box::new(output::Summary(ui::summary::Stats::new())),
@@ -535,6 +538,7 @@ fn parallel_record(
     silent: bool,
     sample_rate: u32,
     maybe_duration: Option<std::time::Duration>,
+    flamegraph_precision: u32,
 ) -> Result<(), Error> {
 
     let maybe_stop_time = match maybe_duration {
@@ -547,7 +551,7 @@ fn parallel_record(
     // Aggregate stack traces as we receive them from the threads that are collecting them
     // Aggregate to 3 places: the raw output (`.raw.gz`), some summary statistics we display live,
     // and the formatted output (a flamegraph or something)
-    let mut out = format.outputter();
+    let mut out = format.outputter(flamegraph_precision);
     let mut summary_out = ui::summary::Stats::new();
     let mut raw_store = storage::Store::new(raw_path, sample_rate)?;
     let mut summary_time = std::time::Instant::now() + Duration::from_secs(1);
@@ -669,7 +673,7 @@ fn record(
 fn report(format: OutputFormat, input: PathBuf, output: PathBuf) -> Result<(), Error>{
     let input_file = File::open(input)?;
     let stuff = storage::from_reader(input_file)?.traces;
-    let mut outputter = format.outputter();
+    let mut outputter = format.outputter(10);
     for trace in stuff {
         outputter.record(&trace)?;
     }
@@ -827,6 +831,10 @@ fn arg_parser() -> App<'static, 'static> {
                     Arg::from_usage( "--silent='Don't print the summary profiling data every second'")
                         .required(false)
                 )
+                .arg(
+                    Arg::from_usage("--flamegraph-precision=[PRECISION] 'Minimum flame width = 1/PRECISION %'")
+                        .default_value("10"),
+                )
                 .arg(Arg::from_usage("<cmd>... 'command to run'").required(false)),
         )
         .subcommand(
@@ -887,6 +895,7 @@ impl Args {
                 let with_subprocesses = submatches.is_present("subprocesses");
 
                 let sample_rate = value_t!(submatches, "rate", u32).unwrap();
+                let flamegraph_precision = value_t!(submatches, "flamegraph-precision", u32).unwrap();
                 let target = if let Some(pid) = get_pid(submatches) {
                     Target::Pid { pid }
                 } else {
@@ -908,6 +917,7 @@ impl Args {
                     no_drop_root,
                     with_subprocesses,
                     silent,
+                    flamegraph_precision,
                 }
             }
             ("report", Some(submatches)) => Report {
@@ -984,6 +994,7 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: false,
                     silent: false,
+                    flamegraph_precision: 10,
                 },
             }
         );
@@ -1004,6 +1015,7 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: false,
                     silent: false,
+                    flamegraph_precision: 10,
                 },
             }
         );
@@ -1024,6 +1036,7 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: false,
                     silent: false,
+                    flamegraph_precision: 10,
                 },
             }
         );
@@ -1044,6 +1057,7 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: false,
                     silent: false,
+                    flamegraph_precision: 10,
                 },
             }
         );
@@ -1064,6 +1078,7 @@ mod tests {
                     no_drop_root: true,
                     with_subprocesses: false,
                     silent: false,
+                    flamegraph_precision: 10,
                 },
             }
         );
@@ -1084,6 +1099,28 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: true,
                     silent: false,
+                    flamegraph_precision: 10,
+                    },
+            }
+        );
+
+        let args = Args::from(make_args(
+            "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --flamegraph-precision 50",
+        )).unwrap();
+        assert_eq!(
+            args,
+            Args {
+                cmd: Record {
+                    target: Target::Pid { pid: 1234 },
+                    out_path: "foo.txt".into(),
+                    raw_path: "raw.gz".into(),
+                    sample_rate: 100,
+                    maybe_duration: None,
+                    format: OutputFormat::flamegraph,
+                    no_drop_root: false,
+                    with_subprocesses: false,
+                    silent: false,
+                    flamegraph_precision: 50,
                     },
             }
         );
