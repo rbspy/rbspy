@@ -26,8 +26,7 @@ mod os_impl {
     use crate::core::initialize::IsMaybeThreadFn;
     use crate::core::types::Pid;
 
-    use proc_maps::{get_process_maps, MapRange};
-    use proc_maps::mac_maps::{get_symbols, Symbol};
+    use proc_maps::mac_maps::{get_symbols, Symbol, get_dyld_info, DyldInfo};
 
     use failure::Error;
 
@@ -102,7 +101,7 @@ mod os_impl {
     }
 
     fn get_program_info(pid: Pid) -> Result<ProgramInfo, Error> {
-        let maps = get_process_maps(pid).map_err(|_| {
+        let maps = get_dyld_info(pid).map_err(|_| {
             AddressFinderError::MacPermissionDenied(pid)
         })?;
         let ruby_binary = get_ruby_binary(&maps)?;
@@ -113,28 +112,18 @@ mod os_impl {
         })
     }
 
-    fn get_ruby_binary(maps: &Vec<MapRange>) -> Result<Binary, Error> {
-        let map: &MapRange = maps.iter()
-            .find(|ref m| if let Some(ref pathname) = m.filename() {
-                pathname.contains("bin/ruby") && m.is_exec()
-            } else {
-                false
-            })
+    fn get_ruby_binary(maps: &Vec<DyldInfo>) -> Result<Binary, Error> {
+        let map: &DyldInfo = maps.iter()
+            .find(|ref m| m.filename.contains("bin/ruby"))
             .ok_or(format_err!("Couldn't find ruby map"))?;
-        Binary::from(map.start(), map.filename().as_ref().unwrap())
+        Binary::from(map.address, &map.filename)
     }
 
-    fn get_libruby_binary(maps: &Vec<MapRange>) -> Option<Binary> {
-        let maybe_map = maps.iter().find(
-            |ref m| if let Some(ref pathname) = m.filename() {
-                pathname.contains("libruby") && m.is_exec()
-            } else {
-                false
-            },
-        );
+    fn get_libruby_binary(maps: &Vec<DyldInfo>) -> Option<Binary> {
+        let maybe_map = maps.iter().find(|ref m| m.filename.contains("libruby"));
         match maybe_map.as_ref() {
             Some(map) => Some(
-                Binary::from(map.start(), map.filename().as_ref().unwrap()).unwrap(),
+                Binary::from(map.address, &map.filename).unwrap()
             ),
             None => None,
         }
