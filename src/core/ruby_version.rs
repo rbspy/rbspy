@@ -319,7 +319,7 @@ macro_rules! get_ruby_string(
                 let basic = rstring.basic;
                 let is_array = basic.flags & 1 << 13 == 0;
                 if is_array {
-                    unsafe { CStr::from_ptr(rstring.as_.ary.as_ref().as_ptr() as *const i8) }
+                    unsafe { CStr::from_ptr(rstring.as_.ary.as_ref().as_ptr() as *const libc::c_char) }
                     .to_bytes()
                         .to_vec()
                 } else {
