@@ -35,6 +35,11 @@ mod os_impl {
         proginfo.symbol_addr("_ruby_version")
     }
 
+    pub fn get_ruby_global_symbols_address(pid: Pid) -> Result<usize, Error> {
+        let proginfo = &get_program_info(pid)?;
+        proginfo.symbol_addr("_ruby_global_symbols")
+    }
+
     pub fn current_thread_address(
         pid: Pid,
         version: &str,
@@ -182,6 +187,11 @@ mod os_impl {
                 ).ok_or_else(|| format_err!("Couldn't find ruby version."))
             }
         }
+    }
+
+    pub fn get_ruby_global_symbols_address(pid: Pid) -> Result<usize, Error> {
+        let proginfo = &get_program_info(pid)?;
+        get_symbol_addr(&proginfo.ruby_map, &proginfo.ruby_elf, "ruby_global_symbols").ok_or_else(|| format_err!("Couldn't find symbol"))
     }
 
     fn elf_symbol_value(elf_file: &elf::File, symbol_name: &str) -> Option<usize> {
