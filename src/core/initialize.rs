@@ -70,6 +70,7 @@ impl StackTraceGetter {
         stack_trace_function(
             self.current_thread_addr_location,
             &self.process,
+            self.process.pid
         )
     }
 
@@ -89,7 +90,7 @@ pub type IsMaybeThreadFn = Box<dyn Fn(usize, usize, &Process, &[MapRange]) -> bo
 
 // Everything below here is private
 
-type StackTraceFn = Box<dyn Fn(usize, &Process) -> Result<StackTrace, MemoryCopyError>>;
+type StackTraceFn = Box<dyn Fn(usize, &Process, Pid) -> Result<StackTrace, MemoryCopyError>>;
 
 fn get_process_ruby_state(process: &Process) -> Result<(usize, StackTraceFn), Error> {
     let version = get_ruby_version_retry(process)

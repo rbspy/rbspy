@@ -153,6 +153,7 @@ macro_rules! get_stack_trace(
         pub fn get_stack_trace<T: ProcessMemory>(
             ruby_current_thread_address_location: usize,
             source: &T,
+            pid: Pid,
             ) -> Result<StackTrace, MemoryCopyError> {
             let current_thread_addr: usize = source
                 .copy_struct(ruby_current_thread_address_location)
@@ -163,7 +164,7 @@ macro_rules! get_stack_trace(
 
             if stack_field(&thread) as usize == 0 {
                 return Ok(StackTrace {
-                    pid: None,
+                    pid: Some(pid),
                     trace: vec!(StackFrame::unknown_c_function()),
                     thread_id: Some(get_thread_id(&thread, source)?),
                     time: Some(SystemTime::now())
@@ -182,7 +183,7 @@ macro_rules! get_stack_trace(
                      * argument. Also checked `git grep vm_push_frame(th, NULL`.
                      */
 
-                    match get_cfunc_name(cfp, source) {
+                    match get_cfunc_name(cfp, source, pid) {
                         Ok(name) => {
                             let frame = StackFrame{
                                 name: name,
@@ -224,7 +225,7 @@ macro_rules! get_stack_trace(
                     }
                 }
             }
-            Ok(StackTrace{trace, pid: None, thread_id: Some(get_thread_id(&thread, source)?), time: Some(SystemTime::now())})
+            Ok(StackTrace{trace, pid: Some(pid), thread_id: Some(get_thread_id(&thread, source)?), time: Some(SystemTime::now())})
         }
 
 use proc_maps::{maps_contain_addr, MapRange};
@@ -258,7 +259,7 @@ pub fn is_maybe_thread<T>(x: usize, x_addr: usize, source: &T, all_maps: &[MapRa
     }
 
     // finally, try to get an actual stack trace from the source and see if it works
-    get_stack_trace(x_addr, source).is_ok()
+    get_stack_trace(x_addr, source, 0).is_ok()
 }
 ));
 
@@ -651,7 +652,7 @@ macro_rules! get_cfps(
 
 macro_rules! get_cfunc_name(
     () => (
-        fn get_cfunc_name<T: ProcessMemory>(_cfp: &rb_control_frame_t, _source: &T) -> Result<String, Error> {
+        fn get_cfunc_name<T: ProcessMemory>(_cfp: &rb_control_frame_t, _source: &T, _pid: Pid) -> Result<String, Error> {
             return Err(remoteprocess::Error::Other(String::from("C function resolution is not supported for this version of Ruby")));
         }
     )
@@ -677,7 +678,7 @@ macro_rules! get_cfunc_name_2_7_0(
             return Ok(raw_imemo as *const rb_method_entry_struct);
         }
 
-        fn get_cfunc_name<T: ProcessMemory>(cfp: &rb_control_frame_t, source: &T) -> Result<String, Error> {
+        fn get_cfunc_name<T: ProcessMemory>(cfp: &rb_control_frame_t, source: &T, pid: Pid) -> Result<String, Error> {
             // TODO: Add note about how this is derived from ruby's .gdbinit script (especially print_id)
 
             // TODO: Try to wrap the unsafe parts more granularly
@@ -727,9 +728,6 @@ macro_rules! get_cfunc_name_2_7_0(
                     ids: VALUE,
                     dsymbol_fstr_hash: VALUE,
                 }
-
-                // XXX: Update this whenever the process gets restarted
-                let pid = 96660;
 
                 let global_symbols_address =
                     match crate::core::address_finder::get_ruby_global_symbols_address(pid) {
@@ -979,7 +977,7 @@ mod tests {
     fn test_get_ruby_stack_trace_2_1_6() {
         let current_thread_addr = 0x562658abd7f0;
         let stack_trace =
-            ruby_version::ruby_2_1_6::get_stack_trace::<CoreDump>(current_thread_addr, &coredump_2_1_6())
+            ruby_version::ruby_2_1_6::get_stack_trace::<CoreDump>(current_thread_addr, &coredump_2_1_6(), 0)
             .unwrap();
         assert_eq!(real_stack_trace_main(), stack_trace.trace);
     }
@@ -989,7 +987,7 @@ mod tests {
     fn test_get_ruby_stack_trace_1_9_3() {
         let current_thread_addr = 0x823930;
         let stack_trace =
-            ruby_version::ruby_1_9_3_0::get_stack_trace::<CoreDump>(current_thread_addr, &coredump_1_9_3())
+            ruby_version::ruby_1_9_3_0::get_stack_trace::<CoreDump>(current_thread_addr, &coredump_1_9_3(), 0)
             .unwrap();
         assert_eq!(real_stack_trace_1_9_3(), stack_trace.trace);
     }
@@ -999,7 +997,7 @@ mod tests {
     fn test_get_ruby_stack_trace_2_5_0() {
         let current_thread_addr = 0x55dd8c3b7758;
         let stack_trace =
-            ruby_version::ruby_2_5_0::get_stack_trace::<CoreDump>(current_thread_addr, &coredump_2_5_0())
+            ruby_version::ruby_2_5_0::get_stack_trace::<CoreDump>(current_thread_addr, &coredump_2_5_0(), 0)
             .unwrap();
         assert_eq!(real_stack_trace(), stack_trace.trace);
     }
@@ -1009,7 +1007,7 @@ mod tests {
     fn test_get_ruby_stack_trace_2_4_0() {
         let current_thread_addr = 0x55df44959920;
         let stack_trace =
-            ruby_version::ruby_2_4_0::get_stack_trace::<CoreDump>(current_thread_addr, &coredump_2_4_0())
+            ruby_version::ruby_2_4_0::get_stack_trace::<CoreDump>(current_thread_addr, &coredump_2_4_0(), 0)
             .unwrap();
         assert_eq!(real_stack_trace(), stack_trace.trace);
     }
@@ -1020,7 +1018,7 @@ mod tests {
         // this stack is from a ruby program that is just running `select`
         let current_thread_addr = 0x562efcd577f0;
         let stack_trace =
-            ruby_version::ruby_2_1_6::get_stack_trace(current_thread_addr, &coredump_2_1_6_c_function())
+            ruby_version::ruby_2_1_6::get_stack_trace(current_thread_addr, &coredump_2_1_6_c_function(), 0)
             .unwrap();
         assert_eq!(vec!(StackFrame::unknown_c_function()), stack_trace.trace);
     }
