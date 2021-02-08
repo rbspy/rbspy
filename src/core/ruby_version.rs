@@ -24,6 +24,7 @@ macro_rules! ruby_version_v_1_9_1(
             get_stack_frame_1_9_1!();
             stack_field_1_9_0!();
             get_thread_id_1_9_0!();
+            get_cfunc_name!();
         }
         ));
 
@@ -45,6 +46,7 @@ macro_rules! ruby_version_v_1_9_2_to_3(
             get_stack_frame_1_9_2!();
             stack_field_1_9_0!();
             get_thread_id_1_9_0!();
+            get_cfunc_name!();
         }
         ));
 
@@ -76,6 +78,7 @@ macro_rules! ruby_version_v_2_0_to_2_2(
             get_stack_frame_2_0_0!();
             stack_field_1_9_0!();
             get_thread_id_1_9_0!();
+            get_cfunc_name!();
         }
 ));
 
@@ -95,6 +98,7 @@ macro_rules! ruby_version_v_2_3_to_2_4(
             get_stack_frame_2_3_0!();
             stack_field_1_9_0!();
             get_thread_id_1_9_0!();
+            get_cfunc_name!();
         }
         ));
 
@@ -115,6 +119,7 @@ macro_rules! ruby_version_v2_5_x(
             stack_field_2_5_0!();
             get_ruby_string_array_2_5_0!();
             get_thread_id_2_5_0!();
+            get_cfunc_name!();
         }
         ));
 
@@ -627,6 +632,14 @@ macro_rules! get_cfps(
             )
         }
         ));
+
+macro_rules! get_cfunc_name(
+    () => (
+        fn get_cfunc_name<T: ProcessMemory>(_cfp: &rb_control_frame_t, _source: &T) -> Result<StackFrame, Error> {
+            return Ok(StackFrame::unknown_c_function());
+        }
+    )
+);
 
 macro_rules! get_cfunc_name_2_7_0(
     ($ruby_version:ident) => (
