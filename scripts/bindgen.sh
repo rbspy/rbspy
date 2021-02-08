@@ -40,6 +40,14 @@ bindgen /tmp/wrapper.h \
     --whitelist-type RString \
     --whitelist-type RArray \
     --whitelist-type VALUE \
+    --whitelist-type ruby_method_ids \
+    --whitelist-type ruby_fl_type \
+    --constified-enum tLAST_OP_ID \
+    --whitelist-type ruby_id_types \
+    --constified-enum RUBY_ID_SCOPE_SHIFT \
+    --whitelist-type rb_id_serial_t \
+    --whitelist-var ID_ENTRY_UNIT \
+    --whitelist-var RUBY_FL_USER1 \
     -- \
     -I/tmp/headers/$1/include \
     -I/home/bork/monorepo/ruby-header-files -I/tmp/headers/$1/ \
