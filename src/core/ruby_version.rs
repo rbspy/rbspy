@@ -181,7 +181,17 @@ macro_rules! get_stack_trace(
                      * code and saw that all of those call sites use the VM_FRAME_FLAG_CFRAME
                      * argument. Also checked `git grep vm_push_frame(th, NULL`.
                      */
-                    trace.push(StackFrame::unknown_c_function());
+
+                    match get_cfunc_name(cfp, source) {
+                        Ok(mid) => {
+                            trace.push(mid);
+                        },
+                        Err(e) => {
+                            debug!("Unknown C function: {:?}", e);
+                            trace.push(StackFrame::unknown_c_function());
+                        }
+                    }
+
                     continue;
                 }
                 if cfp.pc as usize == 0 {
