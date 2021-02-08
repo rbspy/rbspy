@@ -183,8 +183,14 @@ macro_rules! get_stack_trace(
                      */
 
                     match get_cfunc_name(cfp, source) {
-                        Ok(mid) => {
-                            trace.push(mid);
+                        Ok(name) => {
+                            let frame = StackFrame{
+                                name: name,
+                                relative_path: String::from("<c function>"),
+                                absolute_path: Some(String::from("<c function>")),
+                                lineno: 0
+                            };
+                            trace.push(frame);
                         },
                         Err(e) => {
                             debug!("Unknown C function: {:?}", e);
@@ -645,8 +651,8 @@ macro_rules! get_cfps(
 
 macro_rules! get_cfunc_name(
     () => (
-        fn get_cfunc_name<T: ProcessMemory>(_cfp: &rb_control_frame_t, _source: &T) -> Result<StackFrame, Error> {
-            return Ok(StackFrame::unknown_c_function());
+        fn get_cfunc_name<T: ProcessMemory>(_cfp: &rb_control_frame_t, _source: &T) -> Result<String, Error> {
+            return Err(remoteprocess::Error::Other(String::from("C function resolution is not supported for this version of Ruby")));
         }
     )
 );
@@ -671,7 +677,7 @@ macro_rules! get_cfunc_name_2_7_0(
             return Ok(raw_imemo as *const rb_method_entry_struct);
         }
 
-        fn get_cfunc_name<T: ProcessMemory>(cfp: &rb_control_frame_t, source: &T) -> Result<StackFrame, Error> {
+        fn get_cfunc_name<T: ProcessMemory>(cfp: &rb_control_frame_t, source: &T) -> Result<String, Error> {
             // TODO: Add note about how this is derived from ruby's .gdbinit script (especially print_id)
 
             // TODO: Try to wrap the unsafe parts more granularly
@@ -778,12 +784,7 @@ macro_rules! get_cfunc_name_2_7_0(
                 let rstr_ptr: usize = source.copy_struct(rstr_remote_ptr as usize)?;
 
                 match get_ruby_string(rstr_ptr as usize, source) {
-                    Ok(s) => return Ok(StackFrame{
-                        name: s,
-                        relative_path: String::from("<c function>"),
-                        absolute_path: Some(String::from("<c function>")),
-                        lineno: 0
-                    }),
+                    Ok(s) => return Ok(s),
                     Err(e) => return Err(remoteprocess::Error::Other(format!("Couldn't convert the method ID into a string: {:?}", e)))
                 }
             }
