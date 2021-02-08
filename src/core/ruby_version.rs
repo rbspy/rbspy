@@ -135,6 +135,7 @@ macro_rules! ruby_version_v2_6_to_2_7(
             stack_field_2_5_0!();
             get_ruby_string_array_2_5_0!();
             get_thread_id_2_5_0!();
+            get_cfunc_name_2_7_0!($ruby_version);
         }
         ));
 
@@ -626,6 +627,146 @@ macro_rules! get_cfps(
             )
         }
         ));
+
+macro_rules! get_cfunc_name_2_7_0(
+    ($ruby_version:ident) => (
+        use crate::core::types::Error;
+
+        fn check_method_entry<T: ProcessMemory>(raw_imemo: usize, source: &T) -> Result<*const rb_method_entry_struct, Error> {
+            let imemo: rb_method_entry_struct = source.copy_struct(raw_imemo)?;
+
+            // These type constants are defined in ruby's internal/imemo.h
+            let ttype = (imemo.flags >> 12) & 0x07;
+            let imemo_type_ment = 6;
+            let imemo_type_svar = 2;
+
+            if ttype == imemo_type_ment {
+                return Ok(&imemo as *const rb_method_entry_struct);
+            } else if ttype == imemo_type_svar {
+                return check_method_entry(raw_imemo, source);
+            }
+            return Ok(raw_imemo as *const rb_method_entry_struct);
+        }
+
+        fn get_cfunc_name<T: ProcessMemory>(cfp: &rb_control_frame_t, source: &T) -> Result<StackFrame, Error> {
+            // TODO: Add note about how this is derived from ruby's .gdbinit script (especially print_id)
+
+            // TODO: Try to wrap the unsafe parts more granularly
+            unsafe {
+                let mut ep = cfp.ep;
+                let frame_flag: usize = source.copy_struct(ep.offset(0) as usize)?;
+
+                // if VM_FRAME_TYPE($cfp->flag) != VM_FRAME_MAGIC_CFUNC
+                if frame_flag & 0xffff0001 != 0x55550001 {
+                    return Err(remoteprocess::Error::Other(String::from("Not a C function control frame")));
+                }
+
+                let mut env_specval: usize = source.copy_struct(ep.offset(-1) as usize)?;
+                let mut env_me_cref: usize = source.copy_struct(ep.offset(-2) as usize)?;
+
+                // #define VM_ENV_FLAG_LOCAL 0x02
+                while env_specval & 0x02 != 0 {
+                    if !check_method_entry(env_me_cref, source)?.is_null() {
+                        break;
+                    }
+                    ep = ep.offset(0) as *mut usize;
+                    env_specval = source.copy_struct(ep.offset(-1) as usize)?;
+                    env_me_cref = source.copy_struct(ep.offset(-2) as usize)?;
+                }
+
+                let imemo: rb_callable_method_entry_struct = source.copy_struct(env_me_cref)?;
+                if imemo.def.is_null() {
+                    return Err(remoteprocess::Error::Other(String::from("No method definition")));
+                }
+
+                // TODO: Try to get imemo_ment from bindgen:
+                // https://github.com/ruby/ruby/blob/e7fc353f044f9280222ca41b029b1368d2bf2fe3/internal/imemo.h#L34
+                let imemo_type_ment = 6;
+                let ttype = (imemo.flags >> 12) & 0x07;
+                if ttype != imemo_type_ment {
+                    return Err(remoteprocess::Error::Other(String::from("Not a method entry")));
+                }
+
+                // TODO: Try to get these types from bindgen
+                type rb_id_serial_t = u32;
+
+                #[repr(C)]
+                #[derive(Debug, Copy, Clone)]
+                struct rb_symbols_t {
+                    last_id: rb_id_serial_t,
+                    str_sym: *mut st_table,
+                    ids: VALUE,
+                    dsymbol_fstr_hash: VALUE,
+                }
+
+                // XXX: Update this whenever the process gets restarted
+                let pid = 96660;
+
+                let global_symbols_address =
+                    match crate::core::address_finder::get_ruby_global_symbols_address(pid) {
+                        Ok(address) => address,
+                        Err(e) => return Err(remoteprocess::Error::Other(format!("Couldn't get global symbol table: {}", e))),
+                    };
+                let global_symbols: rb_symbols_t = source.copy_struct(global_symbols_address as usize)?;
+                let def: rb_method_definition_struct = source.copy_struct(imemo.def as usize)?;
+                let method_id: usize = def.original_id; // usize
+
+                // rb_id_to_serial
+                let mut serial = method_id;
+                if method_id > ruby_method_ids_tLAST_OP_ID as usize {
+                    serial = method_id >> ruby_id_types_RUBY_ID_SCOPE_SHIFT;
+                }
+
+                if serial > global_symbols.last_id as usize {
+                    return Err(remoteprocess::Error::Other(String::from("Invalid method ID")));
+                }
+
+                // ID_ENTRY_UNIT is defined in symbol.c, so not accessible by bindgen
+                let id_entry_unit = 512;
+                let idx = serial / id_entry_unit;
+                let ids: RArray = source.copy_struct(global_symbols.ids as usize)?;
+                let flags = ids.basic.flags;
+
+                // string2cstring
+                let mut idsptr = ids.as_.heap.ptr;
+                let mut idslen = ids.as_.heap.len;
+                if (flags & ruby_fl_type_RUBY_FL_USER1 as usize) > 0 {
+                    idsptr = &ids.as_.ary[0];
+                    idslen = ((flags & (ruby_fl_type_RUBY_FL_USER3|ruby_fl_type_RUBY_FL_USER4) as usize) >> (ruby_fl_type_RUBY_FL_USHIFT+3)) as i64;
+                }
+                if idx >= idslen as usize {
+                    return Err(remoteprocess::Error::Other(String::from("Invalid index in IDs array")));
+                }
+
+                // ids is an array of pointers to RArray. First jump to the right index to get the
+                // pointer, and then copy the pointed-to array into our memory space
+                let ary_remote_ptr = (idsptr as usize) + std::mem::size_of::<usize>() * idx as usize;
+                let aryptr: usize = source.copy_struct(ary_remote_ptr)?;
+                let ary: RArray = source.copy_struct(aryptr)?;
+
+                let mut aryptr = ary.as_.heap.ptr;
+                let flags = ary.basic.flags;
+                if (flags & ruby_fl_type_RUBY_FL_USER1 as usize) > 0 {
+                    aryptr = &ids.as_.ary[0];
+                }
+
+                let offset = (serial % 512) * 2;
+                let rstr_remote_ptr = aryptr as usize + offset * std::mem::size_of::<usize>();
+                let rstr_ptr: usize = source.copy_struct(rstr_remote_ptr as usize)?;
+
+                match get_ruby_string(rstr_ptr as usize, source) {
+                    Ok(s) => return Ok(StackFrame{
+                        name: s,
+                        relative_path: String::from("<c function>"),
+                        absolute_path: Some(String::from("<c function>")),
+                        lineno: 0
+                    }),
+                    Err(e) => return Err(remoteprocess::Error::Other(format!("Couldn't convert the method ID into a string: {:?}", e)))
+                }
+            }
+        }
+    )
+);
 
 ruby_version_v_1_9_1!(ruby_1_9_1_0);
 ruby_version_v_1_9_2_to_3!(ruby_1_9_2_0);
