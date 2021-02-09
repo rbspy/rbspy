@@ -679,7 +679,8 @@ macro_rules! get_cfunc_name_2_7_0(
         }
 
         fn get_cfunc_name<T: ProcessMemory>(cfp: &rb_control_frame_t, source: &T, pid: Pid) -> Result<String, Error> {
-            // TODO: Add note about how this is derived from ruby's .gdbinit script (especially print_id)
+            // The logic in this function is adapted from the .gdbinit script in 
+            // github.com/ruby/ruby, in particular the print_id function.
 
             // TODO: Try to wrap the unsafe parts more granularly
             unsafe {
