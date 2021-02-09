@@ -175,15 +175,6 @@ macro_rules! get_stack_trace(
             let cfps = get_cfps(thread.cfp as usize, stack_base(&thread) as usize, source)?;
             for cfp in cfps.iter() {
                 if cfp.iseq as usize == 0 {
-                    /*
-                     * As far as I can tell, this means this stack frame is a C function, so we
-                     * note that and continue. The reason I believe this is that I ran
-                     * $ git grep 'vm_push_frame(th, 0'
-                     * (the second argument to vm_push_frame is the iseq address) in the Ruby VM
-                     * code and saw that all of those call sites use the VM_FRAME_FLAG_CFRAME
-                     * argument. Also checked `git grep vm_push_frame(th, NULL`.
-                     */
-
                     match get_cfunc_name(cfp, source, pid) {
                         Ok(name) => {
                             let frame = StackFrame{
