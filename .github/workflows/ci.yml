@@ -34,27 +34,20 @@ jobs:
         - build: macos
           os: macos-latest
           rust: stable
-        - build: win-msvc
-          os: windows-2019
-          rust: stable
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
-
+    - name: Install Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ matrix.ruby }}
+        bundler-cache: true # runs 'bundle install' and caches installed gems automatically
     - name: Install Rust
       uses: actions-rs/toolchain@v1
       with:
         toolchain: ${{ matrix.rust }}
         profile: minimal
         override: true
-
-    - name: Use Cross
-      if: matrix.target != ''
-      run: |
-        cargo install cross
-        echo "CARGO=cross" >> $GITHUB_ENV
-        echo "TARGET_FLAGS=--target ${{ matrix.target }}" >> $GITHUB_ENV
-        echo "TARGET_DIR=./target/${{ matrix.target }}" >> $GITHUB_ENV
 
     - name: Show command used for Cargo
       run: |
