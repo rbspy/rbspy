@@ -38,9 +38,6 @@ jobs:
         - build: win-msvc
           os: windows-2019
           rust: stable
-        - build: win-gnu
-          os: windows-2019
-          rust: stable
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
