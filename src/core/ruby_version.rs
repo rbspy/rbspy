@@ -130,6 +130,7 @@ macro_rules! ruby_version_v2_6_to_2_7(
            use bindings::$ruby_version::*;
            use crate::core::types::ProcessMemory;
            use failure::ResultExt;
+           use failure::Error;
 
             get_stack_trace!(rb_execution_context_struct);
             get_ruby_string!();
@@ -652,17 +653,16 @@ macro_rules! get_cfps(
 
 macro_rules! get_cfunc_name(
     () => (
-        fn get_cfunc_name<T: ProcessMemory>(_cfp: &rb_control_frame_t, _source: &T, _pid: Pid) -> Result<String, Error> {
-            return Err(remoteprocess::Error::Other(String::from("C function resolution is not supported for this version of Ruby")));
+        fn get_cfunc_name<T: ProcessMemory>(_cfp: &rb_control_frame_t, _source: &T, _pid: Pid) -> Result<String, failure::Error> {
+            return Err(format_err!("C function resolution is not supported for this version of Ruby"));
         }
     )
 );
 
 macro_rules! get_cfunc_name_2_7_0(
     ($ruby_version:ident) => (
-        use crate::core::types::Error;
 
-        fn check_method_entry<T: ProcessMemory>(raw_imemo: usize, source: &T) -> Result<*const rb_method_entry_struct, Error> {
+        fn check_method_entry<T: ProcessMemory>(raw_imemo: usize, source: &T) -> Result<*const rb_method_entry_struct, failure::Error> {
             let imemo: rb_method_entry_struct = source.copy_struct(raw_imemo)?;
 
             // These type constants are defined in ruby's internal/imemo.h
@@ -688,7 +688,7 @@ macro_rules! get_cfunc_name_2_7_0(
 
                 // if VM_FRAME_TYPE($cfp->flag) != VM_FRAME_MAGIC_CFUNC
                 if frame_flag & 0xffff0001 != 0x55550001 {
-                    return Err(remoteprocess::Error::Other(String::from("Not a C function control frame")));
+                    return Err(format_err!("Not a C function control frame"));
                 }
 
                 let mut env_specval: usize = source.copy_struct(ep.offset(-1) as usize)?;
@@ -706,7 +706,7 @@ macro_rules! get_cfunc_name_2_7_0(
 
                 let imemo: rb_callable_method_entry_struct = source.copy_struct(env_me_cref)?;
                 if imemo.def.is_null() {
-                    return Err(remoteprocess::Error::Other(String::from("No method definition")));
+                    return Err(format_err!("No method definition"));
                 }
 
                 // TODO: Try to get imemo_ment from bindgen:
@@ -714,7 +714,7 @@ macro_rules! get_cfunc_name_2_7_0(
                 let imemo_type_ment = 6;
                 let ttype = (imemo.flags >> 12) & 0x07;
                 if ttype != imemo_type_ment {
-                    return Err(remoteprocess::Error::Other(String::from("Not a method entry")));
+                    return Err(format_err!("Not a method entry"));
                 }
 
                 // TODO: Try to get these types from bindgen
@@ -729,11 +729,7 @@ macro_rules! get_cfunc_name_2_7_0(
                     dsymbol_fstr_hash: VALUE,
                 }
 
-                let global_symbols_address =
-                    match crate::core::address_finder::get_ruby_global_symbols_address(pid) {
-                        Ok(address) => address,
-                        Err(e) => return Err(remoteprocess::Error::Other(format!("Couldn't get global symbol table: {}", e))),
-                    };
+                let global_symbols_address = crate::core::address_finder::get_ruby_global_symbols_address(pid)?;
                 let global_symbols: rb_symbols_t = source.copy_struct(global_symbols_address as usize)?;
                 let def: rb_method_definition_struct = source.copy_struct(imemo.def as usize)?;
                 let method_id: usize = def.original_id; // usize
@@ -745,7 +741,7 @@ macro_rules! get_cfunc_name_2_7_0(
                 }
 
                 if serial > global_symbols.last_id as usize {
-                    return Err(remoteprocess::Error::Other(String::from("Invalid method ID")));
+                    return Err(format_err!("Invalid method ID"));
                 }
 
                 // ID_ENTRY_UNIT is defined in symbol.c, so not accessible by bindgen
@@ -762,7 +758,7 @@ macro_rules! get_cfunc_name_2_7_0(
                     idslen = ((flags & (ruby_fl_type_RUBY_FL_USER3|ruby_fl_type_RUBY_FL_USER4) as usize) >> (ruby_fl_type_RUBY_FL_USHIFT+3)) as i64;
                 }
                 if idx >= idslen as usize {
-                    return Err(remoteprocess::Error::Other(String::from("Invalid index in IDs array")));
+                    return Err(format_err!("Invalid index in IDs array"));
                 }
 
                 // ids is an array of pointers to RArray. First jump to the right index to get the
@@ -781,10 +777,7 @@ macro_rules! get_cfunc_name_2_7_0(
                 let rstr_remote_ptr = aryptr as usize + offset * std::mem::size_of::<usize>();
                 let rstr_ptr: usize = source.copy_struct(rstr_remote_ptr as usize)?;
 
-                match get_ruby_string(rstr_ptr as usize, source) {
-                    Ok(s) => return Ok(s),
-                    Err(e) => return Err(remoteprocess::Error::Other(format!("Couldn't convert the method ID into a string: {:?}", e)))
-                }
+                Ok(get_ruby_string(rstr_ptr as usize, source)?)
             }
         }
     )
