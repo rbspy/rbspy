@@ -79,7 +79,6 @@ jobs:
         set -x
 
     - name: Run tests
-      if: matrix.target != ''
       run: ${{ env.CARGO }} test --verbose --all ${{ env.TARGET_FLAGS }}
 
 # TODO: maybe add this later if we decide to make rustfmt actually pass
