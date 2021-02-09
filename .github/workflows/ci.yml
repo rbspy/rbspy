@@ -36,7 +36,10 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
-
+    - name: Install Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 2.7.2
     - name: Install Rust
       uses: actions-rs/toolchain@v1
       with:
