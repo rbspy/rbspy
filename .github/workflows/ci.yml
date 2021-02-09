@@ -47,15 +47,6 @@ jobs:
         toolchain: ${{ matrix.rust }}
         profile: minimal
         override: true
-
-    - name: Use Cross
-      if: matrix.target != ''
-      run: |
-        cargo install cross
-        echo "CARGO=cross" >> $GITHUB_ENV
-        echo "TARGET_FLAGS=--target ${{ matrix.target }}" >> $GITHUB_ENV
-        echo "TARGET_DIR=./target/${{ matrix.target }}" >> $GITHUB_ENV
-
     - name: Show command used for Cargo
       run: |
         echo "cargo command is: ${{ env.CARGO }}"
