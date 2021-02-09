@@ -187,9 +187,9 @@ macro_rules! get_stack_trace(
                     match get_cfunc_name(cfp, source, pid) {
                         Ok(name) => {
                             let frame = StackFrame{
-                                name: name,
-                                relative_path: String::from("<c function>"),
-                                absolute_path: Some(String::from("<c function>")),
+                                name: "<c function>".to_string(),
+                                relative_path: name,
+                                absolute_path: None,
                                 lineno: 0
                             };
                             trace.push(frame);
