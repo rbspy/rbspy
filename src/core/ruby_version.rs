@@ -682,104 +682,103 @@ macro_rules! get_cfunc_name_2_7_0(
             // The logic in this function is adapted from the .gdbinit script in 
             // github.com/ruby/ruby, in particular the print_id function.
 
-            // TODO: Try to wrap the unsafe parts more granularly
-            unsafe {
-                let mut ep = cfp.ep;
-                let frame_flag: usize = source.copy_struct(ep.offset(0) as usize)?;
+            let mut ep = cfp.ep;
+            let frame_flag: usize = unsafe { source.copy_struct(ep.offset(0) as usize)? };
 
-                // if VM_FRAME_TYPE($cfp->flag) != VM_FRAME_MAGIC_CFUNC
-                if frame_flag & 0xffff0001 != 0x55550001 {
-                    return Err(format_err!("Not a C function control frame"));
+            // if VM_FRAME_TYPE($cfp->flag) != VM_FRAME_MAGIC_CFUNC
+            if frame_flag & 0xffff0001 != 0x55550001 {
+                return Err(format_err!("Not a C function control frame"));
+            }
+
+            let mut env_specval: usize = unsafe { source.copy_struct(ep.offset(-1) as usize)? };
+            let mut env_me_cref: usize = unsafe { source.copy_struct(ep.offset(-2) as usize)? };
+
+            // #define VM_ENV_FLAG_LOCAL 0x02
+            while env_specval & 0x02 != 0 {
+                if !check_method_entry(env_me_cref, source)?.is_null() {
+                    break;
                 }
-
-                let mut env_specval: usize = source.copy_struct(ep.offset(-1) as usize)?;
-                let mut env_me_cref: usize = source.copy_struct(ep.offset(-2) as usize)?;
-
-                // #define VM_ENV_FLAG_LOCAL 0x02
-                while env_specval & 0x02 != 0 {
-                    if !check_method_entry(env_me_cref, source)?.is_null() {
-                        break;
-                    }
+                unsafe {
                     ep = ep.offset(0) as *mut usize;
                     env_specval = source.copy_struct(ep.offset(-1) as usize)?;
                     env_me_cref = source.copy_struct(ep.offset(-2) as usize)?;
                 }
-
-                let imemo: rb_callable_method_entry_struct = source.copy_struct(env_me_cref)?;
-                if imemo.def.is_null() {
-                    return Err(format_err!("No method definition"));
-                }
-
-                // TODO: Try to get imemo_ment from bindgen:
-                // https://github.com/ruby/ruby/blob/e7fc353f044f9280222ca41b029b1368d2bf2fe3/internal/imemo.h#L34
-                let imemo_type_ment = 6;
-                let ttype = (imemo.flags >> 12) & 0x07;
-                if ttype != imemo_type_ment {
-                    return Err(format_err!("Not a method entry"));
-                }
-
-                // TODO: Try to get these types from bindgen
-                type rb_id_serial_t = u32;
-
-                #[repr(C)]
-                #[derive(Debug, Copy, Clone)]
-                struct rb_symbols_t {
-                    last_id: rb_id_serial_t,
-                    str_sym: *mut st_table,
-                    ids: VALUE,
-                    dsymbol_fstr_hash: VALUE,
-                }
-
-                let global_symbols_address = crate::core::address_finder::get_ruby_global_symbols_address(pid)?;
-                let global_symbols: rb_symbols_t = source.copy_struct(global_symbols_address as usize)?;
-                let def: rb_method_definition_struct = source.copy_struct(imemo.def as usize)?;
-                let method_id: usize = def.original_id; // usize
-
-                // rb_id_to_serial
-                let mut serial = method_id;
-                if method_id > ruby_method_ids_tLAST_OP_ID as usize {
-                    serial = method_id >> ruby_id_types_RUBY_ID_SCOPE_SHIFT;
-                }
-
-                if serial > global_symbols.last_id as usize {
-                    return Err(format_err!("Invalid method ID"));
-                }
-
-                // ID_ENTRY_UNIT is defined in symbol.c, so not accessible by bindgen
-                let id_entry_unit = 512;
-                let idx = serial / id_entry_unit;
-                let ids: RArray = source.copy_struct(global_symbols.ids as usize)?;
-                let flags = ids.basic.flags;
-
-                // string2cstring
-                let mut idsptr = ids.as_.heap.ptr;
-                let mut idslen = ids.as_.heap.len;
-                if (flags & ruby_fl_type_RUBY_FL_USER1 as usize) > 0 {
-                    idsptr = &ids.as_.ary[0];
-                    idslen = ((flags & (ruby_fl_type_RUBY_FL_USER3|ruby_fl_type_RUBY_FL_USER4) as usize) >> (ruby_fl_type_RUBY_FL_USHIFT+3)) as i64;
-                }
-                if idx >= idslen as usize {
-                    return Err(format_err!("Invalid index in IDs array"));
-                }
-
-                // ids is an array of pointers to RArray. First jump to the right index to get the
-                // pointer, and then copy the pointed-to array into our memory space
-                let ary_remote_ptr = (idsptr as usize) + std::mem::size_of::<usize>() * idx as usize;
-                let aryptr: usize = source.copy_struct(ary_remote_ptr)?;
-                let ary: RArray = source.copy_struct(aryptr)?;
-
-                let mut aryptr = ary.as_.heap.ptr;
-                let flags = ary.basic.flags;
-                if (flags & ruby_fl_type_RUBY_FL_USER1 as usize) > 0 {
-                    aryptr = &ids.as_.ary[0];
-                }
-
-                let offset = (serial % 512) * 2;
-                let rstr_remote_ptr = aryptr as usize + offset * std::mem::size_of::<usize>();
-                let rstr_ptr: usize = source.copy_struct(rstr_remote_ptr as usize)?;
-
-                Ok(get_ruby_string(rstr_ptr as usize, source)?)
             }
+
+            let imemo: rb_callable_method_entry_struct = source.copy_struct(env_me_cref)?;
+            if imemo.def.is_null() {
+                return Err(format_err!("No method definition"));
+            }
+
+            // TODO: Try to get imemo_ment from bindgen:
+            // https://github.com/ruby/ruby/blob/e7fc353f044f9280222ca41b029b1368d2bf2fe3/internal/imemo.h#L34
+            let imemo_type_ment = 6;
+            let ttype = (imemo.flags >> 12) & 0x07;
+            if ttype != imemo_type_ment {
+                return Err(format_err!("Not a method entry"));
+            }
+
+            // TODO: Try to get these types from bindgen
+            type rb_id_serial_t = u32;
+
+            #[repr(C)]
+            #[derive(Debug, Copy, Clone)]
+            struct rb_symbols_t {
+                last_id: rb_id_serial_t,
+                str_sym: *mut st_table,
+                ids: VALUE,
+                dsymbol_fstr_hash: VALUE,
+            }
+
+            let global_symbols_address = crate::core::address_finder::get_ruby_global_symbols_address(pid)?;
+            let global_symbols: rb_symbols_t = source.copy_struct(global_symbols_address as usize)?;
+            let def: rb_method_definition_struct = source.copy_struct(imemo.def as usize)?;
+            let method_id: usize = def.original_id; // usize
+
+            // rb_id_to_serial
+            let mut serial = method_id;
+            if method_id > ruby_method_ids_tLAST_OP_ID as usize {
+                serial = method_id >> ruby_id_types_RUBY_ID_SCOPE_SHIFT;
+            }
+
+            if serial > global_symbols.last_id as usize {
+                return Err(format_err!("Invalid method ID"));
+            }
+
+            // ID_ENTRY_UNIT is defined in symbol.c, so not accessible by bindgen
+            let id_entry_unit = 512;
+            let idx = serial / id_entry_unit;
+            let ids: RArray = source.copy_struct(global_symbols.ids as usize)?;
+            let flags = ids.basic.flags;
+
+            // string2cstring
+            let mut idsptr = unsafe { ids.as_.heap.ptr };
+            let mut idslen = unsafe { ids.as_.heap.len };
+            if (flags & ruby_fl_type_RUBY_FL_USER1 as usize) > 0 {
+                idsptr = unsafe { &ids.as_.ary[0] };
+                idslen = ((flags & (ruby_fl_type_RUBY_FL_USER3|ruby_fl_type_RUBY_FL_USER4) as usize) >> (ruby_fl_type_RUBY_FL_USHIFT+3)) as i64;
+            }
+            if idx >= idslen as usize {
+                return Err(format_err!("Invalid index in IDs array"));
+            }
+
+            // ids is an array of pointers to RArray. First jump to the right index to get the
+            // pointer, and then copy the pointed-to array into our memory space
+            let ary_remote_ptr = (idsptr as usize) + std::mem::size_of::<usize>() * idx as usize;
+            let aryptr: usize = source.copy_struct(ary_remote_ptr)?;
+            let ary: RArray = source.copy_struct(aryptr)?;
+
+            let mut aryptr = unsafe { ary.as_.heap.ptr };
+            let flags = ary.basic.flags;
+            if (flags & ruby_fl_type_RUBY_FL_USER1 as usize) > 0 {
+                aryptr = unsafe { &ids.as_.ary[0] };
+            }
+
+            let offset = (serial % 512) * 2;
+            let rstr_remote_ptr = aryptr as usize + offset * std::mem::size_of::<usize>();
+            let rstr_ptr: usize = source.copy_struct(rstr_remote_ptr as usize)?;
+
+            Ok(get_ruby_string(rstr_ptr as usize, source)?)
         }
     )
 );
