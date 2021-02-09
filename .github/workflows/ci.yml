@@ -46,6 +46,7 @@ jobs:
         toolchain: ${{ matrix.rust }}
         profile: minimal
         override: true
+    - uses: Swatinem/rust-cache@v1
     - name: Show command used for Cargo
       run: |
         echo "cargo command is: ${{ env.CARGO }}"
