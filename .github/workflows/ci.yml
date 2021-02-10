@@ -70,9 +70,34 @@ jobs:
         set -x
 
     - name: Run tests
-      env:
-          RUST_BACKTRACE: 1
       run: ${{ env.CARGO }} test --verbose --all ${{ env.TARGET_FLAGS }}
+      if: runner.os != 'macOS'
+    - name: Run tests
+      run: sudo "PATH=$PATH" ${{ env.CARGO }} test --verbose --all ${{ env.TARGET_FLAGS }}
+      if: runner.os == 'macOS'
+
+  build-linux-cross:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [i686-musl, armv7-musleabihf, aarch64-musl, x86_64-musl]
+    container:
+      # we're building with 'rust-musl-cross' https://github.com/messense/rust-musl-cross
+      # with some additions to add a statically compiled version of libunwind
+      image: docker://benfred/rust-musl-cross:${{ matrix.target }}
+      env:
+        RUSTUP_HOME: /root/.rustup
+        CARGO_HOME: /root/.cargo
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: cargo build --release
+    - name: Upload Binaries
+      uses: actions/upload-artifact@v2
+      with:
+        name: binaries
+        path: target/*/release/rbspy
+
 
 # TODO: maybe add this later if we decide to make rustfmt actually pass
 #  rustfmt:
