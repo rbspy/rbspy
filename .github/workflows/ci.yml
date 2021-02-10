@@ -1,0 +1,106 @@
+# originally copied from https://github.com/BurntSushi/ripgrep/blob/master/.github/workflows/ci.yml
+name: ci
+on:
+  pull_request:
+  push:
+    branches:
+    - master
+  schedule:
+  - cron: '00 01 * * *'
+jobs:
+  test:
+    name: test
+    env:
+      CARGO: cargo
+      TARGET_FLAGS: --target ${{ matrix.target }}
+      RUST_BACKTRACE: 1
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        build:
+        - linux
+        - macos
+        include:
+        - build: linux
+          os: ubuntu-20.04
+          target: x86_64-unknown-linux-gnu
+        - build: macos
+          os: macos-latest
+          target: x86_64-apple-darwin
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+    - name: Install Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 2.7.2
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+    - uses: Swatinem/rust-cache@v1
+    - name: Show command used for Cargo
+      run: |
+        echo "cargo command is: ${{ env.CARGO }}"
+        echo "target flag is: ${{ env.TARGET_FLAGS }}"
+
+    - name: Build rbspy
+      run: ${{ env.CARGO }} build --release --verbose --all ${{ env.TARGET_FLAGS }}
+
+    - name: Upload Binaries
+      uses: actions/upload-artifact@v2
+      with:
+        name: binaries
+        path: target/*/release/rbspy
+
+    - name: Run tests
+      timeout-minutes: 5
+      run: ${{ env.CARGO }} test --release --verbose  ${{ env.TARGET_FLAGS }}
+      if: runner.os != 'macOS'
+    - name: Run tests
+      timeout-minutes: 5
+      run: sudo "PATH=$PATH" ${{ env.CARGO }} test --release --verbose  ${{ env.TARGET_FLAGS }}
+      if: runner.os == 'macOS'
+
+  build-linux-cross:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [i686-musl, armv7-musleabihf, aarch64-musl, x86_64-musl]
+    container:
+      # we're building with 'rust-musl-cross' https://github.com/messense/rust-musl-cross
+      # with some additions to add a statically compiled version of libunwind
+      image: docker://benfred/rust-musl-cross:${{ matrix.target }}
+      env:
+        RUSTUP_HOME: /root/.rustup
+        CARGO_HOME: /root/.cargo
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: cargo build --release
+    - name: Upload Binaries
+      uses: actions/upload-artifact@v2
+      with:
+        name: binaries
+        path: target/*/release/rbspy
+
+
+# TODO: maybe add this later if we decide to make rustfmt actually pass
+#  rustfmt:
+#    name: rustfmt
+#    runs-on: ubuntu-18.04
+#    steps:
+#    - name: Checkout repository
+#      uses: actions/checkout@v2
+#    - name: Install Rust
+#      uses: actions-rs/toolchain@v1
+#      with:
+#        toolchain: stable
+#        override: true
+#        profile: minimal
+#        components: rustfmt
+#    - name: Check formatting
+#      run: |
+#        cargo fmt --all -- --check
