@@ -11,14 +11,8 @@ jobs:
   test:
     name: test
     env:
-      # For some builds, we use cross to test on 32-bit and big-endian
-      # systems.
       CARGO: cargo
-      # When CARGO is set to CROSS, this is set to `--target matrix.target`.
-      TARGET_FLAGS:
-      # When CARGO is set to CROSS, TARGET_DIR includes matrix.target.
-      TARGET_DIR: ./target
-      # Emit backtraces on panics.
+      TARGET_FLAGS: --target ${{ matrix.target }}
       RUST_BACKTRACE: 1
     runs-on: ${{ matrix.os }}
     strategy:
@@ -29,10 +23,10 @@ jobs:
         include:
         - build: linux
           os: ubuntu-20.04
-          rust: stable
+          target: x86_64-unknown-linux-gnu
         - build: macos
           os: macos-latest
-          rust: stable
+          target: x86_64-apple-darwin
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
@@ -43,7 +37,7 @@ jobs:
     - name: Install Rust
       uses: actions-rs/toolchain@v1
       with:
-        toolchain: ${{ matrix.rust }}
+        toolchain: stable
         profile: minimal
         override: true
     - uses: Swatinem/rust-cache@v1
@@ -53,27 +47,21 @@ jobs:
         echo "target flag is: ${{ env.TARGET_FLAGS }}"
 
     - name: Build rbspy
-      run: ${{ env.CARGO }} build --verbose --all ${{ env.TARGET_FLAGS }}
+      run: ${{ env.CARGO }} build --release --verbose --all ${{ env.TARGET_FLAGS }}
 
-    # This is useful for debugging problems when the expected build artifacts
-    # (like shell completions and man pages) aren't generated.
-    - name: Show build.rs stderr
-      shell: bash
-      run: |
-        set +x
-        stderr="$(find "${{ env.TARGET_DIR }}/debug" -name stderr -print0 | xargs -0 ls -t | head -n1)"
-        if [ -s "$stderr" ]; then
-          echo "===== $stderr ===== "
-          cat "$stderr"
-          echo "====="
-        fi
-        set -x
+    - name: Upload Binaries
+      uses: actions/upload-artifact@v2
+      with:
+        name: binaries
+        path: target/*/release/rbspy
 
     - name: Run tests
-      run: ${{ env.CARGO }} test --verbose --all ${{ env.TARGET_FLAGS }}
+      timeout-minutes: 5
+      run: ${{ env.CARGO }} test --release --verbose  ${{ env.TARGET_FLAGS }}
       if: runner.os != 'macOS'
     - name: Run tests
-      run: sudo "PATH=$PATH" ${{ env.CARGO }} test --verbose --all ${{ env.TARGET_FLAGS }}
+      timeout-minutes: 5
+      run: sudo "PATH=$PATH" ${{ env.CARGO }} test --release --verbose  ${{ env.TARGET_FLAGS }}
       if: runner.os == 'macOS'
 
   build-linux-cross:
