@@ -191,7 +191,26 @@ mod os_impl {
 
     pub fn get_ruby_global_symbols_address(pid: Pid) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
-        get_symbol_addr(&proginfo.ruby_map, &proginfo.ruby_elf, "ruby_global_symbols").ok_or_else(|| format_err!("Couldn't find global symbols address"))
+        let symbol_name = "ruby_global_symbols";
+        let symbol_addr =
+            get_symbol_addr(&proginfo.ruby_map, &proginfo.ruby_elf, symbol_name);
+        match symbol_addr {
+            Some(addr) => Ok(addr),
+            _ => {
+                get_symbol_addr(
+                    // if we have a ruby map but `ruby_global_symbols` isn't in it, we expect there
+                    // to be a libruby map. If that's not true, that's a bug.
+                    (*proginfo.libruby_map)
+                        .as_ref()
+                        .ok_or_else(|| format_err!("Missing libruby map. Please report this!"))?,
+                    proginfo
+                        .libruby_elf
+                        .as_ref()
+                        .ok_or_else(|| format_err!("Missing libruby ELF. Please report this!"))?,
+                    symbol_name,
+                ).ok_or_else(|| format_err!("Couldn't find ruby global symbols address."))
+            }
+        }
     }
 
     fn elf_symbol_value(elf_file: &elf::File, symbol_name: &str) -> Option<usize> {
