@@ -754,7 +754,8 @@ macro_rules! get_cfunc_name_2_7_0(
             }
 
             // ids is an array of pointers to RArray. First jump to the right index to get the
-            // pointer, and then copy the pointed-to array into our memory space
+            // pointer, then copy the _pointer_ into our memory space, and then finally copy the 
+            // pointed-to array into our memory space
             let ary_remote_ptr = (idsptr as usize) + std::mem::size_of::<usize>() * idx as usize;
             let aryptr: usize = source.copy_struct(ary_remote_ptr)?;
             let ary: RArray = source.copy_struct(aryptr)?;
