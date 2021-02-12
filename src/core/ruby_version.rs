@@ -657,16 +657,12 @@ macro_rules! get_cfunc_name_2_7_0(
             let imemo: rb_method_entry_struct = source.copy_struct(raw_imemo)?;
 
             // These type constants are defined in ruby's internal/imemo.h
-            let ttype = (imemo.flags >> 12) & 0x07;
-            let imemo_type_ment = 6;
-            let imemo_type_svar = 2;
-
-            if ttype == imemo_type_ment {
-                return Ok(&imemo as *const rb_method_entry_struct);
-            } else if ttype == imemo_type_svar {
-                return check_method_entry(raw_imemo, source);
+            #[allow(non_upper_case_globals)]
+            match ((imemo.flags >> 12) & 0x07) as u32 {
+                imemo_type_imemo_ment => Ok(&imemo as *const rb_method_entry_struct),
+                imemo_type_imemo_svar => check_method_entry(raw_imemo, source),
+                _ => Ok(raw_imemo as *const rb_method_entry_struct)
             }
-            return Ok(raw_imemo as *const rb_method_entry_struct);
         }
 
         fn get_cfunc_name<T: ProcessMemory>(cfp: &rb_control_frame_t, source: &T, pid: Pid) -> Result<String, Error> {
@@ -701,11 +697,8 @@ macro_rules! get_cfunc_name_2_7_0(
                 return Err(format_err!("No method definition"));
             }
 
-            // TODO: Try to get imemo_ment from bindgen:
-            // https://github.com/ruby/ruby/blob/e7fc353f044f9280222ca41b029b1368d2bf2fe3/internal/imemo.h#L34
-            let imemo_type_ment = 6;
             let ttype = (imemo.flags >> 12) & 0x07;
-            if ttype != imemo_type_ment {
+            if ttype != imemo_type_imemo_ment as usize {
                 return Err(format_err!("Not a method entry"));
             }
 

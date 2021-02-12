@@ -36,6 +36,7 @@ bindgen /tmp/wrapper.h \
     --whitelist-type rb_control_frame_struct \
     --whitelist-type rb_thread_struct \
     --whitelist-type rb_execution_context_struct \
+    --whitelist-type imemo_type \
     --whitelist-type iseq_insn_info_entry\
     --whitelist-type RString \
     --whitelist-type RArray \
