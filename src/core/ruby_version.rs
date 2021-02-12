@@ -710,6 +710,7 @@ macro_rules! get_cfunc_name_2_7_0(
             }
 
             // TODO: Try to get these types from bindgen
+            #[allow(non_camel_case_types)]
             type rb_id_serial_t = u32;
 
             #[repr(C)]
@@ -724,7 +725,7 @@ macro_rules! get_cfunc_name_2_7_0(
             let global_symbols_address = crate::core::address_finder::get_ruby_global_symbols_address(pid)?;
             let global_symbols: rb_symbols_t = source.copy_struct(global_symbols_address as usize)?;
             let def: rb_method_definition_struct = source.copy_struct(imemo.def as usize)?;
-            let method_id: usize = def.original_id; // usize
+            let method_id: usize = def.original_id;
 
             // rb_id_to_serial
             let mut serial = method_id;
@@ -743,34 +744,34 @@ macro_rules! get_cfunc_name_2_7_0(
             let flags = ids.basic.flags;
 
             // string2cstring
-            let mut idsptr = unsafe { ids.as_.heap.ptr };
-            let mut idslen = unsafe { ids.as_.heap.len };
+            let mut ids_ptr = unsafe { ids.as_.heap.ptr };
+            let mut ids_len = unsafe { ids.as_.heap.len };
             if (flags & ruby_fl_type_RUBY_FL_USER1 as usize) > 0 {
-                idsptr = unsafe { &ids.as_.ary[0] };
-                idslen = ((flags & (ruby_fl_type_RUBY_FL_USER3|ruby_fl_type_RUBY_FL_USER4) as usize) >> (ruby_fl_type_RUBY_FL_USHIFT+3)) as i64;
+                ids_ptr = unsafe { &ids.as_.ary[0] };
+                ids_len = ((flags & (ruby_fl_type_RUBY_FL_USER3|ruby_fl_type_RUBY_FL_USER4) as usize) >> (ruby_fl_type_RUBY_FL_USHIFT+3)) as i64;
             }
-            if idx >= idslen as usize {
+            if idx >= ids_len as usize {
                 return Err(format_err!("Invalid index in IDs array"));
             }
 
             // ids is an array of pointers to RArray. First jump to the right index to get the
             // pointer, then copy the _pointer_ into our memory space, and then finally copy the 
             // pointed-to array into our memory space
-            let ary_remote_ptr = (idsptr as usize) + std::mem::size_of::<usize>() * idx as usize;
-            let aryptr: usize = source.copy_struct(ary_remote_ptr)?;
-            let ary: RArray = source.copy_struct(aryptr)?;
+            let array_remote_ptr = (ids_ptr as usize) + (idx as usize) * std::mem::size_of::<usize>();
+            let array_ptr: usize = source.copy_struct(array_remote_ptr)?;
+            let array: RArray = source.copy_struct(array_ptr)?;
 
-            let mut aryptr = unsafe { ary.as_.heap.ptr };
-            let flags = ary.basic.flags;
+            let mut array_ptr = unsafe { array.as_.heap.ptr };
+            let flags = array.basic.flags;
             if (flags & ruby_fl_type_RUBY_FL_USER1 as usize) > 0 {
-                aryptr = unsafe { &ids.as_.ary[0] };
+                array_ptr = unsafe { &ids.as_.ary[0] };
             }
 
             let offset = (serial % 512) * 2;
-            let rstr_remote_ptr = aryptr as usize + offset * std::mem::size_of::<usize>();
-            let rstr_ptr: usize = source.copy_struct(rstr_remote_ptr as usize)?;
+            let rstring_remote_ptr = (array_ptr as usize) + offset * std::mem::size_of::<usize>();
+            let rstring_ptr: usize = source.copy_struct(rstring_remote_ptr as usize)?;
 
-            Ok(get_ruby_string(rstr_ptr as usize, source)?)
+            Ok(get_ruby_string(rstring_ptr as usize, source)?)
         }
     )
 );
