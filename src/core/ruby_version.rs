@@ -702,10 +702,10 @@ macro_rules! get_cfunc_name_2_7_0(
                 return Err(format_err!("Not a method entry"));
             }
 
-            // TODO: Try to get these types from bindgen
             #[allow(non_camel_case_types)]
             type rb_id_serial_t = u32;
 
+            // Declared in symbol.c prior to ruby 2.7.0, so not accessible by bindgen
             #[repr(C)]
             #[derive(Debug, Copy, Clone)]
             struct rb_symbols_t {
