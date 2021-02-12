@@ -35,9 +35,13 @@ mod os_impl {
         proginfo.symbol_addr("_ruby_version")
     }
 
-    pub fn get_ruby_global_symbols_address(pid: Pid) -> Result<usize, Error> {
+    pub fn get_ruby_global_symbols_address(pid: Pid, version: &str) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
-        proginfo.symbol_addr("_ruby_global_symbols")
+        if version >= "2.7.0" {
+            proginfo.symbol_addr("_ruby_global_symbols")
+        } else {
+            proginfo.symbol_addr("_global_symbols")
+        }
     }
 
     pub fn current_thread_address(
@@ -189,9 +193,13 @@ mod os_impl {
         }
     }
 
-    pub fn get_ruby_global_symbols_address(pid: Pid) -> Result<usize, Error> {
+    pub fn get_ruby_global_symbols_address(pid: Pid, version: &str) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
-        let symbol_name = "ruby_global_symbols";
+        let symbol_name = if version >= "2.7.0" {
+            "ruby_global_symbols"
+        } else {
+            "global_symbols"
+        };
         let symbol_addr =
             get_symbol_addr(&proginfo.ruby_map, &proginfo.ruby_elf, symbol_name);
         match symbol_addr {
