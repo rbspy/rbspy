@@ -26,7 +26,8 @@ macro_rules! ruby_version_v_1_9_1(
             get_thread_id_1_9_0!();
             get_cfunc_name_unsupported!();
         }
-        ));
+    )
+);
 
 
 macro_rules! ruby_version_v_1_9_2_to_3(
@@ -48,7 +49,8 @@ macro_rules! ruby_version_v_1_9_2_to_3(
             get_thread_id_1_9_0!();
             get_cfunc_name_unsupported!();
         }
-        ));
+    )
+);
 
 macro_rules! ruby_version_v_2_0_to_2_2(
     ($ruby_version:ident) => (
@@ -80,7 +82,8 @@ macro_rules! ruby_version_v_2_0_to_2_2(
             get_thread_id_1_9_0!();
             get_cfunc_name_unsupported!();
         }
-));
+    )
+);
 
 macro_rules! ruby_version_v_2_3_to_2_4(
     ($ruby_version:ident) => (
@@ -100,7 +103,8 @@ macro_rules! ruby_version_v_2_3_to_2_4(
             get_thread_id_1_9_0!();
             get_cfunc_name_unsupported!();
         }
-        ));
+    )
+);
 
 macro_rules! ruby_version_v2_5_x(
     ($ruby_version:ident) => (
@@ -125,7 +129,8 @@ macro_rules! ruby_version_v2_5_x(
             #[cfg(target_os = "linux")]
             get_cfunc_name!("2.5.0");
         }
-        ));
+    )
+);
 
 macro_rules! ruby_version_v2_6_x(
     ($ruby_version:ident) => (
@@ -150,29 +155,31 @@ macro_rules! ruby_version_v2_6_x(
             #[cfg(target_os = "linux")]
             get_cfunc_name!("2.6.0");
         }
-    ));
+    )
+);
 
-    macro_rules! ruby_version_v2_7_x(
-        ($ruby_version:ident) => (
-           pub mod $ruby_version {
-               use std;
-               use bindings::$ruby_version::*;
-               use crate::core::types::ProcessMemory;
-               use failure::ResultExt;
-               use failure::Error;
-    
-                get_stack_trace!(rb_execution_context_struct);
-                get_ruby_string!();
-                get_cfps!();
-                get_pos!(rb_iseq_constant_body);
-                get_lineno_2_6_0!();
-                get_stack_frame_2_5_0!();
-                stack_field_2_5_0!();
-                get_ruby_string_array_2_5_0!();
-                get_thread_id_2_5_0!();
-                get_cfunc_name!("2.7.0");
-            }
-        ));
+macro_rules! ruby_version_v2_7_x(
+    ($ruby_version:ident) => (
+        pub mod $ruby_version {
+            use std;
+            use bindings::$ruby_version::*;
+            use crate::core::types::ProcessMemory;
+            use failure::ResultExt;
+            use failure::Error;
+
+            get_stack_trace!(rb_execution_context_struct);
+            get_ruby_string!();
+            get_cfps!();
+            get_pos!(rb_iseq_constant_body);
+            get_lineno_2_6_0!();
+            get_stack_frame_2_5_0!();
+            stack_field_2_5_0!();
+            get_ruby_string_array_2_5_0!();
+            get_thread_id_2_5_0!();
+            get_cfunc_name!("2.7.0");
+        }
+    )
+);
 
 macro_rules! get_stack_trace(
     ($thread_type:ident) => (
