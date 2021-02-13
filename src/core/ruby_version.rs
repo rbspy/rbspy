@@ -109,6 +109,7 @@ macro_rules! ruby_version_v2_5_x(
            use bindings::$ruby_version::*;
            use crate::core::types::ProcessMemory;
            use failure::ResultExt;
+           use failure::Error;
 
             get_stack_trace!(rb_execution_context_struct);
             get_ruby_string!();
@@ -119,7 +120,10 @@ macro_rules! ruby_version_v2_5_x(
             stack_field_2_5_0!();
             get_ruby_string_array_2_5_0!();
             get_thread_id_2_5_0!();
+            #[cfg(target_os = "macos")]
             get_cfunc_name_unsupported!();
+            #[cfg(target_os = "linux")]
+            get_cfunc_name!("2.5.0");
         }
         ));
 
@@ -141,6 +145,9 @@ macro_rules! ruby_version_v2_6_x(
             stack_field_2_5_0!();
             get_ruby_string_array_2_5_0!();
             get_thread_id_2_5_0!();
+            #[cfg(target_os = "macos")]
+            get_cfunc_name_unsupported!();
+            #[cfg(target_os = "linux")]
             get_cfunc_name!("2.6.0");
         }
     ));
