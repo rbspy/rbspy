@@ -917,6 +917,48 @@ mod tests {
             StackFrame::unknown_c_function(),
             ]
     }
+
+    fn real_stack_trace_2_7_2() -> Vec<StackFrame> {
+        vec![
+            StackFrame {
+                name: "<c function>".to_string(),
+                relative_path: "sleep".to_string(),
+                absolute_path: None,
+                lineno: 0
+            },
+            StackFrame {
+                name: "aaa".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/vagrant/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 3
+            },
+            StackFrame {
+                name: "bbb".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/vagrant/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 7
+            },
+            StackFrame {
+                name: "ccc".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/vagrant/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 11
+            },
+            StackFrame {
+                name: "block in <main>".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some("/vagrant/ci/ruby-programs/infinite.rb".to_string()),
+                lineno: 15
+            },
+            StackFrame {
+                name: "<c function>".to_string(),
+                relative_path: "loop".to_string(),
+                absolute_path: None,
+                lineno: 0
+            }
+        ]
+    }
+
     fn real_stack_trace_main() -> Vec<StackFrame> {
         vec![
             StackFrame::unknown_c_function(),
@@ -1037,5 +1079,16 @@ mod tests {
             ruby_version::ruby_2_1_6::get_stack_trace(current_thread_addr, None, &coredump_2_1_6_c_function(), 0)
             .unwrap();
         assert_eq!(vec!(StackFrame::unknown_c_function()), stack_trace.trace);
+    }
+
+    #[cfg(target_pointer_width="64")]
+    #[test]
+    fn test_get_ruby_stack_trace_2_7_2() {
+        let current_thread_addr = 0x7fdd8d626070;
+        let global_symbols_addr = Some(0x7fdd8d60eb80);
+        let stack_trace =
+            ruby_version::ruby_2_7_2::get_stack_trace::<CoreDump>(current_thread_addr, global_symbols_addr, &coredump_2_7_2(), 0)
+            .unwrap();
+        assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
 }
