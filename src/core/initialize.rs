@@ -27,11 +27,12 @@ use std;
  */
 pub fn initialize(pid: Pid) -> Result<StackTraceGetter, Error> {
     let process = Process::new(pid)?;
-    let (current_thread_addr_location, stack_trace_function) = get_process_ruby_state(&process)?;
+    let (current_thread_addr_location, global_symbols_addr_location, stack_trace_function) = get_process_ruby_state(&process)?;
 
     Ok(StackTraceGetter {
         process,
         current_thread_addr_location,
+        global_symbols_addr_location,
         stack_trace_function,
         reinit_count: 0,
     })
@@ -41,6 +42,7 @@ pub fn initialize(pid: Pid) -> Result<StackTraceGetter, Error> {
 pub struct StackTraceGetter {
     process: Process,
     current_thread_addr_location: usize,
+    global_symbols_addr_location: Option<usize>,
     stack_trace_function: StackTraceFn,
     reinit_count: u32,
 }
@@ -69,16 +71,18 @@ impl StackTraceGetter {
         let stack_trace_function = &self.stack_trace_function;
         stack_trace_function(
             self.current_thread_addr_location,
+            self.global_symbols_addr_location,
             &self.process,
             self.process.pid
         )
     }
 
     fn reinitialize(&mut self) -> Result<(), Error> {
-        let (current_thread_addr_location, stack_trace_function) =
+        let (current_thread_addr_location, ruby_global_symbols_addr_location, stack_trace_function) =
             get_process_ruby_state(&self.process)?;
 
         self.current_thread_addr_location = current_thread_addr_location;
+        self.global_symbols_addr_location = ruby_global_symbols_addr_location;
         self.stack_trace_function = stack_trace_function;
         self.reinit_count += 1;
 
@@ -90,9 +94,9 @@ pub type IsMaybeThreadFn = Box<dyn Fn(usize, usize, &Process, &[MapRange]) -> bo
 
 // Everything below here is private
 
-type StackTraceFn = Box<dyn Fn(usize, &Process, Pid) -> Result<StackTrace, MemoryCopyError>>;
+type StackTraceFn = Box<dyn Fn(usize, Option<usize>, &Process, Pid) -> Result<StackTrace, MemoryCopyError>>;
 
-fn get_process_ruby_state(process: &Process) -> Result<(usize, StackTraceFn), Error> {
+fn get_process_ruby_state(process: &Process) -> Result<(usize, Option<usize>, StackTraceFn), Error> {
     let version = get_ruby_version_retry(process)
         .context("Couldn't determine Ruby version")?;
 
@@ -105,6 +109,7 @@ fn get_process_ruby_state(process: &Process) -> Result<(usize, StackTraceFn), Er
             &version,
             is_maybe_thread,
         )?,
+        address_finder::get_ruby_global_symbols_address(process.pid, &version).ok(),
         get_stack_trace_function(&version),
     ))
 }
