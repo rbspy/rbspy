@@ -124,7 +124,7 @@ macro_rules! ruby_version_v2_5_x(
             stack_field_2_5_0!();
             get_ruby_string_array_2_5_0!();
             get_thread_id_2_5_0!();
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", target_os = "windows"))]
             get_cfunc_name_unsupported!();
             #[cfg(target_os = "linux")]
             get_cfunc_name!();
@@ -150,7 +150,7 @@ macro_rules! ruby_version_v2_6_x(
             stack_field_2_5_0!();
             get_ruby_string_array_2_5_0!();
             get_thread_id_2_5_0!();
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", target_os = "windows"))]
             get_cfunc_name_unsupported!();
             #[cfg(target_os = "linux")]
             get_cfunc_name!();

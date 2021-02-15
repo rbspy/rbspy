@@ -390,6 +390,15 @@ mod os_impl {
         get_symbol_address(pid, symbol_name)
     }
 
+    pub fn get_ruby_global_symbols_address(pid: Pid, version: &str) -> Result<usize, Error> {
+        let symbol_name = if version >= "2.7.0" {
+            "ruby_global_symbols"
+        } else {
+            "global_symbols"
+        };
+        get_symbol_address(pid, symbol_name)
+    }
+
     fn get_symbol_address(pid: u32, symbol_name: &str) -> Result<usize, Error> {
         let maps = get_process_maps(pid)?;
         let ruby = get_ruby_binary(&maps)?;
