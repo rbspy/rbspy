@@ -35,6 +35,15 @@ mod os_impl {
         proginfo.symbol_addr("_ruby_version")
     }
 
+    pub fn get_ruby_global_symbols_address(pid: Pid, version: &str) -> Result<usize, Error> {
+        let proginfo = &get_program_info(pid)?;
+        if version >= "2.7.0" {
+            proginfo.symbol_addr("_ruby_global_symbols")
+        } else {
+            proginfo.symbol_addr("_global_symbols")
+        }
+    }
+
     pub fn current_thread_address(
         pid: Pid,
         version: &str,
@@ -163,25 +172,17 @@ mod os_impl {
     pub fn get_ruby_version_address(pid: Pid) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
         let ruby_version_symbol = "ruby_version";
-        let symbol_addr =
-            get_symbol_addr(&proginfo.ruby_map, &proginfo.ruby_elf, ruby_version_symbol);
-        match symbol_addr {
-            Some(addr) => Ok(addr),
-            _ => {
-                get_symbol_addr(
-                    // if we have a ruby map but `ruby_version` isn't in it, we expect there to be
-                    // a libruby map. If that's not true, that's a bug.
-                    (*proginfo.libruby_map)
-                        .as_ref()
-                        .ok_or_else(|| format_err!("Missing libruby map. Please report this!"))?,
-                    proginfo
-                        .libruby_elf
-                        .as_ref()
-                        .ok_or_else(|| format_err!("Missing libruby ELF. Please report this!"))?,
-                    ruby_version_symbol,
-                ).ok_or_else(|| format_err!("Couldn't find ruby version."))
-            }
-        }
+        proginfo.get_symbol_addr(ruby_version_symbol)
+    }
+
+    pub fn get_ruby_global_symbols_address(pid: Pid, version: &str) -> Result<usize, Error> {
+        let proginfo = &get_program_info(pid)?;
+        let symbol_name = if version >= "2.7.0" {
+            "ruby_global_symbols"
+        } else {
+            "global_symbols"
+        };
+        proginfo.get_symbol_addr(symbol_name)
     }
 
     fn elf_symbol_value(elf_file: &elf::File, symbol_name: &str) -> Option<usize> {
@@ -258,27 +259,10 @@ mod os_impl {
     ) -> Option<usize> {
         // TODO: comment this somewhere
         if version >= "2.5.0" {
-            // TODO: make this more robust
-            get_symbol_addr(
-                &proginfo.ruby_map,
-                &proginfo.ruby_elf,
-                "ruby_current_execution_context_ptr",
-            )
+            proginfo.get_symbol_addr("ruby_current_execution_context_ptr").ok()
         } else {
-            get_symbol_addr(
-                &proginfo.ruby_map,
-                &proginfo.ruby_elf,
-                "ruby_current_thread",
-            )
+            proginfo.get_symbol_addr("ruby_current_thread").ok()
         }
-    }
-
-    fn get_symbol_addr(map: &MapRange, elf_file: &elf::File, symbol_name: &str) -> Option<usize> {
-        elf_symbol_value(elf_file, symbol_name).map(|addr| {
-            let load_header = elf_load_header(elf_file);
-            debug!("load header: {}", load_header);
-            map.start() + addr - load_header.vaddr as usize
-        })
     }
 
     fn elf_load_header(elf_file: &elf::File) -> elf::types::ProgramHeader {
@@ -299,6 +283,31 @@ mod os_impl {
         pub libruby_map: Box<Option<MapRange>>,
         pub ruby_elf: elf::File,
         pub libruby_elf: Option<elf::File>,
+    }
+
+    impl ProgramInfo {
+        pub fn get_symbol_addr(&self, symbol_name: &str) -> Result<usize, Error> {
+            if let Some(addr) = elf_symbol_value(&self.ruby_elf, symbol_name).map(|addr| {
+                let load_header = elf_load_header(&self.ruby_elf);
+                debug!("load header: {}", load_header);
+                &self.ruby_map.start() + addr - load_header.vaddr as usize
+            }) {
+                return Ok(addr)
+            }
+
+            let libruby_map = (*self.libruby_map)
+                .as_ref()
+                .ok_or_else(|| format_err!("Missing libruby map. Please report this!"))?;
+            let libruby_elf = self
+                .libruby_elf
+                .as_ref()
+                .ok_or_else(|| format_err!("Missing libruby ELF. Please report this!"))?;
+            elf_symbol_value(libruby_elf, symbol_name).map(|addr| {
+                let load_header = elf_load_header(libruby_elf);
+                debug!("load header: {}", load_header);
+                libruby_map.start() + addr - load_header.vaddr as usize
+            }).ok_or(format_err!("Could not find address for symbol {}", symbol_name))
+        }
     }
 
     fn open_elf_file(pid: Pid, map: &MapRange) -> Result<elf::File, Error> {
@@ -378,6 +387,15 @@ mod os_impl {
             "ruby_current_thread"
         };
 
+        get_symbol_address(pid, symbol_name)
+    }
+
+    pub fn get_ruby_global_symbols_address(pid: Pid, version: &str) -> Result<usize, Error> {
+        let symbol_name = if version >= "2.7.0" {
+            "ruby_global_symbols"
+        } else {
+            "global_symbols"
+        };
         get_symbol_address(pid, symbol_name)
     }
 
