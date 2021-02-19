@@ -1,6 +1,7 @@
 name: Release to crates.io
 
 on:
+  workflow_dispatch:
   release:
     types: [created]
 
