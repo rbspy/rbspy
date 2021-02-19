@@ -1,0 +1,21 @@
+name: Release to crates.io
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  rust-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Publishing crates
+        uses: katyo/publish-crates@v1
+        with:
+          registry-token: ${{ secrets.CARGO_TOKEN }}
