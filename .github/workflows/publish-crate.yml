@@ -10,13 +10,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
-
-      - name: Publishing crates
-        uses: katyo/publish-crates@v1
-        with:
-          registry-token: ${{ secrets.CARGO_TOKEN }}
+      - name: publish ruby-structs crate
+        continue-on-error: true
+        run: |
+          cargo login ${{ secrets.CARGO_TOKEN }}
+          cd ruby-structs
+          cargo publish
+      - name: publish rbspy crate
+        run: |
+          cargo login ${{ secrets.CARGO_TOKEN }}
+          cargo publish
