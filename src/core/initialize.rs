@@ -133,6 +133,7 @@ fn get_ruby_version_retry(process: &Process) -> Result<String, Error> {
             return Ok(version?);
         }
         match version {
+            #[allow(deprecated)] // apparently root_cause() is deprecated, TODO fix it at some point
             Err(err) => {
                 match err.root_cause().downcast_ref::<AddressFinderError>() {
                     Some(&AddressFinderError::PermissionDenied(_)) => {

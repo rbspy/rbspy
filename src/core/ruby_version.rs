@@ -524,6 +524,7 @@ macro_rules! get_lineno_2_3_0(
 
 macro_rules! get_pos(
     ($iseq_type:ident) => (
+        #[allow(unused)] // this doesn't get used in every ruby version
         fn get_pos(iseq_struct: &$iseq_type, cfp: &rb_control_frame_t) -> Result<usize, MemoryCopyError> {
             if (cfp.pc as usize) < (iseq_struct.iseq_encoded as usize) {
                 return Err(MemoryCopyError::Message(format!("program counter and iseq are out of sync")));
@@ -570,7 +571,7 @@ macro_rules! get_lineno_2_6_0(
     () => (
         fn get_lineno<T>(
             iseq_struct: &rb_iseq_constant_body,
-            cfp: &rb_control_frame_t,
+            _cfp: &rb_control_frame_t,
             source: &T,
             ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
             //let pos = get_pos(iseq_struct, cfp)?;
@@ -703,7 +704,7 @@ macro_rules! get_cfunc_name(
             }
         }
 
-        fn get_cfunc_name<T: ProcessMemory>(cfp: &rb_control_frame_t, global_symbols_address: usize, source: &T, pid: Pid) -> Result<String, Error> {
+        fn get_cfunc_name<T: ProcessMemory>(cfp: &rb_control_frame_t, global_symbols_address: usize, source: &T, _pid: Pid) -> Result<String, Error> {
             // The logic in this function is adapted from the .gdbinit script in 
             // github.com/ruby/ruby, in particular the print_id function.
 

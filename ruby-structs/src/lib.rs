@@ -1,3 +1,5 @@
+// TODO: there are a bunch of warnings in here, maybe address them later
+#![allow(warnings)] 
 pub mod ruby_1_9_1_0;
 pub mod ruby_1_9_2_0;
 pub mod ruby_1_9_3_0;

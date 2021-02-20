@@ -244,7 +244,7 @@ mod os_impl {
 
         let i = slice
             .iter().enumerate()
-            .position({ |(i, &x)| is_maybe_thread(x, (i as usize) * (std::mem::size_of::<usize>() as usize) + read_addr, &process, &proginfo.all_maps) })
+            .position(|(i, &x)| is_maybe_thread(x, (i as usize) * (std::mem::size_of::<usize>() as usize) + read_addr, &process, &proginfo.all_maps))
             .ok_or_else(|| format_err!(
                 "Current thread address not found in process {}",
                 &proginfo.pid

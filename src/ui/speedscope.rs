@@ -1,5 +1,4 @@
 use std::collections::{HashMap};
-use std::io;
 use std::io::Write;
 use std::fs::File;
 use std::time::SystemTime;
