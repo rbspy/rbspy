@@ -1,6 +1,6 @@
 [package]
 name = "rbspy-ruby-structs"
-version = "0.1.0"
+version = "0.3.13"
 authors = ["Julia Evans <julia@jvns.ca>"]
 description = "Helper crate for rbspy. Contains Rust bindings for various internal Ruby structions for version 1.9.3 to 2.5.0"
 license = "MIT"
