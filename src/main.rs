@@ -495,7 +495,7 @@ fn test_spawn_record_children_subprocesses() {
         retries -= 1;
     }
 
-    let (trace_receiver, result_receiver, _, _) = spawn_recorder_children(pid, true, 20, None).unwrap();
+    let (trace_receiver, result_receiver, _, _) = spawn_recorder_children(pid, true, 10, None).unwrap();
 
     let results: Vec<_> = result_receiver.iter().take(4).collect();
 
