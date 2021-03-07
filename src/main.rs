@@ -483,6 +483,18 @@ fn test_spawn_record_children_subprocesses() {
 
     let pid = process.id() as Pid;
 
+    // It can take a moment for the ruby process to spin up, so retry a few times. This
+    // mostly seems to affect macOS and Windows.
+    let retry_interval = std::time::Duration::from_millis(10);
+    let mut retries = 1000;
+    while let Err(_) = Process::new(pid) {
+        if retries == 0 {
+            panic!("Couldn't get process handle for ruby PID {}", pid);
+        }
+        std::thread::sleep(retry_interval);
+        retries -= 1;
+    }
+
     let (trace_receiver, result_receiver, _, _) = spawn_recorder_children(pid, true, 20, None).unwrap();
 
     let results: Vec<_> = result_receiver.iter().take(4).collect();
