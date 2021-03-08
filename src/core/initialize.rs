@@ -2,7 +2,7 @@ use crate::core::address_finder::*;
 use crate::core::address_finder;
 use proc_maps::MapRange;
 use crate::core::ruby_version;
-use crate::core::types::{MemoryCopyError, Pid, Process,
+use crate::core::types::{MemoryCopyError, Pid, Process, ProcessRetry,
                          ProcessMemory, StackTrace};
 
 use failure::Error;
@@ -26,7 +26,7 @@ use std;
  *   * Package all that up into a struct that the user can use to get stack traces.
  */
 pub fn initialize(pid: Pid) -> Result<StackTraceGetter, Error> {
-    let process = Process::new(pid)?;
+    let process = Process::new_with_retry(pid)?;
     let (current_thread_addr_location, global_symbols_addr_location, stack_trace_function) = get_process_ruby_state(&process)?;
 
     Ok(StackTraceGetter {

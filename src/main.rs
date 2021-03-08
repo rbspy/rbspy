@@ -63,7 +63,7 @@ pub mod ui;
 pub(crate) mod storage;
 
 use crate::core::initialize::initialize;
-use crate::core::types::{MemoryCopyError, Pid, Process, StackTrace};
+use crate::core::types::{MemoryCopyError, Pid, Process, ProcessRetry, StackTrace};
 use ui::output;
 
 const BILLION: u64 = 1000 * 1000 * 1000; // for nanosleep
@@ -390,7 +390,7 @@ fn spawn_recorder_children(pid: Pid, with_subprocesses: bool, sample_rate: u32, 
         // appear
         let done_clone = done.clone();
         std::thread::spawn(move || {
-            let process = Process::new(pid).unwrap();
+            let process = Process::new_with_retry(pid).unwrap();
             let mut pids: HashSet<Pid> = HashSet::new();
             let done = done.clone();
             // we need to exit this loop when the process we're monitoring exits, otherwise the
@@ -482,18 +482,6 @@ fn test_spawn_record_children_subprocesses() {
         .unwrap();
 
     let pid = process.id() as Pid;
-
-    // It can take a moment for the ruby process to spin up, so retry a few times. This
-    // mostly seems to affect macOS and Windows.
-    let retry_interval = std::time::Duration::from_millis(10);
-    let mut retries = 1000;
-    while let Err(_) = Process::new(pid) {
-        if retries == 0 {
-            panic!("Couldn't get process handle for ruby PID {}", pid);
-        }
-        std::thread::sleep(retry_interval);
-        retries -= 1;
-    }
 
     let (trace_receiver, result_receiver, _, _) = spawn_recorder_children(pid, true, 10, None).unwrap();
 
