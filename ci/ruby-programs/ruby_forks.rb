@@ -1,4 +1,4 @@
-SLEEP_TIME = 2
+SLEEP_TIME = 5
 
 suprocess_cmd = <<-CMD
   pid1_1 = spawn(ENV, RbConfig.ruby, "-esleep(#{SLEEP_TIME})")
