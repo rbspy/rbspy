@@ -483,7 +483,7 @@ fn test_spawn_record_children_subprocesses() {
 
     let pid = process.id() as Pid;
 
-    let (trace_receiver, result_receiver, _, _) = spawn_recorder_children(pid, true, 10, None).unwrap();
+    let (trace_receiver, result_receiver, _, _) = spawn_recorder_children(pid, true, 5, None).unwrap();
 
     let results: Vec<_> = result_receiver.iter().take(4).collect();
 
