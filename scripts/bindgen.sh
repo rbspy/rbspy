@@ -49,6 +49,7 @@ bindgen /tmp/wrapper.h \
     --whitelist-type rb_id_serial_t \
     --whitelist-var ID_ENTRY_UNIT \
     --whitelist-var RUBY_FL_USER1 \
+    --whitelist-type vm_svar \
     -- \
     -I/tmp/headers/$1/include \
     -I/home/bork/monorepo/ruby-header-files -I/tmp/headers/$1/ \
