@@ -75,8 +75,9 @@ The built binary will end up at `target/debug/rbspy`
 Here are the steps for maintainers to tag a new release:
 
 1. Update `Cargo.toml` with the new version, run `cargo build` to ensure `Cargo.lock` is updated.
-1. Open an MR for the version bump. You can generate a CHANGELOG via `git log --pretty='- %s' v0.3.10...HEAD`.
-1. After the MR was merged, tag the new release, e.g. `git tag v0.3.11`, and push it: `git push --tags`.
+1. If you have updated the ruby-structs bindings, update the version number in `ruby-structs/Cargo.toml` so that it matches the new rbspy version.
+1. Open a PR for the version bump. You can generate a CHANGELOG via `git log --pretty='- %s' v0.3.10...HEAD`.
+1. After the PR is merged, tag the new release, e.g. `git tag v0.3.11`, and push it: `git push --tags`.
 1. Travis will publish the tarballs to GitHub.
 
 ## Contributors
