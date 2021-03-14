@@ -161,10 +161,10 @@ mod os_impl {
             Some(addr) => Ok(addr),
             None => {
                 debug!("Trying to find address location another way");
-                Ok(current_thread_address_search_bss(
+                current_thread_address_search_bss(
                     proginfo,
                     is_maybe_thread,
-                )?)
+                )
             }
         }
     }
