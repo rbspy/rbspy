@@ -711,7 +711,7 @@ macro_rules! get_cfunc_name(
             // The logic in this function is adapted from the .gdbinit script in 
             // github.com/ruby/ruby, in particular the print_id function.
 
-            let mut ep = cfp.ep;
+            let mut ep = cfp.ep as *mut usize;
             let frame_flag: usize = unsafe { source.copy_struct(ep.offset(0) as usize)? };
 
             // if VM_FRAME_TYPE($cfp->flag) != VM_FRAME_MAGIC_CFUNC
@@ -739,7 +739,7 @@ macro_rules! get_cfunc_name(
                 return Err(format_err!("No method definition"));
             }
 
-            let ttype = (imemo.flags >> 12) & 0x07;
+            let ttype = ((imemo.flags >> 12) & 0x07) as usize;
             if ttype != imemo_type_imemo_ment as usize {
                 return Err(format_err!("Not a method entry"));
             }
@@ -759,7 +759,7 @@ macro_rules! get_cfunc_name(
 
             let global_symbols: rb_symbols_t = source.copy_struct(global_symbols_address as usize)?;
             let def: rb_method_definition_struct = source.copy_struct(imemo.def as usize)?;
-            let method_id: usize = def.original_id;
+            let method_id = def.original_id as usize;
 
             // rb_id_to_serial
             let mut serial = method_id;
@@ -775,13 +775,13 @@ macro_rules! get_cfunc_name(
             let id_entry_unit = 512;
             let idx = serial / id_entry_unit;
             let ids: RArray = source.copy_struct(global_symbols.ids as usize)?;
-            let flags = ids.basic.flags;
+            let flags = ids.basic.flags as usize;
 
             // string2cstring
             let mut ids_ptr = unsafe { ids.as_.heap.ptr as usize };
             let mut ids_len = unsafe { ids.as_.heap.len as usize };
             if (flags & ruby_fl_type_RUBY_FL_USER1 as usize) > 0 {
-                ids_ptr = unsafe { ids.as_.ary[0] };
+                ids_ptr = unsafe { ids.as_.ary[0] as usize };
                 ids_len = ((flags & (ruby_fl_type_RUBY_FL_USER3|ruby_fl_type_RUBY_FL_USER4) as usize) >> (ruby_fl_type_RUBY_FL_USHIFT+3));
             }
             if idx >= ids_len {
@@ -796,7 +796,7 @@ macro_rules! get_cfunc_name(
             let array: RArray = source.copy_struct(array_ptr)?;
 
             let mut array_ptr = unsafe { array.as_.heap.ptr };
-            let flags = array.basic.flags;
+            let flags = array.basic.flags as usize;
             if (flags & ruby_fl_type_RUBY_FL_USER1 as usize) > 0 {
                 array_ptr = unsafe { &ids.as_.ary[0] };
             }
