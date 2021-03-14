@@ -30,7 +30,7 @@ failure_derive = "0.1.5"
 flate2 = "1"
 libc = "0.2.34"
 proc-maps = "0.1.4"
-rbspy-ruby-structs = { path = "ruby-structs", version="0.3.13" }
+rbspy-ruby-structs = { path = "ruby-structs", version="0.3.14" }
 remoteprocess = "0.3.1"
 serde = "1"
 serde_derive = "1"
