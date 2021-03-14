@@ -699,7 +699,10 @@ macro_rules! get_cfunc_name(
             #[allow(non_upper_case_globals)]
             match ((imemo.flags >> 12) & 0x07) as u32 {
                 imemo_type_imemo_ment => Ok(&imemo as *const rb_method_entry_struct),
-                imemo_type_imemo_svar => check_method_entry(raw_imemo, source),
+                imemo_type_imemo_svar => {
+                    let svar: vm_svar = source.copy_struct(raw_imemo)?;
+                    check_method_entry(svar.cref_or_me, source)
+                },
                 _ => Ok(raw_imemo as *const rb_method_entry_struct)
             }
         }
