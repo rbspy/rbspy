@@ -734,7 +734,7 @@ macro_rules! get_cfunc_name(
                 }
             }
 
-            let imemo: rb_callable_method_entry_struct = source.copy_struct(env_me_cref)?;
+            let imemo: rb_method_entry_struct = source.copy_struct(env_me_cref)?;
             if imemo.def.is_null() {
                 return Err(format_err!("No method definition"));
             }
