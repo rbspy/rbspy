@@ -223,6 +223,10 @@ fn test_current_thread_address() {
     let remoteprocess = Process::new(pid).expect("Failed to initialize process");
     let version = get_ruby_version_retry(&remoteprocess)
         .expect("version should exist");
+    if version >= String::from("3.0.0") {
+        // We won't be able to get the thread address directly, so skip this
+        return;
+    }
 
     let is_maybe_thread = is_maybe_thread_function(&version);
     let result = address_finder::current_thread_address(pid, &version, is_maybe_thread);
