@@ -243,23 +243,20 @@ macro_rules! get_execution_context_from_vm(
 
             // Seek forward in the ractor struct, looking for the main thread's address. The 
             // execution context pointer is in the memory word just before it 
-            // (see rb_ractor_struct). The initial offset was found through experiment.
-            let initial_offset = 520;
-            for i in initial_offset..(initial_offset+500) {
-                let candidate_main_thread_address: usize = source.copy_struct(vm.ractor.main_ractor as usize + i)
-                    .context(vm.ractor.main_ractor as usize)?;
-                if candidate_main_thread_address == vm.ractor.main_thread as usize {
-                    // Rewind by one word to get the execution context pointer
-                    let running_ec_address_location = vm.ractor.main_ractor as usize + i - std::mem::size_of::<usize>();
-                    let running_ec_address: usize = source.copy_struct(running_ec_address_location)
-                        .context(running_ec_address_location)?;
-                    let ec: rb_execution_context_struct = source.copy_struct(running_ec_address)
-                        .context(running_ec_address)?;
-                    return Ok(ec);
-                }
-            }
-
-            Err(format_err!("couldn't find current execution context"))
+            // (see rb_ractor_struct).
+            const ADDRESSES_TO_CHECK: usize = 64;
+            let initial_offset = 520; // Found through experiment
+            let candidate_addresses: [usize; ADDRESSES_TO_CHECK] =
+                source.copy_struct(vm.ractor.main_ractor as usize + initial_offset)?;
+            let matching_index =
+                candidate_addresses
+                .iter()
+                .position(|&addr| addr == vm.ractor.main_thread as usize)
+                .ok_or(format_err!("couldn't find current execution context"))?;
+            let running_ec_address = candidate_addresses[matching_index - 1];
+            let ec: rb_execution_context_struct = source.copy_struct(running_ec_address as usize)
+                .context(running_ec_address)?;
+            Ok(ec)
         }
     )
 );
