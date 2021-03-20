@@ -120,7 +120,7 @@ fn get_process_ruby_state(process: &Process) -> Result<(usize, usize, Option<usi
     debug!("version: {}", version);
     Ok((
         current_thread_address,
-        address_finder::get_vm_address(process.pid)?,
+        address_finder::get_vm_address(process.pid, &version)?,
         address_finder::get_ruby_global_symbols_address(process.pid, &version).ok(),
         get_stack_trace_function(&version),
     ))

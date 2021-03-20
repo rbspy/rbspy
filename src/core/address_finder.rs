@@ -45,9 +45,14 @@ mod os_impl {
         }
     }
 
-    pub fn get_vm_address(pid: Pid) -> Result<usize, Error> {
+    pub fn get_vm_address(pid: Pid, version: &str) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
-        proginfo.symbol_addr("_ruby_current_vm_ptr")
+
+        if version >= "2.5.0" {
+            proginfo.symbol_addr("_ruby_current_vm_ptr")
+        } else {
+            proginfo.symbol_addr("_ruby_current_vm")
+        }
     }
 
     pub fn current_thread_address(
@@ -159,9 +164,14 @@ mod os_impl {
     use failure::{Error, ResultExt};
     use std;
 
-    pub fn get_vm_address(pid: Pid) -> Result<usize, Error> {
+    pub fn get_vm_address(pid: Pid, version: &str) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
-        proginfo.get_symbol_addr("ruby_current_vm_ptr")
+
+        if version >= "2.5.0" {
+            proginfo.get_symbol_addr("ruby_current_vm_ptr")
+        } else {
+            proginfo.get_symbol_addr("ruby_current_vm")
+        }
     }
 
     pub fn current_thread_address(
@@ -395,8 +405,14 @@ mod os_impl {
         get_symbol_address(pid, "ruby_version")
     }
 
-    pub fn get_vm_address(pid: Pid) -> Result<usize, Error> {
-        get_symbol_address(pid, "ruby_current_vm_ptr")
+    pub fn get_vm_address(pid: Pid, version: &str) -> Result<usize, Error> {
+        let symbol_name = if version >= "2.5.0" {
+            "ruby_current_vm_ptr"
+        } else {
+            "ruby_current_vm"
+        };
+
+        get_symbol_address(pid, symbol_name)
     }
 
     pub fn current_thread_address(
