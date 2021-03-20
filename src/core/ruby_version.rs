@@ -227,7 +227,11 @@ macro_rules! get_execution_context_from_thread(
 
 macro_rules! get_execution_context_from_vm(
     () => (
-        pub fn get_execution_context<T: ProcessMemory>(_ruby_current_thread_address_location: usize, ruby_vm_address_location: usize, source: &T) -> Result<rb_execution_context_struct, Error> {
+        pub fn get_execution_context<T: ProcessMemory>(
+            _ruby_current_thread_address_location: usize, 
+            ruby_vm_address_location: usize, 
+            source: &T
+        ) -> Result<rb_execution_context_struct, Error> {
             // This is a roundabout way to get the execution context address, but it helps us 
             // avoid platform-specific structures in memory (e.g. pthread types) that would
             // require us to maintain separate ruby-structs bindings for each platform due to
