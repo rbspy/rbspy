@@ -241,9 +241,11 @@ macro_rules! get_execution_context_from_vm(
             let vm: rb_vm_struct = source.copy_struct(vm_addr as usize)
                 .context(vm_addr)?;
 
-            // Seek forward in the ractor struct, looking for the main thread's address. The 
-            // execution context pointer is in the memory word just before it 
-            // (see rb_ractor_struct).
+            // Seek forward in the ractor struct, looking for the main thread's address. There 
+            // may be other copies of the main thread address in the ractor struct, so it's 
+            // important to jump as close as possible to the main_thread struct field before we 
+            // search, which is the purpose of the initial offset. The execution context pointer 
+            // is in the memory word just before main_thread (see rb_ractor_struct).
             const ADDRESSES_TO_CHECK: usize = 64;
             let initial_offset = 520; // Found through experiment
             let candidate_addresses: [usize; ADDRESSES_TO_CHECK] =
