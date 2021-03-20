@@ -187,7 +187,7 @@ fn get_ruby_version(process: &Process) -> Result<String, Error> {
 
 #[test]
 #[cfg(target_os = "linux")]
-fn test_initialize_wiith_nonexistent_process() {
+fn test_initialize_with_nonexistent_process() {
     let process = Process::new(10000).expect("Failed to initialize process");
     let version = get_ruby_version_retry(&process);
     match version
