@@ -34,6 +34,7 @@ pub struct StackTrace {
 
 #[derive(Fail, Debug)]
 pub enum MemoryCopyError {
+    #[fail(display = "The operation completed successfully")] OperationSucceeded,
     #[fail(display = "Permission denied when reading from process. If you're not running as root, try again with sudo. If you're using Docker, try passing `--cap-add=SYS_PTRACE` to `docker run`")]
 
     PermissionDenied,
@@ -105,6 +106,8 @@ impl From<Context<usize>> for MemoryCopyError {
         }
 
         return match error.raw_os_error() {
+            // Sometimes Windows returns this error code
+            Some(0) => MemoryCopyError::OperationSucceeded,
             /* On Mac, 60 seems to correspond to the process ended */
             /* On Windows, 299 happens when the process ended */
             Some(3) | Some(60) | Some(299) => {

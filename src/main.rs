@@ -476,20 +476,51 @@ fn test_spawn_record_children_subprocesses() {
         .next()
         .expect("failed to execute ruby process");
 
+    let coordination_dir = tempdir::TempDir::new("").unwrap();
+    let coordination_dir_name = coordination_dir.path().to_str().unwrap();
+
     let mut process = std::process::Command::new(ruby_binary_path_str)
         .arg("ci/ruby-programs/ruby_forks.rb")
+        .arg(coordination_dir_name)
         .spawn()
         .unwrap();
 
     let pid = process.id() as Pid;
 
-    let (trace_receiver, result_receiver, _, _) = spawn_recorder_children(pid, true, 5, None).unwrap();
+    let (trace_receiver, result_receiver, _, _) =
+        spawn_recorder_children(pid, true, 5, None).unwrap();
+
+    let mut pids = HashSet::<Pid>::new();
+    for trace in trace_receiver {
+        let pid = trace.pid.unwrap();
+        if !pids.contains(&pid) {
+            // Now that we have a stack trace for this PID, signal to the corresponding
+            // ruby process that it can exit
+            let coordination_filename = format!("rbspy_ack.{}", pid);
+            File::create(coordination_dir.path().join(coordination_filename.clone()))
+                .expect("couldn't create coordination file");
+            pids.insert(pid);
+        }
+
+        if pids.len() == 4 {
+            break;
+        }
+    }
 
     let results: Vec<_> = result_receiver.iter().take(4).collect();
-
-    // check that there are 4 distinct PIDs in the stack traces
-    let pids: HashSet<Pid> = trace_receiver.iter().take(100).map(|x| x.pid.unwrap()).collect();
     for r in results {
+       #[cfg(target_os = "windows")]
+       match &r {
+            Ok(_) => {},
+            Err(e) => {
+                match e.downcast_ref() {
+                    Some(MemoryCopyError::OperationSucceeded) => {},
+                    _ => r.expect("unexpected error"),
+                }
+            },
+        }
+
+        #[cfg(not(target_os = "windows"))]
         r.expect("unexpected error");
     }
 
