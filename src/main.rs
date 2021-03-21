@@ -490,7 +490,7 @@ fn test_spawn_record_children_subprocesses() {
     // check that there are 4 distinct PIDs in the stack traces
     let pids: HashSet<Pid> = trace_receiver.iter().take(100).map(|x| x.pid.unwrap()).collect();
     for r in results {
-        assert!(r.is_ok());
+        r.expect("unexpected error");
     }
 
     assert_eq!(pids.len(), 4);
