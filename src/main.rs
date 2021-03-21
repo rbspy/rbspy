@@ -491,7 +491,7 @@ fn test_spawn_record_children_subprocesses() {
         spawn_recorder_children(pid, true, 5, None).unwrap();
 
     let mut pids = HashSet::<Pid>::new();
-    for trace in trace_receiver {
+    for trace in &trace_receiver {
         let pid = trace.pid.unwrap();
         if !pids.contains(&pid) {
             // Now that we have a stack trace for this PID, signal to the corresponding
@@ -523,6 +523,8 @@ fn test_spawn_record_children_subprocesses() {
         #[cfg(not(target_os = "windows"))]
         r.expect("unexpected error");
     }
+
+    drop(trace_receiver);
 
     assert_eq!(pids.len(), 4);
     process.wait().unwrap();
