@@ -977,7 +977,7 @@ version = "0.3.14"
 [[package]]
 name = "rbspy-testdata"
 version = "0.1.2"
-source = "git+https://github.com/rbspy/rbspy-testdata#ccae0916448e53e85ab951184e39e7de0b3a4db0"
+source = "git+https://github.com/rbspy/rbspy-testdata#ce919da68976a038cf52afbb0cddd4d198e52bb5"
 dependencies = [
  "byteorder 0.5.3",
  "elf",

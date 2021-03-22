@@ -24,7 +24,8 @@ pub enum AddressFinderError {
 mod os_impl {
     use crate::core::address_finder::AddressFinderError;
     use crate::core::initialize::IsMaybeThreadFn;
-    use crate::core::types::Pid;
+    use crate::core::types::{Process, Pid};
+    use remoteprocess::ProcessMemory;
 
     use proc_maps::mac_maps::{get_symbols, Symbol, get_dyld_info, DyldInfo};
 
@@ -44,13 +45,25 @@ mod os_impl {
         }
     }
 
+    pub fn get_vm_address(pid: Pid, version: &str) -> Result<usize, Error> {
+        let proginfo = &get_program_info(pid)?;
+
+        if version >= "2.5.0" {
+            proginfo.symbol_addr("_ruby_current_vm_ptr")
+        } else {
+            proginfo.symbol_addr("_ruby_current_vm")
+        }
+    }
+
     pub fn current_thread_address(
         pid: Pid,
         version: &str,
         _is_maybe_thread: IsMaybeThreadFn,
     ) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;
-        if version >= "2.5.0" {
+        if version >= "3.0.0" {
+            panic!("Current thread address isn't directly accessible on ruby 3 and newer");
+        } else if version >= "2.5.0" {
             proginfo.symbol_addr("_ruby_current_execution_context_ptr")
         } else {
             proginfo.symbol_addr("_ruby_current_thread")
@@ -151,20 +164,34 @@ mod os_impl {
     use failure::{Error, ResultExt};
     use std;
 
+    pub fn get_vm_address(pid: Pid, version: &str) -> Result<usize, Error> {
+        let proginfo = &get_program_info(pid)?;
+
+        if version >= "2.5.0" {
+            proginfo.get_symbol_addr("ruby_current_vm_ptr")
+        } else {
+            proginfo.get_symbol_addr("ruby_current_vm")
+        }
+    }
+
     pub fn current_thread_address(
         pid: Pid,
         version: &str,
         is_maybe_thread: IsMaybeThreadFn,
     ) -> Result<usize, Error> {
-        let proginfo = &get_program_info(pid)?;
-        match current_thread_address_symbol_table(proginfo, version) {
-            Some(addr) => Ok(addr),
-            None => {
-                debug!("Trying to find address location another way");
-                Ok(current_thread_address_search_bss(
-                    proginfo,
-                    is_maybe_thread,
-                )?)
+        if version >= "3.0.0" {
+            panic!("Current thread address isn't directly accessible on ruby 3 and newer");
+        } else {
+            let proginfo = &get_program_info(pid)?;
+            match current_thread_address_symbol_table(proginfo, version) {
+                Some(addr) => Ok(addr),
+                None => {
+                    debug!("Trying to find address location another way");
+                    current_thread_address_search_bss(
+                        proginfo,
+                        is_maybe_thread,
+                    )
+                }
             }
         }
     }
@@ -258,7 +285,9 @@ mod os_impl {
         version: &str,
     ) -> Option<usize> {
         // TODO: comment this somewhere
-        if version >= "2.5.0" {
+        if version >= "3.0.0" {
+            panic!("Current thread address isn't directly accessible on ruby 3 and newer");
+        } else if version >= "2.5.0" {
             proginfo.get_symbol_addr("ruby_current_execution_context_ptr").ok()
         } else {
             proginfo.get_symbol_addr("ruby_current_thread").ok()
@@ -376,12 +405,24 @@ mod os_impl {
         get_symbol_address(pid, "ruby_version")
     }
 
+    pub fn get_vm_address(pid: Pid, version: &str) -> Result<usize, Error> {
+        let symbol_name = if version >= "2.5.0" {
+            "ruby_current_vm_ptr"
+        } else {
+            "ruby_current_vm"
+        };
+
+        get_symbol_address(pid, symbol_name)
+    }
+
     pub fn current_thread_address(
         pid: u32,
         version: &str,
         _is_maybe_thread: IsMaybeThreadFn,
     ) -> Result<usize, Error> {
-        let symbol_name = if version >= "2.5.0" {
+        let symbol_name = if version >= "3.0.0" {
+            panic!("Current thread address isn't directly accessible on ruby 3 and newer");
+        } else if version >= "2.5.0" {
             "ruby_current_execution_context_ptr"
         } else {
             "ruby_current_thread"

@@ -27,11 +27,12 @@ use std;
  */
 pub fn initialize(pid: Pid) -> Result<StackTraceGetter, Error> {
     let process = Process::new_with_retry(pid)?;
-    let (current_thread_addr_location, global_symbols_addr_location, stack_trace_function) = get_process_ruby_state(&process)?;
+    let (current_thread_addr_location, ruby_vm_addr_location, global_symbols_addr_location, stack_trace_function) = get_process_ruby_state(&process)?;
 
     Ok(StackTraceGetter {
         process,
         current_thread_addr_location,
+        ruby_vm_addr_location,
         global_symbols_addr_location,
         stack_trace_function,
         reinit_count: 0,
@@ -42,6 +43,7 @@ pub fn initialize(pid: Pid) -> Result<StackTraceGetter, Error> {
 pub struct StackTraceGetter {
     process: Process,
     current_thread_addr_location: usize,
+    ruby_vm_addr_location: usize,
     global_symbols_addr_location: Option<usize>,
     stack_trace_function: StackTraceFn,
     reinit_count: u32,
@@ -71,6 +73,7 @@ impl StackTraceGetter {
         let stack_trace_function = &self.stack_trace_function;
         stack_trace_function(
             self.current_thread_addr_location,
+            self.ruby_vm_addr_location,
             self.global_symbols_addr_location,
             &self.process,
             self.process.pid
@@ -78,10 +81,11 @@ impl StackTraceGetter {
     }
 
     fn reinitialize(&mut self) -> Result<(), Error> {
-        let (current_thread_addr_location, ruby_global_symbols_addr_location, stack_trace_function) =
+        let (current_thread_addr_location, ruby_vm_addr_location, ruby_global_symbols_addr_location, stack_trace_function) =
             get_process_ruby_state(&self.process)?;
 
         self.current_thread_addr_location = current_thread_addr_location;
+        self.ruby_vm_addr_location = ruby_vm_addr_location;
         self.global_symbols_addr_location = ruby_global_symbols_addr_location;
         self.stack_trace_function = stack_trace_function;
         self.reinit_count += 1;
@@ -94,21 +98,29 @@ pub type IsMaybeThreadFn = Box<dyn Fn(usize, usize, &Process, &[MapRange]) -> bo
 
 // Everything below here is private
 
-type StackTraceFn = Box<dyn Fn(usize, Option<usize>, &Process, Pid) -> Result<StackTrace, MemoryCopyError>>;
+type StackTraceFn = Box<dyn Fn(usize, usize, Option<usize>, &Process, Pid) -> Result<StackTrace, MemoryCopyError>>;
 
-fn get_process_ruby_state(process: &Process) -> Result<(usize, Option<usize>, StackTraceFn), Error> {
+fn get_process_ruby_state(process: &Process) -> Result<(usize, usize, Option<usize>, StackTraceFn), Error> {
     let version = get_ruby_version_retry(process)
         .context("Couldn't determine Ruby version")?;
 
-    let is_maybe_thread = is_maybe_thread_function(&version);
-
-    debug!("version: {}", version);
-    Ok((
+    let current_thread_address = if version.as_str() >= "3.0.0" {
+        // There's no symbol for the current thread address on ruby 3+, so we look it up
+        // dynamically later
+        0
+    } else {
+        let is_maybe_thread = is_maybe_thread_function(&version);
         address_finder::current_thread_address(
             process.pid,
             &version,
             is_maybe_thread,
-        )?,
+        )?
+    };
+
+    debug!("version: {}", version);
+    Ok((
+        current_thread_address,
+        address_finder::get_vm_address(process.pid, &version)?,
         address_finder::get_ruby_global_symbols_address(process.pid, &version).ok(),
         get_stack_trace_function(&version),
     ))
@@ -175,7 +187,7 @@ fn get_ruby_version(process: &Process) -> Result<String, Error> {
 
 #[test]
 #[cfg(target_os = "linux")]
-fn test_initialize_wiith_nonexistent_process() {
+fn test_initialize_with_nonexistent_process() {
     let process = Process::new(10000).expect("Failed to initialize process");
     let version = get_ruby_version_retry(&process);
     match version
@@ -211,6 +223,10 @@ fn test_current_thread_address() {
     let remoteprocess = Process::new(pid).expect("Failed to initialize process");
     let version = get_ruby_version_retry(&remoteprocess)
         .expect("version should exist");
+    if version >= String::from("3.0.0") {
+        // We won't be able to get the thread address directly, so skip this
+        return;
+    }
 
     let is_maybe_thread = is_maybe_thread_function(&version);
     let result = address_finder::current_thread_address(pid, &version, is_maybe_thread);
@@ -357,6 +373,7 @@ fn is_maybe_thread_function(version: &str) -> IsMaybeThreadFn {
         "2.7.0" => ruby_version::ruby_2_7_0::is_maybe_thread,
         "2.7.1" => ruby_version::ruby_2_7_1::is_maybe_thread,
         "2.7.2" => ruby_version::ruby_2_7_2::is_maybe_thread,
+        "3.0.0" => ruby_version::ruby_3_0_0::is_maybe_thread,
         _ => panic!("Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!", version),
     };
     Box::new(function)
@@ -429,6 +446,7 @@ fn get_stack_trace_function(version: &str) -> StackTraceFn {
         "2.7.0" => ruby_version::ruby_2_7_0::get_stack_trace,
         "2.7.1" => ruby_version::ruby_2_7_1::get_stack_trace,
         "2.7.2" => ruby_version::ruby_2_7_2::get_stack_trace,
+        "3.0.0" => ruby_version::ruby_3_0_0::get_stack_trace,
         _ => panic!("Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!", version),
     };
     Box::new(stack_trace_function)

@@ -17,13 +17,17 @@ mkdir -p /tmp/headers/$1
 
 (cd $ruby_src_dir && git checkout v$1)
 cp -R "$ruby_src_dir/include" /tmp/headers/$1
+if [ -e "$ruby_src_dir/internal" ]
+then
+    cp -R "$ruby_src_dir/internal" /tmp/headers/$1
+fi
 if [ -e "$ruby_src_dir/ccan" ]
 then
     cp -R "$ruby_src_dir/ccan" /tmp/headers/$1
 fi
 cp "$ruby_src_dir"/*.h /tmp/headers/$1
 
-OUT=ruby-structs/src/ruby_${1}.rs
+BINDGEN_EXTRA_CLANG_ARGS=-fdeclspec \
 bindgen /tmp/wrapper.h \
     -o /tmp/bindings.rs \
     --impl-debug \
@@ -36,6 +40,7 @@ bindgen /tmp/wrapper.h \
     --whitelist-type rb_control_frame_struct \
     --whitelist-type rb_thread_struct \
     --whitelist-type rb_execution_context_struct \
+    --whitelist-type rb_method_entry_struct \
     --whitelist-type imemo_type \
     --whitelist-type iseq_insn_info_entry\
     --whitelist-type RString \
@@ -43,6 +48,7 @@ bindgen /tmp/wrapper.h \
     --whitelist-type VALUE \
     --whitelist-type ruby_method_ids \
     --whitelist-type ruby_fl_type \
+    --whitelist-type ruby_fl_ushift \
     --constified-enum tLAST_OP_ID \
     --whitelist-type ruby_id_types \
     --constified-enum RUBY_ID_SCOPE_SHIFT \
@@ -58,6 +64,7 @@ bindgen /tmp/wrapper.h \
 
 rustfmt /tmp/bindings.rs
 
+OUT=ruby-structs/src/ruby_${1}.rs
 echo "#![allow(non_upper_case_globals)]" > $OUT
 echo "#![allow(non_camel_case_types)]" >> $OUT
 echo "#![allow(non_snake_case)]" >> $OUT
