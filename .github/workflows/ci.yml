@@ -14,12 +14,14 @@ jobs:
       CARGO: cargo
       TARGET_FLAGS: --target ${{ matrix.target }}
       RUST_BACKTRACE: 1
+    timeout-minutes: 20
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         build:
         - linux
         - macos
+        - windows
         include:
         - build: linux
           os: ubuntu-20.04
@@ -27,6 +29,9 @@ jobs:
         - build: macos
           os: macos-latest
           target: x86_64-apple-darwin
+        - build: windows
+          os: windows-latest
+          target: x86_64-pc-windows-msvc
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
@@ -40,6 +45,9 @@ jobs:
         toolchain: stable
         profile: minimal
         override: true
+    - name: Install Rust toolchain target
+      run: |
+        rustup target add ${{ matrix.target }}
     - uses: Swatinem/rust-cache@v1
     - name: Show command used for Cargo
       run: |
