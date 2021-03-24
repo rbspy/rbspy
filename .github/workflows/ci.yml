@@ -71,6 +71,13 @@ jobs:
       timeout-minutes: 5
       run: sudo "PATH=$PATH" ${{ env.CARGO }} test --release --verbose  ${{ env.TARGET_FLAGS }}
       if: runner.os == 'macOS'
+    - name: Run rbspy with alternative mallocs
+      if: runner.os == 'linux'
+      run: |
+        set -e
+        sudo apt install -y libjemalloc2 libtcmalloc-minimal4
+        target/${{ matrix.target }}/release/rbspy record env LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2 ruby ci/ruby-programs/short_program.rb
+        target/${{ matrix.target }}/release/rbspy record env LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4 ruby ci/ruby-programs/short_program.rb
 
   build-linux-cross:
     runs-on: ubuntu-latest
