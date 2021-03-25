@@ -21,17 +21,6 @@ env:
     # This will be part of the release tarball
     - PROJECT_NAME=rbspy
 
-before_install:
-  - export PATH="$PATH:$HOME/.cargo/bin"
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get update ; fi
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get -y install perl; fi
-
-install:
-  - bash ci/install.sh
-
-script:
-  - bash ci/script.sh
-
 before_deploy:
   - bash ci/before_deploy.sh
 
