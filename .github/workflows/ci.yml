@@ -57,11 +57,18 @@ jobs:
     - name: Build rbspy
       run: ${{ env.CARGO }} build --release --verbose --all ${{ env.TARGET_FLAGS }}
 
-    - name: Upload Binaries
+    - name: Upload Linux and macOS Binaries
+      if: runner.os != 'windows'
       uses: actions/upload-artifact@v2
       with:
-        name: binaries
+        name: rbspy-${{ matrix.target }}
         path: target/*/release/rbspy
+    - name: Upload Windows Binaries
+      if: runner.os == 'windows'
+      uses: actions/upload-artifact@v2
+      with:
+        name: rbspy-${{ matrix.target }}.exe
+        path: target/*/release/rbspy.exe
 
     - name: Run tests
       timeout-minutes: 5
@@ -98,7 +105,7 @@ jobs:
     - name: Upload Binaries
       uses: actions/upload-artifact@v2
       with:
-        name: binaries
+        name: rbspy-${{ matrix.target }}
         path: target/*/release/rbspy
 
 
