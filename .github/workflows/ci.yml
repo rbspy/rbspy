@@ -14,12 +14,14 @@ jobs:
       CARGO: cargo
       TARGET_FLAGS: --target ${{ matrix.target }}
       RUST_BACKTRACE: 1
+    timeout-minutes: 20
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         build:
         - linux
         - macos
+        - windows
         include:
         - build: linux
           os: ubuntu-20.04
@@ -27,6 +29,9 @@ jobs:
         - build: macos
           os: macos-latest
           target: x86_64-apple-darwin
+        - build: windows
+          os: windows-latest
+          target: x86_64-pc-windows-msvc
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
@@ -40,6 +45,9 @@ jobs:
         toolchain: stable
         profile: minimal
         override: true
+    - name: Install Rust toolchain target
+      run: |
+        rustup target add ${{ matrix.target }}
     - uses: Swatinem/rust-cache@v1
     - name: Show command used for Cargo
       run: |
@@ -49,11 +57,18 @@ jobs:
     - name: Build rbspy
       run: ${{ env.CARGO }} build --release --verbose --all ${{ env.TARGET_FLAGS }}
 
-    - name: Upload Binaries
+    - name: Upload Linux and macOS Binaries
+      if: runner.os != 'windows'
       uses: actions/upload-artifact@v2
       with:
-        name: binaries
+        name: rbspy-${{ matrix.target }}
         path: target/*/release/rbspy
+    - name: Upload Windows Binaries
+      if: runner.os == 'windows'
+      uses: actions/upload-artifact@v2
+      with:
+        name: rbspy-${{ matrix.target }}.exe
+        path: target/*/release/rbspy.exe
 
     - name: Run tests
       timeout-minutes: 5
@@ -63,6 +78,13 @@ jobs:
       timeout-minutes: 5
       run: sudo "PATH=$PATH" ${{ env.CARGO }} test --release --verbose  ${{ env.TARGET_FLAGS }}
       if: runner.os == 'macOS'
+    - name: Run rbspy with alternative mallocs
+      if: runner.os == 'linux'
+      run: |
+        set -e
+        sudo apt install -y libjemalloc2 libtcmalloc-minimal4
+        target/${{ matrix.target }}/release/rbspy record env LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2 ruby ci/ruby-programs/short_program.rb
+        target/${{ matrix.target }}/release/rbspy record env LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4 ruby ci/ruby-programs/short_program.rb
 
   build-linux-cross:
     runs-on: ubuntu-latest
@@ -83,7 +105,7 @@ jobs:
     - name: Upload Binaries
       uses: actions/upload-artifact@v2
       with:
-        name: binaries
+        name: rbspy-${{ matrix.target }}
         path: target/*/release/rbspy
 
 
