@@ -81,7 +81,7 @@ impl Stats {
         let top = top.unwrap_or(::std::usize::MAX);
         let truncate = truncate.unwrap_or(::std::usize::MAX);
         let mut sorted: Vec<(u64, u64, &str)> = self.counts.iter().map(|(x,y)| (y.self_, y.total, x.as_ref())).collect();
-        sorted.sort();
+        sorted.sort_unstable();
         let counts = sorted.iter().rev().take(top);
         writeln!(w, "{}", Stats::HEADER)?;
         for &(self_, total, name) in counts {
