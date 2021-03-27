@@ -8,17 +8,17 @@ struct Counts {
     total: u64,
 }
 
+#[derive(Default)]
 pub struct Stats {
     counts: HashMap<String, Counts>,
     total_traces: u32,
 }
 
-
 impl Stats {
     const HEADER: &'static str = "% self  % total  name";
 
     pub fn new() -> Stats {
-        Stats { counts: HashMap::new(), total_traces: 0}
+        Default::default()
     }
 
     fn inc_self(&mut self, name: String) {
