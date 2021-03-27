@@ -6,7 +6,6 @@ use std::time::SystemTime;
 use crate::core::types::{Pid, StackTrace, StackFrame};
 
 use failure::{Error};
-use serde_json;
 
 /*
  * This file contains code to export rbspy profiles for use in https://speedscope.app

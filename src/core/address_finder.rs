@@ -164,9 +164,7 @@ mod os_impl {
     use proc_maps::{MapRange, get_process_maps};
     use remoteprocess::ProcessMemory;
 
-    use elf;
     use failure::{Error, ResultExt};
-    use std;
 
     pub fn get_vm_address(pid: Pid, version: &str) -> Result<usize, Error> {
         let proginfo = &get_program_info(pid)?;

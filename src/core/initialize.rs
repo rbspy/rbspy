@@ -11,7 +11,6 @@ use failure::Fail;
 use libc::c_char;
 
 use std::time::Duration;
-use std;
 
 /**
  * Initialization code for the profiler.
