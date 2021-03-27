@@ -61,7 +61,7 @@ impl StackTraceGetter {
             },
             Err(MemoryCopyError::InvalidAddressError(addr))
                 if addr == self.current_thread_addr_location => {}
-            Err(e) => Err(e)?,
+            Err(e) => return Err(e.into()),
         }
         debug!("Thread address location invalid, reinitializing");
         self.reinitialize()?;

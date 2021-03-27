@@ -105,7 +105,7 @@ impl From<Context<usize>> for MemoryCopyError {
             return MemoryCopyError::PermissionDenied;
         }
 
-        return match error.raw_os_error() {
+        match error.raw_os_error() {
             // Sometimes Windows returns this error code
             Some(0) => MemoryCopyError::OperationSucceeded,
             /* On Mac, 60 seems to correspond to the process ended */
@@ -135,7 +135,7 @@ impl ProcessRetry for remoteprocess::Process {
                 Ok(p) => return Ok(p),
                 Err(e) => {
                     if retries == 0 {
-                        return Err(Error::from(e));
+                        return Err(e);
                     }
                     std::thread::sleep(retry_interval);
                     retries -= 1;

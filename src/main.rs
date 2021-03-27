@@ -356,7 +356,7 @@ impl SampleTime {
 
 /// Start thread(s) recording a PID and possibly its children. Tracks new processes
 /// Returns a pair of Receivers from which you can consume recorded stacktraces and errors
-fn spawn_recorder_children(pid: Pid, with_subprocesses: bool, sample_rate: u32, maybe_stop_time: Option<Instant>) -> Result<(Receiver<StackTrace>, Receiver<Result<(), Error>>, Arc<AtomicUsize>, Arc<AtomicUsize>), Error> {
+fn spawn_recorder_children(pid: Pid, with_subprocesses: bool, sample_rate: u32, maybe_stop_time: Option<Instant>) -> (Receiver<StackTrace>, Receiver<Result<(), Error>>, Arc<AtomicUsize>, Arc<AtomicUsize>) {
     let done = Arc::new(AtomicBool::new(false));
     let total_traces = Arc::new(AtomicUsize::new(0));
     let timing_error_traces = Arc::new(AtomicUsize::new(0));
@@ -397,15 +397,14 @@ fn spawn_recorder_children(pid: Pid, with_subprocesses: bool, sample_rate: u32, 
             // sender channels won't get closed and rbspy will hang. So we check the done
             // mutex.
             while !done_clone.load(Ordering::Relaxed) {
-                let descendents = process.child_processes()
-                    .and_then(|tuples| {
-                        let mut children: Vec<Pid> = tuples.into_iter()
-                            .map(|x| x.0).collect();
-
-                        children.push(pid);
-
-                        Ok(children)
-                    }).expect("Error finding descendents of pid");
+                let mut descendents: Vec<Pid> = process.child_processes()
+                    .expect("Error finding descendents of pid")
+                    .into_iter()
+                    .map(|tuple| {
+                        tuple.0
+                    })
+                    .collect();
+                descendents.push(pid);
 
                 for pid in descendents {
                     if pids.contains(&pid) {
@@ -437,9 +436,6 @@ fn spawn_recorder_children(pid: Pid, with_subprocesses: bool, sample_rate: u32, 
         });
     } else {
         // Start a single recorder thread
-        let done = done.clone();
-        let timing_error_traces = timing_error_traces.clone();
-        let total_traces = total_traces.clone();
         std::thread::spawn(move || {
             let result = record(
                 pid,
@@ -454,7 +450,7 @@ fn spawn_recorder_children(pid: Pid, with_subprocesses: bool, sample_rate: u32, 
             drop(error_sender);
         });
     }
-    Ok((trace_receiver, result_receiver, total_traces_clone, timing_error_traces_clone))
+    (trace_receiver, result_receiver, total_traces_clone, timing_error_traces_clone)
 }
 
 #[test]
@@ -488,7 +484,7 @@ fn test_spawn_record_children_subprocesses() {
     let pid = process.id() as Pid;
 
     let (trace_receiver, result_receiver, _, _) =
-        spawn_recorder_children(pid, true, 5, None).unwrap();
+        spawn_recorder_children(pid, true, 5, None);
 
     let mut pids = HashSet::<Pid>::new();
     for trace in &trace_receiver {
@@ -546,7 +542,7 @@ fn parallel_record(
         None => None
     };
 
-    let (trace_receiver, result_receiver, total_traces, timing_error_traces) = spawn_recorder_children(pid, with_subprocesses, sample_rate, maybe_stop_time)?;
+    let (trace_receiver, result_receiver, total_traces, timing_error_traces) = spawn_recorder_children(pid, with_subprocesses, sample_rate, maybe_stop_time);
 
     // Aggregate stack traces as we receive them from the threads that are collecting them
     // Aggregate to 3 places: the raw output (`.raw.gz`), some summary statistics we display live,

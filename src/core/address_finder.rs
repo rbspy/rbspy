@@ -260,7 +260,7 @@ mod os_impl {
         let read_addr = map.start() + bss_section.addr as usize - load_header.vaddr as usize;
 
         debug!("read_addr: {:x}", read_addr);
-        let process = Process::new(proginfo.pid).unwrap();
+        let process = Process::new(proginfo.pid)?;
         let mut data = process.copy(read_addr as usize, bss_section.size as usize)
             .context(read_addr as usize)?;
         debug!("successfully read data");
@@ -321,7 +321,7 @@ mod os_impl {
             if let Some(addr) = elf_symbol_value(&self.ruby_elf, symbol_name).map(|addr| {
                 let load_header = elf_load_header(&self.ruby_elf);
                 debug!("load header: {}", load_header);
-                &self.ruby_map.start() + addr - load_header.vaddr as usize
+                self.ruby_map.start() + addr - load_header.vaddr as usize
             }) {
                 return Ok(addr)
             }
@@ -337,7 +337,7 @@ mod os_impl {
                 let load_header = elf_load_header(libruby_elf);
                 debug!("load header: {}", load_header);
                 libruby_map.start() + addr - load_header.vaddr as usize
-            }).ok_or(format_err!("Could not find address for symbol {}", symbol_name))
+            }).ok_or_else(|| format_err!("Could not find address for symbol {}", symbol_name))
         }
     }
 
