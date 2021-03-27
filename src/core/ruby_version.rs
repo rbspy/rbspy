@@ -861,7 +861,7 @@ macro_rules! get_cfunc_name(
             let mut ids_len = unsafe { ids.as_.heap.len as usize };
             if (flags & ruby_fl_type_RUBY_FL_USER1 as usize) > 0 {
                 ids_ptr = unsafe { ids.as_.ary[0] as usize };
-                ids_len = ((flags & (ruby_fl_type_RUBY_FL_USER3|ruby_fl_type_RUBY_FL_USER4) as usize) >> (ruby_fl_type_RUBY_FL_USHIFT+3));
+                ids_len = (flags & (ruby_fl_type_RUBY_FL_USER3|ruby_fl_type_RUBY_FL_USER4) as usize) >> (ruby_fl_type_RUBY_FL_USHIFT+3);
             }
             if idx >= ids_len {
                 return Err(format_err!("Invalid index in IDs array"));
