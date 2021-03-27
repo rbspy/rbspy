@@ -29,8 +29,7 @@ pub enum AddressFinderError {
 mod os_impl {
     use crate::core::address_finder::AddressFinderError;
     use crate::core::initialize::IsMaybeThreadFn;
-    use crate::core::types::{Process, Pid};
-    use remoteprocess::ProcessMemory;
+    use crate::core::types::Pid;
 
     use proc_maps::mac_maps::{get_symbols, Symbol, get_dyld_info, DyldInfo};
 
