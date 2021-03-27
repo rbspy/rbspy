@@ -193,7 +193,7 @@ fn test_initialize_with_nonexistent_process() {
     let version = get_ruby_version_retry(&process);
     match version
         .unwrap_err()
-        .root_cause()
+        .find_root_cause()
         .downcast_ref::<AddressFinderError>()
         .unwrap() {
         &AddressFinderError::NoSuchProcess(10000) => {}
@@ -208,7 +208,7 @@ fn test_initialize_with_disallowed_process() {
     let version = get_ruby_version_retry(&process);
     match version
         .unwrap_err()
-        .root_cause()
+        .find_root_cause()
         .downcast_ref::<AddressFinderError>()
         .unwrap() {
         &AddressFinderError::PermissionDenied(1) => {}
@@ -231,7 +231,7 @@ fn test_current_thread_address() {
 
     let is_maybe_thread = is_maybe_thread_function(&version);
     let result = address_finder::current_thread_address(pid, &version, is_maybe_thread);
-    assert!(result.is_ok(), format!("result not ok: {:?}", result));
+    result.expect("unexpected error");
     process.kill().unwrap();
 }
 
