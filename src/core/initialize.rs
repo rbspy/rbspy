@@ -148,6 +148,7 @@ fn get_ruby_version_retry(process: &Process) -> Result<String, Error> {
             #[allow(deprecated)] // apparently root_cause() is deprecated, TODO fix it at some point
             Err(err) => {
                 match err.root_cause().downcast_ref::<AddressFinderError>() {
+                    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
                     Some(&AddressFinderError::PermissionDenied(_)) => {
                         return Err(err.into());
                     }
@@ -155,6 +156,7 @@ fn get_ruby_version_retry(process: &Process) -> Result<String, Error> {
                     Some(&AddressFinderError::MacPermissionDenied(_)) => {
                         return Err(err.into());
                     }
+                    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
                     Some(&AddressFinderError::NoSuchProcess(_)) => {
                         return Err(err.into());
                     }

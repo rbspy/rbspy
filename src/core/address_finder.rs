@@ -11,13 +11,18 @@ use crate::core::types::Pid;
 
 #[derive(Fail, Debug)]
 pub enum AddressFinderError {
-    #[fail(display = "No process with PID: {}", _0)] NoSuchProcess(Pid),
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+    #[fail(display = "No process with PID: {}", _0)]
+    NoSuchProcess(Pid),
     #[fail(display = "Permission denied when reading from process {}. If you're not running as root, try again with sudo. If you're using Docker, try passing `--cap-add=SYS_PTRACE` to `docker run`", _0)]
+    #[cfg(not(target_os = "macos"))]
     PermissionDenied(Pid),
     #[fail(display = "Couldn't get port for PID {}. Possibilities: that process doesn't exist or you have SIP enabled and you're trying to profile system Ruby (try rbenv instead).", _0)]
     #[cfg(target_os = "macos")]
     MacPermissionDenied(Pid),
-    #[fail(display = "Error reading /proc/{}/maps", _0)] ProcMapsError(Pid),
+    #[fail(display = "Error reading /proc/{}/maps", _0)]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+    ProcMapsError(Pid),
 }
 
 #[cfg(target_os = "macos")]
