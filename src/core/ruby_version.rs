@@ -435,9 +435,15 @@ macro_rules! get_ruby_string_array_2_5_0(
             // the reason I am not checking is that I don't know how to check yet
             let path_addr: usize = unsafe { rarray.as_.ary[0] as usize }; // 1 means get the absolute path, not the relative path
             let abs_path_addr: usize = unsafe { rarray.as_.ary[1] as usize }; // 1 means get the absolute path, not the relative path
-            Ok((get_ruby_string(path_addr, source)?, get_ruby_string(abs_path_addr, source)?))
+            let rel_path = get_ruby_string(path_addr, source)?;
+            // In the case of internal ruby functions (and maybe others), we may not get a valid
+            // pointer here
+            let abs_path = get_ruby_string(abs_path_addr, source)
+                .unwrap_or(String::from("unknown"));
+            Ok((rel_path, abs_path))
         }
-        ));
+    )
+);
 
 macro_rules! get_ruby_string(
     () => (
