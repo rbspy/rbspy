@@ -12,7 +12,7 @@ use crate::core::types::Pid;
 #[derive(Fail, Debug)]
 pub enum AddressFinderError {
     #[fail(display = "No process with PID: {}", _0)]
-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+    #[cfg(not(target_os = "macos"))]
     NoSuchProcess(Pid),
     #[fail(display = "Permission denied when reading from process {}. If you're not running as root, try again with sudo. If you're using Docker, try passing `--cap-add=SYS_PTRACE` to `docker run`", _0)]
     #[cfg(not(target_os = "macos"))]
@@ -21,7 +21,7 @@ pub enum AddressFinderError {
     #[cfg(target_os = "macos")]
     MacPermissionDenied(Pid),
     #[fail(display = "Error reading /proc/{}/maps", _0)]
-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+    #[cfg(not(target_os = "macos"))]
     ProcMapsError(Pid),
 }
 
@@ -399,6 +399,7 @@ mod os_impl {
 #[cfg(windows)]
 mod os_impl {
     use failure::Error;
+    use crate::core::address_finder::AddressFinderError;
     use crate::core::initialize::IsMaybeThreadFn;
     use proc_maps::{get_process_maps, MapRange, Pid};
     use proc_maps::win_maps::SymbolLoader;
@@ -443,7 +444,11 @@ mod os_impl {
     }
 
     fn get_symbol_address(pid: u32, symbol_name: &str) -> Result<usize, Error> {
-        let maps = get_process_maps(pid)?;
+        let maps = get_process_maps(pid).map_err(|e| match e.kind() {
+            std::io::ErrorKind::NotFound => AddressFinderError::NoSuchProcess(pid),
+            std::io::ErrorKind::PermissionDenied => AddressFinderError::PermissionDenied(pid),
+            _ => AddressFinderError::ProcMapsError(pid),
+        })?;
         let ruby = get_ruby_binary(&maps)?;
         if let Some(ref filename) = ruby.filename() {
             let handler = SymbolLoader::new(pid as Pid)?;
