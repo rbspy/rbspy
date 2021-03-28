@@ -11,8 +11,8 @@ use crate::core::types::Pid;
 
 #[derive(Fail, Debug)]
 pub enum AddressFinderError {
-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     #[fail(display = "No process with PID: {}", _0)]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     NoSuchProcess(Pid),
     #[fail(display = "Permission denied when reading from process {}. If you're not running as root, try again with sudo. If you're using Docker, try passing `--cap-add=SYS_PTRACE` to `docker run`", _0)]
     #[cfg(not(target_os = "macos"))]

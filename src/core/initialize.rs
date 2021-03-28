@@ -7,7 +7,6 @@ use crate::core::types::{MemoryCopyError, Pid, Process, ProcessRetry,
 
 use failure::Error;
 use failure::ResultExt;
-use failure::Fail;
 use libc::c_char;
 
 use std::time::Duration;
@@ -137,33 +136,31 @@ fn get_ruby_version_retry(process: &Process) -> Result<String, Error> {
      */
     let mut i = 0;
     loop {
-        let version = get_ruby_version(process)
-            .context("Couldn't create process handle for PID");
+        let version = get_ruby_version(process);
 
         if i > 100 {
             return Ok(version?);
         }
         match version {
-            #[allow(deprecated)] // apparently root_cause() is deprecated, TODO fix it at some point
             Err(err) => {
-                match err.root_cause().downcast_ref::<AddressFinderError>() {
-                    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+                match err.find_root_cause().downcast_ref::<AddressFinderError>() {
+                    #[cfg(not(target_os = "macos"))]
                     Some(&AddressFinderError::PermissionDenied(_)) => {
-                        return Err(err.into());
+                        return Err(err);
                     }
                     #[cfg(target_os = "macos")]
                     Some(&AddressFinderError::MacPermissionDenied(_)) => {
-                        return Err(err.into());
+                        return Err(err);
                     }
                     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
                     Some(&AddressFinderError::NoSuchProcess(_)) => {
-                        return Err(err.into());
+                        return Err(err);
                     }
                     _ => {}
                 }
                 if let Some(&MemoryCopyError::PermissionDenied) =
-                    err.root_cause().downcast_ref::<MemoryCopyError>() {
-                        return Err(err.into());
+                    err.find_root_cause().downcast_ref::<MemoryCopyError>() {
+                        return Err(err);
                 }
             }
             Ok(x) => {

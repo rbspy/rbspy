@@ -181,7 +181,10 @@ fn do_main() -> Result<(), Error> {
                         }
                     }
                     #[cfg(windows)]
-                    { Command::new(prog).args(args).spawn()?.id() as Pid }
+                    { 
+                        let _ = no_drop_root;
+                        Command::new(prog).args(args).spawn()?.id() as Pid 
+                    }
                 }
             };
 
@@ -269,7 +272,7 @@ fn test_is_wow64_process() {
 
         let result = is_wow64_process(cmd.id());
 
-        cmd.kill();
+        cmd.kill().expect("command wasn't running or couldn't be killed");
 
         result.unwrap()
     }).collect();
