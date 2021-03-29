@@ -3,7 +3,6 @@ use std::io::BufReader;
 use crate::core::types::{Header, StackTrace, StackFrame};
 
 use failure::Error;
-use serde_json;
 
 use super::*;
 

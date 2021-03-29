@@ -24,7 +24,6 @@ use crate::core::types::StackTrace;
 
 use self::flate2::Compression;
 use failure::Error;
-use serde_json;
 
 mod v0;
 mod v1;

@@ -7,15 +7,14 @@ use crate::core::types::StackFrame;
 use failure::Error;
 use inferno::flamegraph::{Direction, Options};
 
+#[derive(Default)]
 pub struct Stats {
     pub counts: HashMap<String, usize>,
 }
 
 impl Stats {
     pub fn new() -> Stats {
-        Stats {
-            counts: HashMap::new(),
-        }
+        Default::default()
     }
 
     pub fn record(&mut self, stack: &[StackFrame]) -> Result<(), io::Error> {

@@ -8,17 +8,17 @@ struct Counts {
     total: u64,
 }
 
+#[derive(Default)]
 pub struct Stats {
     counts: HashMap<String, Counts>,
     total_traces: u32,
 }
 
-
 impl Stats {
     const HEADER: &'static str = "% self  % total  name";
 
     pub fn new() -> Stats {
-        Stats { counts: HashMap::new(), total_traces: 0}
+        Default::default()
     }
 
     fn inc_self(&mut self, name: String) {
@@ -81,7 +81,7 @@ impl Stats {
         let top = top.unwrap_or(::std::usize::MAX);
         let truncate = truncate.unwrap_or(::std::usize::MAX);
         let mut sorted: Vec<(u64, u64, &str)> = self.counts.iter().map(|(x,y)| (y.self_, y.total, x.as_ref())).collect();
-        sorted.sort();
+        sorted.sort_unstable();
         let counts = sorted.iter().rev().take(top);
         writeln!(w, "{}", Stats::HEADER)?;
         for &(self_, total, name) in counts {

@@ -6,7 +6,6 @@ use std::time::SystemTime;
 use crate::core::types::{Pid, StackTrace, StackFrame};
 
 use failure::{Error};
-use serde_json;
 
 /*
  * This file contains code to export rbspy profiles for use in https://speedscope.app
@@ -144,6 +143,7 @@ impl Frame {
     }
 }
 
+#[derive(Default)]
 pub struct Stats {
     samples: HashMap<Option<Pid>, Vec<Vec<usize>>>,
     frames: Vec<Frame>,
@@ -154,13 +154,7 @@ pub struct Stats {
 
 impl Stats {
     pub fn new() -> Stats {
-        Stats {
-            samples: HashMap::new(),
-            frames: vec![],
-            frame_to_index: HashMap::new(),
-            weights: vec![],
-            prev_time: None
-        }
+        Default::default()
     }
 
     pub fn record(&mut self, stack: &StackTrace) -> Result<(), failure::Error> {

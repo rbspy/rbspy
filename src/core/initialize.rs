@@ -7,11 +7,9 @@ use crate::core::types::{MemoryCopyError, Pid, Process, ProcessRetry,
 
 use failure::Error;
 use failure::ResultExt;
-use failure::Fail;
 use libc::c_char;
 
 use std::time::Duration;
-use std;
 
 /**
  * Initialization code for the profiler.
@@ -62,7 +60,7 @@ impl StackTraceGetter {
             },
             Err(MemoryCopyError::InvalidAddressError(addr))
                 if addr == self.current_thread_addr_location => {}
-            Err(e) => Err(e)?,
+            Err(e) => return Err(e.into()),
         }
         debug!("Thread address location invalid, reinitializing");
         self.reinitialize()?;
@@ -138,31 +136,31 @@ fn get_ruby_version_retry(process: &Process) -> Result<String, Error> {
      */
     let mut i = 0;
     loop {
-        let version = get_ruby_version(process)
-            .context("Couldn't create process handle for PID");
+        let version = get_ruby_version(process);
 
         if i > 100 {
             return Ok(version?);
         }
         match version {
-            #[allow(deprecated)] // apparently root_cause() is deprecated, TODO fix it at some point
             Err(err) => {
-                match err.root_cause().downcast_ref::<AddressFinderError>() {
+                match err.find_root_cause().downcast_ref::<AddressFinderError>() {
+                    #[cfg(not(target_os = "macos"))]
                     Some(&AddressFinderError::PermissionDenied(_)) => {
-                        return Err(err.into());
+                        return Err(err);
                     }
                     #[cfg(target_os = "macos")]
                     Some(&AddressFinderError::MacPermissionDenied(_)) => {
-                        return Err(err.into());
+                        return Err(err);
                     }
+                    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
                     Some(&AddressFinderError::NoSuchProcess(_)) => {
-                        return Err(err.into());
+                        return Err(err);
                     }
                     _ => {}
                 }
                 if let Some(&MemoryCopyError::PermissionDenied) =
-                    err.root_cause().downcast_ref::<MemoryCopyError>() {
-                        return Err(err.into());
+                    err.find_root_cause().downcast_ref::<MemoryCopyError>() {
+                        return Err(err);
                 }
             }
             Ok(x) => {
@@ -192,7 +190,7 @@ fn test_initialize_with_nonexistent_process() {
     let version = get_ruby_version_retry(&process);
     match version
         .unwrap_err()
-        .root_cause()
+        .find_root_cause()
         .downcast_ref::<AddressFinderError>()
         .unwrap() {
         &AddressFinderError::NoSuchProcess(10000) => {}
@@ -207,7 +205,7 @@ fn test_initialize_with_disallowed_process() {
     let version = get_ruby_version_retry(&process);
     match version
         .unwrap_err()
-        .root_cause()
+        .find_root_cause()
         .downcast_ref::<AddressFinderError>()
         .unwrap() {
         &AddressFinderError::PermissionDenied(1) => {}
@@ -230,7 +228,7 @@ fn test_current_thread_address() {
 
     let is_maybe_thread = is_maybe_thread_function(&version);
     let result = address_finder::current_thread_address(pid, &version, is_maybe_thread);
-    assert!(result.is_ok(), format!("result not ok: {:?}", result));
+    result.expect("unexpected error");
     process.kill().unwrap();
 }
 
