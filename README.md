@@ -79,9 +79,3 @@ Here are the steps for maintainers to tag a new release:
 1. Open a PR for the version bump. You can generate a CHANGELOG via `git log --pretty='- %s' v0.3.10...HEAD`.
 1. After the PR is merged, tag the new release, e.g. `git tag v0.3.11`, and push it: `git push --tags`.
 1. Travis will publish the tarballs to GitHub.
-
-## Contributors
-
-* [Julia Evans](https://github.com/jvns)
-* [Kamal Marhubi](https://github.com/kamalmarhubi)
-* [Joel Johnson](https://github.com/liaden/)
