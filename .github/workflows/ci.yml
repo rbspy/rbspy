@@ -51,7 +51,7 @@ jobs:
       run: |
         rustup target add ${{ matrix.target }}
     - name: Cargo Cache
-      uses: actions/cache@v2
+      uses: actions/cache@v2.1.4
       with:
         path: |
           ~/.cargo/registry
@@ -119,7 +119,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Cargo Cache
-      uses: actions/cache@v2
+      uses: actions/cache@v2.1.4
       with:
         path: |
           ~/.cargo/registry
