@@ -8,8 +8,8 @@ on:
   schedule:
   - cron: '00 01 * * *'
 jobs:
-  test:
-    name: test
+  build:
+    name: Build, test, and upload binaries
     env:
       CARGO: cargo
       TARGET_FLAGS: --target ${{ matrix.target }}
