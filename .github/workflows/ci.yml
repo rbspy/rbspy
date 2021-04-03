@@ -142,7 +142,7 @@ jobs:
         path: rbspy-${{ matrix.target }}
 
   release:
-    name: Release
+    name: Publish release
     runs-on: ubuntu-latest
     if: "startsWith(github.ref, 'refs/tags/')"
     needs: [build-linux-cross, build]
