@@ -149,19 +149,23 @@ jobs:
     steps:
       - uses: actions/download-artifact@v2
         with:
-          path: artifacts
+          path: raw-artifacts
       - name: Prepare binary archives
         run: |
           set -euo pipefail
 
+          mkdir staging
+          mv $(find raw-artifacts -type f | xargs) staging
+
           mkdir archives
-          for target in $(ls artifacts); do
-            if [ -f "artifacts/$target/release/rbspy" ]; then
-              echo "Found unix binary for target $target"
-              tar czf -C $target archives/rbspy-$target.tar.gz --skip-components=2 artifacts/$target/release/rbspy
-            else
+          cd staging
+          for target in $(ls); do
+            if echo "$target" | grep -q ".exe" 2>/dev/null; then
               echo "Found Windows binary for target $target"
-              zip -j archives/rbspy-$target.zip artifacts/$target/release/rbspy.exe
+              zip -j ../archives/$target.zip $target
+            else
+              echo "Found unix binary for target $target"
+              tar czf ../archives/$target.tar.gz $target
             fi
           done
 
