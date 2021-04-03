@@ -5,6 +5,8 @@ on:
   push:
     branches:
     - master
+    tags:
+    - v*
   schedule:
   - cron: '00 01 * * *'
 jobs:
@@ -135,6 +137,22 @@ jobs:
         name: rbspy-${{ matrix.target }}.tar.gz
         path: rbspy-${{ matrix.target }}.tar.gz
 
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: "startsWith(github.ref, 'refs/tags/')"
+    needs: [build-linux-cross, build]
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          path: artifacts
+      - uses: "marvinpinto/action-automatic-releases@v1.1.1"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          draft: true
+          prerelease: false
+          files: |
+            artifacts/*/rbspy-*
 
 # TODO: maybe add this later if we decide to make rustfmt actually pass
 #  rustfmt:
