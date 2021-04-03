@@ -1,6 +1,6 @@
 # rbspy
 
-<a href="https://travis-ci.org/rbspy/rbspy"><img src="https://travis-ci.org/rbspy/rbspy.svg"></a>
+[![ci](https://github.com/rbspy/rbspy/actions/workflows/ci.yml/badge.svg)](https://github.com/rbspy/rbspy/actions/workflows/ci.yml)
 
 <img src="https://rbspy.github.io/rbspy.jpg" width="128px">
 
