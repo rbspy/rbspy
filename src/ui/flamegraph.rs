@@ -29,10 +29,8 @@ impl Stats {
     pub fn write(&self, w: File) -> Result<(), Error> {
         let lines: Vec<String> = self.counts.iter().map(|(k, v)| format!("{} {}", k, v)).collect();
 
-        let mut opts =  Options {
-            direction: Direction::Inverted,
-            ..Default::default()
-        };
+        let mut opts = Options::default();
+        opts.direction = Direction::Inverted;
 
         inferno::flamegraph::from_lines(&mut opts, lines.iter().map(|x| x.as_str()), w).unwrap();
         Ok(())

@@ -22,10 +22,10 @@ clap = "2"
 ctrlc = "3.1.0"
 elf = "0.0.10"
 log = "0.4.6"
-env_logger = "0.6.1"
-rand = "0.6"
-inferno = "0.9.0"
-failure = "0.1.5"
+env_logger = "0.8.3"
+rand = "0.8.3"
+inferno = "0.10.3"
+failure = "0.1.8"
 failure_derive = "0.1.5"
 flate2 = "1"
 libc = "0.2.34"
@@ -39,10 +39,10 @@ term_size = "0.3"
 tempdir = "0.3"
 
 [target.'cfg(unix)'.dependencies]
-nix = "0.13.0"
+nix = "0.20.0"
 
 [target.'cfg(target_os="macos")'.dependencies]
-libproc = "0.4.0"
+libproc = "0.9.1"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["timeapi", "wow64apiset"] }
@@ -53,4 +53,4 @@ rbspy-testdata = { git = "https://github.com/rbspy/rbspy-testdata", branch = "ma
 tempdir = "0.3.4"
 
 [build-dependencies]
-rustc_version = "0.2.3"
+rustc_version = "0.3.3"

@@ -41,7 +41,7 @@ use chrono::prelude::*;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use failure::Error;
 use failure::ResultExt;
-use rand::{thread_rng, Rng};
+use rand::Rng;
 use rand::distributions::Alphanumeric;
 
 use std::collections::HashSet;
@@ -731,14 +731,14 @@ fn test_output_filename() {
 }
 
 fn output_filename(base_dir: &str, maybe_filename: Option<&str>, extension: &str) -> Result<PathBuf, Error> {
-    let mut rng = thread_rng();
-
     let path = match maybe_filename {
         Some(filename) => filename.into(),
         None => {
-            let s = ::std::iter::repeat(()).map(|()| rng.sample(Alphanumeric))
+            let s: String = rand::thread_rng()
+                .sample_iter(&Alphanumeric)
                 .take(10)
-                .collect::<String>();
+                .map(char::from)
+                .collect();
             let filename = format!("{}-{}-{}.{}", "rbspy", Utc::now().format("%Y-%m-%d"), s, extension);
             let dirname = Path::new(base_dir).join(".cache").join("rbspy").join("records");
             DirBuilder::new().recursive(true).create(&dirname)?;
