@@ -66,27 +66,27 @@ jobs:
     - name: Build rbspy
       run: ${{ env.CARGO }} build --release --verbose --all ${{ env.TARGET_FLAGS }}
 
-    - name: Prepare Binary Archives
+    - name: Prepare binary for upload
       if: runner.os != 'windows'
       run: |
-        tar czf rbspy-${{ matrix.target }}.tar.gz --strip-components=3 target/*/release/rbspy
-    - name: Prepare Binary Archives
+        cp target/${{ matrix.target }}/release/rbspy rbspy-${{ matrix.target }}
+    - name: Prepare binary for upload
       if: runner.os == 'windows'
       run: |
-        zip -j rbspy-${{ matrix.target }}.zip target/*/release/rbspy.exe
+        copy target/${{ matrix.target }}/release/rbspy.exe rbspy-${{ matrix.target }}.exe
 
     - name: Upload Linux and macOS Binaries
       if: runner.os != 'windows'
       uses: actions/upload-artifact@v2
       with:
-        name: rbspy-${{ matrix.target }}.tar.gz
-        path: rbspy-${{ matrix.target }}.tar.gz
+        name: rbspy-${{ matrix.target }}
+        path: rbspy-${{ matrix.target }}
     - name: Upload Windows Binaries
       if: runner.os == 'windows'
       uses: actions/upload-artifact@v2
       with:
-        name: rbspy-${{ matrix.target }}.zip
-        path: rbspy-${{ matrix.target }}.zip
+        name: rbspy-${{ matrix.target }}.exe
+        path: rbspy-${{ matrix.target }}.exe
 
     - name: Run tests
       timeout-minutes: 5
@@ -128,14 +128,14 @@ jobs:
         key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: Build
       run: cargo build --release
-    - name: Prepare Binary Archives
+    - name: Prepare binary for upload
       run: |
-        tar czf rbspy-${{ matrix.target }}.tar.gz --strip-components=3 target/*/release/rbspy
+        cp target/*/release/rbspy rbspy-${{ matrix.target }}
     - name: Upload Binaries
       uses: actions/upload-artifact@v2
       with:
-        name: rbspy-${{ matrix.target }}.tar.gz
-        path: rbspy-${{ matrix.target }}.tar.gz
+        name: rbspy-${{ matrix.target }}
+        path: rbspy-${{ matrix.target }}
 
   release:
     name: Release
@@ -146,13 +146,28 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           path: artifacts
+      - name: Prepare binary archives
+        run: |
+          set -euo pipefail
+
+          mkdir archives
+          for target in $(ls artifacts); do
+            if [ -f "artifacts/$target/release/rbspy" ]; then
+              echo "Found unix binary for target $target"
+              tar czf -C $target archives/rbspy-$target.tar.gz --skip-components=2 artifacts/$target/release/rbspy
+            else
+              echo "Found Windows binary for target $target"
+              zip -j archives/rbspy-$target.zip artifacts/$target/release/rbspy.exe
+            fi
+          done
+
       - uses: "marvinpinto/action-automatic-releases@v1.1.1"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           draft: true
           prerelease: false
           files: |
-            artifacts/*/rbspy-*
+            archives/*
 
 # TODO: maybe add this later if we decide to make rustfmt actually pass
 #  rustfmt:
