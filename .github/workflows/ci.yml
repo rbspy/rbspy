@@ -58,6 +58,8 @@ jobs:
           ~/.cargo/git
           target
         key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.target }}-cargo-
     - name: Show command used for Cargo
       run: |
         echo "cargo command is: ${{ env.CARGO }}"
@@ -126,6 +128,8 @@ jobs:
           ~/.cargo/git
           target
         key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.target }}-cargo-
     - name: Build
       run: cargo build --release
     - name: Prepare binary for upload
