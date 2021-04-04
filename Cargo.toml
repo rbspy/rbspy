@@ -27,7 +27,7 @@ rand = "0.8.3"
 inferno = "0.10.3"
 failure = "0.1.8"
 failure_derive = "0.1.5"
-flate2 = "1"
+flate2 = "1.0.20"
 libc = "0.2.34"
 proc-maps = "0.1.7"
 rbspy-ruby-structs = { path = "ruby-structs", version="0.4.0" }
@@ -48,7 +48,7 @@ libproc = "0.9.1"
 winapi = { version = "0.3", features = ["timeapi", "wow64apiset"] }
 
 [dev-dependencies]
-byteorder = "1.3.1"
+byteorder = "1.4.3"
 rbspy-testdata = { git = "https://github.com/rbspy/rbspy-testdata", branch = "master" }
 tempdir = "0.3.4"
 
