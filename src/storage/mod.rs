@@ -10,7 +10,8 @@
 ///
 /// The use of b'\n' as a terminator effectively reserves a byte, and provides
 /// flexibility to go to a different version encoding scheme if this format
-/// changes _way_ to much.
+/// changes _way_ too much.
+extern crate anyhow;
 extern crate flate2;
 
 use std::io;
@@ -23,7 +24,9 @@ use crate::core::types::Header;
 use crate::core::types::StackTrace;
 
 use self::flate2::Compression;
-use failure::Error;
+
+use anyhow::{Error, Result};
+use thiserror::Error;
 
 mod v0;
 mod v1;
@@ -89,23 +92,23 @@ impl Version {
     }
 }
 
-#[derive(Fail, Debug)]
+#[derive(Error, Debug)]
 pub(crate) enum StorageError {
     /// The file doesn't begin with the magic tag `rbspy` + version number.
-    #[fail(display = "Invalid rbspy file")]
+    #[error("Invalid rbspy file")]
     Invalid,
     /// The version of the rbspy file can't be handled by this version of rbspy.
-    #[fail(display = "Cannot handle rbspy format {}", _0)]
+    #[error("Cannot handle rbspy format {}", _0)]
     UnknownVersion(Version),
     /// An IO error occurred.
-    #[fail(display = "IO error {:?}", _0)]
-    Io(#[cause] io::Error),
+    #[error("IO error {:?}", _0)]
+    Io(io::Error),
 }
 
 /// Types that can be deserialized from an `io::Read` into something convertible
 /// to the current internal form.
 pub(crate) trait Storage: Into<v2::Data> {
-    fn from_reader<R: Read>(r: R) -> Result<Self, Error>;
+    fn from_reader<R: Read>(r: R) -> Result<Self>;
     fn version() -> Version;
 }
 

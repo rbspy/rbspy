@@ -4,7 +4,7 @@ use std::fs::File;
 
 use crate::core::types::StackFrame;
 
-use failure::Error;
+use anyhow::Result;
 use inferno::flamegraph::{Direction, Options};
 
 #[derive(Default)]
@@ -26,7 +26,7 @@ impl Stats {
         Ok(())
     }
 
-    pub fn write(&self, w: File) -> Result<(), Error> {
+    pub fn write(&self, w: File) -> Result<()> {
         let lines: Vec<String> = self.counts.iter().map(|(k, v)| format!("{} {}", k, v)).collect();
 
         let mut opts = Options::default();

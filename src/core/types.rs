@@ -5,9 +5,10 @@ use std::fmt;
 use std::{self, convert::From};
 use std::time::SystemTime;
 
-use failure::Context;
+use anyhow::{Error, Result};
+use thiserror::Error;
 
-pub use remoteprocess::{Error, Process, Pid, ProcessMemory};
+pub use remoteprocess::{Process, Pid, ProcessMemory};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub(crate) struct Header {
@@ -32,19 +33,19 @@ pub struct StackTrace {
     pub time: Option<SystemTime>,
 }
 
-#[derive(Fail, Debug)]
+#[derive(Error, Debug)]
 pub enum MemoryCopyError {
-    #[fail(display = "The operation completed successfully")] OperationSucceeded,
-    #[fail(display = "Permission denied when reading from process. If you're not running as root, try again with sudo. If you're using Docker, try passing `--cap-add=SYS_PTRACE` to `docker run`")]
+    #[error("The operation completed successfully")] OperationSucceeded,
+    #[error("Permission denied when reading from process. If you're not running as root, try again with sudo. If you're using Docker, try passing `--cap-add=SYS_PTRACE` to `docker run`")]
 
     PermissionDenied,
-    #[fail(display = "Failed to copy memory address {:x}", _0)] Io(usize, #[cause] std::io::Error),
-    #[fail(display = "Process isn't running")] ProcessEnded,
-    #[fail(display = "Copy error: {}", _0)] Message(String),
-    #[fail(display = "Too much memory requested when copying: {}", _0)] RequestTooLarge(usize),
-    #[fail(display = "Tried to read invalid string")]
-    InvalidStringError(#[cause] std::string::FromUtf8Error),
-    #[fail(display = "Tried to read invalid memory address {:x}", _0)]
+    #[error("Failed to copy memory address {:x}", _0)] Io(usize, std::io::Error),
+    #[error("Process isn't running")] ProcessEnded,
+    #[error("Copy error: {}", _0)] Message(String),
+    #[error("Too much memory requested when copying: {}", _0)] RequestTooLarge(usize),
+    #[error("Tried to read invalid string")]
+    InvalidStringError(std::string::FromUtf8Error),
+    #[error("Tried to read invalid memory address {:x}", _0)]
     InvalidAddressError(usize),
 }
 
@@ -96,9 +97,9 @@ impl StackTrace {
     }
 }
 
-impl From<Context<usize>> for MemoryCopyError {
-    fn from(context: Context<usize>) -> Self {
-        let addr = *context.get_context();
+impl From<Error> for MemoryCopyError {
+    fn from(error: Error) -> Self {
+        let addr = *error.downcast_ref::<usize>().unwrap_or(&0);
         let error = std::io::Error::last_os_error();
 
         if error.kind() == std::io::ErrorKind::PermissionDenied {
@@ -120,14 +121,14 @@ impl From<Context<usize>> for MemoryCopyError {
     }
 }
 pub trait ProcessRetry {
-    fn new_with_retry(pid: Pid) -> Result<Process, Error>;
+    fn new_with_retry(pid: Pid) -> Result<Process>;
 }
 
 impl ProcessRetry for remoteprocess::Process {
     // It can take a moment for the ruby process to spin up, so new_with_retry automatically
     // retries for a few seconds. This delay mostly seems to affect macOS and Windows and is
     // especially common in CI environments.
-    fn new_with_retry(pid: Pid) -> Result<Process, Error> {
+    fn new_with_retry(pid: Pid) -> Result<Process> {
         let retry_interval = std::time::Duration::from_millis(10);
         let mut retries = 500;
         loop {
@@ -135,7 +136,7 @@ impl ProcessRetry for remoteprocess::Process {
                 Ok(p) => return Ok(p),
                 Err(e) => {
                     if retries == 0 {
-                        return Err(e);
+                        return Err(e)?;
                     }
                     std::thread::sleep(retry_interval);
                     retries -= 1;

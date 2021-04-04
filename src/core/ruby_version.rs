@@ -12,9 +12,9 @@ macro_rules! ruby_version_v_1_9_1(
     ($ruby_version:ident) => (
         pub mod $ruby_version {
             use std;
+            use anyhow::{Context, format_err, Result};
             use bindings::$ruby_version::*;
             use crate::core::types::ProcessMemory;
-            use failure::ResultExt;
 
             get_stack_trace!(rb_thread_struct);
             get_execution_context_from_thread!(rb_thread_struct);
@@ -36,9 +36,9 @@ macro_rules! ruby_version_v_1_9_2_to_3(
     ($ruby_version:ident) => (
         pub mod $ruby_version {
             use std;
+            use anyhow::{Context, format_err, Result};
             use bindings::$ruby_version::*;
             use crate::core::types::ProcessMemory;
-            use failure::ResultExt;
 
             get_stack_trace!(rb_thread_struct);
             get_execution_context_from_thread!(rb_thread_struct);
@@ -58,9 +58,9 @@ macro_rules! ruby_version_v_2_0_to_2_2(
     ($ruby_version:ident) => (
        pub mod $ruby_version {
            use std;
+           use anyhow::{Context, format_err, Result};
            use bindings::$ruby_version::*;
            use crate::core::types::ProcessMemory;
-           use failure::ResultExt;
 
             // These 4 functions are the
             // core of how the program works. They're essentially a straight port of
@@ -92,9 +92,9 @@ macro_rules! ruby_version_v_2_3_to_2_4(
     ($ruby_version:ident) => (
        pub mod $ruby_version {
            use std;
+           use anyhow::{Context, format_err, Result};
            use bindings::$ruby_version::*;
            use crate::core::types::ProcessMemory;
-           use failure::ResultExt;
 
             get_stack_trace!(rb_thread_struct);
             get_execution_context_from_thread!(rb_thread_struct);
@@ -114,10 +114,9 @@ macro_rules! ruby_version_v2_5_x(
     ($ruby_version:ident) => (
        pub mod $ruby_version {
            use std;
+           use anyhow::{Context, format_err, Result};
            use bindings::$ruby_version::*;
            use crate::core::types::ProcessMemory;
-           use failure::ResultExt;
-           use failure::Error;
 
             get_stack_trace!(rb_execution_context_struct);
             get_execution_context_from_thread!(rb_execution_context_struct);
@@ -141,10 +140,9 @@ macro_rules! ruby_version_v2_6_x(
     ($ruby_version:ident) => (
        pub mod $ruby_version {
            use std;
+           use anyhow::{Context, format_err, Result};
            use bindings::$ruby_version::*;
            use crate::core::types::ProcessMemory;
-           use failure::ResultExt;
-           use failure::Error;
 
             get_stack_trace!(rb_execution_context_struct);
             get_execution_context_from_thread!(rb_execution_context_struct);
@@ -168,10 +166,9 @@ macro_rules! ruby_version_v2_7_x(
     ($ruby_version:ident) => (
         pub mod $ruby_version {
             use std;
+            use anyhow::{Context, format_err, Result};
             use bindings::$ruby_version::*;
             use crate::core::types::ProcessMemory;
-            use failure::ResultExt;
-            use failure::Error;
 
             get_stack_trace!(rb_execution_context_struct);
             get_execution_context_from_thread!(rb_execution_context_struct);
@@ -192,10 +189,9 @@ macro_rules! ruby_version_v3_0_x(
     ($ruby_version:ident) => (
         pub mod $ruby_version {
             use std;
+            use anyhow::{Context, format_err, Result};
             use bindings::$ruby_version::*;
             use crate::core::types::ProcessMemory;
-            use failure::ResultExt;
-            use failure::Error;
 
             get_stack_trace!(rb_execution_context_struct);
             get_execution_context_from_vm!();
@@ -217,9 +213,15 @@ macro_rules! ruby_version_v3_0_x(
 
 macro_rules! get_execution_context_from_thread(
     ($thread_type:ident) => (
-        pub fn get_execution_context<T: ProcessMemory>(ruby_current_thread_address_location: usize, _ruby_vm_address_location: usize, source: &T) -> Result<$thread_type, Error> {
-            let current_thread_addr: usize = source.copy_struct(ruby_current_thread_address_location)?;
-            let thread: $thread_type = source.copy_struct(current_thread_addr)?;
+        pub fn get_execution_context<T: ProcessMemory>(
+            ruby_current_thread_address_location: usize, 
+            _ruby_vm_address_location: usize, 
+            source: &T
+        ) -> Result<$thread_type, MemoryCopyError> {
+            let current_thread_addr: usize = source.copy_struct(ruby_current_thread_address_location)
+                .context(ruby_current_thread_address_location)?;
+            let thread: $thread_type = source.copy_struct(current_thread_addr)
+                .context(current_thread_addr)?;
             Ok(thread)
         }
     )
@@ -231,7 +233,7 @@ macro_rules! get_execution_context_from_vm(
             _ruby_current_thread_address_location: usize, 
             ruby_vm_address_location: usize, 
             source: &T
-        ) -> Result<rb_execution_context_struct, Error> {
+        ) -> Result<rb_execution_context_struct, MemoryCopyError> {
             // This is a roundabout way to get the execution context address, but it helps us 
             // avoid platform-specific structures in memory (e.g. pthread types) that would
             // require us to maintain separate ruby-structs bindings for each platform due to
@@ -248,8 +250,10 @@ macro_rules! get_execution_context_from_vm(
             // is in the memory word just before main_thread (see rb_ractor_struct).
             const ADDRESSES_TO_CHECK: usize = 64;
             let initial_offset = 520; // Found through experiment
+            let main_ractor_address = vm.ractor.main_ractor as usize;
             let candidate_addresses: [usize; ADDRESSES_TO_CHECK] =
-                source.copy_struct(vm.ractor.main_ractor as usize + initial_offset)?;
+                source.copy_struct(main_ractor_address + initial_offset)
+                    .context(main_ractor_address)?;
             let matching_index =
                 candidate_addresses
                 .iter()
@@ -265,7 +269,6 @@ macro_rules! get_execution_context_from_vm(
 
 macro_rules! get_stack_trace(
     ($thread_type:ident) => (
-
         use crate::core::types::*;
         use crate::core::types::StackFrame;
 
@@ -321,7 +324,7 @@ macro_rules! get_stack_trace(
                 match label_path {
                     Ok(call)  => trace.push(call),
                     Err(x) => {
-                        debug!("Error: {}", x);
+                        debug!("Error: {:#?}", x);
                         debug!("cfp: {:?}", cfp);
                         debug!("thread: {:?}", thread);
                         debug!("iseq struct: {:?}", iseq_struct);
@@ -449,8 +452,10 @@ macro_rules! get_ruby_string(
     () => (
         use std::ffi::CStr;
 
-        fn get_ruby_string<T>(addr: usize, source: &T)
-                              -> Result<String, MemoryCopyError> where T: ProcessMemory {
+        fn get_ruby_string<T>(
+            addr: usize, 
+            source: &T
+        ) -> Result<String, MemoryCopyError> where T: ProcessMemory {
             let vec = {
                 let rstring: RString = source.copy_struct(addr)
                     .context(addr)?;
@@ -459,7 +464,7 @@ macro_rules! get_ruby_string(
                 if is_array {
                     unsafe { CStr::from_ptr(rstring.as_.ary.as_ref().as_ptr() as *const libc::c_char) }
                     .to_bytes()
-                        .to_vec()
+                    .to_vec()
                 } else {
                     unsafe {
                         let addr = rstring.as_.heap.ptr as usize;
@@ -768,44 +773,57 @@ macro_rules! get_cfps(
 
 macro_rules! get_cfunc_name_unsupported(
     () => (
-        fn get_cfunc_name<T: ProcessMemory>(_cfp: &rb_control_frame_t, _global_symbols_address: usize, _source: &T, _pid: Pid) -> Result<String, failure::Error> {
-            return Err(format_err!("C function resolution is not supported for this version of Ruby"));
+        fn get_cfunc_name<T: ProcessMemory>(_cfp: &rb_control_frame_t, _global_symbols_address: usize, _source: &T, _pid: Pid) -> Result<String, MemoryCopyError> {
+            return Err(format_err!("C function resolution is not supported for this version of Ruby").into());
         }
     )
 );
 
 macro_rules! get_cfunc_name(
     () => (
-
-        fn check_method_entry<T: ProcessMemory>(raw_imemo: usize, source: &T) -> Result<*const rb_method_entry_struct, failure::Error> {
-            let imemo: rb_method_entry_struct = source.copy_struct(raw_imemo)?;
+        fn check_method_entry<T: ProcessMemory>(
+            raw_imemo: usize, 
+            source: &T
+        ) -> Result<*const rb_method_entry_struct, MemoryCopyError> {
+            let imemo: rb_method_entry_struct = source.copy_struct(raw_imemo).context(raw_imemo)?;
 
             // These type constants are defined in ruby's internal/imemo.h
             #[allow(non_upper_case_globals)]
             match ((imemo.flags >> 12) & 0x07) as u32 {
                 imemo_type_imemo_ment => Ok(&imemo as *const rb_method_entry_struct),
                 imemo_type_imemo_svar => {
-                    let svar: vm_svar = source.copy_struct(raw_imemo)?;
+                    let svar: vm_svar = source.copy_struct(raw_imemo).context(raw_imemo)?;
                     check_method_entry(svar.cref_or_me, source)
                 },
                 _ => Ok(raw_imemo as *const rb_method_entry_struct)
             }
         }
 
-        fn get_cfunc_name<T: ProcessMemory>(cfp: &rb_control_frame_t, global_symbols_address: usize, source: &T, _pid: Pid) -> Result<String, Error> {
+        fn get_cfunc_name<T: ProcessMemory>(
+            cfp: &rb_control_frame_t, 
+            global_symbols_address: usize, 
+            source: &T, 
+            _pid: Pid
+        ) -> Result<String, MemoryCopyError> {
             // The logic in this function is adapted from the .gdbinit script in 
             // github.com/ruby/ruby, in particular the print_id function.
 
             let mut ep = cfp.ep as *mut usize;
-            let frame_flag: usize = unsafe { source.copy_struct(ep.offset(0) as usize)? };
+            let frame_flag: usize = unsafe {
+                source.copy_struct(ep.offset(0) as usize).context(ep.offset(0) as usize)?
+            };
 
             // if VM_FRAME_TYPE($cfp->flag) != VM_FRAME_MAGIC_CFUNC
             if frame_flag & 0xffff0001 != 0x55550001 {
-                return Err(format_err!("Not a C function control frame"));
+                return Err(format_err!("Not a C function control frame").into());
             }
 
-            let mut env_specval: usize = unsafe { source.copy_struct(ep.offset(-1) as usize)? };
-            let mut env_me_cref: usize = unsafe { source.copy_struct(ep.offset(-2) as usize)? };
+            let mut env_specval: usize = unsafe {
+                source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)? 
+            };
+            let mut env_me_cref: usize = unsafe {
+                source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-1) as usize)?
+            };
 
             // #define VM_ENV_FLAG_LOCAL 0x02
             while env_specval & 0x02 != 0 {
@@ -814,19 +832,19 @@ macro_rules! get_cfunc_name(
                 }
                 unsafe {
                     ep = ep.offset(0) as *mut usize;
-                    env_specval = source.copy_struct(ep.offset(-1) as usize)?;
-                    env_me_cref = source.copy_struct(ep.offset(-2) as usize)?;
+                    env_specval = source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?;
+                    env_me_cref = source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-2) as usize)?;
                 }
             }
 
-            let imemo: rb_method_entry_struct = source.copy_struct(env_me_cref)?;
+            let imemo: rb_method_entry_struct = source.copy_struct(env_me_cref).context(env_me_cref)?;
             if imemo.def.is_null() {
-                return Err(format_err!("No method definition"));
+                return Err(format_err!("No method definition").into());
             }
 
             let ttype = ((imemo.flags >> 12) & 0x07) as usize;
             if ttype != imemo_type_imemo_ment as usize {
-                return Err(format_err!("Not a method entry"));
+                return Err(format_err!("Not a method entry").into());
             }
 
             #[allow(non_camel_case_types)]
@@ -842,8 +860,8 @@ macro_rules! get_cfunc_name(
                 dsymbol_fstr_hash: VALUE,
             }
 
-            let global_symbols: rb_symbols_t = source.copy_struct(global_symbols_address as usize)?;
-            let def: rb_method_definition_struct = source.copy_struct(imemo.def as usize)?;
+            let global_symbols: rb_symbols_t = source.copy_struct(global_symbols_address as usize).context(global_symbols_address as usize)?;
+            let def: rb_method_definition_struct = source.copy_struct(imemo.def as usize).context(imemo.def as usize)?;
             let method_id = def.original_id as usize;
 
             // rb_id_to_serial
@@ -853,13 +871,13 @@ macro_rules! get_cfunc_name(
             }
 
             if serial > global_symbols.last_id as usize {
-                return Err(format_err!("Invalid method ID"));
+                return Err(format_err!("Invalid method ID").into());
             }
 
             // ID_ENTRY_UNIT is defined in symbol.c, so not accessible by bindgen
             let id_entry_unit = 512;
             let idx = serial / id_entry_unit;
-            let ids: RArray = source.copy_struct(global_symbols.ids as usize)?;
+            let ids: RArray = source.copy_struct(global_symbols.ids as usize).context(global_symbols.ids as usize)?;
             let flags = ids.basic.flags as usize;
 
             // string2cstring
@@ -870,15 +888,15 @@ macro_rules! get_cfunc_name(
                 ids_len = (flags & (ruby_fl_type_RUBY_FL_USER3|ruby_fl_type_RUBY_FL_USER4) as usize) >> (ruby_fl_type_RUBY_FL_USHIFT+3);
             }
             if idx >= ids_len {
-                return Err(format_err!("Invalid index in IDs array"));
+                return Err(format_err!("Invalid index in IDs array").into());
             }
 
             // ids is an array of pointers to RArray. First jump to the right index to get the
             // pointer, then copy the _pointer_ into our memory space, and then finally copy the 
             // pointed-to array into our memory space
             let array_remote_ptr = (ids_ptr as usize) + (idx as usize) * std::mem::size_of::<usize>();
-            let array_ptr: usize = source.copy_struct(array_remote_ptr)?;
-            let array: RArray = source.copy_struct(array_ptr)?;
+            let array_ptr: usize = source.copy_struct(array_remote_ptr).context(array_remote_ptr)?;
+            let array: RArray = source.copy_struct(array_ptr).context(array_ptr)?;
 
             let mut array_ptr = unsafe { array.as_.heap.ptr };
             let flags = array.basic.flags as usize;
@@ -888,7 +906,7 @@ macro_rules! get_cfunc_name(
 
             let offset = (serial % 512) * 2;
             let rstring_remote_ptr = (array_ptr as usize) + offset * std::mem::size_of::<usize>();
-            let rstring_ptr: usize = source.copy_struct(rstring_remote_ptr as usize)?;
+            let rstring_ptr: usize = source.copy_struct(rstring_remote_ptr as usize).context(rstring_remote_ptr as usize)?;
 
             Ok(get_ruby_string(rstring_ptr as usize, source)?)
         }

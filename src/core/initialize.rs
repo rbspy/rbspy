@@ -5,8 +5,7 @@ use crate::core::ruby_version;
 use crate::core::types::{MemoryCopyError, Pid, Process, ProcessRetry,
                          ProcessMemory, StackTrace};
 
-use failure::Error;
-use failure::ResultExt;
+use anyhow::{Context, Result};
 use libc::c_char;
 
 use std::time::Duration;
@@ -23,7 +22,7 @@ use std::time::Duration;
  *   * Find the right stack trace function for the Ruby version we found
  *   * Package all that up into a struct that the user can use to get stack traces.
  */
-pub fn initialize(pid: Pid) -> Result<StackTraceGetter, Error> {
+pub fn initialize(pid: Pid) -> Result<StackTraceGetter> {
     let process = Process::new_with_retry(pid)?;
     let (current_thread_addr_location, ruby_vm_addr_location, global_symbols_addr_location, stack_trace_function) = get_process_ruby_state(&process)?;
 
@@ -48,7 +47,7 @@ pub struct StackTraceGetter {
 }
 
 impl StackTraceGetter {
-    pub fn get_trace(&mut self) -> Result<StackTrace, Error> {
+    pub fn get_trace(&mut self) -> Result<StackTrace> {
         match self.get_trace_from_current_thread() {
             Ok(mut trace) => return {
                 /* This is a spike to enrich the trace with the pid.
@@ -78,7 +77,7 @@ impl StackTraceGetter {
         )
     }
 
-    fn reinitialize(&mut self) -> Result<(), Error> {
+    fn reinitialize(&mut self) -> Result<()> {
         let (current_thread_addr_location, ruby_vm_addr_location, ruby_global_symbols_addr_location, stack_trace_function) =
             get_process_ruby_state(&self.process)?;
 
@@ -98,7 +97,7 @@ pub type IsMaybeThreadFn = Box<dyn Fn(usize, usize, &Process, &[MapRange]) -> bo
 
 type StackTraceFn = Box<dyn Fn(usize, usize, Option<usize>, &Process, Pid) -> Result<StackTrace, MemoryCopyError>>;
 
-fn get_process_ruby_state(process: &Process) -> Result<(usize, usize, Option<usize>, StackTraceFn), Error> {
+fn get_process_ruby_state(process: &Process) -> Result<(usize, usize, Option<usize>, StackTraceFn)> {
     let version = get_ruby_version_retry(process)
         .context("Couldn't determine Ruby version")?;
 
@@ -124,7 +123,7 @@ fn get_process_ruby_state(process: &Process) -> Result<(usize, usize, Option<usi
     ))
 }
 
-fn get_ruby_version_retry(process: &Process) -> Result<String, Error> {
+fn get_ruby_version_retry(process: &Process) -> Result<String> {
     /* This exists because:
      * a) Sometimes rbenv takes a while to exec the right Ruby binary.
      * b) Dynamic linking takes a nonzero amount of time, so even after the right Ruby binary is
@@ -143,7 +142,7 @@ fn get_ruby_version_retry(process: &Process) -> Result<String, Error> {
         }
         match version {
             Err(err) => {
-                match err.find_root_cause().downcast_ref::<AddressFinderError>() {
+                match err.root_cause().downcast_ref::<AddressFinderError>() {
                     #[cfg(not(target_os = "macos"))]
                     Some(&AddressFinderError::PermissionDenied(_)) => {
                         return Err(err);
@@ -159,7 +158,7 @@ fn get_ruby_version_retry(process: &Process) -> Result<String, Error> {
                     _ => {}
                 }
                 if let Some(&MemoryCopyError::PermissionDenied) =
-                    err.find_root_cause().downcast_ref::<MemoryCopyError>() {
+                    err.root_cause().downcast_ref::<MemoryCopyError>() {
                         return Err(err);
                 }
             }
@@ -173,7 +172,7 @@ fn get_ruby_version_retry(process: &Process) -> Result<String, Error> {
     }
 }
 
-fn get_ruby_version(process: &Process) -> Result<String, Error> {
+fn get_ruby_version(process: &Process) -> Result<String> {
     let addr = address_finder::get_ruby_version_address(process.pid)?;
     let x: [c_char; 15] = process.copy_struct(addr)?;
     Ok(unsafe {
@@ -190,7 +189,7 @@ fn test_initialize_with_nonexistent_process() {
     let version = get_ruby_version_retry(&process);
     match version
         .unwrap_err()
-        .find_root_cause()
+        .root_cause()
         .downcast_ref::<AddressFinderError>()
         .unwrap() {
         &AddressFinderError::NoSuchProcess(10000) => {}
@@ -205,7 +204,7 @@ fn test_initialize_with_disallowed_process() {
     let version = get_ruby_version_retry(&process);
     match version
         .unwrap_err()
-        .find_root_cause()
+        .root_cause()
         .downcast_ref::<AddressFinderError>()
         .unwrap() {
         &AddressFinderError::PermissionDenied(1) => {}

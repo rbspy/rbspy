@@ -1,5 +1,6 @@
 #![cfg_attr(rustc_nightly, feature(test))]
 
+extern crate anyhow;
 #[cfg(test)]
 extern crate byteorder;
 extern crate chrono;
@@ -9,10 +10,6 @@ extern crate ctrlc;
 extern crate elf;
 extern crate env_logger;
 extern crate inferno;
-#[macro_use]
-extern crate failure;
-#[macro_use]
-extern crate failure_derive;
 extern crate libc;
 #[cfg(target_os = "macos")]
 extern crate libproc;
@@ -36,11 +33,11 @@ extern crate term_size;
 #[cfg(windows)]
 extern crate winapi;
 
-
+use anyhow::{Context, Error, Result};
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+use anyhow::format_err;
 use chrono::prelude::*;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
-use failure::Error;
-use failure::ResultExt;
 use rand::Rng;
 use rand::distributions::Alphanumeric;
 
@@ -283,10 +280,10 @@ fn test_is_wow64_process() {
 fn main() {
     if let Err(x) = do_main() {
         eprintln!("Error. Causes: ");
-        for c in x.iter_chain() {
+        for c in x.chain() {
             eprintln!("- {}", c);
         }
-        eprintln!("{}", x.backtrace());
+        eprintln!("{:?}", x);
         std::process::exit(1);
     }
 }

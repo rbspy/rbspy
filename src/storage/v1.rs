@@ -2,8 +2,6 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use crate::core::types::{Header, StackTrace};
 
-use failure::Error;
-
 use super::*;
 
 pub(crate) struct Data(pub Vec<StackTrace>);

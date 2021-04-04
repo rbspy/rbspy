@@ -59,6 +59,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.40"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "28b2cd92db5cbd74e8e5028f7e27dd7aa3090e89e4f2a197cc7c8dfb69c7063b"
+
+[[package]]
 name = "arrayvec"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -107,7 +113,7 @@ dependencies = [
  "kernel32-sys",
  "libc",
  "log",
- "mach 0.3.2",
+ "mach",
  "winapi 0.2.8",
 ]
 
@@ -290,17 +296,6 @@ dependencies = [
  "log",
  "regex",
  "termcolor",
-]
-
-[[package]]
-name = "errno"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e2b2decb0484e15560df3210cf0d78654bb0864b2c138977c07e377a1bae0e2"
-dependencies = [
- "kernel32-sys",
- "libc",
- "winapi 0.2.8",
 ]
 
 [[package]]
@@ -508,21 +503,11 @@ checksum = "56d855069fafbb9b344c0f962150cd2c1187975cb1c22c1522c240d8c4986714"
 
 [[package]]
 name = "libproc"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58d23e79d5a9fc3f86a75bcd31a5418f27104518aca33615802b0373380beab4"
-dependencies = [
- "errno 0.1.8",
- "libc",
-]
-
-[[package]]
-name = "libproc"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "15fb50befee2d3be15b38c93ef79ba22ecbd667874bf692309ffdff179282b8d"
 dependencies = [
- "errno 0.2.7",
+ "errno",
  "libc",
 ]
 
@@ -533,15 +518,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "51b9bbe6c47d51fc3e1a9b945965946b4c44142ab8792c50835a980d362c2710"
 dependencies = [
  "cfg-if 1.0.0",
-]
-
-[[package]]
-name = "mach"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fd13ee2dd61cc82833ba05ade5a30bb3d63f7ced605ef827063c63078302de9"
-dependencies = [
- "libc",
 ]
 
 [[package]]
@@ -738,14 +714,14 @@ dependencies = [
 
 [[package]]
 name = "proc-maps"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "405a565c252559e556e2539c8300d01a468053cc6bc12356d2d38441f5db5379"
+checksum = "1f7e49bf46401bf141cb9d2bba151efcfa85f2956e51c6794fe07a3803ec6004"
 dependencies = [
- "failure",
+ "anyhow",
  "libc",
- "libproc 0.3.2",
- "mach 0.1.2",
+ "libproc",
+ "mach",
  "winapi 0.3.9",
 ]
 
@@ -839,18 +815,17 @@ dependencies = [
 name = "rbspy"
 version = "0.4.2"
 dependencies = [
+ "anyhow",
  "byteorder 1.4.3",
  "chrono",
  "clap",
  "ctrlc",
  "elf",
  "env_logger",
- "failure",
- "failure_derive",
  "flate2",
  "inferno",
  "libc",
- "libproc 0.9.1",
+ "libproc",
  "log",
  "nix 0.20.0",
  "proc-maps",
@@ -864,6 +839,7 @@ dependencies = [
  "serde_json",
  "tempdir",
  "term_size",
+ "thiserror",
  "winapi 0.3.9",
 ]
 
@@ -921,9 +897,9 @@ dependencies = [
  "goblin",
  "lazy_static",
  "libc",
- "libproc 0.9.1",
+ "libproc",
  "log",
- "mach 0.3.2",
+ "mach",
  "mach_o_sys",
  "memmap",
  "nix 0.19.1",
@@ -1145,6 +1121,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d326610f408c7a4eb6f51c37c330e496b08506c9457c9d34287ecc38809fb060"
 dependencies = [
  "unicode-width",
+]
+
+[[package]]
+name = "thiserror"
+version = "1.0.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0f4a65597094d4483ddaed134f409b2cb7c1beccf25201a9f73c719254fa98e"
+dependencies = [
+ "thiserror-impl",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "1.0.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7765189610d8241a44529806d6fd1f2e0a08734313a35d5b3a556f92b381f3c0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
