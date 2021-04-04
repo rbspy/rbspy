@@ -66,7 +66,7 @@ jobs:
         echo "target flag is: ${{ env.TARGET_FLAGS }}"
 
     - name: Build rbspy
-      run: ${{ env.CARGO }} build --release --locked --verbose --all ${{ env.TARGET_FLAGS }}
+      run: ${{ env.CARGO }} build --release --locked --verbose --workspace ${{ env.TARGET_FLAGS }}
 
     - name: Prepare binary for upload
       if: runner.os != 'windows'
