@@ -299,8 +299,8 @@ macro_rules! get_stack_trace(
                         match get_cfunc_name(cfp, global_symbols_addr, source, pid) {
                             Ok(name) => {
                                 frame = StackFrame{
-                                    name: "<c function>".to_string(),
-                                    relative_path: name,
+                                    name: format!("{} [c function]", name),
+                                    relative_path: "(unknown)".to_string(),
                                     absolute_path: None,
                                     lineno: 0
                                 };
@@ -1029,8 +1029,8 @@ mod tests {
     fn real_stack_trace_2_7_2() -> Vec<StackFrame> {
         vec![
             StackFrame {
-                name: "<c function>".to_string(),
-                relative_path: "sleep".to_string(),
+                name: "sleep [c function]".to_string(),
+                relative_path: "(unknown)".to_string(),
                 absolute_path: None,
                 lineno: 0
             },
@@ -1059,8 +1059,8 @@ mod tests {
                 lineno: 15
             },
             StackFrame {
-                name: "<c function>".to_string(),
-                relative_path: "loop".to_string(),
+                name: "loop [c function]".to_string(),
+                relative_path: "(unknown)".to_string(),
                 absolute_path: None,
                 lineno: 0
             }

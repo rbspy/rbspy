@@ -61,8 +61,8 @@ impl StackFrame {
     // would be a constant but it has strings in it so it can't be.
     pub fn unknown_c_function() -> StackFrame {
         StackFrame {
-            name: "<c function>".to_string(),
-            relative_path: "unknown".to_string(),
+            name: "(unknown) [c function]".to_string(),
+            relative_path: "(unknown)".to_string(),
             absolute_path: None,
             lineno: 0
         }
