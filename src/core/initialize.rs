@@ -370,6 +370,7 @@ fn is_maybe_thread_function(version: &str) -> IsMaybeThreadFn {
         "2.7.0" => ruby_version::ruby_2_7_0::is_maybe_thread,
         "2.7.1" => ruby_version::ruby_2_7_1::is_maybe_thread,
         "2.7.2" => ruby_version::ruby_2_7_2::is_maybe_thread,
+        "2.7.3" => ruby_version::ruby_2_7_3::is_maybe_thread,
         "3.0.0" => ruby_version::ruby_3_0_0::is_maybe_thread,
         _ => panic!("Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!", version),
     };
@@ -443,6 +444,7 @@ fn get_stack_trace_function(version: &str) -> StackTraceFn {
         "2.7.0" => ruby_version::ruby_2_7_0::get_stack_trace,
         "2.7.1" => ruby_version::ruby_2_7_1::get_stack_trace,
         "2.7.2" => ruby_version::ruby_2_7_2::get_stack_trace,
+        "2.7.3" => ruby_version::ruby_2_7_3::get_stack_trace,
         "3.0.0" => ruby_version::ruby_3_0_0::get_stack_trace,
         _ => panic!("Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!", version),
     };

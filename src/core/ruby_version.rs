@@ -978,6 +978,7 @@ ruby_version_v2_6_x!(ruby_2_6_6);
 ruby_version_v2_7_x!(ruby_2_7_0);
 ruby_version_v2_7_x!(ruby_2_7_1);
 ruby_version_v2_7_x!(ruby_2_7_2);
+ruby_version_v2_7_x!(ruby_2_7_3);
 ruby_version_v3_0_x!(ruby_3_0_0);
 
 #[cfg(test)]
