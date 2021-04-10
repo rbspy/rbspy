@@ -453,6 +453,8 @@ fn spawn_recorder_children(pid: Pid, with_subprocesses: bool, sample_rate: u32, 
     (trace_receiver, result_receiver, total_traces_clone, timing_error_traces_clone)
 }
 
+// TODO: Find a more reliable way to test this on Windows hosts
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_spawn_record_children_subprocesses() {
     let which = if cfg!(target_os = "windows") {
