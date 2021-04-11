@@ -59,8 +59,7 @@ bindgen /tmp/wrapper.h \
     --whitelist-type vm_svar \
     -- \
     -I/tmp/headers/$1/include \
-    -I/home/bork/monorepo/ruby-header-files -I/tmp/headers/$1/ \
-    -I/usr/lib/llvm-3.8/lib/clang/3.8.0/include/ \
+    -I/tmp/headers/$1/ \
     "-I$ruby_header_dir"
 
 OUT=ruby-structs/src/ruby_${1}.rs
