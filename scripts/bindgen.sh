@@ -1,4 +1,6 @@
-set -eux
+#!/bin/bash
+
+set -eu
 
 error() { echo "$@" 1>&2; }
 
