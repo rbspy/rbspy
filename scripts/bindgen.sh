@@ -10,7 +10,8 @@ fi
 
 ruby_header_dir="$(ruby -rrbconfig -e 'puts RbConfig::CONFIG["rubyarchhdrdir"]')"
 
-echo "#include </tmp/headers/$1/vm_core.h>" > /tmp/wrapper.h
+echo "#define RUBY_JMP_BUF sigjmp_buf" > /tmp/wrapper.h
+echo "#include </tmp/headers/$1/vm_core.h>" >> /tmp/wrapper.h
 echo "#include </tmp/headers/$1/iseq.h>" >> /tmp/wrapper.h
 rm -rf /tmp/headers/$1
 mkdir -p /tmp/headers/$1
