@@ -32,6 +32,7 @@ bindgen /tmp/wrapper.h \
     -o /tmp/bindings.rs \
     --impl-debug \
     --no-doc-comments \
+    --rustfmt-bindings \
     --whitelist-type rb_iseq_constant_body \
     --whitelist-type rb_iseq_location_struct \
     --whitelist-type rb_thread_struct \
@@ -61,8 +62,6 @@ bindgen /tmp/wrapper.h \
     -I/home/bork/monorepo/ruby-header-files -I/tmp/headers/$1/ \
     -I/usr/lib/llvm-3.8/lib/clang/3.8.0/include/ \
     "-I$ruby_header_dir"
-
-rustfmt /tmp/bindings.rs
 
 OUT=ruby-structs/src/ruby_${1}.rs
 echo "#![allow(non_upper_case_globals)]" > $OUT
