@@ -3,8 +3,8 @@ extern crate tempdir;
 
 use std::fs::File;
 
+use crate::core::types::{StackFrame, StackTrace};
 use crate::ui::{callgrind, flamegraph, speedscope, summary};
-use crate::core::types::{StackTrace, StackFrame};
 
 use anyhow::Result;
 
@@ -91,10 +91,8 @@ fn filter_unknown(trace: &[StackFrame]) -> Vec<StackFrame> {
     let unknown = StackFrame::unknown_c_function();
     let vec: Vec<StackFrame> = trace.iter().filter(|&x| x != &unknown).cloned().collect();
     if vec.is_empty() {
-        vec!(unknown)
+        vec![unknown]
     } else {
         vec
     }
 }
-
-

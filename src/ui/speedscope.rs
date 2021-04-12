@@ -1,9 +1,9 @@
-use std::collections::{HashMap};
-use std::io::Write;
+use std::collections::HashMap;
 use std::fs::File;
+use std::io::Write;
 use std::time::SystemTime;
 
-use crate::core::types::{Pid, StackTrace, StackFrame};
+use crate::core::types::{Pid, StackFrame, StackTrace};
 
 use anyhow::Result;
 
@@ -96,40 +96,45 @@ enum ValueUnit {
 }
 
 impl SpeedscopeFile {
-  pub fn new(samples: HashMap<Option<Pid>, Vec<Vec<usize>>>, frames: Vec<Frame>, weights: Vec<f64>) -> SpeedscopeFile {
-    let end_value = samples.len();
+    pub fn new(
+        samples: HashMap<Option<Pid>, Vec<Vec<usize>>>,
+        frames: Vec<Frame>,
+        weights: Vec<f64>,
+    ) -> SpeedscopeFile {
+        let end_value = samples.len();
 
-    SpeedscopeFile {
-      // This is always the same
-      schema: "https://www.speedscope.app/file-format-schema.json".to_string(),
+        SpeedscopeFile {
+            // This is always the same
+            schema: "https://www.speedscope.app/file-format-schema.json".to_string(),
 
-      active_profile_index: None,
+            active_profile_index: None,
 
-      name: Some("rbspy profile".to_string()),
+            name: Some("rbspy profile".to_string()),
 
-      exporter: Some(format!("rbspy@{}", env!("CARGO_PKG_VERSION"))),
+            exporter: Some(format!("rbspy@{}", env!("CARGO_PKG_VERSION"))),
 
-      profiles: samples.iter().map(|(option_pid, samples)| {
-        Profile {
-            profile_type: ProfileType::Sampled,
+            profiles: samples
+                .iter()
+                .map(|(option_pid, samples)| Profile {
+                    profile_type: ProfileType::Sampled,
 
-            name: option_pid.map_or("rbspy profile".to_string(), |pid| format!("rbspy profile - pid {}", pid)),
+                    name: option_pid.map_or("rbspy profile".to_string(), |pid| {
+                        format!("rbspy profile - pid {}", pid)
+                    }),
 
-            unit: ValueUnit::Seconds,
+                    unit: ValueUnit::Seconds,
 
-            start_value: 0.0,
-            end_value: end_value as f64,
+                    start_value: 0.0,
+                    end_value: end_value as f64,
 
-            samples: samples.clone(),
-            weights: weights.clone()
+                    samples: samples.clone(),
+                    weights: weights.clone(),
+                })
+                .collect(),
+
+            shared: Shared { frames },
         }
-      }).collect(),
-
-      shared: Shared {
-          frames
-      }
     }
-  }
 }
 
 impl Frame {
@@ -138,7 +143,7 @@ impl Frame {
             name: stack_frame.name.clone(),
             file: Some(stack_frame.relative_path.clone()),
             line: Some(stack_frame.lineno),
-            col: None
+            col: None,
         }
     }
 }
@@ -149,7 +154,7 @@ pub struct Stats {
     frames: Vec<Frame>,
     frame_to_index: HashMap<StackFrame, usize>,
     weights: Vec<f64>,
-    prev_time: Option<SystemTime>
+    prev_time: Option<SystemTime>,
 }
 
 impl Stats {
@@ -158,19 +163,24 @@ impl Stats {
     }
 
     pub fn record(&mut self, stack: &StackTrace) -> Result<()> {
-        let mut frame_indices: Vec<usize> = stack.trace.iter().map(|frame| {
-            let frames = &mut self.frames;
-            *self.frame_to_index.entry(frame.clone()).or_insert_with(|| {
-                let len = frames.len();
-                frames.push(Frame::new(&frame));
-                len
+        let mut frame_indices: Vec<usize> = stack
+            .trace
+            .iter()
+            .map(|frame| {
+                let frames = &mut self.frames;
+                *self.frame_to_index.entry(frame.clone()).or_insert_with(|| {
+                    let len = frames.len();
+                    frames.push(Frame::new(&frame));
+                    len
+                })
             })
-        }).collect();
+            .collect();
         frame_indices.reverse();
 
-        self.samples.entry(stack.pid).or_insert_with(|| {
-            vec![]
-        }).push(frame_indices);
+        self.samples
+            .entry(stack.pid)
+            .or_insert_with(|| vec![])
+            .push(frame_indices);
 
         if let Some(time) = stack.time {
             if let Some(prev_time) = self.prev_time {
@@ -190,7 +200,11 @@ impl Stats {
     }
 
     pub fn write(&self, mut w: File) -> Result<()> {
-        let json = serde_json::to_string(&SpeedscopeFile::new(self.samples.clone(), self.frames.clone(), self.weights.clone()))?;
+        let json = serde_json::to_string(&SpeedscopeFile::new(
+            self.samples.clone(),
+            self.frames.clone(),
+            self.weights.clone(),
+        ))?;
         writeln!(&mut w, "{}", json)?;
         Ok(())
     }

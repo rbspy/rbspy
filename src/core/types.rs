@@ -1,14 +1,13 @@
 /// Core types used throughout rbspy: StackFrame and StackTrace
-
 use std::cmp::Ordering;
 use std::fmt;
-use std::{self, convert::From};
 use std::time::SystemTime;
+use std::{self, convert::From};
 
 use anyhow::{Error, Result};
 use thiserror::Error;
 
-pub use remoteprocess::{Process, Pid, ProcessMemory};
+pub use remoteprocess::{Pid, Process, ProcessMemory};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub(crate) struct Header {
@@ -35,14 +34,18 @@ pub struct StackTrace {
 
 #[derive(Error, Debug)]
 pub enum MemoryCopyError {
-    #[error("The operation completed successfully")] OperationSucceeded,
+    #[error("The operation completed successfully")]
+    OperationSucceeded,
     #[error("Permission denied when reading from process. If you're not running as root, try again with sudo. If you're using Docker, try passing `--cap-add=SYS_PTRACE` to `docker run`")]
-
     PermissionDenied,
-    #[error("Failed to copy memory address {:x}", _0)] Io(usize, std::io::Error),
-    #[error("Process isn't running")] ProcessEnded,
-    #[error("Copy error: {}", _0)] Message(String),
-    #[error("Too much memory requested when copying: {}", _0)] RequestTooLarge(usize),
+    #[error("Failed to copy memory address {:x}", _0)]
+    Io(usize, std::io::Error),
+    #[error("Process isn't running")]
+    ProcessEnded,
+    #[error("Copy error: {}", _0)]
+    Message(String),
+    #[error("Too much memory requested when copying: {}", _0)]
+    RequestTooLarge(usize),
     #[error("Tried to read invalid string")]
     InvalidStringError(std::string::FromUtf8Error),
     #[error("Tried to read invalid memory address {:x}", _0)]
@@ -64,10 +67,9 @@ impl StackFrame {
             name: "(unknown) [c function]".to_string(),
             relative_path: "(unknown)".to_string(),
             absolute_path: None,
-            lineno: 0
+            lineno: 0,
         }
     }
-
 }
 
 impl fmt::Display for StackFrame {
@@ -92,7 +94,7 @@ impl PartialOrd for StackFrame {
 }
 
 impl StackTrace {
-    pub fn iter(&self) ->  std::slice::Iter<StackFrame> {
+    pub fn iter(&self) -> std::slice::Iter<StackFrame> {
         self.trace.iter()
     }
 }
@@ -111,12 +113,10 @@ impl From<Error> for MemoryCopyError {
             Some(0) => MemoryCopyError::OperationSucceeded,
             /* On Mac, 60 seems to correspond to the process ended */
             /* On Windows, 299 happens when the process ended */
-            Some(3) | Some(60) | Some(299) => {
-                MemoryCopyError::ProcessEnded
-            },
+            Some(3) | Some(60) | Some(299) => MemoryCopyError::ProcessEnded,
             // On *nix EFAULT means that the address was invalid
             Some(14) => MemoryCopyError::InvalidAddressError(addr),
-            _ => MemoryCopyError::Io(addr, error)
+            _ => MemoryCopyError::Io(addr, error),
         }
     }
 }

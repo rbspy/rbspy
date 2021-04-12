@@ -33,31 +33,31 @@ extern crate term_size;
 #[cfg(windows)]
 extern crate winapi;
 
-use anyhow::{Context, Error, Result};
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 use anyhow::format_err;
+use anyhow::{Context, Error, Result};
 use chrono::prelude::*;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
-use rand::Rng;
 use rand::distributions::Alphanumeric;
+use rand::Rng;
 
 use std::collections::HashSet;
-use std::fs::{DirBuilder, File};
-use std::path::{Path, PathBuf};
 use std::env;
-use std::process::Command;
-use std::sync::atomic::{AtomicBool, Ordering, AtomicUsize};
-use std::sync::Arc;
-use std::time::{Instant, Duration};
+use std::fs::{DirBuilder, File};
 #[cfg(unix)]
 use std::os::unix::prelude::*;
-use std::sync::mpsc::{sync_channel, channel, SyncSender, Receiver};
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::mpsc::{channel, sync_channel, Receiver, SyncSender};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 #[cfg(windows)]
 use winapi::um::timeapi;
 
 pub mod core;
-pub mod ui;
 pub(crate) mod storage;
+pub mod ui;
 
 use crate::core::initialize::initialize;
 use crate::core::types::{MemoryCopyError, Pid, Process, ProcessRetry, StackTrace};
@@ -73,7 +73,7 @@ enum Target {
 }
 
 // Formats we can write to
-arg_enum!{
+arg_enum! {
     // The values of this enum get translated directly to command line arguments. Make them
     // lowercase so that we don't have camelcase command line arguments
     #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -101,11 +101,15 @@ enum SubCmd {
         no_drop_root: bool,
         with_subprocesses: bool,
         silent: bool,
-        flame_min_width: f64
+        flame_min_width: f64,
     },
     /// Capture and print a stacktrace snapshot of process `pid`.
     Snapshot { pid: Pid },
-    Report { format: OutputFormat, input: PathBuf, output: PathBuf, },
+    Report {
+        format: OutputFormat,
+        input: PathBuf,
+        output: PathBuf,
+    },
 }
 use SubCmd::*;
 
@@ -115,22 +119,24 @@ struct Args {
     cmd: SubCmd,
 }
 
-
 fn do_main() -> Result<(), Error> {
     env_logger::init();
 
     let args = Args::from_args()?;
 
-    #[cfg(target_os="macos")]
+    #[cfg(target_os = "macos")]
     {
         let root_cmd = match args.cmd {
-            Snapshot{..} => Some("snapshot"),
-            Record{..} => Some("record"),
+            Snapshot { .. } => Some("snapshot"),
+            Record { .. } => Some("record"),
             _ => None,
         };
         if let Some(root_cmd) = root_cmd {
             if !check_root_user() {
-                return Err(format_err!("rbspy {} needs to run as root on Mac", root_cmd))
+                return Err(format_err!(
+                    "rbspy {} needs to run as root on Mac",
+                    root_cmd
+                ));
             }
         }
     }
@@ -141,7 +147,7 @@ fn do_main() -> Result<(), Error> {
             check_wow64_process(pid);
 
             snapshot(pid)
-        },
+        }
         Record {
             target,
             out_path,
@@ -166,10 +172,14 @@ fn do_main() -> Result<(), Error> {
                     #[cfg(unix)]
                     {
                         let uid_str = std::env::var("SUDO_UID");
-                        if nix::unistd::Uid::effective().is_root() && !no_drop_root && uid_str.is_ok() {
-                            let uid: u32 = uid_str.unwrap().parse::<u32>().context(
-                                "Failed to parse UID",
-                            )?;
+                        if nix::unistd::Uid::effective().is_root()
+                            && !no_drop_root
+                            && uid_str.is_ok()
+                        {
+                            let uid: u32 = uid_str
+                                .unwrap()
+                                .parse::<u32>()
+                                .context("Failed to parse UID")?;
                             eprintln!(
                                 "Dropping permissions: running Ruby command as user {}",
                                 std::env::var("SUDO_USER")?
@@ -180,9 +190,9 @@ fn do_main() -> Result<(), Error> {
                         }
                     }
                     #[cfg(windows)]
-                    { 
+                    {
                         let _ = no_drop_root;
-                        Command::new(prog).args(args).spawn()?.id() as Pid 
+                        Command::new(prog).args(args).spawn()?.id() as Pid
                     }
                 }
             };
@@ -201,12 +211,16 @@ fn do_main() -> Result<(), Error> {
                 maybe_duration,
                 flame_min_width,
             )
-        },
-        Report{format, input, output} => report(format, input, output),
+        }
+        Report {
+            format,
+            input,
+            output,
+        } => report(format, input, output),
     }
 }
 
-#[cfg(target_os="macos")]
+#[cfg(target_os = "macos")]
 fn check_root_user() -> bool {
     let euid = nix::unistd::Uid::effective();
     if euid.is_root() {
@@ -231,27 +245,24 @@ fn check_wow64_process(pid: Pid) {
 #[cfg(all(windows, target_arch = "x86_64"))]
 fn is_wow64_process(pid: Pid) -> Result<bool, Error> {
     use std::os::windows::io::RawHandle;
-    use winapi::um::wow64apiset::IsWow64Process;
+    use winapi::shared::minwindef::{BOOL, FALSE, PBOOL};
     use winapi::um::processthreadsapi::OpenProcess;
     use winapi::um::winnt::PROCESS_QUERY_INFORMATION;
-    use winapi::shared::minwindef::{BOOL, FALSE, PBOOL};
+    use winapi::um::wow64apiset::IsWow64Process;
 
-    let handle = unsafe {
-        OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid)
-    };
+    let handle = unsafe { OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid) };
 
     if handle == (0 as RawHandle) {
         return Err(format_err!(
-            "Unable to fetch process handle for process {}", pid
+            "Unable to fetch process handle for process {}",
+            pid
         ));
     }
 
     let mut is_wow64: BOOL = 0;
 
     if unsafe { IsWow64Process(handle, &mut is_wow64 as PBOOL) } == FALSE {
-        return Err(format_err!(
-            "Could not determine process bitness! {}", pid
-        ))
+        return Err(format_err!("Could not determine process bitness! {}", pid));
     }
 
     Ok(is_wow64 != 0)
@@ -265,17 +276,21 @@ fn test_is_wow64_process() {
         "C:\\Program Files\\Internet Explorer\\iexplore.exe",
     ];
 
-    let results: Vec<bool> = programs.iter().map(|path| {
-        let mut cmd = Command::new(path)
-            .spawn()
-            .expect("ls command failed to start");
+    let results: Vec<bool> = programs
+        .iter()
+        .map(|path| {
+            let mut cmd = Command::new(path)
+                .spawn()
+                .expect("ls command failed to start");
 
-        let result = is_wow64_process(cmd.id());
+            let result = is_wow64_process(cmd.id());
 
-        cmd.kill().expect("command wasn't running or couldn't be killed");
+            cmd.kill()
+                .expect("command wasn't running or couldn't be killed");
 
-        result.unwrap()
-    }).collect();
+            result.unwrap()
+        })
+        .collect();
 
     assert_eq!(results, vec![true, false]);
 }
@@ -303,11 +318,15 @@ fn snapshot(pid: Pid) -> Result<(), Error> {
 impl OutputFormat {
     fn outputter(self, flame_min_width: f64) -> Box<dyn ui::output::Outputter> {
         match self {
-            OutputFormat::flamegraph => Box::new(output::Flamegraph(ui::flamegraph::Stats::new(flame_min_width))),
+            OutputFormat::flamegraph => Box::new(output::Flamegraph(ui::flamegraph::Stats::new(
+                flame_min_width,
+            ))),
             OutputFormat::callgrind => Box::new(output::Callgrind(ui::callgrind::Stats::new())),
             OutputFormat::speedscope => Box::new(output::Speedscope(ui::speedscope::Stats::new())),
             OutputFormat::summary => Box::new(output::Summary(ui::summary::Stats::new())),
-            OutputFormat::summary_by_line => Box::new(output::SummaryLine(ui::summary::Stats::new())),
+            OutputFormat::summary_by_line => {
+                Box::new(output::SummaryLine(ui::summary::Stats::new()))
+            }
         }
     }
 
@@ -318,7 +337,8 @@ impl OutputFormat {
             OutputFormat::speedscope => "speedscope.json",
             OutputFormat::summary => "summary.txt",
             OutputFormat::summary_by_line => "summary_by_line.txt",
-        }.to_string()
+        }
+        .to_string()
     }
 }
 
@@ -335,7 +355,7 @@ struct SampleTime {
 
 impl SampleTime {
     pub fn new(rate: u32) -> SampleTime {
-        SampleTime{
+        SampleTime {
             start_time: Instant::now(),
             nanos_between_samples: BILLION / u64::from(rate),
             num_samples: 0,
@@ -359,7 +379,17 @@ impl SampleTime {
 
 /// Start thread(s) recording a PID and possibly its children. Tracks new processes
 /// Returns a pair of Receivers from which you can consume recorded stacktraces and errors
-fn spawn_recorder_children(pid: Pid, with_subprocesses: bool, sample_rate: u32, maybe_stop_time: Option<Instant>) -> (Receiver<StackTrace>, Receiver<Result<(), Error>>, Arc<AtomicUsize>, Arc<AtomicUsize>) {
+fn spawn_recorder_children(
+    pid: Pid,
+    with_subprocesses: bool,
+    sample_rate: u32,
+    maybe_stop_time: Option<Instant>,
+) -> (
+    Receiver<StackTrace>,
+    Receiver<Result<(), Error>>,
+    Arc<AtomicUsize>,
+    Arc<AtomicUsize>,
+) {
     let done = Arc::new(AtomicBool::new(false));
     let total_traces = Arc::new(AtomicUsize::new(0));
     let timing_error_traces = Arc::new(AtomicUsize::new(0));
@@ -377,7 +407,8 @@ fn spawn_recorder_children(pid: Pid, with_subprocesses: bool, sample_rate: u32, 
         eprintln!("Interrupted.");
         // Trigger the end of the loop
         done_clone.store(true, Ordering::Relaxed);
-    }).expect("Error setting Ctrl-C handler");
+    })
+    .expect("Error setting Ctrl-C handler");
 
     eprintln!("Press Ctrl+C to stop");
 
@@ -400,12 +431,11 @@ fn spawn_recorder_children(pid: Pid, with_subprocesses: bool, sample_rate: u32, 
             // sender channels won't get closed and rbspy will hang. So we check the done
             // mutex.
             while !done_clone.load(Ordering::Relaxed) {
-                let mut descendents: Vec<Pid> = process.child_processes()
+                let mut descendents: Vec<Pid> = process
+                    .child_processes()
                     .expect("Error finding descendents of pid")
                     .into_iter()
-                    .map(|tuple| {
-                        tuple.0
-                    })
+                    .map(|tuple| tuple.0)
                     .collect();
                 descendents.push(pid);
 
@@ -428,8 +458,8 @@ fn spawn_recorder_children(pid: Pid, with_subprocesses: bool, sample_rate: u32, 
                             done,
                             timing_error_traces,
                             total_traces,
-                            trace_sender
-                            );
+                            trace_sender,
+                        );
                         error_sender.send(result).expect("couldn't send error");
                         drop(error_sender);
                     });
@@ -447,13 +477,18 @@ fn spawn_recorder_children(pid: Pid, with_subprocesses: bool, sample_rate: u32, 
                 done,
                 timing_error_traces,
                 total_traces,
-                trace_sender
-                );
+                trace_sender,
+            );
             error_sender.send(result).unwrap();
             drop(error_sender);
         });
     }
-    (trace_receiver, result_receiver, total_traces_clone, timing_error_traces_clone)
+    (
+        trace_receiver,
+        result_receiver,
+        total_traces_clone,
+        timing_error_traces_clone,
+    )
 }
 
 // TODO: Find a more reliable way to test this on Windows hosts
@@ -473,7 +508,8 @@ fn test_spawn_record_children_subprocesses() {
 
     let ruby_binary_path = String::from_utf8(output.stdout).unwrap();
 
-    let ruby_binary_path_str = ruby_binary_path.lines()
+    let ruby_binary_path_str = ruby_binary_path
+        .lines()
         .next()
         .expect("failed to execute ruby process");
 
@@ -488,8 +524,7 @@ fn test_spawn_record_children_subprocesses() {
 
     let pid = process.id() as Pid;
 
-    let (trace_receiver, result_receiver, _, _) =
-        spawn_recorder_children(pid, true, 5, None);
+    let (trace_receiver, result_receiver, _, _) = spawn_recorder_children(pid, true, 5, None);
 
     let mut pids = HashSet::<Pid>::new();
     for trace in &trace_receiver {
@@ -510,14 +545,12 @@ fn test_spawn_record_children_subprocesses() {
 
     let results: Vec<_> = result_receiver.iter().take(4).collect();
     for r in results {
-       #[cfg(target_os = "windows")]
-       match &r {
-            Ok(_) => {},
-            Err(e) => {
-                match e.downcast_ref() {
-                    Some(MemoryCopyError::OperationSucceeded) => {},
-                    _ => r.expect("unexpected error"),
-                }
+        #[cfg(target_os = "windows")]
+        match &r {
+            Ok(_) => {}
+            Err(e) => match e.downcast_ref() {
+                Some(MemoryCopyError::OperationSucceeded) => {}
+                _ => r.expect("unexpected error"),
             },
         }
 
@@ -542,13 +575,13 @@ fn parallel_record(
     maybe_duration: Option<std::time::Duration>,
     flame_min_width: f64,
 ) -> Result<(), Error> {
-
     let maybe_stop_time = match maybe_duration {
         Some(duration) => Some(std::time::Instant::now() + duration),
-        None => None
+        None => None,
     };
 
-    let (trace_receiver, result_receiver, total_traces, timing_error_traces) = spawn_recorder_children(pid, with_subprocesses, sample_rate, maybe_stop_time);
+    let (trace_receiver, result_receiver, total_traces, timing_error_traces) =
+        spawn_recorder_children(pid, with_subprocesses, sample_rate, maybe_stop_time);
 
     // Aggregate stack traces as we receive them from the threads that are collecting them
     // Aggregate to 3 places: the raw output (`.raw.gz`), some summary statistics we display live,
@@ -567,7 +600,13 @@ fn parallel_record(
         if !silent {
             // Print a summary every second
             if std::time::Instant::now() > summary_time {
-                print_summary(&summary_out, &start_time, sample_rate, timing_error_traces.load(Ordering::Relaxed), total_traces.load(Ordering::Relaxed))?;
+                print_summary(
+                    &summary_out,
+                    &start_time,
+                    sample_rate,
+                    timing_error_traces.load(Ordering::Relaxed),
+                    total_traces.load(Ordering::Relaxed),
+                )?;
                 summary_time = std::time::Instant::now() + Duration::from_secs(1);
             }
         }
@@ -577,7 +616,10 @@ fn parallel_record(
     eprintln!("Wrote raw data to {}", raw_path.display());
     eprintln!("Writing formatted output to {}", out_path.display());
 
-    let out_file = File::create(&out_path).context(format!( "Failed to create output file {}", &out_path.display()))?;
+    let out_file = File::create(&out_path).context(format!(
+        "Failed to create output file {}",
+        &out_path.display()
+    ))?;
     out.complete(out_file)?;
     raw_store.complete();
 
@@ -607,7 +649,7 @@ fn record(
     done: Arc<AtomicBool>,
     timing_error_traces: Arc<AtomicUsize>,
     total_traces: Arc<AtomicUsize>,
-    sender: SyncSender<StackTrace>
+    sender: SyncSender<StackTrace>,
 ) -> Result<(), Error> {
     let mut getter = core::initialize::initialize(pid)?;
 
@@ -623,7 +665,9 @@ fn record(
         // The downside is that this will increase power usage: good discussions are:
         // https://randomascii.wordpress.com/2013/07/08/windows-timer-resolution-megawatts-wasted/
         // and http://www.belshe.com/2010/06/04/chrome-cranking-up-the-clock/
-        unsafe { timeapi::timeBeginPeriod(1); }
+        unsafe {
+            timeapi::timeBeginPeriod(1);
+        }
     }
 
     while !done.load(Ordering::Relaxed) {
@@ -659,20 +703,26 @@ fn record(
         // Sleep until the next expected sample time
         total_traces.fetch_add(1, Ordering::Relaxed);
         match sample_time.get_sleep_time() {
-            Ok(sleep_time) => {std::thread::sleep(std::time::Duration::new(0, sleep_time));},
-            Err(_) => { timing_error_traces.fetch_add(1, Ordering::Relaxed); },
+            Ok(sleep_time) => {
+                std::thread::sleep(std::time::Duration::new(0, sleep_time));
+            }
+            Err(_) => {
+                timing_error_traces.fetch_add(1, Ordering::Relaxed);
+            }
         }
     }
 
-   // reset time period calls
+    // reset time period calls
     #[cfg(windows)]
     {
-        unsafe { timeapi::timeEndPeriod(1); }
+        unsafe {
+            timeapi::timeEndPeriod(1);
+        }
     }
     Ok(())
 }
 
-fn report(format: OutputFormat, input: PathBuf, output: PathBuf) -> Result<(), Error>{
+fn report(format: OutputFormat, input: PathBuf, output: PathBuf) -> Result<(), Error> {
     let input_file = File::open(input)?;
     let stuff = storage::from_reader(input_file)?.traces;
     let mut outputter = format.outputter(0.1);
@@ -683,14 +733,23 @@ fn report(format: OutputFormat, input: PathBuf, output: PathBuf) -> Result<(), E
     Ok(())
 }
 
-fn print_summary(summary_out: &ui::summary::Stats, start_time: &Instant, sample_rate: u32, timing_error_traces: usize, total_traces: usize) -> Result<(), Error> {
+fn print_summary(
+    summary_out: &ui::summary::Stats,
+    start_time: &Instant,
+    sample_rate: u32,
+    timing_error_traces: usize,
+    total_traces: usize,
+) -> Result<(), Error> {
     let width = match term_size::dimensions() {
         Some((w, _)) => Some(w as usize),
         None => None,
     };
     println!("{}[2J", 27 as char); // clear screen
     println!("{}[0;0H", 27 as char); // go to 0,0
-    eprintln!("Time since start: {}s. Press Ctrl+C to stop.", start_time.elapsed().as_secs());
+    eprintln!(
+        "Time since start: {}s. Press Ctrl+C to stop.",
+        start_time.elapsed().as_secs()
+    );
     let percent_timing_error = (timing_error_traces as f64) / (total_traces as f64) * 100.0;
     eprintln!("Summary of profiling data so far:");
     summary_out.print_top_n(20, width)?;
@@ -717,7 +776,10 @@ fn print_errors(errors: usize, total: usize) {
 fn test_output_filename() {
     let d = tempdir::TempDir::new("temp").unwrap();
     let dirname = d.path().to_str().unwrap();
-    assert_eq!(output_filename("", Some("foo"), "txt").unwrap(), Path::new("foo"));
+    assert_eq!(
+        output_filename("", Some("foo"), "txt").unwrap(),
+        Path::new("foo")
+    );
     let generated_filename = output_filename(dirname, None, "txt").unwrap();
 
     let filename_pattern = if cfg!(target_os = "windows") {
@@ -726,14 +788,16 @@ fn test_output_filename() {
         ".cache/rbspy/records/rbspy-"
     };
 
-    assert!(
-        generated_filename
-            .to_string_lossy()
-            .contains(filename_pattern)
-    );
+    assert!(generated_filename
+        .to_string_lossy()
+        .contains(filename_pattern));
 }
 
-fn output_filename(base_dir: &str, maybe_filename: Option<&str>, extension: &str) -> Result<PathBuf, Error> {
+fn output_filename(
+    base_dir: &str,
+    maybe_filename: Option<&str>,
+    extension: &str,
+) -> Result<PathBuf, Error> {
     let path = match maybe_filename {
         Some(filename) => filename.into(),
         None => {
@@ -742,8 +806,17 @@ fn output_filename(base_dir: &str, maybe_filename: Option<&str>, extension: &str
                 .take(10)
                 .map(char::from)
                 .collect();
-            let filename = format!("{}-{}-{}.{}", "rbspy", Utc::now().format("%Y-%m-%d"), s, extension);
-            let dirname = Path::new(base_dir).join(".cache").join("rbspy").join("records");
+            let filename = format!(
+                "{}-{}-{}.{}",
+                "rbspy",
+                Utc::now().format("%Y-%m-%d"),
+                s,
+                extension
+            );
+            let dirname = Path::new(base_dir)
+                .join(".cache")
+                .join("rbspy")
+                .join("records");
             DirBuilder::new().recursive(true).create(&dirname)?;
             dirname.join(&filename)
         }
@@ -754,7 +827,9 @@ fn output_filename(base_dir: &str, maybe_filename: Option<&str>, extension: &str
 /// Check `s` is a positive integer.
 // This assumes a process group isn't a sensible thing to snapshot; could be wrong!
 fn validate_pid(s: String) -> Result<(), String> {
-    let pid: Pid = s.parse().map_err(|_| "PID must be an integer".to_string())?;
+    let pid: Pid = s
+        .parse()
+        .map_err(|_| "PID must be an integer".to_string())?;
     if pid <= 0 {
         return Err("PID must be positive".to_string());
     }
@@ -886,7 +961,8 @@ impl Args {
                 let home = &std::env::var("userprofile")?;
 
                 let raw_path = output_filename(home, submatches.value_of("raw-file"), "raw.gz")?;
-                let out_path = output_filename(home, submatches.value_of("file"), &format.extension())?;
+                let out_path =
+                    output_filename(home, submatches.value_of("file"), &format.extension())?;
                 let maybe_duration = match value_t!(submatches, "duration", u64) {
                     Err(_) => None,
                     Ok(integer_duration) => Some(std::time::Duration::from_secs(integer_duration)),
@@ -982,7 +1058,10 @@ mod tests {
             x => panic!("Unexpected: {:?}", x),
         };
 
-        let args = Args::from(make_args("rbspy record --pid 1234 --file foo.txt --raw-file raw.gz")).unwrap();
+        let args = Args::from(make_args(
+            "rbspy record --pid 1234 --file foo.txt --raw-file raw.gz",
+        ))
+        .unwrap();
         assert_eq!(
             args,
             Args {
@@ -1003,7 +1082,8 @@ mod tests {
 
         let args = Args::from(make_args(
             "rbspy record --pid 1234 --file foo.txt --raw-file raw.gz --rate 25",
-        )).unwrap();
+        ))
+        .unwrap();
         assert_eq!(
             args,
             Args {
@@ -1024,7 +1104,8 @@ mod tests {
 
         let args = Args::from(make_args(
             "rbspy record --pid 1234 --file foo.txt --raw-file raw.gz --duration 60",
-        )).unwrap();
+        ))
+        .unwrap();
         assert_eq!(
             args,
             Args {
@@ -1066,7 +1147,8 @@ mod tests {
 
         let args = Args::from(make_args(
             "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --no-drop-root",
-        )).unwrap();
+        ))
+        .unwrap();
         assert_eq!(
             args,
             Args {
@@ -1087,7 +1169,8 @@ mod tests {
 
         let args = Args::from(make_args(
             "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --subprocesses",
-        )).unwrap();
+        ))
+        .unwrap();
         assert_eq!(
             args,
             Args {
@@ -1102,13 +1185,14 @@ mod tests {
                     with_subprocesses: true,
                     silent: false,
                     flame_min_width: 0.1,
-                    },
+                },
             }
         );
 
         let args = Args::from(make_args(
             "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --flame-min-width 0.02",
-        )).unwrap();
+        ))
+        .unwrap();
         assert_eq!(
             args,
             Args {
@@ -1123,16 +1207,14 @@ mod tests {
                     with_subprocesses: false,
                     silent: false,
                     flame_min_width: 0.02,
-                    },
+                },
             }
         );
     }
 
     #[test]
     fn test_report_arg_parsing() {
-        let args = Args::from(make_args(
-            "rbspy report --input xyz.raw.gz --output xyz",
-        )).unwrap();
+        let args = Args::from(make_args("rbspy report --input xyz.raw.gz --output xyz")).unwrap();
         assert_eq!(
             args,
             Args {

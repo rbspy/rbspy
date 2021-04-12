@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::io;
 use std::fs::File;
+use std::io;
 
 use crate::core::types::StackFrame;
 
@@ -22,16 +22,23 @@ impl Stats {
     }
 
     pub fn record(&mut self, stack: &[StackFrame]) -> Result<(), io::Error> {
-        let frame = stack.iter().rev().map(|frame| {
-            format!("{}", frame)
-        }).collect::<Vec<String>>().join(";");
+        let frame = stack
+            .iter()
+            .rev()
+            .map(|frame| format!("{}", frame))
+            .collect::<Vec<String>>()
+            .join(";");
 
         *self.counts.entry(frame).or_insert(0) += 1;
         Ok(())
     }
 
     pub fn write(&self, w: File) -> Result<()> {
-        let lines: Vec<String> = self.counts.iter().map(|(k, v)| format!("{} {}", k, v)).collect();
+        let lines: Vec<String> = self
+            .counts
+            .iter()
+            .map(|(k, v)| format!("{} {}", k, v))
+            .collect();
 
         let mut opts = Options::default();
         opts.direction = Direction::Inverted;
@@ -73,7 +80,11 @@ mod tests {
 
         let counts = &stats.counts;
         assert_contains(counts, "func1 - file1.rb:1", 1);
-        assert_contains(counts, "func1 - file1.rb:1;func3 - file3.rb:3;func2 - file2.rb:2", 3);
+        assert_contains(
+            counts,
+            "func1 - file1.rb:1;func3 - file3.rb:3;func2 - file2.rb:2",
+            3,
+        );
         assert_contains(counts, "func1 - file1.rb:1;func2 - file2.rb:2", 2);
 
         Ok(())

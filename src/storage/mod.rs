@@ -14,9 +14,9 @@
 extern crate anyhow;
 extern crate flate2;
 
+use std::fs::File;
 use std::io;
 use std::io::prelude::*;
-use std::fs::File;
 use std::path::Path;
 use std::time::SystemTime;
 
@@ -65,7 +65,6 @@ impl Store {
 
 #[derive(Clone, Debug, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) struct Version(u64);
-
 
 impl ::std::fmt::Display for Version {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {

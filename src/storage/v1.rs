@@ -1,6 +1,6 @@
+use crate::core::types::{Header, StackTrace};
 use std::io::prelude::*;
 use std::io::BufReader;
-use crate::core::types::{Header, StackTrace};
 
 use super::*;
 

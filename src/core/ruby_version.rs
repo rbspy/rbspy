@@ -30,7 +30,6 @@ macro_rules! ruby_version_v_1_9_1(
     )
 );
 
-
 macro_rules! ruby_version_v_1_9_2_to_3(
     // support for absolute paths appears for 1.9.2
     ($ruby_version:ident) => (
@@ -214,8 +213,8 @@ macro_rules! ruby_version_v3_0_x(
 macro_rules! get_execution_context_from_thread(
     ($thread_type:ident) => (
         pub fn get_execution_context<T: ProcessMemory>(
-            ruby_current_thread_address_location: usize, 
-            _ruby_vm_address_location: usize, 
+            ruby_current_thread_address_location: usize,
+            _ruby_vm_address_location: usize,
             source: &T
         ) -> Result<$thread_type, MemoryCopyError> {
             let current_thread_addr: usize = source.copy_struct(ruby_current_thread_address_location)
@@ -230,11 +229,11 @@ macro_rules! get_execution_context_from_thread(
 macro_rules! get_execution_context_from_vm(
     () => (
         pub fn get_execution_context<T: ProcessMemory>(
-            _ruby_current_thread_address_location: usize, 
-            ruby_vm_address_location: usize, 
+            _ruby_current_thread_address_location: usize,
+            ruby_vm_address_location: usize,
             source: &T
         ) -> Result<rb_execution_context_struct, MemoryCopyError> {
-            // This is a roundabout way to get the execution context address, but it helps us 
+            // This is a roundabout way to get the execution context address, but it helps us
             // avoid platform-specific structures in memory (e.g. pthread types) that would
             // require us to maintain separate ruby-structs bindings for each platform due to
             // their varying sizes and alignments.
@@ -243,10 +242,10 @@ macro_rules! get_execution_context_from_vm(
             let vm: rb_vm_struct = source.copy_struct(vm_addr as usize)
                 .context(vm_addr)?;
 
-            // Seek forward in the ractor struct, looking for the main thread's address. There 
-            // may be other copies of the main thread address in the ractor struct, so it's 
-            // important to jump as close as possible to the main_thread struct field before we 
-            // search, which is the purpose of the initial offset. The execution context pointer 
+            // Seek forward in the ractor struct, looking for the main thread's address. There
+            // may be other copies of the main thread address in the ractor struct, so it's
+            // important to jump as close as possible to the main_thread struct field before we
+            // search, which is the purpose of the initial offset. The execution context pointer
             // is in the memory word just before main_thread (see rb_ractor_struct).
             const ADDRESSES_TO_CHECK: usize = 64;
             let initial_offset = 520; // Found through experiment
@@ -453,7 +452,7 @@ macro_rules! get_ruby_string(
         use std::ffi::CStr;
 
         fn get_ruby_string<T>(
-            addr: usize, 
+            addr: usize,
             source: &T
         ) -> Result<String, MemoryCopyError> where T: ProcessMemory {
             let vec = {
@@ -504,7 +503,6 @@ macro_rules! get_stack_frame_1_9_1(
         }
         ));
 
-
 macro_rules! get_stack_frame_1_9_2(
     () => (
         fn get_stack_frame<T>(
@@ -550,7 +548,6 @@ macro_rules! get_lineno_1_9_0(
             }
         }
 ));
-
 
 macro_rules! get_lineno_2_0_0(
     () => (
@@ -782,7 +779,7 @@ macro_rules! get_cfunc_name_unsupported(
 macro_rules! get_cfunc_name(
     () => (
         fn check_method_entry<T: ProcessMemory>(
-            raw_imemo: usize, 
+            raw_imemo: usize,
             source: &T
         ) -> Result<*const rb_method_entry_struct, MemoryCopyError> {
             let imemo: rb_method_entry_struct = source.copy_struct(raw_imemo).context(raw_imemo)?;
@@ -800,12 +797,12 @@ macro_rules! get_cfunc_name(
         }
 
         fn get_cfunc_name<T: ProcessMemory>(
-            cfp: &rb_control_frame_t, 
-            global_symbols_address: usize, 
-            source: &T, 
+            cfp: &rb_control_frame_t,
+            global_symbols_address: usize,
+            source: &T,
             _pid: Pid
         ) -> Result<String, MemoryCopyError> {
-            // The logic in this function is adapted from the .gdbinit script in 
+            // The logic in this function is adapted from the .gdbinit script in
             // github.com/ruby/ruby, in particular the print_id function.
 
             let mut ep = cfp.ep as *mut usize;
@@ -819,7 +816,7 @@ macro_rules! get_cfunc_name(
             }
 
             let mut env_specval: usize = unsafe {
-                source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)? 
+                source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?
             };
             let mut env_me_cref: usize = unsafe {
                 source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-1) as usize)?
@@ -892,7 +889,7 @@ macro_rules! get_cfunc_name(
             }
 
             // ids is an array of pointers to RArray. First jump to the right index to get the
-            // pointer, then copy the _pointer_ into our memory space, and then finally copy the 
+            // pointer, then copy the _pointer_ into our memory space, and then finally copy the
             // pointed-to array into our memory space
             let array_remote_ptr = (ids_ptr as usize) + (idx as usize) * std::mem::size_of::<usize>();
             let array_ptr: usize = source.copy_struct(array_remote_ptr).context(array_remote_ptr)?;
@@ -995,25 +992,33 @@ mod tests {
             StackFrame {
                 name: "aaa".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
-                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                absolute_path: Some(
+                    "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
                 lineno: 2,
             },
             StackFrame {
                 name: "bbb".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
-                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                absolute_path: Some(
+                    "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
                 lineno: 6,
             },
             StackFrame {
                 name: "ccc".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
-                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                absolute_path: Some(
+                    "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
                 lineno: 10,
             },
             StackFrame {
                 name: "block in <main>".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
-                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                absolute_path: Some(
+                    "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
                 lineno: 14,
             },
             StackFrame::unknown_c_function(),
@@ -1021,11 +1026,13 @@ mod tests {
             StackFrame {
                 name: "<main>".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
-                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                absolute_path: Some(
+                    "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
                 lineno: 13,
             },
             StackFrame::unknown_c_function(),
-            ]
+        ]
     }
 
     fn real_stack_trace_2_7_2() -> Vec<StackFrame> {
@@ -1034,38 +1041,38 @@ mod tests {
                 name: "sleep [c function]".to_string(),
                 relative_path: "(unknown)".to_string(),
                 absolute_path: None,
-                lineno: 0
+                lineno: 0,
             },
             StackFrame {
                 name: "aaa".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
                 absolute_path: Some("/vagrant/ci/ruby-programs/infinite.rb".to_string()),
-                lineno: 3
+                lineno: 3,
             },
             StackFrame {
                 name: "bbb".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
                 absolute_path: Some("/vagrant/ci/ruby-programs/infinite.rb".to_string()),
-                lineno: 7
+                lineno: 7,
             },
             StackFrame {
                 name: "ccc".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
                 absolute_path: Some("/vagrant/ci/ruby-programs/infinite.rb".to_string()),
-                lineno: 11
+                lineno: 11,
             },
             StackFrame {
                 name: "block in <main>".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
                 absolute_path: Some("/vagrant/ci/ruby-programs/infinite.rb".to_string()),
-                lineno: 15
+                lineno: 15,
             },
             StackFrame {
                 name: "loop [c function]".to_string(),
                 relative_path: "(unknown)".to_string(),
                 absolute_path: None,
-                lineno: 0
-            }
+                lineno: 0,
+            },
         ]
     }
 
@@ -1075,35 +1082,45 @@ mod tests {
             StackFrame {
                 name: "aaa".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
-                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                absolute_path: Some(
+                    "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
                 lineno: 2,
             },
             StackFrame {
                 name: "bbb".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
-                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                absolute_path: Some(
+                    "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
                 lineno: 6,
             },
             StackFrame {
                 name: "ccc".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
-                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                absolute_path: Some(
+                    "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
                 lineno: 10,
             },
             StackFrame {
                 name: "block in <main>".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
-                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                absolute_path: Some(
+                    "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
                 lineno: 14,
             },
             StackFrame::unknown_c_function(),
             StackFrame {
                 name: "<main>".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
-                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                absolute_path: Some(
+                    "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
                 lineno: 13,
             },
-            ]
+        ]
     }
 
     fn real_stack_trace() -> Vec<StackFrame> {
@@ -1112,128 +1129,181 @@ mod tests {
             StackFrame {
                 name: "aaa".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
-                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                absolute_path: Some(
+                    "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
                 lineno: 2,
             },
             StackFrame {
                 name: "bbb".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
-                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                absolute_path: Some(
+                    "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
                 lineno: 6,
             },
             StackFrame {
                 name: "ccc".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
-                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                absolute_path: Some(
+                    "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
                 lineno: 10,
             },
             StackFrame {
                 name: "block in <main>".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
-                absolute_path: Some("/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string()),
+                absolute_path: Some(
+                    "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
                 lineno: 14,
             },
             StackFrame::unknown_c_function(),
-            ]
+        ]
     }
 
     // These tests on core dumps don't work on 32bit platforms (error is
     // "Not enough memory resources are available to complete this operation.")
     // disable.
-    #[cfg(target_pointer_width="64")]
+    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_2_1_6() {
         let current_thread_addr = 0x562658abd7f0;
-        let stack_trace =
-            ruby_version::ruby_2_1_6::get_stack_trace::<CoreDump>(current_thread_addr, 0, None, &coredump_2_1_6(), 0)
-            .unwrap();
+        let stack_trace = ruby_version::ruby_2_1_6::get_stack_trace::<CoreDump>(
+            current_thread_addr,
+            0,
+            None,
+            &coredump_2_1_6(),
+            0,
+        )
+        .unwrap();
         assert_eq!(real_stack_trace_main(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width="64")]
+    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_1_9_3() {
         let current_thread_addr = 0x823930;
-        let stack_trace =
-            ruby_version::ruby_1_9_3_0::get_stack_trace::<CoreDump>(current_thread_addr, 0, None, &coredump_1_9_3(), 0)
-            .unwrap();
+        let stack_trace = ruby_version::ruby_1_9_3_0::get_stack_trace::<CoreDump>(
+            current_thread_addr,
+            0,
+            None,
+            &coredump_1_9_3(),
+            0,
+        )
+        .unwrap();
         assert_eq!(real_stack_trace_1_9_3(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width="64")]
+    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_2_5_0() {
         let current_thread_addr = 0x55dd8c3b7758;
-        let stack_trace =
-            ruby_version::ruby_2_5_0::get_stack_trace::<CoreDump>(current_thread_addr, 0, None, &coredump_2_5_0(), 0)
-            .unwrap();
+        let stack_trace = ruby_version::ruby_2_5_0::get_stack_trace::<CoreDump>(
+            current_thread_addr,
+            0,
+            None,
+            &coredump_2_5_0(),
+            0,
+        )
+        .unwrap();
         assert_eq!(real_stack_trace(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width="64")]
+    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_2_4_0() {
         let current_thread_addr = 0x55df44959920;
-        let stack_trace =
-            ruby_version::ruby_2_4_0::get_stack_trace::<CoreDump>(current_thread_addr, 0, None, &coredump_2_4_0(), 0)
-            .unwrap();
+        let stack_trace = ruby_version::ruby_2_4_0::get_stack_trace::<CoreDump>(
+            current_thread_addr,
+            0,
+            None,
+            &coredump_2_4_0(),
+            0,
+        )
+        .unwrap();
         assert_eq!(real_stack_trace(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width="64")]
+    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_2_1_6_2() {
         // this stack is from a ruby program that is just running `select`
         let current_thread_addr = 0x562efcd577f0;
-        let stack_trace =
-            ruby_version::ruby_2_1_6::get_stack_trace(current_thread_addr, 0, None, &coredump_2_1_6_c_function(), 0)
-            .unwrap();
+        let stack_trace = ruby_version::ruby_2_1_6::get_stack_trace(
+            current_thread_addr,
+            0,
+            None,
+            &coredump_2_1_6_c_function(),
+            0,
+        )
+        .unwrap();
         assert_eq!(vec!(StackFrame::unknown_c_function()), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width="64")]
+    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_2_7_2() {
         let current_thread_addr = 0x7fdd8d626070;
         let global_symbols_addr = Some(0x7fdd8d60eb80);
-        let stack_trace =
-            ruby_version::ruby_2_7_2::get_stack_trace::<CoreDump>(current_thread_addr, 0, global_symbols_addr, &coredump_2_7_2(), 0)
-            .unwrap();
+        let stack_trace = ruby_version::ruby_2_7_2::get_stack_trace::<CoreDump>(
+            current_thread_addr,
+            0,
+            global_symbols_addr,
+            &coredump_2_7_2(),
+            0,
+        )
+        .unwrap();
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width="64")]
+    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_2_7_3() {
         let current_thread_addr = 0x7fdd8d626070;
         let global_symbols_addr = Some(0x7fdd8d60eb80);
-        let stack_trace =
-            ruby_version::ruby_2_7_3::get_stack_trace::<CoreDump>(current_thread_addr, 0, global_symbols_addr, &coredump_2_7_2(), 0)
-            .unwrap();
+        let stack_trace = ruby_version::ruby_2_7_3::get_stack_trace::<CoreDump>(
+            current_thread_addr,
+            0,
+            global_symbols_addr,
+            &coredump_2_7_2(),
+            0,
+        )
+        .unwrap();
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width="64")]
+    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_0_0() {
         let source = coredump_3_0_0();
         let vm_addr = 0x7fdacdab7470;
         let global_symbols_addr = Some(0x7fdacdaa9d80);
-        let stack_trace = 
-            ruby_version::ruby_3_0_0::get_stack_trace::<CoreDump>(0, vm_addr, global_symbols_addr, &source, 0)
-            .unwrap();
+        let stack_trace = ruby_version::ruby_3_0_0::get_stack_trace::<CoreDump>(
+            0,
+            vm_addr,
+            global_symbols_addr,
+            &source,
+            0,
+        )
+        .unwrap();
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width="64")]
+    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_0_1() {
         let source = coredump_3_0_0();
         let vm_addr = 0x7fdacdab7470;
         let global_symbols_addr = Some(0x7fdacdaa9d80);
-        let stack_trace = 
-            ruby_version::ruby_3_0_1::get_stack_trace::<CoreDump>(0, vm_addr, global_symbols_addr, &source, 0)
-            .unwrap();
+        let stack_trace = ruby_version::ruby_3_0_1::get_stack_trace::<CoreDump>(
+            0,
+            vm_addr,
+            global_symbols_addr,
+            &source,
+            0,
+        )
+        .unwrap();
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
 }
