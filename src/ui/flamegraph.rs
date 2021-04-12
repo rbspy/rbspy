@@ -10,11 +10,15 @@ use inferno::flamegraph::{Direction, Options};
 #[derive(Default)]
 pub struct Stats {
     pub counts: HashMap<String, usize>,
+    pub min_width: f64,
 }
 
 impl Stats {
-    pub fn new() -> Stats {
-        Default::default()
+    pub fn new(flame_min_width: f64) -> Stats {
+        Stats {
+            min_width: flame_min_width,
+            ..Default::default()
+        }
     }
 
     pub fn record(&mut self, stack: &[StackFrame]) -> Result<(), io::Error> {
@@ -31,6 +35,7 @@ impl Stats {
 
         let mut opts = Options::default();
         opts.direction = Direction::Inverted;
+        opts.min_width = self.min_width;
 
         inferno::flamegraph::from_lines(&mut opts, lines.iter().map(|x| x.as_str()), w).unwrap();
         Ok(())
@@ -57,7 +62,7 @@ mod tests {
 
     #[test]
     fn test_stats() -> Result<(), io::Error> {
-        let mut stats = Stats::new();
+        let mut stats = Stats::new(0.1);
 
         stats.record(&vec![f(1)])?;
         stats.record(&vec![f(2), f(1)])?;

@@ -88,7 +88,7 @@ arg_enum!{
 }
 
 /// Subcommand.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Clone, PartialEq, PartialOrd, Debug)]
 enum SubCmd {
     /// Record `target`, writing output `output`.
     Record {
@@ -100,7 +100,8 @@ enum SubCmd {
         format: OutputFormat,
         no_drop_root: bool,
         with_subprocesses: bool,
-        silent: bool
+        silent: bool,
+        flame_min_width: f64
     },
     /// Capture and print a stacktrace snapshot of process `pid`.
     Snapshot { pid: Pid },
@@ -109,7 +110,7 @@ enum SubCmd {
 use SubCmd::*;
 
 /// Top level args type.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Clone, PartialEq, PartialOrd, Debug)]
 struct Args {
     cmd: SubCmd,
 }
@@ -151,6 +152,7 @@ fn do_main() -> Result<(), Error> {
             no_drop_root,
             with_subprocesses,
             silent,
+            flame_min_width,
         } => {
             let pid = match target {
                 Target::Pid { pid } => pid,
@@ -197,6 +199,7 @@ fn do_main() -> Result<(), Error> {
                 silent,
                 sample_rate,
                 maybe_duration,
+                flame_min_width,
             )
         },
         Report{format, input, output} => report(format, input, output),
@@ -298,9 +301,9 @@ fn snapshot(pid: Pid) -> Result<(), Error> {
 }
 
 impl OutputFormat {
-    fn outputter(self) -> Box<dyn ui::output::Outputter> {
+    fn outputter(self, flame_min_width: f64) -> Box<dyn ui::output::Outputter> {
         match self {
-            OutputFormat::flamegraph => Box::new(output::Flamegraph(ui::flamegraph::Stats::new())),
+            OutputFormat::flamegraph => Box::new(output::Flamegraph(ui::flamegraph::Stats::new(flame_min_width))),
             OutputFormat::callgrind => Box::new(output::Callgrind(ui::callgrind::Stats::new())),
             OutputFormat::speedscope => Box::new(output::Speedscope(ui::speedscope::Stats::new())),
             OutputFormat::summary => Box::new(output::Summary(ui::summary::Stats::new())),
@@ -537,6 +540,7 @@ fn parallel_record(
     silent: bool,
     sample_rate: u32,
     maybe_duration: Option<std::time::Duration>,
+    flame_min_width: f64,
 ) -> Result<(), Error> {
 
     let maybe_stop_time = match maybe_duration {
@@ -549,7 +553,7 @@ fn parallel_record(
     // Aggregate stack traces as we receive them from the threads that are collecting them
     // Aggregate to 3 places: the raw output (`.raw.gz`), some summary statistics we display live,
     // and the formatted output (a flamegraph or something)
-    let mut out = format.outputter();
+    let mut out = format.outputter(flame_min_width);
     let mut summary_out = ui::summary::Stats::new();
     let mut raw_store = storage::Store::new(raw_path, sample_rate)?;
     let mut summary_time = std::time::Instant::now() + Duration::from_secs(1);
@@ -671,7 +675,7 @@ fn record(
 fn report(format: OutputFormat, input: PathBuf, output: PathBuf) -> Result<(), Error>{
     let input_file = File::open(input)?;
     let stuff = storage::from_reader(input_file)?.traces;
-    let mut outputter = format.outputter();
+    let mut outputter = format.outputter(0.1);
     for trace in stuff {
         outputter.record(&trace)?;
     }
@@ -829,6 +833,10 @@ fn arg_parser() -> App<'static, 'static> {
                     Arg::from_usage( "--silent='Don't print the summary profiling data every second'")
                         .required(false)
                 )
+                .arg(
+                    Arg::from_usage("--flame-min-width='Minimum flame width in %'")
+                        .default_value("0.1"),
+                )
                 .arg(Arg::from_usage("<cmd>... 'command to run'").required(false)),
         )
         .subcommand(
@@ -889,6 +897,7 @@ impl Args {
                 let with_subprocesses = submatches.is_present("subprocesses");
 
                 let sample_rate = value_t!(submatches, "rate", u32).unwrap();
+                let flame_min_width = value_t!(submatches, "flame-min-width", f64).unwrap();
                 let target = if let Some(pid) = get_pid(submatches) {
                     Target::Pid { pid }
                 } else {
@@ -910,6 +919,7 @@ impl Args {
                     no_drop_root,
                     with_subprocesses,
                     silent,
+                    flame_min_width,
                 }
             }
             ("report", Some(submatches)) => Report {
@@ -986,6 +996,7 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: false,
                     silent: false,
+                    flame_min_width: 0.1,
                 },
             }
         );
@@ -1006,6 +1017,7 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: false,
                     silent: false,
+                    flame_min_width: 0.1,
                 },
             }
         );
@@ -1026,6 +1038,7 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: false,
                     silent: false,
+                    flame_min_width: 0.1,
                 },
             }
         );
@@ -1046,6 +1059,7 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: false,
                     silent: false,
+                    flame_min_width: 0.1,
                 },
             }
         );
@@ -1066,6 +1080,7 @@ mod tests {
                     no_drop_root: true,
                     with_subprocesses: false,
                     silent: false,
+                    flame_min_width: 0.1,
                 },
             }
         );
@@ -1086,6 +1101,28 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: true,
                     silent: false,
+                    flame_min_width: 0.1,
+                    },
+            }
+        );
+
+        let args = Args::from(make_args(
+            "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --flame-min-width 0.02",
+        )).unwrap();
+        assert_eq!(
+            args,
+            Args {
+                cmd: Record {
+                    target: Target::Pid { pid: 1234 },
+                    out_path: "foo.txt".into(),
+                    raw_path: "raw.gz".into(),
+                    sample_rate: 100,
+                    maybe_duration: None,
+                    format: OutputFormat::flamegraph,
+                    no_drop_root: false,
+                    with_subprocesses: false,
+                    silent: false,
+                    flame_min_width: 0.02,
                     },
             }
         );
