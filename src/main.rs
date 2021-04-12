@@ -88,7 +88,7 @@ arg_enum!{
 }
 
 /// Subcommand.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Clone, PartialEq, PartialOrd, Debug)]
 enum SubCmd {
     /// Record `target`, writing output `output`.
     Record {
@@ -101,7 +101,7 @@ enum SubCmd {
         no_drop_root: bool,
         with_subprocesses: bool,
         silent: bool,
-        flamegraph_precision: u32
+        flamegraph_precision: f64
     },
     /// Capture and print a stacktrace snapshot of process `pid`.
     Snapshot { pid: Pid },
@@ -110,7 +110,7 @@ enum SubCmd {
 use SubCmd::*;
 
 /// Top level args type.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Clone, PartialEq, PartialOrd, Debug)]
 struct Args {
     cmd: SubCmd,
 }
@@ -301,7 +301,7 @@ fn snapshot(pid: Pid) -> Result<(), Error> {
 }
 
 impl OutputFormat {
-    fn outputter(self, flamegraph_precision: u32) -> Box<dyn ui::output::Outputter> {
+    fn outputter(self, flamegraph_precision: f64) -> Box<dyn ui::output::Outputter> {
         match self {
             OutputFormat::flamegraph => Box::new(output::Flamegraph(ui::flamegraph::Stats::new(flamegraph_precision))),
             OutputFormat::callgrind => Box::new(output::Callgrind(ui::callgrind::Stats::new())),
@@ -538,7 +538,7 @@ fn parallel_record(
     silent: bool,
     sample_rate: u32,
     maybe_duration: Option<std::time::Duration>,
-    flamegraph_precision: u32,
+    flamegraph_precision: f64,
 ) -> Result<(), Error> {
 
     let maybe_stop_time = match maybe_duration {
@@ -673,7 +673,7 @@ fn record(
 fn report(format: OutputFormat, input: PathBuf, output: PathBuf) -> Result<(), Error>{
     let input_file = File::open(input)?;
     let stuff = storage::from_reader(input_file)?.traces;
-    let mut outputter = format.outputter(10);
+    let mut outputter = format.outputter(0.1);
     for trace in stuff {
         outputter.record(&trace)?;
     }
@@ -832,8 +832,8 @@ fn arg_parser() -> App<'static, 'static> {
                         .required(false)
                 )
                 .arg(
-                    Arg::from_usage("--flamegraph-precision=[PRECISION] 'Minimum flame width = 1/PRECISION %'")
-                        .default_value("10"),
+                    Arg::from_usage("--flamegraph-precision='Minimum flame width in %'")
+                        .default_value("0.1"),
                 )
                 .arg(Arg::from_usage("<cmd>... 'command to run'").required(false)),
         )
@@ -895,7 +895,7 @@ impl Args {
                 let with_subprocesses = submatches.is_present("subprocesses");
 
                 let sample_rate = value_t!(submatches, "rate", u32).unwrap();
-                let flamegraph_precision = value_t!(submatches, "flamegraph-precision", u32).unwrap();
+                let flamegraph_precision = value_t!(submatches, "flamegraph-precision", f64).unwrap();
                 let target = if let Some(pid) = get_pid(submatches) {
                     Target::Pid { pid }
                 } else {
@@ -994,7 +994,7 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: false,
                     silent: false,
-                    flamegraph_precision: 10,
+                    flamegraph_precision: 0.1,
                 },
             }
         );
@@ -1015,7 +1015,7 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: false,
                     silent: false,
-                    flamegraph_precision: 10,
+                    flamegraph_precision: 0.1,
                 },
             }
         );
@@ -1036,7 +1036,7 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: false,
                     silent: false,
-                    flamegraph_precision: 10,
+                    flamegraph_precision: 0.1,
                 },
             }
         );
@@ -1057,7 +1057,7 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: false,
                     silent: false,
-                    flamegraph_precision: 10,
+                    flamegraph_precision: 0.1,
                 },
             }
         );
@@ -1078,7 +1078,7 @@ mod tests {
                     no_drop_root: true,
                     with_subprocesses: false,
                     silent: false,
-                    flamegraph_precision: 10,
+                    flamegraph_precision: 0.1,
                 },
             }
         );
@@ -1099,13 +1099,13 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: true,
                     silent: false,
-                    flamegraph_precision: 10,
+                    flamegraph_precision: 0.1,
                     },
             }
         );
 
         let args = Args::from(make_args(
-            "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --flamegraph-precision 50",
+            "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --flamegraph-precision 0.02",
         )).unwrap();
         assert_eq!(
             args,
@@ -1120,7 +1120,7 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: false,
                     silent: false,
-                    flamegraph_precision: 50,
+                    flamegraph_precision: 0.02,
                     },
             }
         );

@@ -14,9 +14,9 @@ pub struct Stats {
 }
 
 impl Stats {
-    pub fn new(flamegraph_precision: u32) -> Stats {
+    pub fn new(flamegraph_precision: f64) -> Stats {
         Stats {
-            min_width: 1_f64/(flamegraph_precision as f64),
+            min_width: flamegraph_precision,
             ..Default::default()
         }
     }
@@ -62,7 +62,7 @@ mod tests {
 
     #[test]
     fn test_stats() -> Result<(), io::Error> {
-        let mut stats = Stats::new(10);
+        let mut stats = Stats::new(0.1);
 
         stats.record(&vec![f(1)])?;
         stats.record(&vec![f(2), f(1)])?;
