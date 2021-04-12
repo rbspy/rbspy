@@ -182,7 +182,7 @@ fn do_main() -> Result<(), Error> {
                                 .context("Failed to parse UID")?;
                             eprintln!(
                                 "Dropping permissions: running Ruby command as user {}",
-                                std::env::var("SUDO_USER")?
+                                std::env::var("SUDO_USER").context("SUDO_USER")?
                             );
                             Command::new(prog).uid(uid).args(args).spawn()?.id() as Pid
                         } else {
@@ -956,9 +956,9 @@ impl Args {
                 let format = value_t!(submatches, "format", OutputFormat).unwrap();
 
                 #[cfg(unix)]
-                let home = &std::env::var("HOME")?;
+                let home = &std::env::var("HOME").context("HOME")?;
                 #[cfg(windows)]
-                let home = &std::env::var("userprofile")?;
+                let home = &std::env::var("userprofile").context("userprofile")?;
 
                 let raw_path = output_filename(home, submatches.value_of("raw-file"), "raw.gz")?;
                 let out_path =
