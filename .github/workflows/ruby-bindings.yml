@@ -1,0 +1,119 @@
+name: ruby-bindings
+on:
+  workflow_dispatch:
+jobs:
+  generate:
+    name: Generate Ruby bindings
+    env:
+      CARGO: cargo
+      TARGET_FLAGS: --target ${{ matrix.target }}
+      RUST_BACKTRACE: 1
+    timeout-minutes: 20
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby-version: [
+          # ruby 1_9_1_* and 1_9_2_* builds fail with yylex error
+          1_9_3_551,
+          2_0_0_648,
+          2_1_0, 2_1_1, 2_1_2, 2_1_3, 2_1_4, 2_1_5, 2_1_6, 2_1_7, 2_1_8, 2_1_9, 2_1_10,
+          2_2_0, 2_2_1, 2_2_2, 2_2_3, 2_2_4, 2_2_5, 2_2_6, 2_2_7, 2_2_8, 2_2_9, 2_2_10,
+          2_3_0, 2_3_1, 2_3_2, 2_3_3, 2_3_4, 2_3_5, 2_3_6, 2_3_7, 2_3_8,
+          2_4_0, 2_4_1, 2_4_2, 2_4_3, 2_4_4, 2_4_5, 2_4_6, 2_4_7, 2_4_8, 2_4_9, 2_4_10,
+          2_5_0, 2_5_1, 2_5_2, 2_5_3, 2_5_4, 2_5_5, 2_5_6, 2_5_7, 2_5_8,
+          2_6_0, 2_6_1, 2_6_2, 2_6_3, 2_6_4, 2_6_5, 2_6_6,
+          2_7_0, 2_7_1, 2_7_2, 2_7_3,
+          3_0_0, 3_0_1
+        ]
+        os: ["ubuntu-20.04"]
+        target: ["x86_64-unknown-linux-gnu"]
+    steps:
+    - name: Checkout rbspy repository
+      uses: actions/checkout@v2
+      with:
+          path: "rbspy"
+    - name: Checkout ruby repository
+      uses: actions/checkout@v2
+      with:
+        repository: "ruby/ruby"
+        path: "ruby"
+        ref: v${{ matrix.ruby-version }}
+    - name: Install Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 2.7.2
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+    - name: Install Rust toolchain target
+      run: |
+        rustup target add ${{ matrix.target }}
+    - name: Compile ruby include headers
+      run: |
+        set -euo pipefail
+
+        cd $GITHUB_WORKSPACE/ruby
+        autoconf
+        ./configure --disable-install-doc
+        make -j$(( $(nproc) + 1 )) incs
+    - name: Generate bindings for ruby ${{ matrix.ruby-version }}
+      run: |
+        set -euo pipefail
+
+        mkdir ~/clones
+        ln -s $GITHUB_WORKSPACE/ruby ~/clones/ruby
+        (
+          cd $GITHUB_WORKSPACE/rbspy
+          sh scripts/bindgen.sh ${{ matrix.ruby-version }}
+
+          mkdir ../bindings-staging
+          # Add new files to the index so that they get picked up
+          git add ruby-structs/src
+          cp $(git diff --name-only --staged | xargs) ../bindings-staging || echo "No new or modified files - bindings are up to date"
+        )
+    - name: Upload Bindings
+      uses: actions/upload-artifact@v2
+      with:
+        name: bindings-${{ matrix.ruby-version }}
+        path: bindings-staging
+
+  create-branch:
+    name: Create branch with updated bindings
+    runs-on: ubuntu-20.04
+    needs: [generate]
+    steps:
+      - name: Checkout rbspy repository
+        uses: actions/checkout@v2
+        with:
+            path: "rbspy"
+            fetch-depth: 0
+      - uses: actions/download-artifact@v2
+      - name: Copy bindings into place
+        run: |
+          cp bindings-*/ruby*.rs rbspy/ruby-structs/src/
+      - name: Create branch
+        run: |
+          # Configure git just enough that it can push branches
+          cat <<- EOF > $HOME/.netrc
+            machine github.com
+            login ${{ github.actor }}
+            password ${{ secrets.GITHUB_TOKEN }}
+    
+            machine api.github.com
+            login ${{ github.actor }}
+            password ${{ secrets.GITHUB_TOKEN }}
+          EOF
+          chmod 600 $HOME/.netrc
+
+          cd rbspy
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+
+          branch_name="generate-ruby-bindings-${{ github.run_number }}"
+          git checkout -b $branch_name
+          git commit -a -m "Regenerate ruby C bindings" --author="GitHub Actions <actions@github.com>"
+          git push --set-upstream origin $branch_name

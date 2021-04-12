@@ -1,4 +1,6 @@
-set -eux
+#!/bin/bash
+
+set -eu
 
 error() { echo "$@" 1>&2; }
 
@@ -10,7 +12,8 @@ fi
 
 ruby_header_dir="$(ruby -rrbconfig -e 'puts RbConfig::CONFIG["rubyarchhdrdir"]')"
 
-echo "#include </tmp/headers/$1/vm_core.h>" > /tmp/wrapper.h
+echo "#define RUBY_JMP_BUF sigjmp_buf" > /tmp/wrapper.h
+echo "#include </tmp/headers/$1/vm_core.h>" >> /tmp/wrapper.h
 echo "#include </tmp/headers/$1/iseq.h>" >> /tmp/wrapper.h
 rm -rf /tmp/headers/$1
 mkdir -p /tmp/headers/$1
@@ -32,6 +35,7 @@ bindgen /tmp/wrapper.h \
     -o /tmp/bindings.rs \
     --impl-debug \
     --no-doc-comments \
+    --rustfmt-bindings \
     --whitelist-type rb_iseq_constant_body \
     --whitelist-type rb_iseq_location_struct \
     --whitelist-type rb_thread_struct \
@@ -58,11 +62,8 @@ bindgen /tmp/wrapper.h \
     --whitelist-type vm_svar \
     -- \
     -I/tmp/headers/$1/include \
-    -I/home/bork/monorepo/ruby-header-files -I/tmp/headers/$1/ \
-    -I/usr/lib/llvm-3.8/lib/clang/3.8.0/include/ \
+    -I/tmp/headers/$1/ \
     "-I$ruby_header_dir"
-
-rustfmt /tmp/bindings.rs
 
 OUT=ruby-structs/src/ruby_${1}.rs
 echo "#![allow(non_upper_case_globals)]" > $OUT
