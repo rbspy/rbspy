@@ -14,9 +14,9 @@ pub struct Stats {
 }
 
 impl Stats {
-    pub fn new(flamegraph_precision: f64) -> Stats {
+    pub fn new(flame_min_width: f64) -> Stats {
         Stats {
-            min_width: flamegraph_precision,
+            min_width: flame_min_width,
             ..Default::default()
         }
     }
