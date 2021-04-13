@@ -988,6 +988,7 @@ ruby_version_v2_6_x!(ruby_2_6_3);
 ruby_version_v2_6_x!(ruby_2_6_4);
 ruby_version_v2_6_x!(ruby_2_6_5);
 ruby_version_v2_6_x!(ruby_2_6_6);
+ruby_version_v2_6_x!(ruby_2_6_7);
 ruby_version_v2_7_x!(ruby_2_7_0);
 ruby_version_v2_7_x!(ruby_2_7_1);
 ruby_version_v2_7_x!(ruby_2_7_2);
