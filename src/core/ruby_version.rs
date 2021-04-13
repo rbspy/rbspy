@@ -1183,21 +1183,6 @@ mod tests {
     // disable.
     #[cfg(target_pointer_width = "64")]
     #[test]
-    fn test_get_ruby_stack_trace_2_1_6() {
-        let current_thread_addr = 0x562658abd7f0;
-        let stack_trace = ruby_version::ruby_2_1_6::get_stack_trace::<CoreDump>(
-            current_thread_addr,
-            0,
-            None,
-            &coredump_2_1_6(),
-            0,
-        )
-        .unwrap();
-        assert_eq!(real_stack_trace_main(), stack_trace.trace);
-    }
-
-    #[cfg(target_pointer_width = "64")]
-    #[test]
     fn test_get_ruby_stack_trace_1_9_3() {
         let current_thread_addr = 0x823930;
         let stack_trace = ruby_version::ruby_1_9_3_0::get_stack_trace::<CoreDump>(
@@ -1213,17 +1198,33 @@ mod tests {
 
     #[cfg(target_pointer_width = "64")]
     #[test]
-    fn test_get_ruby_stack_trace_2_5_0() {
-        let current_thread_addr = 0x55dd8c3b7758;
-        let stack_trace = ruby_version::ruby_2_5_0::get_stack_trace::<CoreDump>(
+    fn test_get_ruby_stack_trace_2_1_6() {
+        let current_thread_addr = 0x562658abd7f0;
+        let stack_trace = ruby_version::ruby_2_1_6::get_stack_trace::<CoreDump>(
             current_thread_addr,
             0,
             None,
-            &coredump_2_5_0(),
+            &coredump_2_1_6(),
             0,
         )
         .unwrap();
-        assert_eq!(real_stack_trace(), stack_trace.trace);
+        assert_eq!(real_stack_trace_main(), stack_trace.trace);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn test_get_ruby_stack_trace_2_1_6_2() {
+        // this stack is from a ruby program that is just running `select`
+        let current_thread_addr = 0x562efcd577f0;
+        let stack_trace = ruby_version::ruby_2_1_6::get_stack_trace(
+            current_thread_addr,
+            0,
+            None,
+            &coredump_2_1_6_c_function(),
+            0,
+        )
+        .unwrap();
+        assert_eq!(vec!(StackFrame::unknown_c_function()), stack_trace.trace);
     }
 
     #[cfg(target_pointer_width = "64")]
@@ -1243,18 +1244,17 @@ mod tests {
 
     #[cfg(target_pointer_width = "64")]
     #[test]
-    fn test_get_ruby_stack_trace_2_1_6_2() {
-        // this stack is from a ruby program that is just running `select`
-        let current_thread_addr = 0x562efcd577f0;
-        let stack_trace = ruby_version::ruby_2_1_6::get_stack_trace(
+    fn test_get_ruby_stack_trace_2_5_0() {
+        let current_thread_addr = 0x55dd8c3b7758;
+        let stack_trace = ruby_version::ruby_2_5_0::get_stack_trace::<CoreDump>(
             current_thread_addr,
             0,
             None,
-            &coredump_2_1_6_c_function(),
+            &coredump_2_5_0(),
             0,
         )
         .unwrap();
-        assert_eq!(vec!(StackFrame::unknown_c_function()), stack_trace.trace);
+        assert_eq!(real_stack_trace(), stack_trace.trace);
     }
 
     #[cfg(target_pointer_width = "64")]
