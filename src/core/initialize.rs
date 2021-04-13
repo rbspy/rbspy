@@ -435,7 +435,7 @@ fn get_stack_trace_function(version: &str) -> StackTraceFn {
         "2.2.7" => ruby_version::ruby_2_2_7::get_stack_trace,
         "2.2.8" => ruby_version::ruby_2_2_8::get_stack_trace,
         "2.2.9" => ruby_version::ruby_2_2_9::get_stack_trace,
-        "2.2.10" => ruby_version::ruby_2_1_10::get_stack_trace,
+        "2.2.10" => ruby_version::ruby_2_2_10::get_stack_trace,
         "2.3.0" => ruby_version::ruby_2_3_0::get_stack_trace,
         "2.3.1" => ruby_version::ruby_2_3_1::get_stack_trace,
         "2.3.2" => ruby_version::ruby_2_3_2::get_stack_trace,
