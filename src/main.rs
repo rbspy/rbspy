@@ -380,7 +380,7 @@ impl SampleTime {
 /// Start thread(s) recording a PID and possibly its children. Tracks new processes
 /// Returns a pair of Receivers from which you can consume recorded stacktraces and errors
 fn spawn_recorder_children(
-    pid: Pid,
+    root_pid: Pid,
     with_subprocesses: bool,
     sample_rate: u32,
     maybe_stop_time: Option<Instant>,
@@ -390,7 +390,6 @@ fn spawn_recorder_children(
     Arc<AtomicUsize>,
     Arc<AtomicUsize>,
 ) {
-    let root_pid = pid;
     let done = Arc::new(AtomicBool::new(false));
     let total_traces = Arc::new(AtomicUsize::new(0));
     let timing_error_traces = Arc::new(AtomicUsize::new(0));
@@ -425,7 +424,7 @@ fn spawn_recorder_children(
         // appear
         let done_clone = done.clone();
         std::thread::spawn(move || {
-            let process = Process::new_with_retry(pid).unwrap();
+            let process = Process::new_with_retry(root_pid).unwrap();
             let mut pids: HashSet<Pid> = HashSet::new();
             let done = done.clone();
             // we need to exit this loop when the process we're monitoring exits, otherwise the
@@ -438,7 +437,7 @@ fn spawn_recorder_children(
                     .into_iter()
                     .map(|tuple| tuple.0)
                     .collect();
-                descendents.push(pid);
+                descendents.push(root_pid);
 
                 for pid in descendents {
                     if pids.contains(&pid) {
@@ -480,7 +479,7 @@ fn spawn_recorder_children(
         // Start a single recorder thread
         std::thread::spawn(move || {
             let result = record(
-                pid,
+                root_pid,
                 sample_rate,
                 maybe_stop_time,
                 done,
