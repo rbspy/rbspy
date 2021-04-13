@@ -10,8 +10,8 @@ on:
   schedule:
   - cron: '00 01 * * *'
 jobs:
-  rustfmt:
-    name: rustfmt
+  format:
+    name: Check code formatting
     runs-on: ubuntu-20.04
     steps:
     - name: Checkout repository
@@ -23,7 +23,7 @@ jobs:
         override: true
         profile: minimal
         components: rustfmt
-    - name: Check formatting
+    - name: Run cargo fmt
       run: |
         cargo fmt --all -- --check
 
