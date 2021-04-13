@@ -501,7 +501,6 @@ fn spawn_recorder_children(
 }
 
 // TODO: Find a more reliable way to test this on Windows hosts
-#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_spawn_record_children_subprocesses() {
     let which = if cfg!(target_os = "windows") {
@@ -554,16 +553,6 @@ fn test_spawn_record_children_subprocesses() {
 
     let results: Vec<_> = result_receiver.iter().take(4).collect();
     for r in results {
-        #[cfg(target_os = "windows")]
-        match &r {
-            Ok(_) => {}
-            Err(e) => match e.downcast_ref() {
-                Some(MemoryCopyError::OperationSucceeded) => {}
-                _ => r.expect("unexpected error"),
-            },
-        }
-
-        #[cfg(not(target_os = "windows"))]
         r.expect("unexpected error");
     }
 
