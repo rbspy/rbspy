@@ -339,40 +339,41 @@ macro_rules! get_stack_trace(
             Ok(StackTrace{trace, pid: Some(pid), thread_id: Some(get_thread_id(&thread, source)?), time: Some(SystemTime::now())})
         }
 
-use proc_maps::{maps_contain_addr, MapRange};
-use std::time::SystemTime;
+        use proc_maps::{maps_contain_addr, MapRange};
+        use std::time::SystemTime;
 
-// Checks whether the address looks even vaguely like a thread struct, mostly by making sure its
-// addresses are reasonable
-fn could_be_thread(thread: &$thread_type, all_maps: &[MapRange]) -> bool {
-    maps_contain_addr(thread.tag as usize, all_maps) &&
-        maps_contain_addr(thread.cfp as usize, all_maps) &&
-        maps_contain_addr(stack_field(thread) as usize, all_maps) &&
-        stack_size_field(thread) < 3_000_000
-}
+        // Checks whether the address looks even vaguely like a thread struct, mostly by making sure its
+        // addresses are reasonable
+        fn could_be_thread(thread: &$thread_type, all_maps: &[MapRange]) -> bool {
+            maps_contain_addr(thread.tag as usize, all_maps) &&
+                maps_contain_addr(thread.cfp as usize, all_maps) &&
+                maps_contain_addr(stack_field(thread) as usize, all_maps) &&
+                stack_size_field(thread) < 3_000_000
+        }
 
-fn stack_base(thread: &$thread_type) -> i64 {
-    stack_field(thread) + stack_size_field(thread) * std::mem::size_of::<VALUE>() as i64 - 1 * std::mem::size_of::<rb_control_frame_t>() as i64
-}
+        fn stack_base(thread: &$thread_type) -> i64 {
+            stack_field(thread) + stack_size_field(thread) * std::mem::size_of::<VALUE>() as i64 - 1 * std::mem::size_of::<rb_control_frame_t>() as i64
+        }
 
-pub fn is_maybe_thread<T>(x: usize, x_addr: usize, source: &T, all_maps: &[MapRange]) -> bool where T: ProcessMemory {
-    if !maps_contain_addr(x, all_maps) {
-        return false;
-    }
+        pub fn is_maybe_thread<T>(x: usize, x_addr: usize, source: &T, all_maps: &[MapRange]) -> bool where T: ProcessMemory {
+            if !maps_contain_addr(x, all_maps) {
+                return false;
+            }
 
-    let thread: $thread_type = match source.copy_struct(x) {
-        Ok(x) => x,
-        _ => { return false; },
-    };
+            let thread: $thread_type = match source.copy_struct(x) {
+                Ok(x) => x,
+                _ => { return false; },
+            };
 
-    if !could_be_thread(&thread, &all_maps) {
-        return false;
-    }
+            if !could_be_thread(&thread, &all_maps) {
+                return false;
+            }
 
-    // finally, try to get an actual stack trace from the source and see if it works
-    get_stack_trace(x_addr, 0, None, source, 0).is_ok()
-}
-));
+            // finally, try to get an actual stack trace from the source and see if it works
+            get_stack_trace(x_addr, 0, None, source, 0).is_ok()
+        }
+    )
+);
 
 macro_rules! stack_field_1_9_0(
     () => (
@@ -383,7 +384,8 @@ macro_rules! stack_field_1_9_0(
         fn stack_size_field(thread: &rb_thread_struct) -> i64 {
             thread.stack_size as i64
         }
-        ));
+    )
+);
 
 macro_rules! stack_field_2_5_0(
     () => (
@@ -395,7 +397,8 @@ macro_rules! stack_field_2_5_0(
         fn stack_size_field(thread: &rb_execution_context_struct) -> i64 {
             thread.vm_stack_size as i64
         }
-        ));
+    )
+);
 
 macro_rules! get_thread_id_1_9_0(
     () => (
@@ -403,8 +406,8 @@ macro_rules! get_thread_id_1_9_0(
         fn get_thread_id<T>(thread_struct: &rb_thread_struct, _source: &T) -> Result<usize, MemoryCopyError> {
             Ok(thread_struct.thread_id as usize)
         }
-
-        ));
+    )
+);
 
 macro_rules! get_thread_id_2_5_0(
     () => (
@@ -415,8 +418,8 @@ macro_rules! get_thread_id_2_5_0(
                 .context(thread_struct.thread_ptr as usize)?;
             Ok(thread.thread_id as usize)
         }
-
-        ));
+    )
+);
 
 macro_rules! get_ruby_string_array_2_5_0(
     () => (
@@ -485,7 +488,8 @@ macro_rules! get_ruby_string(
 
             String::from_utf8(vec).or(Err(error))
         }
-));
+    )
+);
 
 macro_rules! get_stack_frame_1_9_1(
     () => (
@@ -501,7 +505,8 @@ macro_rules! get_stack_frame_1_9_1(
                 lineno: get_lineno(iseq_struct, cfp, source)?,
             })
         }
-        ));
+    )
+);
 
 macro_rules! get_stack_frame_1_9_2(
     () => (
@@ -517,7 +522,8 @@ macro_rules! get_stack_frame_1_9_2(
                 lineno: get_lineno(iseq_struct, cfp, source)?,
             })
         }
-        ));
+    )
+);
 
 macro_rules! get_lineno_1_9_0(
     () => (
@@ -547,7 +553,8 @@ macro_rules! get_lineno_1_9_0(
                 Ok(table[t_size-1].line_no as u32)
             }
         }
-));
+    )
+);
 
 macro_rules! get_lineno_2_0_0(
     () => (
@@ -577,7 +584,8 @@ macro_rules! get_lineno_2_0_0(
                 Ok(table[t_size-1].line_no)
             }
         }
-));
+    )
+);
 
 macro_rules! get_lineno_2_3_0(
     () => (
@@ -607,7 +615,8 @@ macro_rules! get_lineno_2_3_0(
                 Ok(table[t_size-1].line_no)
             }
         }
-));
+    )
+);
 
 macro_rules! get_pos(
     ($iseq_type:ident) => (
@@ -622,7 +631,8 @@ macro_rules! get_pos(
             }
             Ok(pos)
         }
-));
+    )
+);
 
 macro_rules! get_lineno_2_5_0(
     () => (
@@ -652,7 +662,8 @@ macro_rules! get_lineno_2_5_0(
                 Ok(table[t_size-1].line_no as u32)
             }
         }
-));
+    )
+);
 
 macro_rules! get_lineno_2_6_0(
     () => (
@@ -684,7 +695,8 @@ macro_rules! get_lineno_2_6_0(
                 Ok(table[t_size-1].line_no as u32)
             }
         }
-));
+    )
+);
 
 macro_rules! get_stack_frame_2_0_0(
     () => (
@@ -700,7 +712,8 @@ macro_rules! get_stack_frame_2_0_0(
                 lineno: get_lineno(iseq_struct, cfp, source)?,
             })
         }
-        ));
+    )
+);
 
 macro_rules! get_stack_frame_2_3_0(
     () => (
@@ -718,7 +731,8 @@ macro_rules! get_stack_frame_2_3_0(
                 lineno: get_lineno(&body, cfp, source)?,
             })
         }
-        ));
+    )
+);
 
 macro_rules! get_stack_frame_2_5_0(
     () => (
@@ -740,7 +754,8 @@ macro_rules! get_stack_frame_2_5_0(
                 lineno: get_lineno(&body, cfp, source)?,
             })
         }
-        ));
+    )
+);
 
 macro_rules! get_cfps(
     () => (
@@ -766,7 +781,8 @@ macro_rules! get_cfps(
                     .context(cfp_address)?
             )
         }
-        ));
+    )
+);
 
 macro_rules! get_cfunc_name_unsupported(
     () => (
