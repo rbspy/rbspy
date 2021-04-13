@@ -380,7 +380,7 @@ impl SampleTime {
 /// Start thread(s) recording a PID and possibly its children. Tracks new processes
 /// Returns a pair of Receivers from which you can consume recorded stacktraces and errors
 fn spawn_recorder_children(
-    pid: Pid,
+    root_pid: Pid,
     with_subprocesses: bool,
     sample_rate: u32,
     maybe_stop_time: Option<Instant>,
@@ -424,7 +424,7 @@ fn spawn_recorder_children(
         // appear
         let done_clone = done.clone();
         std::thread::spawn(move || {
-            let process = Process::new_with_retry(pid).unwrap();
+            let process = Process::new_with_retry(root_pid).unwrap();
             let mut pids: HashSet<Pid> = HashSet::new();
             let done = done.clone();
             // we need to exit this loop when the process we're monitoring exits, otherwise the
@@ -437,7 +437,7 @@ fn spawn_recorder_children(
                     .into_iter()
                     .map(|tuple| tuple.0)
                     .collect();
-                descendents.push(pid);
+                descendents.push(root_pid);
 
                 for pid in descendents {
                     if pids.contains(&pid) {
@@ -447,7 +447,8 @@ fn spawn_recorder_children(
                     pids.insert(pid);
                     let trace_sender = trace_sender.clone();
                     let error_sender = error_sender.clone();
-                    let done = done.clone();
+                    let done_root = done.clone();
+                    let done_thread = done.clone();
                     let timing_error_traces = timing_error_traces.clone();
                     let total_traces = total_traces.clone();
                     std::thread::spawn(move || {
@@ -455,13 +456,20 @@ fn spawn_recorder_children(
                             pid,
                             sample_rate,
                             maybe_stop_time,
-                            done,
+                            done_thread,
                             timing_error_traces,
                             total_traces,
                             trace_sender,
                         );
                         error_sender.send(result).expect("couldn't send error");
                         drop(error_sender);
+
+                        if pid == root_pid {
+                            debug!("Root process {} ended", pid);
+                            // we need to store done = true here to signal the other threads here that we
+                            // should stop profiling
+                            done_root.store(true, Ordering::Relaxed);
+                        }
                     });
                 }
                 std::thread::sleep(Duration::from_secs(1));
@@ -471,7 +479,7 @@ fn spawn_recorder_children(
         // Start a single recorder thread
         std::thread::spawn(move || {
             let result = record(
-                pid,
+                root_pid,
                 sample_rate,
                 maybe_stop_time,
                 done,
@@ -492,7 +500,6 @@ fn spawn_recorder_children(
 }
 
 // TODO: Find a more reliable way to test this on Windows hosts
-#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_spawn_record_children_subprocesses() {
     let which = if cfg!(target_os = "windows") {
@@ -545,16 +552,6 @@ fn test_spawn_record_children_subprocesses() {
 
     let results: Vec<_> = result_receiver.iter().take(4).collect();
     for r in results {
-        #[cfg(target_os = "windows")]
-        match &r {
-            Ok(_) => {}
-            Err(e) => match e.downcast_ref() {
-                Some(MemoryCopyError::OperationSucceeded) => {}
-                _ => r.expect("unexpected error"),
-            },
-        }
-
-        #[cfg(not(target_os = "windows"))]
         r.expect("unexpected error");
     }
 
@@ -679,11 +676,8 @@ fn record(
             }
             Err(x) => {
                 if let Some(MemoryCopyError::ProcessEnded) = x.downcast_ref() {
-                    // we need to store done = true here to signal the other threads here that we
-                    // should stop profiling
-                    done.store(true, Ordering::Relaxed);
-                    debug!("Process ended");
-                    break;
+                    debug!("Process {} ended", pid);
+                    return Ok(());
                 }
 
                 errors += 1;
