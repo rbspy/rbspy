@@ -390,6 +390,7 @@ fn spawn_recorder_children(
     Arc<AtomicUsize>,
     Arc<AtomicUsize>,
 ) {
+    let root_pid = pid;
     let done = Arc::new(AtomicBool::new(false));
     let total_traces = Arc::new(AtomicUsize::new(0));
     let timing_error_traces = Arc::new(AtomicUsize::new(0));
@@ -447,7 +448,8 @@ fn spawn_recorder_children(
                     pids.insert(pid);
                     let trace_sender = trace_sender.clone();
                     let error_sender = error_sender.clone();
-                    let done = done.clone();
+                    let done_root = done.clone();
+                    let done_thread = done.clone();
                     let timing_error_traces = timing_error_traces.clone();
                     let total_traces = total_traces.clone();
                     std::thread::spawn(move || {
@@ -455,13 +457,20 @@ fn spawn_recorder_children(
                             pid,
                             sample_rate,
                             maybe_stop_time,
-                            done,
+                            done_thread,
                             timing_error_traces,
                             total_traces,
                             trace_sender,
                         );
                         error_sender.send(result).expect("couldn't send error");
                         drop(error_sender);
+
+                        if pid == root_pid {
+                            debug!("Root process {} ended", pid);
+                            // we need to store done = true here to signal the other threads here that we
+                            // should stop profiling
+                            done_root.store(true, Ordering::Relaxed);
+                        }
                     });
                 }
                 std::thread::sleep(Duration::from_secs(1));
@@ -679,11 +688,8 @@ fn record(
             }
             Err(x) => {
                 if let Some(MemoryCopyError::ProcessEnded) = x.downcast_ref() {
-                    // we need to store done = true here to signal the other threads here that we
-                    // should stop profiling
-                    done.store(true, Ordering::Relaxed);
-                    debug!("Process ended");
-                    break;
+                    debug!("Process {} ended", pid);
+                    return Ok(());
                 }
 
                 errors += 1;
