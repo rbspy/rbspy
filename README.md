@@ -1,5 +1,6 @@
 # rbspy
 
+[![crates.io](https://badgen.net/crates/v/rbspy)](https://crates.io/crates/rbspy)
 [![ci](https://github.com/rbspy/rbspy/actions/workflows/ci.yml/badge.svg)](https://github.com/rbspy/rbspy/actions/workflows/ci.yml)
 
 <img src="https://rbspy.github.io/rbspy.jpg" width="128px">
