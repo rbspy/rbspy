@@ -74,6 +74,35 @@ impl StackTraceGetter {
 
     fn get_trace_from_current_thread(&self) -> Result<StackTrace, MemoryCopyError> {
         let stack_trace_function = &self.stack_trace_function;
+        let _lock = self
+            .process
+            .lock()
+            .context("locking process during stack trace retrieval")
+            .or_else(|e| {
+                if let Some(source) = e.source() {
+                    match source.downcast_ref::<remoteprocess::Error>().ok_or(source) {
+                        Ok(remoteprocess::Error::IOError(e)) => {
+                            match e.kind() {
+                                std::io::ErrorKind::NotFound => {
+                                    return Err(MemoryCopyError::ProcessEnded)
+                                }
+                                _ => {}
+                            };
+                        }
+                        #[cfg(target_os = "linux")]
+                        Ok(remoteprocess::Error::NixError(e)) => match e {
+                            nix::Error::Sys(nix::errno::Errno::EPERM) => {
+                                return Err(MemoryCopyError::ProcessEnded);
+                            }
+                            _ => {}
+                        },
+                        _ => {}
+                    }
+                }
+
+                Err(e.into())
+            })?;
+
         stack_trace_function(
             self.current_thread_addr_location,
             self.ruby_vm_addr_location,
