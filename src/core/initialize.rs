@@ -86,6 +86,10 @@ impl StackTraceGetter {
                                 std::io::ErrorKind::NotFound => {
                                     return Err(MemoryCopyError::ProcessEnded)
                                 }
+                                // Windows
+                                std::io::ErrorKind::PermissionDenied => {
+                                    return Err(MemoryCopyError::ProcessEnded)
+                                }
                                 _ => {}
                             };
                         }
