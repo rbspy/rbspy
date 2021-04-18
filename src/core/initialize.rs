@@ -12,7 +12,7 @@ use std::time::Duration;
 /**
  * Initialization code for the profiler.
  *
- * The only public function here is `initialize(pid: Pid)`, which returns a struct which you can
+ * The only public function here is `initialize`, which returns a struct which you can
  * call `get_trace()` on to get a stack trace.
  *
  * Core responsibilities of this code:
@@ -21,7 +21,7 @@ use std::time::Duration;
  *   * Find the right stack trace function for the Ruby version we found
  *   * Package all that up into a struct that the user can use to get stack traces.
  */
-pub fn initialize(pid: Pid) -> Result<StackTraceGetter> {
+pub fn initialize(pid: Pid, lock_process: bool) -> Result<StackTraceGetter> {
     let process = Process::new_with_retry(pid)?;
     let (
         current_thread_addr_location,
@@ -37,6 +37,7 @@ pub fn initialize(pid: Pid) -> Result<StackTraceGetter> {
         global_symbols_addr_location,
         stack_trace_function,
         reinit_count: 0,
+        lock_process,
     })
 }
 
@@ -48,6 +49,7 @@ pub struct StackTraceGetter {
     global_symbols_addr_location: Option<usize>,
     stack_trace_function: StackTraceFn,
     reinit_count: u32,
+    lock_process: bool,
 }
 
 impl StackTraceGetter {
@@ -74,38 +76,42 @@ impl StackTraceGetter {
 
     fn get_trace_from_current_thread(&self) -> Result<StackTrace, MemoryCopyError> {
         let stack_trace_function = &self.stack_trace_function;
-        let _lock = self
-            .process
-            .lock()
-            .context("locking process during stack trace retrieval")
-            .or_else(|e| {
-                if let Some(source) = e.source() {
-                    match source.downcast_ref::<remoteprocess::Error>().ok_or(source) {
-                        Ok(remoteprocess::Error::IOError(e)) => {
-                            match e.kind() {
-                                std::io::ErrorKind::NotFound => {
-                                    return Err(MemoryCopyError::ProcessEnded)
-                                }
-                                // Windows
-                                std::io::ErrorKind::PermissionDenied => {
-                                    return Err(MemoryCopyError::ProcessEnded)
+
+        let _lock;
+        if self.lock_process {
+            _lock = self
+                .process
+                .lock()
+                .context("locking process during stack trace retrieval")
+                .or_else(|e| {
+                    if let Some(source) = e.source() {
+                        match source.downcast_ref::<remoteprocess::Error>().ok_or(source) {
+                            Ok(remoteprocess::Error::IOError(e)) => {
+                                match e.kind() {
+                                    std::io::ErrorKind::NotFound => {
+                                        return Err(MemoryCopyError::ProcessEnded)
+                                    }
+                                    // Windows
+                                    std::io::ErrorKind::PermissionDenied => {
+                                        return Err(MemoryCopyError::ProcessEnded)
+                                    }
+                                    _ => {}
+                                };
+                            }
+                            #[cfg(target_os = "linux")]
+                            Ok(remoteprocess::Error::NixError(e)) => match e {
+                                nix::Error::Sys(nix::errno::Errno::EPERM) => {
+                                    return Err(MemoryCopyError::ProcessEnded);
                                 }
                                 _ => {}
-                            };
-                        }
-                        #[cfg(target_os = "linux")]
-                        Ok(remoteprocess::Error::NixError(e)) => match e {
-                            nix::Error::Sys(nix::errno::Errno::EPERM) => {
-                                return Err(MemoryCopyError::ProcessEnded);
-                            }
+                            },
                             _ => {}
-                        },
-                        _ => {}
+                        }
                     }
-                }
 
-                Err(e.into())
-            })?;
+                    Err(e.into())
+                })?;
+        }
 
         stack_trace_function(
             self.current_thread_addr_location,
@@ -327,7 +333,7 @@ fn test_get_trace() {
         .spawn()
         .unwrap();
     let pid = process.id() as Pid;
-    let mut getter = initialize(pid).unwrap();
+    let mut getter = initialize(pid, true).unwrap();
     std::thread::sleep(std::time::Duration::from_millis(50));
     let trace = getter.get_trace();
     assert!(trace.is_ok());
@@ -349,7 +355,7 @@ fn test_get_exec_trace() {
         .unwrap();
 
     let pid = process.id() as Pid;
-    let mut getter = initialize(pid).expect("initialize");
+    let mut getter = initialize(pid, true).expect("initialize");
 
     std::thread::sleep(std::time::Duration::from_millis(50));
     let trace1 = getter.get_trace();

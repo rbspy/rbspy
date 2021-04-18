@@ -102,9 +102,10 @@ enum SubCmd {
         with_subprocesses: bool,
         silent: bool,
         flame_min_width: f64,
+        lock_process: bool,
     },
     /// Capture and print a stacktrace snapshot of process `pid`.
-    Snapshot { pid: Pid },
+    Snapshot { pid: Pid, lock_process: bool },
     Report {
         format: OutputFormat,
         input: PathBuf,
@@ -142,11 +143,11 @@ fn do_main() -> Result<(), Error> {
     }
 
     match args.cmd {
-        Snapshot { pid } => {
+        Snapshot { pid, lock_process } => {
             #[cfg(all(windows, target_arch = "x86_64"))]
             check_wow64_process(pid);
 
-            snapshot(pid)
+            snapshot(pid, lock_process)
         }
         Record {
             target,
@@ -159,6 +160,7 @@ fn do_main() -> Result<(), Error> {
             with_subprocesses,
             silent,
             flame_min_width,
+            lock_process,
         } => {
             let pid = match target {
                 Target::Pid { pid } => pid,
@@ -210,6 +212,7 @@ fn do_main() -> Result<(), Error> {
                 sample_rate,
                 maybe_duration,
                 flame_min_width,
+                lock_process,
             )
         }
         Report {
@@ -306,8 +309,8 @@ fn main() {
     }
 }
 
-fn snapshot(pid: Pid) -> Result<(), Error> {
-    let mut getter = initialize(pid)?;
+fn snapshot(pid: Pid, lock_process: bool) -> Result<(), Error> {
+    let mut getter = initialize(pid, lock_process)?;
     let trace = getter.get_trace()?;
     for x in trace.iter().rev() {
         println!("{}", x);
@@ -384,6 +387,7 @@ fn spawn_recorder_children(
     with_subprocesses: bool,
     sample_rate: u32,
     maybe_stop_time: Option<Instant>,
+    lock_process: bool,
 ) -> (
     Receiver<StackTrace>,
     Receiver<Result<(), Error>>,
@@ -460,6 +464,7 @@ fn spawn_recorder_children(
                             timing_error_traces,
                             total_traces,
                             trace_sender,
+                            lock_process,
                         );
                         error_sender.send(result).expect("couldn't send error");
                         drop(error_sender);
@@ -486,6 +491,7 @@ fn spawn_recorder_children(
                 timing_error_traces,
                 total_traces,
                 trace_sender,
+                lock_process,
             );
             error_sender.send(result).unwrap();
             drop(error_sender);
@@ -531,7 +537,7 @@ fn test_spawn_record_children_subprocesses() {
 
     let pid = process.id() as Pid;
 
-    let (trace_receiver, result_receiver, _, _) = spawn_recorder_children(pid, true, 5, None);
+    let (trace_receiver, result_receiver, _, _) = spawn_recorder_children(pid, true, 5, None, true);
 
     let mut pids = HashSet::<Pid>::new();
     for trace in &trace_receiver {
@@ -571,6 +577,7 @@ fn parallel_record(
     sample_rate: u32,
     maybe_duration: Option<std::time::Duration>,
     flame_min_width: f64,
+    lock_process: bool,
 ) -> Result<(), Error> {
     let maybe_stop_time = match maybe_duration {
         Some(duration) => Some(std::time::Instant::now() + duration),
@@ -578,7 +585,13 @@ fn parallel_record(
     };
 
     let (trace_receiver, result_receiver, total_traces, timing_error_traces) =
-        spawn_recorder_children(pid, with_subprocesses, sample_rate, maybe_stop_time);
+        spawn_recorder_children(
+            pid,
+            with_subprocesses,
+            sample_rate,
+            maybe_stop_time,
+            lock_process,
+        );
 
     // Aggregate stack traces as we receive them from the threads that are collecting them
     // Aggregate to 3 places: the raw output (`.raw.gz`), some summary statistics we display live,
@@ -647,8 +660,9 @@ fn record(
     timing_error_traces: Arc<AtomicUsize>,
     total_traces: Arc<AtomicUsize>,
     sender: SyncSender<StackTrace>,
+    lock_process: bool,
 ) -> Result<(), Error> {
-    let mut getter = core::initialize::initialize(pid)?;
+    let mut getter = core::initialize::initialize(pid, lock_process)?;
 
     let mut total = 0;
     let mut errors = 0;
@@ -849,8 +863,12 @@ fn arg_parser() -> App<'static, 'static> {
                 .arg(
                     Arg::from_usage("-p --pid=[PID] 'PID of the Ruby process you want to profile'")
                         .validator(validate_pid)
-                        .required(true),
-                ),
+                        .required(true)
+                )
+                .arg(
+                    Arg::from_usage("--nonblocking='Don't pause the ruby process when taking the snapshot. Setting this option will reduce \
+                                                    the performance impact of sampling but may produce inaccurate results'"),
+                )
         )
         .subcommand(
             SubCommand::with_name("record")
@@ -906,6 +924,10 @@ fn arg_parser() -> App<'static, 'static> {
                     Arg::from_usage("--flame-min-width='Minimum flame width in %'")
                         .default_value("0.1"),
                 )
+                .arg(
+                    Arg::from_usage("--nonblocking='Don't pause the ruby process when collecting stack samples. Setting this option will reduce \
+                                                   the performance impact of sampling but may produce inaccurate results'"),
+                )
                 .arg(Arg::from_usage("<cmd>... 'command to run'").required(false)),
         )
         .subcommand(
@@ -941,10 +963,23 @@ impl Args {
             }
         }
 
+        fn get_lock_process(matches: &ArgMatches) -> Option<bool> {
+            if let Some(lock_process_str) = matches.value_of("lock_process") {
+                Some(
+                    lock_process_str
+                        .parse()
+                        .expect("this shouldn't happen because clap validated the arg"),
+                )
+            } else {
+                None
+            }
+        }
+
         let cmd = match matches.subcommand() {
             ("snapshot", Some(submatches)) => Snapshot {
                 pid: get_pid(submatches)
                     .expect("this shouldn't happen because clap requires a pid"),
+                lock_process: get_lock_process(submatches).unwrap_or_default(),
             },
             ("record", Some(submatches)) => {
                 let format = value_t!(submatches, "format", OutputFormat).unwrap();
@@ -965,6 +1000,7 @@ impl Args {
                 let no_drop_root = submatches.occurrences_of("no-drop-root") == 1;
                 let silent = submatches.is_present("silent");
                 let with_subprocesses = submatches.is_present("subprocesses");
+                let nonblocking = submatches.is_present("nonblocking");
 
                 let sample_rate = value_t!(submatches, "rate", u32).unwrap();
                 let flame_min_width = value_t!(submatches, "flame-min-width", f64).unwrap();
@@ -990,6 +1026,7 @@ impl Args {
                     with_subprocesses,
                     silent,
                     flame_min_width,
+                    lock_process: !nonblocking,
                 }
             }
             ("report", Some(submatches)) => Report {
@@ -1033,7 +1070,10 @@ mod tests {
         assert_eq!(
             args,
             Args {
-                cmd: Snapshot { pid: 1234 },
+                cmd: Snapshot {
+                    pid: 1234,
+                    lock_process: false
+                },
             }
         );
 
@@ -1070,6 +1110,7 @@ mod tests {
                     with_subprocesses: false,
                     silent: false,
                     flame_min_width: 0.1,
+                    lock_process: true,
                 },
             }
         );
@@ -1092,6 +1133,7 @@ mod tests {
                     with_subprocesses: false,
                     silent: false,
                     flame_min_width: 0.1,
+                    lock_process: true,
                 },
             }
         );
@@ -1114,6 +1156,7 @@ mod tests {
                     with_subprocesses: false,
                     silent: false,
                     flame_min_width: 0.1,
+                    lock_process: true,
                 },
             }
         );
@@ -1135,6 +1178,7 @@ mod tests {
                     with_subprocesses: false,
                     silent: false,
                     flame_min_width: 0.1,
+                    lock_process: true,
                 },
             }
         );
@@ -1157,6 +1201,7 @@ mod tests {
                     with_subprocesses: false,
                     silent: false,
                     flame_min_width: 0.1,
+                    lock_process: true,
                 },
             }
         );
@@ -1179,6 +1224,7 @@ mod tests {
                     with_subprocesses: true,
                     silent: false,
                     flame_min_width: 0.1,
+                    lock_process: true,
                 },
             }
         );
@@ -1201,6 +1247,30 @@ mod tests {
                     with_subprocesses: false,
                     silent: false,
                     flame_min_width: 0.02,
+                    lock_process: true,
+                },
+            }
+        );
+
+        let args = Args::from(make_args(
+            "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --nonblocking",
+        ))
+        .unwrap();
+        assert_eq!(
+            args,
+            Args {
+                cmd: Record {
+                    target: Target::Pid { pid: 1234 },
+                    out_path: "foo.txt".into(),
+                    raw_path: "raw.gz".into(),
+                    sample_rate: 100,
+                    maybe_duration: None,
+                    format: OutputFormat::flamegraph,
+                    no_drop_root: false,
+                    with_subprocesses: false,
+                    silent: false,
+                    flame_min_width: 0.1,
+                    lock_process: false,
                 },
             }
         );
