@@ -191,9 +191,7 @@ fn get_process_ruby_state(
         let current_thread_address = if version.as_str() >= "3.0.0" {
             // There's no symbol for the current thread address on ruby 3+, so we look it up
             // dynamically later
-            Err(anyhow::format_err!(
-                "programming error: no symbol for current thread address on ruby 3+"
-            ))
+            Ok(0)
         } else {
             let is_maybe_thread = is_maybe_thread_function(&version);
             address_finder::current_thread_address(process.pid, &version, is_maybe_thread)
