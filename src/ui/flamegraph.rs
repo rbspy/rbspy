@@ -44,7 +44,12 @@ impl Stats {
         opts.direction = Direction::Inverted;
         opts.min_width = self.min_width;
 
-        inferno::flamegraph::from_lines(&mut opts, lines.iter().map(|x| x.as_str()), w).unwrap();
+        if lines.is_empty() {
+            eprintln!("Warning: no profile samples were collected");
+        } else {
+            inferno::flamegraph::from_lines(&mut opts, lines.iter().map(|x| x.as_str()), w)?;
+        }
+
         Ok(())
     }
 }
