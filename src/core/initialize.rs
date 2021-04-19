@@ -161,15 +161,15 @@ fn get_process_ruby_state(
      */
     let mut i = 0;
     loop {
-        let version = get_ruby_version(process).context("Couldn't determine Ruby version");
-        if version.is_err() {
-            debug!("[{}] Retrying version", process.pid);
+        let version = get_ruby_version(&process).context("Couldn't determine Ruby version");
+        if let Err(e) = version {
+            debug!(
+                "[{}] Trying again to get ruby version. Last error was: {:?}",
+                process.pid, e
+            );
             i += 1;
             if i > 100 {
-                return Err(anyhow::format_err!(
-                    "Couldn't get ruby version: {:?}",
-                    version.err()
-                ));
+                return Err(anyhow::format_err!("Couldn't get ruby version: {:?}", e));
             }
             std::thread::sleep(Duration::from_millis(1));
             continue;
