@@ -111,28 +111,7 @@ type StackTraceFn =
 fn get_process_ruby_state(
     process: &Process,
 ) -> Result<(usize, usize, Option<usize>, StackTraceFn)> {
-    let version = get_ruby_version_retry(process).context("Couldn't determine Ruby version")?;
-
-    let current_thread_address = if version.as_str() >= "3.0.0" {
-        // There's no symbol for the current thread address on ruby 3+, so we look it up
-        // dynamically later
-        0
-    } else {
-        let is_maybe_thread = is_maybe_thread_function(&version);
-        address_finder::current_thread_address(process.pid, &version, is_maybe_thread)?
-    };
-
-    debug!("version: {}", version);
-    Ok((
-        current_thread_address,
-        address_finder::get_vm_address(process.pid, &version)?,
-        address_finder::get_ruby_global_symbols_address(process.pid, &version).ok(),
-        get_stack_trace_function(&version),
-    ))
-}
-
-fn get_ruby_version_retry(process: &Process) -> Result<String> {
-    /* This exists because:
+    /* This retry loop exists because:
      * a) Sometimes rbenv takes a while to exec the right Ruby binary.
      * b) Dynamic linking takes a nonzero amount of time, so even after the right Ruby binary is
      *    exec'd we still need to wait for the right memory maps to be in place
@@ -143,45 +122,93 @@ fn get_ruby_version_retry(process: &Process) -> Result<String> {
      */
     let mut i = 0;
     loop {
-        let version = get_ruby_version(process);
+        let version = get_ruby_version(process).context("Couldn't determine Ruby version");
+        if version.is_err() {
+            debug!("[{}] Retrying version", process.pid);
+            i += 1;
+            if i > 100 {
+                return Err(anyhow::format_err!(
+                    "Couldn't get ruby version: {:?}",
+                    version.err()
+                ));
+            }
+            std::thread::sleep(Duration::from_millis(1));
+            continue;
+        };
+        let version = version.unwrap();
+
+        let current_thread_address = if version.as_str() >= "3.0.0" {
+            // There's no symbol for the current thread address on ruby 3+, so we look it up
+            // dynamically later
+            Err(anyhow::format_err!(
+                "programming error: no symbol for current thread address on ruby 3+"
+            ))
+        } else {
+            let is_maybe_thread = is_maybe_thread_function(&version);
+            address_finder::current_thread_address(process.pid, &version, is_maybe_thread)
+        };
+        let vm_address = address_finder::get_vm_address(process.pid, &version);
+        let global_symbols_address =
+            address_finder::get_ruby_global_symbols_address(process.pid, &version);
+
+        let addresses_status = format!("version: {:x?}\ncurrent thread address: {:#x?}\nVM address: {:#x?}\nglobal symbols address: {:#x?}\n", version, &current_thread_address, &vm_address, global_symbols_address);
+
+        // The global symbols address lookup is allowed to fail (e.g. on older rubies)
+        if (&current_thread_address).is_ok() && (&vm_address).is_ok() {
+            debug!("{}", addresses_status);
+            return Ok((
+                current_thread_address.unwrap(),
+                vm_address.unwrap(),
+                global_symbols_address.ok(),
+                get_stack_trace_function(&version),
+            ));
+        }
 
         if i > 100 {
-            return Ok(version?);
+            return Err(anyhow::format_err!(
+                "Couldn't get ruby process state. Please open a GitHub issue for this and include the following information:\n{}",
+                addresses_status
+            ));
         }
-        match version {
-            Err(err) => {
-                match err.root_cause().downcast_ref::<AddressFinderError>() {
-                    #[cfg(not(target_os = "macos"))]
-                    Some(&AddressFinderError::PermissionDenied(_)) => {
-                        return Err(err);
-                    }
-                    #[cfg(target_os = "macos")]
-                    Some(&AddressFinderError::MacPermissionDenied(_)) => {
-                        return Err(err);
-                    }
-                    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
-                    Some(&AddressFinderError::NoSuchProcess(_)) => {
-                        return Err(err);
-                    }
-                    _ => {}
-                }
-                if let Some(&MemoryCopyError::PermissionDenied) =
-                    err.root_cause().downcast_ref::<MemoryCopyError>()
-                {
-                    return Err(err);
-                }
-            }
-            Ok(x) => {
-                return Ok(x);
-            }
-        }
-        // if it doesn't work, sleep for 1ms and try again
+
+        // if we didn't get the required addresses, sleep for a short time and try again
+        debug!("[{}] Trying again to get ruby process state", process.pid);
         i += 1;
         std::thread::sleep(Duration::from_millis(1));
     }
 }
 
 fn get_ruby_version(process: &Process) -> Result<String> {
+    match get_ruby_version_from_process(process) {
+        Err(err) => {
+            if let Some(&MemoryCopyError::PermissionDenied) =
+                err.root_cause().downcast_ref::<MemoryCopyError>()
+            {
+                return Err(err);
+            }
+            match err.root_cause().downcast_ref::<AddressFinderError>() {
+                #[cfg(not(target_os = "macos"))]
+                Some(&AddressFinderError::PermissionDenied(_)) => {
+                    return Err(err);
+                }
+                #[cfg(target_os = "macos")]
+                Some(&AddressFinderError::MacPermissionDenied(_)) => {
+                    return Err(err);
+                }
+                #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+                Some(&AddressFinderError::NoSuchProcess(_)) => {
+                    return Err(err);
+                }
+                _ => return Err(err),
+            }
+        }
+        Ok(x) => {
+            return Ok(x);
+        }
+    }
+}
+
+fn get_ruby_version_from_process(process: &Process) -> Result<String> {
     let addr = address_finder::get_ruby_version_address(process.pid)?;
     let x: [c_char; 15] = process.copy_struct(addr)?;
     Ok(unsafe {
@@ -195,7 +222,7 @@ fn get_ruby_version(process: &Process) -> Result<String> {
 #[cfg(target_os = "linux")]
 fn test_initialize_with_nonexistent_process() {
     let process = Process::new(10000).expect("Failed to initialize process");
-    let version = get_ruby_version_retry(&process);
+    let version = get_ruby_version(&process);
     match version
         .unwrap_err()
         .root_cause()
@@ -211,7 +238,7 @@ fn test_initialize_with_nonexistent_process() {
 #[cfg(target_os = "linux")]
 fn test_initialize_with_disallowed_process() {
     let process = Process::new(1).expect("Failed to initialize process");
-    let version = get_ruby_version_retry(&process);
+    let version = get_ruby_version(&process);
     match version
         .unwrap_err()
         .root_cause()
@@ -232,7 +259,21 @@ fn test_current_thread_address() {
         .unwrap();
     let pid = process.id() as Pid;
     let remoteprocess = Process::new(pid).expect("Failed to initialize process");
-    let version = get_ruby_version_retry(&remoteprocess).expect("version should exist");
+    let version;
+    let mut i = 0;
+    loop {
+        // It can take a moment for the process to become ready, so retry as needed
+        let r = get_ruby_version(&remoteprocess);
+        if r.is_ok() {
+            version = r.unwrap();
+            break;
+        }
+        if i > 100 {
+            panic!("couldn't get ruby version");
+        }
+        i += 1;
+        std::thread::sleep(Duration::from_millis(1));
+    }
     if version >= String::from("3.0.0") {
         // We won't be able to get the thread address directly, so skip this
         return;
