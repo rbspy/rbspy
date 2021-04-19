@@ -22,13 +22,13 @@ use std::time::Duration;
  *   * Package all that up into a struct that the user can use to get stack traces.
  */
 pub fn initialize(pid: Pid, lock_process: bool) -> Result<StackTraceGetter> {
-    let process = Process::new_with_retry(pid)?;
     let (
+        process,
         current_thread_addr_location,
         ruby_vm_addr_location,
         global_symbols_addr_location,
         stack_trace_function,
-    ) = get_process_ruby_state(&process)?;
+    ) = get_process_ruby_state(pid)?;
 
     Ok(StackTraceGetter {
         process,
@@ -124,12 +124,14 @@ impl StackTraceGetter {
 
     fn reinitialize(&mut self) -> Result<()> {
         let (
+            process,
             current_thread_addr_location,
             ruby_vm_addr_location,
             ruby_global_symbols_addr_location,
             stack_trace_function,
-        ) = get_process_ruby_state(&self.process)?;
+        ) = get_process_ruby_state(self.process.pid)?;
 
+        self.process = process;
         self.current_thread_addr_location = current_thread_addr_location;
         self.ruby_vm_addr_location = ruby_vm_addr_location;
         self.global_symbols_addr_location = ruby_global_symbols_addr_location;
@@ -148,8 +150,8 @@ type StackTraceFn =
     Box<dyn Fn(usize, usize, Option<usize>, &Process, Pid) -> Result<StackTrace, MemoryCopyError>>;
 
 fn get_process_ruby_state(
-    process: &Process,
-) -> Result<(usize, usize, Option<usize>, StackTraceFn)> {
+    pid: Pid,
+) -> Result<(Process, usize, usize, Option<usize>, StackTraceFn)> {
     /* This retry loop exists because:
      * a) Sometimes rbenv takes a while to exec the right Ruby binary.
      * b) Dynamic linking takes a nonzero amount of time, so even after the right Ruby binary is
@@ -161,6 +163,16 @@ fn get_process_ruby_state(
      */
     let mut i = 0;
     loop {
+        let process = Process::new_with_retry(pid);
+        if let Err(e) = process {
+            return Err(anyhow::format_err!(
+                "Couldn't find process with PID {}. Is it running? Error was {:?}",
+                pid,
+                e
+            ));
+        }
+        let process = process.unwrap();
+
         let version = get_ruby_version(&process).context("Couldn't determine Ruby version");
         if let Err(e) = version {
             debug!(
@@ -196,6 +208,7 @@ fn get_process_ruby_state(
         if (&current_thread_address).is_ok() && (&vm_address).is_ok() {
             debug!("{}", addresses_status);
             return Ok((
+                process,
                 current_thread_address.unwrap(),
                 vm_address.unwrap(),
                 global_symbols_address.ok(),
