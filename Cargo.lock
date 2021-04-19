@@ -827,7 +827,7 @@ dependencies = [
  "libc",
  "libproc",
  "log",
- "nix 0.20.0",
+ "nix 0.19.1",
  "proc-maps",
  "rand 0.8.3",
  "rbspy-ruby-structs",

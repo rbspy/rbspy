@@ -39,7 +39,7 @@ tempdir = "0.3"
 thiserror = "1.0.24"
 
 [target.'cfg(unix)'.dependencies]
-nix = "0.20.0"
+nix = "0.19.1"
 
 [target.'cfg(target_os="macos")'.dependencies]
 libproc = "0.9.1"
