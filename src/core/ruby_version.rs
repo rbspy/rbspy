@@ -531,7 +531,7 @@ macro_rules! get_lineno_1_9_0(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-            ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
+        ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
             let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.insn_info_size as usize;
             if t_size == 0 {
@@ -562,7 +562,7 @@ macro_rules! get_lineno_2_0_0(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-            ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
+        ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
             let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.line_info_size as usize;
             if t_size == 0 {
@@ -593,7 +593,7 @@ macro_rules! get_lineno_2_3_0(
             iseq_struct: &rb_iseq_constant_body,
             cfp: &rb_control_frame_t,
             source: &T,
-            ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
+        ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
             let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.line_info_size as usize;
             if t_size == 0 {
@@ -640,7 +640,7 @@ macro_rules! get_lineno_2_5_0(
             iseq_struct: &rb_iseq_constant_body,
             cfp: &rb_control_frame_t,
             source: &T,
-            ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
+        ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
             let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.insns_info_size as usize;
             if t_size == 0 {
@@ -671,7 +671,7 @@ macro_rules! get_lineno_2_6_0(
             iseq_struct: &rb_iseq_constant_body,
             _cfp: &rb_control_frame_t,
             source: &T,
-            ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
+        ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
             //let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.insns_info.size as usize;
             if t_size == 0 {
@@ -704,7 +704,7 @@ macro_rules! get_stack_frame_2_0_0(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-            ) -> Result<StackFrame, MemoryCopyError> where T: ProcessMemory {
+        ) -> Result<StackFrame, MemoryCopyError> where T: ProcessMemory {
             Ok(StackFrame{
                 name: get_ruby_string(iseq_struct.location.label as usize, source)?,
                 relative_path: get_ruby_string(iseq_struct.location.path as usize, source)?,
@@ -721,7 +721,7 @@ macro_rules! get_stack_frame_2_3_0(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-            ) -> Result<StackFrame, MemoryCopyError> where T: ProcessMemory {
+        ) -> Result<StackFrame, MemoryCopyError> where T: ProcessMemory {
             let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
                 .context(iseq_struct.body as usize)?;
             Ok(StackFrame{
@@ -740,7 +740,7 @@ macro_rules! get_stack_frame_2_5_0(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-            ) -> Result<StackFrame, MemoryCopyError> where T: ProcessMemory {
+        ) -> Result<StackFrame, MemoryCopyError> where T: ProcessMemory {
             let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
                 .context(iseq_struct.body as usize)?;
             let rstring: RString = source.copy_struct(body.location.label as usize)
@@ -767,8 +767,11 @@ macro_rules! get_cfps(
         // The base of the call stack is therefore at
         //   stack + stack_size * sizeof(VALUE) - sizeof(rb_control_frame_t)
         // (with everything in bytes).
-        fn get_cfps<T>(cfp_address: usize, stack_base: usize, source: &T)
-                       -> Result<Vec<rb_control_frame_t>, MemoryCopyError> where T: ProcessMemory {
+        fn get_cfps<T>(
+            cfp_address: usize,
+            stack_base: usize,
+            source: &T
+        ) -> Result<Vec<rb_control_frame_t>, MemoryCopyError> where T: ProcessMemory {
             if (stack_base as usize) <= cfp_address {
                 // this probably means we've hit some kind of race, return an error so we can try
                 // again
