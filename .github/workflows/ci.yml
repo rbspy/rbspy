@@ -124,7 +124,7 @@ jobs:
         target/${{ matrix.target }}/release/rbspy record env LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4 ruby ci/ruby-programs/short_program.rb
 
   build-linux-cross:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     strategy:
       matrix:
         target: [i686-musl, armv7-musleabihf, aarch64-musl, x86_64-musl]
@@ -160,7 +160,7 @@ jobs:
 
   release:
     name: Publish release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     if: "startsWith(github.ref, 'refs/tags/')"
     needs: [build-linux-cross, build]
     steps:
