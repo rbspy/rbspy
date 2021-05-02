@@ -129,9 +129,7 @@ jobs:
       matrix:
         target: [i686-musl, armv7-musleabihf, aarch64-musl, x86_64-musl]
     container:
-      # we're building with 'rust-musl-cross' https://github.com/messense/rust-musl-cross
-      # with some additions to add a statically compiled version of libunwind
-      image: docker://benfred/rust-musl-cross:${{ matrix.target }}
+      image: docker://messense/rust-musl-cross:${{ matrix.target }}
       env:
         RUSTUP_HOME: /root/.rustup
         CARGO_HOME: /root/.cargo
