@@ -39,18 +39,26 @@ jobs:
       fail-fast: false
       matrix:
         build:
-        - linux
+        - linux-x86_64
+        - linux-aarch64
         - macos
         - windows
         include:
-        - build: linux
+        - build: linux-x86_64
           os: ubuntu-20.04
+          run-tests: 'true'
           target: x86_64-unknown-linux-gnu
+        - build: linux-aarch64
+          os: ubuntu-20.04
+          run-tests: 'false'
+          target: aarch64-unknown-linux-gnu
         - build: macos
           os: macos-latest
+          run-tests: 'true'
           target: x86_64-apple-darwin
         - build: windows
           os: windows-latest
+          run-tests: 'true'
           target: x86_64-pc-windows-msvc
     steps:
     - name: Checkout repository
@@ -68,6 +76,10 @@ jobs:
     - name: Install Rust toolchain target
       run: |
         rustup target add ${{ matrix.target }}
+    - name: Install cross-compile toolchain
+      if: matrix.target == 'aarch64-unknown-linux-gnu'
+      run: |
+        sudo apt update -qq && sudo apt install -qq -y gcc-aarch64-linux-gnu
     - name: Cargo Cache
       uses: actions/cache@v2.1.4
       with:
@@ -110,13 +122,13 @@ jobs:
     - name: Run tests
       timeout-minutes: 5
       run: ${{ env.CARGO }} test --release --verbose  ${{ env.TARGET_FLAGS }}
-      if: runner.os != 'macOS'
+      if: runner.os != 'macOS' && matrix.run-tests == 'true'
     - name: Run tests
       timeout-minutes: 5
       run: sudo "PATH=$PATH" ${{ env.CARGO }} test --release --verbose  ${{ env.TARGET_FLAGS }}
-      if: runner.os == 'macOS'
+      if: runner.os == 'macOS' && matrix.run-tests == 'true'
     - name: Run rbspy with alternative mallocs
-      if: runner.os == 'linux'
+      if: runner.os == 'linux' && matrix.run-tests == 'true'
       run: |
         set -e
         sudo apt install -y libjemalloc2 libtcmalloc-minimal4
