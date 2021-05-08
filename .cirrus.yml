@@ -1,7 +1,7 @@
 # Adapted from
 # https://github.com/benfred/py-spy/blob/d79a69a4f6f380a179944106126ce88265c4bab1/.cirrus.yml
 freebsd_instance:
-  image: freebsd-12-0-release-amd64
+  image: freebsd-12-2-release-amd64
 
 freebsd_task:
   name: x86_64-unknown-freebsd
