@@ -358,7 +358,7 @@ mod os_impl {
         let map_path = map
             .filename()
             .as_ref()
-            .expect("map's pathname shouldn't be None");
+            .expect(&format!("[{}] map's pathname shouldn't be None", pid));
         #[cfg(target_os = "linux")]
         let elf_path = format!("/proc/{}/root{}", pid, map_path);
         #[cfg(target_os = "freebsd")]
