@@ -168,6 +168,45 @@ jobs:
         name: rbspy-${{ matrix.target }}
         path: rbspy-${{ matrix.target }}
 
+  build-freebsd:
+    runs-on: macos-10.15
+    name: Build, test, and upload binaries (freebsd-x86_64)
+    steps:
+    - uses: actions/checkout@v2
+    - name: Cargo Cache
+      uses: actions/cache@v2.1.4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: freebsd-x86_64-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          freebsd-x86_64-cargo-
+    - name: Build
+      uses: vmactions/freebsd-vm@v0.1.4
+      timeout-minutes: 20
+      with:
+        mem: 4096
+        usesh: true
+        prepare: pkg install -y curl ruby
+        run: |
+          set -euo pipefail
+
+          curl https://sh.rustup.rs -sSf --output rustup.sh
+          sh rustup.sh -y --default-toolchain stable
+
+          $HOME/.cargo/bin/rustup run stable cargo build --release --verbose --workspace
+          $HOME/.cargo/bin/rustup run stable cargo test --release --verbose -- --skip test_spawn_record_children_subprocesses
+    - name: Prepare binary for upload
+      run: |
+        cp target/release/rbspy rbspy-x86_64-unknown-freebsd
+    - name: Upload Binaries
+      uses: actions/upload-artifact@v2
+      with:
+        name: rbspy-x86_64-unknown-freebsd
+        path: rbspy-x86_64-unknown-freebsd
+
   release:
     name: Publish release
     runs-on: ubuntu-20.04
