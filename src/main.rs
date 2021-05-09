@@ -844,14 +844,6 @@ fn validate_pid(s: String) -> Result<(), String> {
     Ok(())
 }
 
-// Prevent collision for the flamegraph filename
-fn validate_filename(s: String) -> Result<(), String> {
-    if s.ends_with(".svg") {
-        return Err("Filename must not end with .svg".to_string());
-    }
-    Ok(())
-}
-
 fn arg_parser() -> App<'static, 'static> {
     App::new("rbspy")
         .version(env!("CARGO_PKG_VERSION"))
@@ -884,12 +876,10 @@ fn arg_parser() -> App<'static, 'static> {
                 )
                 .arg(
                     Arg::from_usage("--raw-file=[FILE] 'File to write raw data to (will be gzipped)'")
-                        .validator(validate_filename)
                         .required(false),
                 )
                 .arg(
                     Arg::from_usage("-f --file=[FILE] 'File to write formatted output to'")
-                        .validator(validate_filename)
                         .required(false),
                 )
                 .arg(
