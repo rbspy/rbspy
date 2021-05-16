@@ -71,12 +71,14 @@ https://www.rust-lang.org/ has great resources for learning Rust.
 
 The built binary will end up at `target/debug/rbspy`
 
-## Tagging a release
+## Making a new release
 
-Here are the steps for maintainers to tag a new release:
+Here are the steps for maintainers to make a new release:
 
-1. Update `Cargo.toml` with the new version, run `cargo build` to ensure `Cargo.lock` is updated.
-1. If you have updated the ruby-structs bindings, update the version number in `ruby-structs/Cargo.toml` so that it matches the new rbspy version.
-1. Open a PR for the version bump. You can generate a CHANGELOG via `git log --pretty='- %s' v0.3.10...HEAD`.
-1. After the PR is merged, tag the new release, e.g. `git tag v0.3.11`, and push it: `git push --tags`.
-1. Travis will publish the tarballs to GitHub.
+1. Update `Cargo.toml` with the new version, and then run `cargo build` to ensure `Cargo.lock` is updated.
+1. Update the version number in `ruby-structs/Cargo.toml` so that it matches the new rbspy version.
+1. Push a commit (or open a PR) for the version bump. If you open a PR, wait for it to be reviewed and merged before continuing.
+1. Tag the new release, e.g. `git tag v0.3.11`, and push it: `git push --tags`.
+1. GitHub Actions workflows will build new binaries, create a new draft release, and attach the binaries.
+1. Review the draft release, editing the generated notes so that they highlight the important changes.
+1. Publish the release. GitHub Actions workflows will publish the new version to crates.io and Docker Hub.
