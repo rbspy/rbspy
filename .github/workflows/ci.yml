@@ -9,6 +9,7 @@ on:
     - v*
   schedule:
   - cron: '00 01 * * *'
+  workflow_dispatch:
 jobs:
   format:
     name: Check code formatting
