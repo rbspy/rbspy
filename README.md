@@ -48,7 +48,8 @@ On Mac, you can install with Homebrew: `brew install rbspy`.
 
 On Linux:
 
-1. Download recent release of `rbspy` from [the GitHub releases page](https://github.com/rbspy/rbspy/releases)
+1. Download recent release of `rbspy` from [the GitHub releases page](https://github.com/rbspy/rbspy/releases).
+    * The binaries tagged with `musl` are statically linked against musl libc and can be used on most systems. The ones tagged with `gnu` are dynamically linked against GNU libc, so you will need it to be installed.
 2. Unpack it
 3. Move the `rbspy` binary to `/usr/local/bin`
 
