@@ -506,6 +506,7 @@ fn spawn_recorder_children(
 }
 
 // TODO: Find a more reliable way to test this on Windows hosts
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_spawn_record_children_subprocesses() {
     let which = if cfg!(target_os = "windows") {
