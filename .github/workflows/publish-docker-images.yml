@@ -63,7 +63,7 @@ jobs:
 
           release_version=$(tr -d 'v' <<< ${{ github.event.release.tag_name }})
           echo "release_version=$release_version" >> $GITHUB_ENV
-          image_tags="rbspy/rbspy:${release_version},rbspy/rbspy:${release_version}-gnu,rbspy/rbspy:${release_version}-gnu"
+          image_tags="rbspy/rbspy:${release_version}-gnu,rbspy/rbspy:${release_version}-gnu"
           echo "image_tags=$image_tags" >> $GITHUB_ENV
       - name: Build and push
         uses: docker/build-push-action@v2
