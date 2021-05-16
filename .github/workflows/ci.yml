@@ -33,7 +33,7 @@ jobs:
       CARGO: cargo
       TARGET_FLAGS: --target ${{ matrix.target }}
       RUST_BACKTRACE: 1
-    timeout-minutes: 20
+    timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -185,7 +185,7 @@ jobs:
           freebsd-x86_64-cargo-
     - name: Build
       uses: vmactions/freebsd-vm@v0.1.4
-      timeout-minutes: 20
+      timeout-minutes: 30
       with:
         mem: 4096
         usesh: true
