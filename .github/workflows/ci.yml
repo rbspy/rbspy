@@ -194,6 +194,10 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Workaround for hanging rustup
+          # https://github.com/rust-lang/rustup/issues/2774
+          export RUSTUP_IO_THREADS=1
+
           curl https://sh.rustup.rs -sSf --output rustup.sh
           sh rustup.sh -y --default-toolchain stable
 
