@@ -9,6 +9,8 @@ use thiserror::Error;
 
 pub use remoteprocess::{Pid, Process, ProcessMemory};
 
+use crate::ui::*;
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub(crate) struct Header {
     pub sample_rate: Option<u32>,
@@ -143,5 +145,46 @@ impl ProcessRetry for remoteprocess::Process {
                 }
             }
         }
+    }
+}
+
+// Formats we can write to
+arg_enum! {
+    // The values of this enum get translated directly to command line arguments. Make them
+    // lowercase so that we don't have camelcase command line arguments
+    #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+    #[allow(non_camel_case_types)]
+    pub enum OutputFormat {
+        flamegraph,
+        collapsed,
+        callgrind,
+        speedscope,
+        summary,
+        summary_by_line,
+    }
+}
+
+impl OutputFormat {
+    pub fn outputter(self, flame_min_width: f64) -> Box<dyn output::Outputter> {
+        match self {
+            OutputFormat::flamegraph => Box::new(output::Flamegraph::new(flame_min_width)),
+            OutputFormat::collapsed => Box::new(output::Collapsed::default()),
+            OutputFormat::callgrind => Box::new(output::Callgrind(callgrind::Stats::new())),
+            OutputFormat::speedscope => Box::new(output::Speedscope(speedscope::Stats::new())),
+            OutputFormat::summary => Box::new(output::Summary(summary::Stats::new())),
+            OutputFormat::summary_by_line => Box::new(output::SummaryLine(summary::Stats::new())),
+        }
+    }
+
+    pub fn extension(&self) -> String {
+        match *self {
+            OutputFormat::flamegraph => "flamegraph.svg",
+            OutputFormat::collapsed => "collapsed.txt",
+            OutputFormat::callgrind => "callgrind.txt",
+            OutputFormat::speedscope => "speedscope.json",
+            OutputFormat::summary => "summary.txt",
+            OutputFormat::summary_by_line => "summary_by_line.txt",
+        }
+        .to_string()
     }
 }
