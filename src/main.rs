@@ -11,7 +11,7 @@ use rand::Rng;
 use rbspy::report;
 #[cfg(target_os = "macos")]
 use rbspy::check_root_user;
-use rbspy::sampler::{record::parallel_record, snapshot::snapshot};
+use rbspy::sampler;
 use rbspy::{OutputFormat, Pid};
 use std::env;
 use std::fs::DirBuilder;
@@ -103,7 +103,7 @@ fn do_main() -> Result<(), Error> {
             #[cfg(all(windows, target_arch = "x86_64"))]
             check_wow64_process(pid);
 
-            snapshot(pid, lock_process)
+            sampler::snapshot(pid, lock_process)
         }
         SubCmd::Record {
             target,
@@ -165,10 +165,10 @@ fn do_main() -> Result<(), Error> {
             #[cfg(all(windows, target_arch = "x86_64"))]
             check_wow64_process(pid);
 
-            parallel_record(
+            let config = sampler::RecordConfig {
                 format,
-                &raw_path,
-                &out_path,
+                raw_path,
+                out_path,
                 pid,
                 with_subprocesses,
                 silent,
@@ -176,7 +176,8 @@ fn do_main() -> Result<(), Error> {
                 maybe_duration,
                 flame_min_width,
                 lock_process,
-            )
+            };
+            sampler::record(config)
         }
         SubCmd::Report {
             format,

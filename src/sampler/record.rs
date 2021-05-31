@@ -237,38 +237,40 @@ fn test_spawn_record_children_subprocesses() {
     process.wait().unwrap();
 }
 
-pub fn parallel_record(
-    format: crate::core::types::OutputFormat,
-    raw_path: &PathBuf,
-    out_path: &PathBuf,
-    pid: Pid,
-    with_subprocesses: bool,
-    silent: bool,
-    sample_rate: u32,
-    maybe_duration: Option<std::time::Duration>,
-    flame_min_width: f64,
-    lock_process: bool,
-) -> Result<(), Error> {
-    let maybe_stop_time = match maybe_duration {
+pub struct Config {
+    pub format: crate::core::types::OutputFormat,
+    pub raw_path: PathBuf,
+    pub out_path: PathBuf,
+    pub pid: Pid,
+    pub with_subprocesses: bool,
+    pub silent: bool,
+    pub sample_rate: u32,
+    pub maybe_duration: Option<std::time::Duration>,
+    pub flame_min_width: f64,
+    pub lock_process: bool,
+}
+
+pub fn parallel_record(config: Config) -> Result<(), Error> {
+    let maybe_stop_time = match config.maybe_duration {
         Some(duration) => Some(std::time::Instant::now() + duration),
         None => None,
     };
 
     let (trace_receiver, result_receiver, total_traces, timing_error_traces) =
         spawn_recorder_children(
-            pid,
-            with_subprocesses,
-            sample_rate,
+            config.pid,
+            config.with_subprocesses,
+            config.sample_rate,
             maybe_stop_time,
-            lock_process,
+            config.lock_process,
         );
 
     // Aggregate stack traces as we receive them from the threads that are collecting them
     // Aggregate to 3 places: the raw output (`.raw.gz`), some summary statistics we display live,
     // and the formatted output (a flamegraph or something)
-    let mut out = format.outputter(flame_min_width);
+    let mut out = config.format.outputter(config.flame_min_width);
     let mut summary_out = summary::Stats::new();
-    let mut raw_store = Store::new(raw_path, sample_rate)?;
+    let mut raw_store = Store::new(&config.raw_path, config.sample_rate)?;
     let mut summary_time = std::time::Instant::now() + Duration::from_secs(1);
     let start_time = Instant::now();
 
@@ -277,13 +279,13 @@ pub fn parallel_record(
         summary_out.add_function_name(&trace.trace);
         raw_store.write(&trace)?;
 
-        if !silent {
+        if !config.silent {
             // Print a summary every second
             if std::time::Instant::now() > summary_time {
                 print_summary(
                     &summary_out,
                     &start_time,
-                    sample_rate,
+                    config.sample_rate,
                     timing_error_traces.load(Ordering::Relaxed),
                     total_traces.load(Ordering::Relaxed),
                 )?;
@@ -293,15 +295,15 @@ pub fn parallel_record(
     }
 
     // Finish writing all data to disk
-    eprintln!("Wrote raw data to {}", raw_path.display());
-    eprintln!("Writing formatted output to {}", out_path.display());
+    eprintln!("Wrote raw data to {}", config.raw_path.display());
+    eprintln!("Writing formatted output to {}", config.out_path.display());
 
-    if out_path.display().to_string() == "-" {
+    if config.out_path.display().to_string() == "-" {
         out.complete(&mut std::io::stdout())?;
     } else {
-        let mut out_file = File::create(&out_path).context(format!(
+        let mut out_file = File::create(&config.out_path).context(format!(
             "Failed to create output file {}",
-            &out_path.display()
+            &config.out_path.display()
         ))?;
         out.complete(&mut out_file)?;
     }
