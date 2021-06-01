@@ -1,16 +1,13 @@
+use crate::core::types::{Header, StackFrame, StackTrace};
 use std::io::prelude::*;
 use std::io::BufReader;
-use crate::core::types::{Header, StackTrace, StackFrame};
-
-use failure::Error;
-use serde_json;
 
 use super::*;
 
 pub(crate) struct Data(Vec<Vec<StackFrame>>);
 
 impl Storage for Data {
-    fn from_reader<R: Read>(r: R) -> Result<Data, Error> {
+    fn from_reader<R: Read>(r: R) -> Result<Data> {
         let reader = BufReader::new(r);
         let mut result = Vec::new();
         for line in reader.lines() {
@@ -40,6 +37,11 @@ impl From<Data> for v2::Data {
 
 impl From<Vec<StackFrame>> for StackTrace {
     fn from(trace: Vec<StackFrame>) -> StackTrace {
-        StackTrace{pid: None, trace, thread_id: None, time: None}
+        StackTrace {
+            pid: None,
+            trace,
+            thread_id: None,
+            time: None,
+        }
     }
 }

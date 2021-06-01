@@ -52,7 +52,6 @@ use crate::core::types::StackFrame;
  *
  */
 
-
 // Stats about the relationship between two functions, one of which
 // calls the other.
 #[derive(Debug)]
@@ -330,7 +329,8 @@ mod tests {
             .0
             .get(&parent)
             .expect(format!("No location for {}", parent).as_ref());
-        let call = ploc.calls
+        let call = ploc
+            .calls
             .get(&child)
             .expect(format!("No call of {} in {}", child, parent).as_ref());
         assert_eq!(

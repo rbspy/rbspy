@@ -1,13 +1,13 @@
 /// Core types used throughout rbspy: StackFrame and StackTrace
-
 use std::cmp::Ordering;
 use std::fmt;
-use std::{self, convert::From};
 use std::time::SystemTime;
+use std::{self, convert::From};
 
-use failure::Context;
+use anyhow::{Error, Result};
+use thiserror::Error;
 
-pub use remoteprocess::{Error, Process, Pid, ProcessMemory};
+pub use remoteprocess::{Pid, Process, ProcessMemory};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub(crate) struct Header {
@@ -32,18 +32,23 @@ pub struct StackTrace {
     pub time: Option<SystemTime>,
 }
 
-#[derive(Fail, Debug)]
+#[derive(Error, Debug)]
 pub enum MemoryCopyError {
-    #[fail(display = "Permission denied when reading from process. If you're not running as root, try again with sudo. If you're using Docker, try passing `--cap-add=SYS_PTRACE` to `docker run`")]
-
+    #[error("The operation completed successfully")]
+    OperationSucceeded,
+    #[error("Permission denied when reading from process. If you're not running as root, try again with sudo. If you're using Docker, try passing `--cap-add=SYS_PTRACE` to `docker run`")]
     PermissionDenied,
-    #[fail(display = "Failed to copy memory address {:x}", _0)] Io(usize, #[cause] std::io::Error),
-    #[fail(display = "Process isn't running")] ProcessEnded,
-    #[fail(display = "Copy error: {}", _0)] Message(String),
-    #[fail(display = "Too much memory requested when copying: {}", _0)] RequestTooLarge(usize),
-    #[fail(display = "Tried to read invalid string")]
-    InvalidStringError(#[cause] std::string::FromUtf8Error),
-    #[fail(display = "Tried to read invalid memory address {:x}", _0)]
+    #[error("Failed to copy memory address {:x}", _0)]
+    Io(usize, std::io::Error),
+    #[error("Process isn't running")]
+    ProcessEnded,
+    #[error("Copy error: {}", _0)]
+    Message(String),
+    #[error("Too much memory requested when copying: {}", _0)]
+    RequestTooLarge(usize),
+    #[error("Tried to read invalid string")]
+    InvalidStringError(std::string::FromUtf8Error),
+    #[error("Tried to read invalid memory address {:x}", _0)]
     InvalidAddressError(usize),
 }
 
@@ -59,13 +64,12 @@ impl StackFrame {
     // would be a constant but it has strings in it so it can't be.
     pub fn unknown_c_function() -> StackFrame {
         StackFrame {
-            name: "<c function>".to_string(),
-            relative_path: "unknown".to_string(),
+            name: "(unknown) [c function]".to_string(),
+            relative_path: "(unknown)".to_string(),
             absolute_path: None,
-            lineno: 0
+            lineno: 0,
         }
     }
-
 }
 
 impl fmt::Display for StackFrame {
@@ -90,29 +94,54 @@ impl PartialOrd for StackFrame {
 }
 
 impl StackTrace {
-    pub fn iter(&self) ->  std::slice::Iter<StackFrame> {
+    pub fn iter(&self) -> std::slice::Iter<StackFrame> {
         self.trace.iter()
     }
 }
 
-impl From<Context<usize>> for MemoryCopyError {
-    fn from(context: Context<usize>) -> Self {
-        let addr = *context.get_context();
+impl From<Error> for MemoryCopyError {
+    fn from(error: Error) -> Self {
+        let addr = *error.downcast_ref::<usize>().unwrap_or(&0);
         let error = std::io::Error::last_os_error();
 
         if error.kind() == std::io::ErrorKind::PermissionDenied {
             return MemoryCopyError::PermissionDenied;
         }
 
-        return match error.raw_os_error() {
+        match error.raw_os_error() {
+            // Sometimes Windows returns this error code
+            Some(0) => MemoryCopyError::OperationSucceeded,
             /* On Mac, 60 seems to correspond to the process ended */
             /* On Windows, 299 happens when the process ended */
-            Some(3) | Some(60) | Some(299) => {
-                MemoryCopyError::ProcessEnded
-            },
+            Some(3) | Some(60) | Some(299) => MemoryCopyError::ProcessEnded,
             // On *nix EFAULT means that the address was invalid
             Some(14) => MemoryCopyError::InvalidAddressError(addr),
-            _ => MemoryCopyError::Io(addr, error)
+            _ => MemoryCopyError::Io(addr, error),
+        }
+    }
+}
+pub trait ProcessRetry {
+    fn new_with_retry(pid: Pid) -> Result<Process>;
+}
+
+impl ProcessRetry for remoteprocess::Process {
+    // It can take a moment for the ruby process to spin up, so new_with_retry automatically
+    // retries for a few seconds. This delay mostly seems to affect macOS and Windows and is
+    // especially common in CI environments.
+    fn new_with_retry(pid: Pid) -> Result<Process> {
+        let retry_interval = std::time::Duration::from_millis(10);
+        let mut retries = 500;
+        loop {
+            match Process::new(pid) {
+                Ok(p) => return Ok(p),
+                Err(e) => {
+                    if retries == 0 {
+                        return Err(e)?;
+                    }
+                    std::thread::sleep(retry_interval);
+                    retries -= 1;
+                }
+            }
         }
     }
 }

@@ -8,26 +8,32 @@ struct Counts {
     total: u64,
 }
 
+#[derive(Default)]
 pub struct Stats {
     counts: HashMap<String, Counts>,
     total_traces: u32,
 }
 
-
 impl Stats {
     const HEADER: &'static str = "% self  % total  name";
 
     pub fn new() -> Stats {
-        Stats { counts: HashMap::new(), total_traces: 0}
+        Default::default()
     }
 
     fn inc_self(&mut self, name: String) {
-        let entry = self.counts.entry(name).or_insert(Counts{self_: 0, total: 0});
+        let entry = self
+            .counts
+            .entry(name)
+            .or_insert(Counts { self_: 0, total: 0 });
         entry.self_ += 1;
     }
 
     fn inc_tot(&mut self, name: String) {
-        let entry = self.counts.entry(name).or_insert(Counts{self_: 0, total: 0});
+        let entry = self
+            .counts
+            .entry(name)
+            .or_insert(Counts { self_: 0, total: 0 });
         entry.total += 1;
     }
 
@@ -63,7 +69,9 @@ impl Stats {
         self.total_traces += 1;
         self.inc_self(Stats::name_lineno(&stack[0]));
         let mut set: HashSet<&StackFrame> = HashSet::new();
-        for frame in stack { set.insert(&frame); }
+        for frame in stack {
+            set.insert(&frame);
+        }
         for frame in set {
             self.inc_tot(Stats::name_lineno(frame));
         }
@@ -77,15 +85,31 @@ impl Stats {
         self.write_counts(&mut ::std::io::stdout(), Some(n), truncate)
     }
 
-    fn write_counts(&self, w: &mut dyn io::Write, top: Option<usize>, truncate: Option<usize>) -> io::Result<()> {
+    fn write_counts(
+        &self,
+        w: &mut dyn io::Write,
+        top: Option<usize>,
+        truncate: Option<usize>,
+    ) -> io::Result<()> {
         let top = top.unwrap_or(::std::usize::MAX);
         let truncate = truncate.unwrap_or(::std::usize::MAX);
-        let mut sorted: Vec<(u64, u64, &str)> = self.counts.iter().map(|(x,y)| (y.self_, y.total, x.as_ref())).collect();
-        sorted.sort();
+        let mut sorted: Vec<(u64, u64, &str)> = self
+            .counts
+            .iter()
+            .map(|(x, y)| (y.self_, y.total, x.as_ref()))
+            .collect();
+        sorted.sort_unstable();
         let counts = sorted.iter().rev().take(top);
         writeln!(w, "{}", Stats::HEADER)?;
         for &(self_, total, name) in counts {
-            writeln!(w, "{:>6.2} {:>8.2}  {:.*}", 100.0 * (self_ as f64) / f64::from(self.total_traces), 100.0 * (total as f64) / f64::from(self.total_traces), truncate - 14 - 3, name)?;
+            writeln!(
+                w,
+                "{:>6.2} {:>8.2}  {:.*}",
+                100.0 * (self_ as f64) / f64::from(self.total_traces),
+                100.0 * (total as f64) / f64::from(self.total_traces),
+                truncate - 14 - 3,
+                name
+            )?;
         }
         Ok(())
     }
@@ -122,9 +146,7 @@ mod tests {
 ";
 
         let mut buf: Vec<u8> = Vec::new();
-        stats
-            .write(&mut buf)
-            .expect("Callgrind write failed");
+        stats.write(&mut buf).expect("Callgrind write failed");
         let actual = String::from_utf8(buf).expect("summary output not utf8");
         assert_eq!(actual, expected, "Unexpected summary output");
     }
@@ -146,11 +168,8 @@ mod tests {
 ";
 
         let mut buf: Vec<u8> = Vec::new();
-        stats
-            .write(&mut buf)
-            .expect("summary write failed");
+        stats.write(&mut buf).expect("summary write failed");
         let actual = String::from_utf8(buf).expect("summary output not utf8");
         assert_eq!(actual, expected, "Unexpected summary output");
     }
-
 }

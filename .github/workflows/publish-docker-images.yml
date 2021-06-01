@@ -1,0 +1,92 @@
+name: Publish Docker images
+on:
+  release:
+    types: [published]
+
+jobs:
+  musl:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Log into DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Generate image tags
+        id: generate-image-tags
+        run: |
+          set -euo pipefail
+
+          release_version=$(tr -d 'v' <<< ${{ github.event.release.tag_name }})
+          echo "release_version=$release_version" >> $GITHUB_ENV
+          image_tags="rbspy/rbspy:${release_version}-musl,rbspy/rbspy:${release_version}-musl"
+          echo "image_tags=$image_tags" >> $GITHUB_ENV
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          build-args: VERSION=${{ env.release_version }}
+          context: .
+          file: ci/docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.image_tags }}
+          target: musl
+
+  gnu:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Log into DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Generate image tags
+        id: generate-image-tags
+        run: |
+          set -euo pipefail
+
+          release_version=$(tr -d 'v' <<< ${{ github.event.release.tag_name }})
+          echo "release_version=$release_version" >> $GITHUB_ENV
+          image_tags="rbspy/rbspy:${release_version}-gnu"
+          echo "image_tags=$image_tags" >> $GITHUB_ENV
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          build-args: VERSION=${{ env.release_version }}
+          context: .
+          file: ci/docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.image_tags }}
+          target: gnu
+
+  readme:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: Sync README to Docker Hub
+        uses: ms-jpq/sync-dockerhub-readme@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+          repository: rbspy/rbspy
+          readme: "./README.md"

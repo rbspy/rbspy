@@ -1,5 +1,6 @@
 #![cfg_attr(rustc_nightly, feature(test))]
 
+extern crate anyhow;
 #[cfg(test)]
 extern crate byteorder;
 extern crate chrono;
@@ -9,10 +10,6 @@ extern crate ctrlc;
 extern crate elf;
 extern crate env_logger;
 extern crate inferno;
-#[macro_use]
-extern crate failure;
-#[macro_use]
-extern crate failure_derive;
 extern crate libc;
 #[cfg(target_os = "macos")]
 extern crate libproc;
@@ -36,34 +33,34 @@ extern crate term_size;
 #[cfg(windows)]
 extern crate winapi;
 
-
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+use anyhow::format_err;
+use anyhow::{Context, Error, Result};
 use chrono::prelude::*;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
-use failure::Error;
-use failure::ResultExt;
-use rand::{thread_rng, Rng};
 use rand::distributions::Alphanumeric;
+use rand::Rng;
 
 use std::collections::HashSet;
-use std::fs::{DirBuilder, File};
-use std::path::{Path, PathBuf};
 use std::env;
-use std::process::Command;
-use std::sync::atomic::{AtomicBool, Ordering, AtomicUsize};
-use std::sync::Arc;
-use std::time::{Instant, Duration};
+use std::fs::{DirBuilder, File};
 #[cfg(unix)]
 use std::os::unix::prelude::*;
-use std::sync::mpsc::{sync_channel, channel, SyncSender, Receiver};
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::mpsc::{channel, sync_channel, Receiver, SyncSender};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 #[cfg(windows)]
 use winapi::um::timeapi;
 
 pub mod core;
-pub mod ui;
 pub(crate) mod storage;
+pub mod ui;
 
 use crate::core::initialize::initialize;
-use crate::core::types::{MemoryCopyError, Pid, Process, StackTrace};
+use crate::core::types::{MemoryCopyError, Pid, Process, ProcessRetry, StackTrace};
 use ui::output;
 
 const BILLION: u64 = 1000 * 1000 * 1000; // for nanosleep
@@ -76,7 +73,7 @@ enum Target {
 }
 
 // Formats we can write to
-arg_enum!{
+arg_enum! {
     // The values of this enum get translated directly to command line arguments. Make them
     // lowercase so that we don't have camelcase command line arguments
     #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -92,7 +89,7 @@ arg_enum!{
 }
 
 /// Subcommand.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Clone, PartialEq, PartialOrd, Debug)]
 enum SubCmd {
     /// Record `target`, writing output `output`.
     Record {
@@ -104,47 +101,55 @@ enum SubCmd {
         format: OutputFormat,
         no_drop_root: bool,
         with_subprocesses: bool,
-        silent: bool
+        silent: bool,
+        flame_min_width: f64,
+        lock_process: bool,
     },
     /// Capture and print a stacktrace snapshot of process `pid`.
-    Snapshot { pid: Pid },
-    Report { format: OutputFormat, input: PathBuf, output: PathBuf, },
+    Snapshot { pid: Pid, lock_process: bool },
+    Report {
+        format: OutputFormat,
+        input: PathBuf,
+        output: PathBuf,
+    },
 }
 use SubCmd::*;
 
 /// Top level args type.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Clone, PartialEq, PartialOrd, Debug)]
 struct Args {
     cmd: SubCmd,
 }
-
 
 fn do_main() -> Result<(), Error> {
     env_logger::init();
 
     let args = Args::from_args()?;
 
-    #[cfg(target_os="macos")]
+    #[cfg(target_os = "macos")]
     {
         let root_cmd = match args.cmd {
-            Snapshot{..} => Some("snapshot"),
-            Record{..} => Some("record"),
+            Snapshot { .. } => Some("snapshot"),
+            Record { .. } => Some("record"),
             _ => None,
         };
         if let Some(root_cmd) = root_cmd {
             if !check_root_user() {
-                return Err(format_err!("rbspy {} needs to run as root on Mac", root_cmd))
+                return Err(format_err!(
+                    "rbspy {} needs to run as root on Mac",
+                    root_cmd
+                ));
             }
         }
     }
 
     match args.cmd {
-        Snapshot { pid } => {
+        Snapshot { pid, lock_process } => {
             #[cfg(all(windows, target_arch = "x86_64"))]
             check_wow64_process(pid);
 
-            snapshot(pid)
-        },
+            snapshot(pid, lock_process)
+        }
         Record {
             target,
             out_path,
@@ -155,6 +160,8 @@ fn do_main() -> Result<(), Error> {
             no_drop_root,
             with_subprocesses,
             silent,
+            flame_min_width,
+            lock_process,
         } => {
             let pid = match target {
                 Target::Pid { pid } => pid,
@@ -168,13 +175,17 @@ fn do_main() -> Result<(), Error> {
                     #[cfg(unix)]
                     {
                         let uid_str = std::env::var("SUDO_UID");
-                        if nix::unistd::Uid::effective().is_root() && !no_drop_root && uid_str.is_ok() {
-                            let uid: u32 = uid_str.unwrap().parse::<u32>().context(
-                                "Failed to parse UID",
-                            )?;
+                        if nix::unistd::Uid::effective().is_root()
+                            && !no_drop_root
+                            && uid_str.is_ok()
+                        {
+                            let uid: u32 = uid_str
+                                .unwrap()
+                                .parse::<u32>()
+                                .context("Failed to parse UID")?;
                             eprintln!(
                                 "Dropping permissions: running Ruby command as user {}",
-                                std::env::var("SUDO_USER")?
+                                std::env::var("SUDO_USER").context("SUDO_USER")?
                             );
                             Command::new(prog).uid(uid).args(args).spawn()?.id() as Pid
                         } else {
@@ -182,7 +193,10 @@ fn do_main() -> Result<(), Error> {
                         }
                     }
                     #[cfg(windows)]
-                    { Command::new(prog).args(args).spawn()?.id() as Pid }
+                    {
+                        let _ = no_drop_root;
+                        Command::new(prog).args(args).spawn()?.id() as Pid
+                    }
                 }
             };
 
@@ -198,13 +212,19 @@ fn do_main() -> Result<(), Error> {
                 silent,
                 sample_rate,
                 maybe_duration,
+                flame_min_width,
+                lock_process,
             )
-        },
-        Report{format, input, output} => report(format, input, output),
+        }
+        Report {
+            format,
+            input,
+            output,
+        } => report(format, input, output),
     }
 }
 
-#[cfg(target_os="macos")]
+#[cfg(target_os = "macos")]
 fn check_root_user() -> bool {
     let euid = nix::unistd::Uid::effective();
     if euid.is_root() {
@@ -229,27 +249,24 @@ fn check_wow64_process(pid: Pid) {
 #[cfg(all(windows, target_arch = "x86_64"))]
 fn is_wow64_process(pid: Pid) -> Result<bool, Error> {
     use std::os::windows::io::RawHandle;
-    use winapi::um::wow64apiset::IsWow64Process;
+    use winapi::shared::minwindef::{BOOL, FALSE, PBOOL};
     use winapi::um::processthreadsapi::OpenProcess;
     use winapi::um::winnt::PROCESS_QUERY_INFORMATION;
-    use winapi::shared::minwindef::{BOOL, FALSE, PBOOL};
+    use winapi::um::wow64apiset::IsWow64Process;
 
-    let handle = unsafe {
-        OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid)
-    };
+    let handle = unsafe { OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid) };
 
     if handle == (0 as RawHandle) {
         return Err(format_err!(
-            "Unable to fetch process handle for process {}", pid
+            "Unable to fetch process handle for process {}",
+            pid
         ));
     }
 
     let mut is_wow64: BOOL = 0;
 
     if unsafe { IsWow64Process(handle, &mut is_wow64 as PBOOL) } == FALSE {
-        return Err(format_err!(
-            "Could not determine process bitness! {}", pid
-        ))
+        return Err(format_err!("Could not determine process bitness! {}", pid));
     }
 
     Ok(is_wow64 != 0)
@@ -263,17 +280,21 @@ fn test_is_wow64_process() {
         "C:\\Program Files\\Internet Explorer\\iexplore.exe",
     ];
 
-    let results: Vec<bool> = programs.iter().map(|path| {
-        let mut cmd = Command::new(path)
-            .spawn()
-            .expect("ls command failed to start");
+    let results: Vec<bool> = programs
+        .iter()
+        .map(|path| {
+            let mut cmd = Command::new(path)
+                .spawn()
+                .expect("ls command failed to start");
 
-        let result = is_wow64_process(cmd.id());
+            let result = is_wow64_process(cmd.id());
 
-        cmd.kill();
+            cmd.kill()
+                .expect("command wasn't running or couldn't be killed");
 
-        result.unwrap()
-    }).collect();
+            result.unwrap()
+        })
+        .collect();
 
     assert_eq!(results, vec![true, false]);
 }
@@ -281,16 +302,16 @@ fn test_is_wow64_process() {
 fn main() {
     if let Err(x) = do_main() {
         eprintln!("Error. Causes: ");
-        for c in x.iter_chain() {
+        for c in x.chain() {
             eprintln!("- {}", c);
         }
-        eprintln!("{}", x.backtrace());
+        eprintln!("{:?}", x);
         std::process::exit(1);
     }
 }
 
-fn snapshot(pid: Pid) -> Result<(), Error> {
-    let mut getter = initialize(pid)?;
+fn snapshot(pid: Pid, lock_process: bool) -> Result<(), Error> {
+    let mut getter = initialize(pid, lock_process)?;
     let trace = getter.get_trace()?;
     for x in trace.iter().rev() {
         println!("{}", x);
@@ -299,14 +320,20 @@ fn snapshot(pid: Pid) -> Result<(), Error> {
 }
 
 impl OutputFormat {
-    fn outputter(self) -> Box<dyn ui::output::Outputter> {
+    fn outputter(self, flame_min_width: f64) -> Box<dyn ui::output::Outputter> {
         match self {
-            OutputFormat::flamegraph => Box::new(output::Flamegraph(ui::flamegraph::Stats::new())),
-            OutputFormat::flamegraph_stack_lines => Box::new(output::FlamegraphStackLines(ui::flamegraph::Stats::new())),
+            OutputFormat::flamegraph => Box::new(output::Flamegraph(ui::flamegraph::Stats::new(
+                flame_min_width,
+            ))),
+            OutputFormat::flamegraph_stack_lines => Box::new(output::FlamegraphStackLines(
+                ui::flamegraph::Stats::new(flame_min_width),
+            )),
             OutputFormat::callgrind => Box::new(output::Callgrind(ui::callgrind::Stats::new())),
             OutputFormat::speedscope => Box::new(output::Speedscope(ui::speedscope::Stats::new())),
             OutputFormat::summary => Box::new(output::Summary(ui::summary::Stats::new())),
-            OutputFormat::summary_by_line => Box::new(output::SummaryLine(ui::summary::Stats::new())),
+            OutputFormat::summary_by_line => {
+                Box::new(output::SummaryLine(ui::summary::Stats::new()))
+            }
         }
     }
 
@@ -318,7 +345,8 @@ impl OutputFormat {
             OutputFormat::speedscope => "speedscope.json",
             OutputFormat::summary => "summary.txt",
             OutputFormat::summary_by_line => "summary_by_line.txt",
-        }.to_string()
+        }
+        .to_string()
     }
 }
 
@@ -335,7 +363,7 @@ struct SampleTime {
 
 impl SampleTime {
     pub fn new(rate: u32) -> SampleTime {
-        SampleTime{
+        SampleTime {
             start_time: Instant::now(),
             nanos_between_samples: BILLION / u64::from(rate),
             num_samples: 0,
@@ -359,7 +387,18 @@ impl SampleTime {
 
 /// Start thread(s) recording a PID and possibly its children. Tracks new processes
 /// Returns a pair of Receivers from which you can consume recorded stacktraces and errors
-fn spawn_recorder_children(pid: Pid, with_subprocesses: bool, sample_rate: u32, maybe_stop_time: Option<Instant>) -> Result<(Receiver<StackTrace>, Receiver<Result<(), Error>>, Arc<AtomicUsize>, Arc<AtomicUsize>), Error> {
+fn spawn_recorder_children(
+    root_pid: Pid,
+    with_subprocesses: bool,
+    sample_rate: u32,
+    maybe_stop_time: Option<Instant>,
+    lock_process: bool,
+) -> (
+    Receiver<StackTrace>,
+    Receiver<Result<(), Error>>,
+    Arc<AtomicUsize>,
+    Arc<AtomicUsize>,
+) {
     let done = Arc::new(AtomicBool::new(false));
     let total_traces = Arc::new(AtomicUsize::new(0));
     let timing_error_traces = Arc::new(AtomicUsize::new(0));
@@ -377,7 +416,8 @@ fn spawn_recorder_children(pid: Pid, with_subprocesses: bool, sample_rate: u32, 
         eprintln!("Interrupted.");
         // Trigger the end of the loop
         done_clone.store(true, Ordering::Relaxed);
-    }).expect("Error setting Ctrl-C handler");
+    })
+    .expect("Error setting Ctrl-C handler");
 
     eprintln!("Press Ctrl+C to stop");
 
@@ -393,22 +433,20 @@ fn spawn_recorder_children(pid: Pid, with_subprocesses: bool, sample_rate: u32, 
         // appear
         let done_clone = done.clone();
         std::thread::spawn(move || {
-            let process = Process::new(pid).unwrap();
+            let process = Process::new_with_retry(root_pid).unwrap();
             let mut pids: HashSet<Pid> = HashSet::new();
             let done = done.clone();
             // we need to exit this loop when the process we're monitoring exits, otherwise the
             // sender channels won't get closed and rbspy will hang. So we check the done
             // mutex.
             while !done_clone.load(Ordering::Relaxed) {
-                let descendents = process.child_processes()
-                    .and_then(|tuples| {
-                        let mut children: Vec<Pid> = tuples.into_iter()
-                            .map(|x| x.0).collect();
-
-                        children.push(pid);
-
-                        Ok(children)
-                    }).expect("Error finding descendents of pid");
+                let mut descendents: Vec<Pid> = process
+                    .child_processes()
+                    .expect("Error finding descendents of pid")
+                    .into_iter()
+                    .map(|tuple| tuple.0)
+                    .collect();
+                descendents.push(root_pid);
 
                 for pid in descendents {
                     if pids.contains(&pid) {
@@ -418,7 +456,8 @@ fn spawn_recorder_children(pid: Pid, with_subprocesses: bool, sample_rate: u32, 
                     pids.insert(pid);
                     let trace_sender = trace_sender.clone();
                     let error_sender = error_sender.clone();
-                    let done = done.clone();
+                    let done_root = done.clone();
+                    let done_thread = done.clone();
                     let timing_error_traces = timing_error_traces.clone();
                     let total_traces = total_traces.clone();
                     std::thread::spawn(move || {
@@ -426,13 +465,21 @@ fn spawn_recorder_children(pid: Pid, with_subprocesses: bool, sample_rate: u32, 
                             pid,
                             sample_rate,
                             maybe_stop_time,
-                            done,
+                            done_thread,
                             timing_error_traces,
                             total_traces,
-                            trace_sender
-                            );
+                            trace_sender,
+                            lock_process,
+                        );
                         error_sender.send(result).expect("couldn't send error");
                         drop(error_sender);
+
+                        if pid == root_pid {
+                            debug!("Root process {} ended", pid);
+                            // we need to store done = true here to signal the other threads here that we
+                            // should stop profiling
+                            done_root.store(true, Ordering::Relaxed);
+                        }
                     });
                 }
                 std::thread::sleep(Duration::from_secs(1));
@@ -440,26 +487,31 @@ fn spawn_recorder_children(pid: Pid, with_subprocesses: bool, sample_rate: u32, 
         });
     } else {
         // Start a single recorder thread
-        let done = done.clone();
-        let timing_error_traces = timing_error_traces.clone();
-        let total_traces = total_traces.clone();
         std::thread::spawn(move || {
             let result = record(
-                pid,
+                root_pid,
                 sample_rate,
                 maybe_stop_time,
                 done,
                 timing_error_traces,
                 total_traces,
-                trace_sender
-                );
+                trace_sender,
+                lock_process,
+            );
             error_sender.send(result).unwrap();
             drop(error_sender);
         });
     }
-    Ok((trace_receiver, result_receiver, total_traces_clone, timing_error_traces_clone))
+    (
+        trace_receiver,
+        result_receiver,
+        total_traces_clone,
+        timing_error_traces_clone,
+    )
 }
 
+// TODO: Find a more reliable way to test this on Windows hosts
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_spawn_record_children_subprocesses() {
     let which = if cfg!(target_os = "windows") {
@@ -475,26 +527,47 @@ fn test_spawn_record_children_subprocesses() {
 
     let ruby_binary_path = String::from_utf8(output.stdout).unwrap();
 
-    let ruby_binary_path_str = ruby_binary_path.lines()
+    let ruby_binary_path_str = ruby_binary_path
+        .lines()
         .next()
         .expect("failed to execute ruby process");
 
+    let coordination_dir = tempdir::TempDir::new("").unwrap();
+    let coordination_dir_name = coordination_dir.path().to_str().unwrap();
+
     let mut process = std::process::Command::new(ruby_binary_path_str)
         .arg("ci/ruby-programs/ruby_forks.rb")
+        .arg(coordination_dir_name)
         .spawn()
         .unwrap();
 
     let pid = process.id() as Pid;
 
-    let (trace_receiver, result_receiver, _, _) = spawn_recorder_children(pid, true, 10, None).unwrap();
+    let (trace_receiver, result_receiver, _, _) = spawn_recorder_children(pid, true, 5, None, true);
+
+    let mut pids = HashSet::<Pid>::new();
+    for trace in &trace_receiver {
+        let pid = trace.pid.unwrap();
+        if !pids.contains(&pid) {
+            // Now that we have a stack trace for this PID, signal to the corresponding
+            // ruby process that it can exit
+            let coordination_filename = format!("rbspy_ack.{}", pid);
+            File::create(coordination_dir.path().join(coordination_filename.clone()))
+                .expect("couldn't create coordination file");
+            pids.insert(pid);
+        }
+
+        if pids.len() == 4 {
+            break;
+        }
+    }
 
     let results: Vec<_> = result_receiver.iter().take(4).collect();
-
-    // check that there are 4 distinct PIDs in the stack traces
-    let pids: HashSet<Pid> = trace_receiver.iter().take(20).map(|x| x.pid.unwrap()).collect();
     for r in results {
-        assert!(r.is_ok());
+        r.expect("unexpected error");
     }
+
+    drop(trace_receiver);
 
     assert_eq!(pids.len(), 4);
     process.wait().unwrap();
@@ -509,19 +582,27 @@ fn parallel_record(
     silent: bool,
     sample_rate: u32,
     maybe_duration: Option<std::time::Duration>,
+    flame_min_width: f64,
+    lock_process: bool,
 ) -> Result<(), Error> {
-
     let maybe_stop_time = match maybe_duration {
         Some(duration) => Some(std::time::Instant::now() + duration),
-        None => None
+        None => None,
     };
 
-    let (trace_receiver, result_receiver, total_traces, timing_error_traces) = spawn_recorder_children(pid, with_subprocesses, sample_rate, maybe_stop_time)?;
+    let (trace_receiver, result_receiver, total_traces, timing_error_traces) =
+        spawn_recorder_children(
+            pid,
+            with_subprocesses,
+            sample_rate,
+            maybe_stop_time,
+            lock_process,
+        );
 
     // Aggregate stack traces as we receive them from the threads that are collecting them
     // Aggregate to 3 places: the raw output (`.raw.gz`), some summary statistics we display live,
     // and the formatted output (a flamegraph or something)
-    let mut out = format.outputter();
+    let mut out = format.outputter(flame_min_width);
     let mut summary_out = ui::summary::Stats::new();
     let mut raw_store = storage::Store::new(raw_path, sample_rate)?;
     let mut summary_time = std::time::Instant::now() + Duration::from_secs(1);
@@ -535,7 +616,13 @@ fn parallel_record(
         if !silent {
             // Print a summary every second
             if std::time::Instant::now() > summary_time {
-                print_summary(&summary_out, &start_time, sample_rate, timing_error_traces.load(Ordering::Relaxed), total_traces.load(Ordering::Relaxed))?;
+                print_summary(
+                    &summary_out,
+                    &start_time,
+                    sample_rate,
+                    timing_error_traces.load(Ordering::Relaxed),
+                    total_traces.load(Ordering::Relaxed),
+                )?;
                 summary_time = std::time::Instant::now() + Duration::from_secs(1);
             }
         }
@@ -545,7 +632,10 @@ fn parallel_record(
     eprintln!("Wrote raw data to {}", raw_path.display());
     eprintln!("Writing formatted output to {}", out_path.display());
 
-    let out_file = File::create(&out_path).context(format!( "Failed to create output file {}", &out_path.display()))?;
+    let out_file = File::create(&out_path).context(format!(
+        "Failed to create output file {}",
+        &out_path.display()
+    ))?;
     out.complete(out_file)?;
     raw_store.complete();
 
@@ -575,9 +665,10 @@ fn record(
     done: Arc<AtomicBool>,
     timing_error_traces: Arc<AtomicUsize>,
     total_traces: Arc<AtomicUsize>,
-    sender: SyncSender<StackTrace>
+    sender: SyncSender<StackTrace>,
+    lock_process: bool,
 ) -> Result<(), Error> {
-    let mut getter = core::initialize::initialize(pid)?;
+    let mut getter = core::initialize::initialize(pid, lock_process)?;
 
     let mut total = 0;
     let mut errors = 0;
@@ -591,7 +682,9 @@ fn record(
         // The downside is that this will increase power usage: good discussions are:
         // https://randomascii.wordpress.com/2013/07/08/windows-timer-resolution-megawatts-wasted/
         // and http://www.belshe.com/2010/06/04/chrome-cranking-up-the-clock/
-        unsafe { timeapi::timeBeginPeriod(1); }
+        unsafe {
+            timeapi::timeBeginPeriod(1);
+        }
     }
 
     while !done.load(Ordering::Relaxed) {
@@ -603,11 +696,8 @@ fn record(
             }
             Err(x) => {
                 if let Some(MemoryCopyError::ProcessEnded) = x.downcast_ref() {
-                    // we need to store done = true here to signal the other threads here that we
-                    // should stop profiling
-                    done.store(true, Ordering::Relaxed);
-                    debug!("Process ended");
-                    break;
+                    debug!("Process {} ended", pid);
+                    return Ok(());
                 }
 
                 errors += 1;
@@ -627,23 +717,29 @@ fn record(
         // Sleep until the next expected sample time
         total_traces.fetch_add(1, Ordering::Relaxed);
         match sample_time.get_sleep_time() {
-            Ok(sleep_time) => {std::thread::sleep(std::time::Duration::new(0, sleep_time));},
-            Err(_) => { timing_error_traces.fetch_add(1, Ordering::Relaxed); },
+            Ok(sleep_time) => {
+                std::thread::sleep(std::time::Duration::new(0, sleep_time));
+            }
+            Err(_) => {
+                timing_error_traces.fetch_add(1, Ordering::Relaxed);
+            }
         }
     }
 
-   // reset time period calls
+    // reset time period calls
     #[cfg(windows)]
     {
-        unsafe { timeapi::timeEndPeriod(1); }
+        unsafe {
+            timeapi::timeEndPeriod(1);
+        }
     }
     Ok(())
 }
 
-fn report(format: OutputFormat, input: PathBuf, output: PathBuf) -> Result<(), Error>{
+fn report(format: OutputFormat, input: PathBuf, output: PathBuf) -> Result<(), Error> {
     let input_file = File::open(input)?;
     let stuff = storage::from_reader(input_file)?.traces;
-    let mut outputter = format.outputter();
+    let mut outputter = format.outputter(0.1);
     for trace in stuff {
         outputter.record(&trace)?;
     }
@@ -651,14 +747,23 @@ fn report(format: OutputFormat, input: PathBuf, output: PathBuf) -> Result<(), E
     Ok(())
 }
 
-fn print_summary(summary_out: &ui::summary::Stats, start_time: &Instant, sample_rate: u32, timing_error_traces: usize, total_traces: usize) -> Result<(), Error> {
+fn print_summary(
+    summary_out: &ui::summary::Stats,
+    start_time: &Instant,
+    sample_rate: u32,
+    timing_error_traces: usize,
+    total_traces: usize,
+) -> Result<(), Error> {
     let width = match term_size::dimensions() {
         Some((w, _)) => Some(w as usize),
         None => None,
     };
     println!("{}[2J", 27 as char); // clear screen
     println!("{}[0;0H", 27 as char); // go to 0,0
-    eprintln!("Time since start: {}s. Press Ctrl+C to stop.", start_time.elapsed().as_secs());
+    eprintln!(
+        "Time since start: {}s. Press Ctrl+C to stop.",
+        start_time.elapsed().as_secs()
+    );
     let percent_timing_error = (timing_error_traces as f64) / (total_traces as f64) * 100.0;
     eprintln!("Summary of profiling data so far:");
     summary_out.print_top_n(20, width)?;
@@ -685,7 +790,10 @@ fn print_errors(errors: usize, total: usize) {
 fn test_output_filename() {
     let d = tempdir::TempDir::new("temp").unwrap();
     let dirname = d.path().to_str().unwrap();
-    assert_eq!(output_filename("", Some("foo"), "txt").unwrap(), Path::new("foo"));
+    assert_eq!(
+        output_filename("", Some("foo"), "txt").unwrap(),
+        Path::new("foo")
+    );
     let generated_filename = output_filename(dirname, None, "txt").unwrap();
 
     let filename_pattern = if cfg!(target_os = "windows") {
@@ -694,24 +802,35 @@ fn test_output_filename() {
         ".cache/rbspy/records/rbspy-"
     };
 
-    assert!(
-        generated_filename
-            .to_string_lossy()
-            .contains(filename_pattern)
-    );
+    assert!(generated_filename
+        .to_string_lossy()
+        .contains(filename_pattern));
 }
 
-fn output_filename(base_dir: &str, maybe_filename: Option<&str>, extension: &str) -> Result<PathBuf, Error> {
-    let mut rng = thread_rng();
-
+fn output_filename(
+    base_dir: &str,
+    maybe_filename: Option<&str>,
+    extension: &str,
+) -> Result<PathBuf, Error> {
     let path = match maybe_filename {
         Some(filename) => filename.into(),
         None => {
-            let s = ::std::iter::repeat(()).map(|()| rng.sample(Alphanumeric))
+            let s: String = rand::thread_rng()
+                .sample_iter(&Alphanumeric)
                 .take(10)
-                .collect::<String>();
-            let filename = format!("{}-{}-{}.{}", "rbspy", Utc::now().format("%Y-%m-%d"), s, extension);
-            let dirname = Path::new(base_dir).join(".cache").join("rbspy").join("records");
+                .map(char::from)
+                .collect();
+            let filename = format!(
+                "{}-{}-{}.{}",
+                "rbspy",
+                Utc::now().format("%Y-%m-%d"),
+                s,
+                extension
+            );
+            let dirname = Path::new(base_dir)
+                .join(".cache")
+                .join("rbspy")
+                .join("records");
             DirBuilder::new().recursive(true).create(&dirname)?;
             dirname.join(&filename)
         }
@@ -722,17 +841,11 @@ fn output_filename(base_dir: &str, maybe_filename: Option<&str>, extension: &str
 /// Check `s` is a positive integer.
 // This assumes a process group isn't a sensible thing to snapshot; could be wrong!
 fn validate_pid(s: String) -> Result<(), String> {
-    let pid: Pid = s.parse().map_err(|_| "PID must be an integer".to_string())?;
+    let pid: Pid = s
+        .parse()
+        .map_err(|_| "PID must be an integer".to_string())?;
     if pid <= 0 {
         return Err("PID must be positive".to_string());
-    }
-    Ok(())
-}
-
-// Prevent collision for the flamegraph filename
-fn validate_filename(s: String) -> Result<(), String> {
-    if s.ends_with(".svg") {
-        return Err("Filename must not end with .svg".to_string());
     }
     Ok(())
 }
@@ -748,8 +861,12 @@ fn arg_parser() -> App<'static, 'static> {
                 .arg(
                     Arg::from_usage("-p --pid=[PID] 'PID of the Ruby process you want to profile'")
                         .validator(validate_pid)
-                        .required(true),
-                ),
+                        .required(true)
+                )
+                .arg(
+                    Arg::from_usage("--nonblocking='Don't pause the ruby process when taking the snapshot. Setting this option will reduce \
+                                                    the performance impact of sampling but may produce inaccurate results'"),
+                )
         )
         .subcommand(
             SubCommand::with_name("record")
@@ -765,12 +882,10 @@ fn arg_parser() -> App<'static, 'static> {
                 )
                 .arg(
                     Arg::from_usage("--raw-file=[FILE] 'File to write raw data to (will be gzipped)'")
-                        .validator(validate_filename)
                         .required(false),
                 )
                 .arg(
                     Arg::from_usage("-f --file=[FILE] 'File to write formatted output to'")
-                        .validator(validate_filename)
                         .required(false),
                 )
                 .arg(
@@ -800,6 +915,14 @@ fn arg_parser() -> App<'static, 'static> {
                 .arg(
                     Arg::from_usage( "--silent='Don't print the summary profiling data every second'")
                         .required(false)
+                )
+                .arg(
+                    Arg::from_usage("--flame-min-width='Minimum flame width in %'")
+                        .default_value("0.1"),
+                )
+                .arg(
+                    Arg::from_usage("--nonblocking='Don't pause the ruby process when collecting stack samples. Setting this option will reduce \
+                                                   the performance impact of sampling but may produce inaccurate results'"),
                 )
                 .arg(Arg::from_usage("<cmd>... 'command to run'").required(false)),
         )
@@ -836,21 +959,35 @@ impl Args {
             }
         }
 
+        fn get_lock_process(matches: &ArgMatches) -> Option<bool> {
+            if let Some(lock_process_str) = matches.value_of("lock_process") {
+                Some(
+                    lock_process_str
+                        .parse()
+                        .expect("this shouldn't happen because clap validated the arg"),
+                )
+            } else {
+                None
+            }
+        }
+
         let cmd = match matches.subcommand() {
             ("snapshot", Some(submatches)) => Snapshot {
                 pid: get_pid(submatches)
                     .expect("this shouldn't happen because clap requires a pid"),
+                lock_process: get_lock_process(submatches).unwrap_or_default(),
             },
             ("record", Some(submatches)) => {
                 let format = value_t!(submatches, "format", OutputFormat).unwrap();
 
                 #[cfg(unix)]
-                let home = &std::env::var("HOME")?;
+                let home = &std::env::var("HOME").context("HOME")?;
                 #[cfg(windows)]
-                let home = &std::env::var("userprofile")?;
+                let home = &std::env::var("userprofile").context("userprofile")?;
 
                 let raw_path = output_filename(home, submatches.value_of("raw-file"), "raw.gz")?;
-                let out_path = output_filename(home, submatches.value_of("file"), &format.extension())?;
+                let out_path =
+                    output_filename(home, submatches.value_of("file"), &format.extension())?;
                 let maybe_duration = match value_t!(submatches, "duration", u64) {
                     Err(_) => None,
                     Ok(integer_duration) => Some(std::time::Duration::from_secs(integer_duration)),
@@ -859,8 +996,10 @@ impl Args {
                 let no_drop_root = submatches.occurrences_of("no-drop-root") == 1;
                 let silent = submatches.is_present("silent");
                 let with_subprocesses = submatches.is_present("subprocesses");
+                let nonblocking = submatches.is_present("nonblocking");
 
                 let sample_rate = value_t!(submatches, "rate", u32).unwrap();
+                let flame_min_width = value_t!(submatches, "flame-min-width", f64).unwrap();
                 let target = if let Some(pid) = get_pid(submatches) {
                     Target::Pid { pid }
                 } else {
@@ -882,6 +1021,8 @@ impl Args {
                     no_drop_root,
                     with_subprocesses,
                     silent,
+                    flame_min_width,
+                    lock_process: !nonblocking,
                 }
             }
             ("report", Some(submatches)) => Report {
@@ -925,7 +1066,10 @@ mod tests {
         assert_eq!(
             args,
             Args {
-                cmd: Snapshot { pid: 1234 },
+                cmd: Snapshot {
+                    pid: 1234,
+                    lock_process: false
+                },
             }
         );
 
@@ -944,7 +1088,10 @@ mod tests {
             x => panic!("Unexpected: {:?}", x),
         };
 
-        let args = Args::from(make_args("rbspy record --pid 1234 --file foo.txt --raw-file raw.gz")).unwrap();
+        let args = Args::from(make_args(
+            "rbspy record --pid 1234 --file foo.txt --raw-file raw.gz",
+        ))
+        .unwrap();
         assert_eq!(
             args,
             Args {
@@ -958,13 +1105,16 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: false,
                     silent: false,
+                    flame_min_width: 0.1,
+                    lock_process: true,
                 },
             }
         );
 
         let args = Args::from(make_args(
             "rbspy record --pid 1234 --file foo.txt --raw-file raw.gz --rate 25",
-        )).unwrap();
+        ))
+        .unwrap();
         assert_eq!(
             args,
             Args {
@@ -978,13 +1128,16 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: false,
                     silent: false,
+                    flame_min_width: 0.1,
+                    lock_process: true,
                 },
             }
         );
 
         let args = Args::from(make_args(
             "rbspy record --pid 1234 --file foo.txt --raw-file raw.gz --duration 60",
-        )).unwrap();
+        ))
+        .unwrap();
         assert_eq!(
             args,
             Args {
@@ -998,6 +1151,8 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: false,
                     silent: false,
+                    flame_min_width: 0.1,
+                    lock_process: true,
                 },
             }
         );
@@ -1018,13 +1173,16 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: false,
                     silent: false,
+                    flame_min_width: 0.1,
+                    lock_process: true,
                 },
             }
         );
 
         let args = Args::from(make_args(
             "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --no-drop-root",
-        )).unwrap();
+        ))
+        .unwrap();
         assert_eq!(
             args,
             Args {
@@ -1038,13 +1196,16 @@ mod tests {
                     no_drop_root: true,
                     with_subprocesses: false,
                     silent: false,
+                    flame_min_width: 0.1,
+                    lock_process: true,
                 },
             }
         );
 
         let args = Args::from(make_args(
             "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --subprocesses",
-        )).unwrap();
+        ))
+        .unwrap();
         assert_eq!(
             args,
             Args {
@@ -1058,16 +1219,62 @@ mod tests {
                     no_drop_root: false,
                     with_subprocesses: true,
                     silent: false,
-                    },
+                    flame_min_width: 0.1,
+                    lock_process: true,
+                },
+            }
+        );
+
+        let args = Args::from(make_args(
+            "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --flame-min-width 0.02",
+        ))
+        .unwrap();
+        assert_eq!(
+            args,
+            Args {
+                cmd: Record {
+                    target: Target::Pid { pid: 1234 },
+                    out_path: "foo.txt".into(),
+                    raw_path: "raw.gz".into(),
+                    sample_rate: 100,
+                    maybe_duration: None,
+                    format: OutputFormat::flamegraph,
+                    no_drop_root: false,
+                    with_subprocesses: false,
+                    silent: false,
+                    flame_min_width: 0.02,
+                    lock_process: true,
+                },
+            }
+        );
+
+        let args = Args::from(make_args(
+            "rbspy record --pid 1234 --raw-file raw.gz --file foo.txt --nonblocking",
+        ))
+        .unwrap();
+        assert_eq!(
+            args,
+            Args {
+                cmd: Record {
+                    target: Target::Pid { pid: 1234 },
+                    out_path: "foo.txt".into(),
+                    raw_path: "raw.gz".into(),
+                    sample_rate: 100,
+                    maybe_duration: None,
+                    format: OutputFormat::flamegraph,
+                    no_drop_root: false,
+                    with_subprocesses: false,
+                    silent: false,
+                    flame_min_width: 0.1,
+                    lock_process: false,
+                },
             }
         );
     }
 
     #[test]
     fn test_report_arg_parsing() {
-        let args = Args::from(make_args(
-            "rbspy report --input xyz.raw.gz --output xyz",
-        )).unwrap();
+        let args = Args::from(make_args("rbspy report --input xyz.raw.gz --output xyz")).unwrap();
         assert_eq!(
             args,
             Args {

@@ -1,6 +1,0 @@
-###### Ubuntu Main Repos
-deb http://ca.archive.ubuntu.com/ubuntu/ xenial main restricted universe 
-
-###### Ubuntu Update Repos
-deb http://ca.archive.ubuntu.com/ubuntu/ xenial-security main restricted universe 
-deb http://ca.archive.ubuntu.com/ubuntu/ xenial-updates main restricted universe 

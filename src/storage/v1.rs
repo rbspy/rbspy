@@ -1,9 +1,6 @@
+use crate::core::types::{Header, StackTrace};
 use std::io::prelude::*;
 use std::io::BufReader;
-use crate::core::types::{Header, StackTrace};
-
-use failure::Error;
-use serde_json;
 
 use super::*;
 

@@ -1,27 +1,28 @@
 #[cfg(test)]
 extern crate tempdir;
 
-use failure::Error;
 use std::fs::File;
 
+use crate::core::types::{StackFrame, StackTrace};
 use crate::ui::{callgrind, flamegraph, speedscope, summary};
-use crate::core::types::{StackTrace, StackFrame};
+
+use anyhow::Result;
 
 pub trait Outputter {
-    fn record(&mut self, stack: &StackTrace) -> Result<(), Error>;
-    fn complete(&mut self, file: File) -> Result<(), Error>;
+    fn record(&mut self, stack: &StackTrace) -> Result<()>;
+    fn complete(&mut self, file: File) -> Result<()>;
 }
 
 // Uses Inferno to visualize stack traces
 pub struct Flamegraph(pub flamegraph::Stats);
 
 impl Outputter for Flamegraph {
-    fn record(&mut self, stack: &StackTrace) -> Result<(), Error> {
+    fn record(&mut self, stack: &StackTrace) -> Result<()> {
         self.0.record(&stack.trace)?;
         Ok(())
     }
 
-    fn complete(&mut self, file: File) -> Result<(), Error> {
+    fn complete(&mut self, file: File) -> Result<()> {
         self.0.write(file)?;
         Ok(())
     }
@@ -44,12 +45,12 @@ impl Outputter for FlamegraphStackLines {
 pub struct Callgrind(pub callgrind::Stats);
 
 impl Outputter for Callgrind {
-    fn record(&mut self, stack: &StackTrace) -> Result<(), Error> {
+    fn record(&mut self, stack: &StackTrace) -> Result<()> {
         self.0.add(&filter_unknown(&stack.trace));
         Ok(())
     }
 
-    fn complete(&mut self, mut file: File) -> Result<(), Error> {
+    fn complete(&mut self, mut file: File) -> Result<()> {
         self.0.finish();
         self.0.write(&mut file)?;
         Ok(())
@@ -59,12 +60,12 @@ impl Outputter for Callgrind {
 pub struct Summary(pub summary::Stats);
 
 impl Outputter for Summary {
-    fn record(&mut self, stack: &StackTrace) -> Result<(), Error> {
+    fn record(&mut self, stack: &StackTrace) -> Result<()> {
         self.0.add_function_name(&filter_unknown(&stack.trace));
         Ok(())
     }
 
-    fn complete(&mut self, mut file: File) -> Result<(), Error> {
+    fn complete(&mut self, mut file: File) -> Result<()> {
         self.0.write(&mut file)?;
         Ok(())
     }
@@ -73,12 +74,12 @@ impl Outputter for Summary {
 pub struct SummaryLine(pub summary::Stats);
 
 impl Outputter for SummaryLine {
-    fn record(&mut self, stack: &StackTrace) -> Result<(), Error> {
+    fn record(&mut self, stack: &StackTrace) -> Result<()> {
         self.0.add_lineno(&filter_unknown(&stack.trace));
         Ok(())
     }
 
-    fn complete(&mut self, mut file: File) -> Result<(), Error> {
+    fn complete(&mut self, mut file: File) -> Result<()> {
         self.0.write(&mut file)?;
         Ok(())
     }
@@ -87,12 +88,12 @@ impl Outputter for SummaryLine {
 pub struct Speedscope(pub speedscope::Stats);
 
 impl Outputter for Speedscope {
-    fn record(&mut self, stack: &StackTrace) -> Result<(), Error> {
+    fn record(&mut self, stack: &StackTrace) -> Result<()> {
         self.0.record(&stack)?;
         Ok(())
     }
 
-    fn complete(&mut self, file: File) -> Result<(), Error> {
+    fn complete(&mut self, file: File) -> Result<()> {
         self.0.write(file)?;
         Ok(())
     }
@@ -104,10 +105,8 @@ fn filter_unknown(trace: &[StackFrame]) -> Vec<StackFrame> {
     let unknown = StackFrame::unknown_c_function();
     let vec: Vec<StackFrame> = trace.iter().filter(|&x| x != &unknown).cloned().collect();
     if vec.is_empty() {
-        vec!(unknown)
+        vec![unknown]
     } else {
         vec
     }
 }
-
-

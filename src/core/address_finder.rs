@@ -1,5 +1,6 @@
 pub use self::os_impl::*;
 use crate::core::types::Pid;
+use thiserror::Error;
 
 /*
  * Operating-system specific code for getting
@@ -9,15 +10,20 @@ use crate::core::types::Pid;
  * from a running Ruby process. Involves a lot of reading memory maps and symbols.
  */
 
-#[derive(Fail, Debug)]
+#[derive(Error, Debug)]
 pub enum AddressFinderError {
-    #[fail(display = "No process with PID: {}", _0)] NoSuchProcess(Pid),
-    #[fail(display = "Permission denied when reading from process {}. If you're not running as root, try again with sudo. If you're using Docker, try passing `--cap-add=SYS_PTRACE` to `docker run`", _0)]
+    #[error("No process with PID: {}", _0)]
+    #[cfg(not(target_os = "macos"))]
+    NoSuchProcess(Pid),
+    #[error("Permission denied when reading from process {}. If you're not running as root, try again with sudo. If you're using Docker, try passing `--cap-add=SYS_PTRACE` to `docker run`", _0)]
+    #[cfg(not(target_os = "macos"))]
     PermissionDenied(Pid),
-    #[fail(display = "Couldn't get port for PID {}. Possibilities: that process doesn't exist or you have SIP enabled and you're trying to profile system Ruby (try rbenv instead).", _0)]
+    #[error("Couldn't get port for PID {}. Possibilities: that process doesn't exist or you have SIP enabled and you're trying to profile system Ruby (try rbenv instead).", _0)]
     #[cfg(target_os = "macos")]
     MacPermissionDenied(Pid),
-    #[fail(display = "Error reading /proc/{}/maps", _0)] ProcMapsError(Pid),
+    #[error("Error reading /proc/{}/maps", _0)]
+    #[cfg(not(target_os = "macos"))]
+    ProcMapsError(Pid),
 }
 
 #[cfg(target_os = "macos")]
@@ -26,23 +32,42 @@ mod os_impl {
     use crate::core::initialize::IsMaybeThreadFn;
     use crate::core::types::Pid;
 
-    use proc_maps::{get_process_maps, MapRange};
-    use proc_maps::mac_maps::{get_symbols, Symbol};
+    use anyhow::{format_err, Result};
+    use proc_maps::mac_maps::{get_dyld_info, get_symbols, DyldInfo, Symbol};
 
-    use failure::Error;
-
-    pub fn get_ruby_version_address(pid: Pid) -> Result<usize, Error> {
+    pub fn get_ruby_version_address(pid: Pid) -> Result<usize> {
         let proginfo = &get_program_info(pid)?;
         proginfo.symbol_addr("_ruby_version")
+    }
+
+    pub fn get_ruby_global_symbols_address(pid: Pid, version: &str) -> Result<usize> {
+        let proginfo = &get_program_info(pid)?;
+        if version >= "2.7.0" {
+            proginfo.symbol_addr("_ruby_global_symbols")
+        } else {
+            proginfo.symbol_addr("_global_symbols")
+        }
+    }
+
+    pub fn get_vm_address(pid: Pid, version: &str) -> Result<usize> {
+        let proginfo = &get_program_info(pid)?;
+
+        if version >= "2.5.0" {
+            proginfo.symbol_addr("_ruby_current_vm_ptr")
+        } else {
+            proginfo.symbol_addr("_ruby_current_vm")
+        }
     }
 
     pub fn current_thread_address(
         pid: Pid,
         version: &str,
         _is_maybe_thread: IsMaybeThreadFn,
-    ) -> Result<usize, Error> {
+    ) -> Result<usize> {
         let proginfo = &get_program_info(pid)?;
-        if version >= "2.5.0" {
+        if version >= "3.0.0" {
+            panic!("Current thread address isn't directly accessible on ruby 3 and newer");
+        } else if version >= "2.5.0" {
             proginfo.symbol_addr("_ruby_current_execution_context_ptr")
         } else {
             proginfo.symbol_addr("_ruby_current_thread")
@@ -55,8 +80,9 @@ mod os_impl {
     }
 
     impl ProgramInfo {
-        pub fn symbol_addr(&self, symbol_name: &str) -> Result<usize, Error> {
-            let offset = self.ruby_binary
+        pub fn symbol_addr(&self, symbol_name: &str) -> Result<usize> {
+            let offset = self
+                .ruby_binary
                 .symbol_value_mach("__mh_execute_header")
                 .expect("Couldn't find __mh_execute_header symbol");
             if let Ok(try_1) = self.ruby_binary.symbol_addr(symbol_name, offset) {
@@ -72,17 +98,17 @@ mod os_impl {
     }
 
     impl Binary {
-        pub fn from(start_addr: usize, filename: &str) -> Result<Binary, Error> {
+        pub fn from(start_addr: usize, filename: &str) -> Result<Binary> {
             Ok(Binary {
                 start_addr,
                 symbols: get_symbols(filename)?,
             })
         }
 
-        pub fn symbol_addr(&self, symbol_name: &str, offset: usize) -> Result<usize, Error> {
-            let addr = self.symbol_value_mach(symbol_name).ok_or(format_err!(
-                "Couldn't find symbol"
-            ))?;
+        pub fn symbol_addr(&self, symbol_name: &str, offset: usize) -> Result<usize> {
+            let addr = self
+                .symbol_value_mach(symbol_name)
+                .ok_or(format_err!("Couldn't find symbol"))?;
             Ok(addr + self.start_addr - offset)
         }
 
@@ -101,10 +127,8 @@ mod os_impl {
         libruby_binary: Option<Binary>,
     }
 
-    fn get_program_info(pid: Pid) -> Result<ProgramInfo, Error> {
-        let maps = get_process_maps(pid).map_err(|_| {
-            AddressFinderError::MacPermissionDenied(pid)
-        })?;
+    fn get_program_info(pid: Pid) -> Result<ProgramInfo> {
+        let maps = get_dyld_info(pid).map_err(|_| AddressFinderError::MacPermissionDenied(pid))?;
         let ruby_binary = get_ruby_binary(&maps)?;
         let libruby_binary = get_libruby_binary(&maps);
         Ok(ProgramInfo {
@@ -113,29 +137,18 @@ mod os_impl {
         })
     }
 
-    fn get_ruby_binary(maps: &Vec<MapRange>) -> Result<Binary, Error> {
-        let map: &MapRange = maps.iter()
-            .find(|ref m| if let Some(ref pathname) = m.filename() {
-                pathname.contains("bin/ruby") && m.is_exec()
-            } else {
-                false
-            })
+    fn get_ruby_binary(maps: &Vec<DyldInfo>) -> Result<Binary> {
+        let map: &DyldInfo = maps
+            .iter()
+            .find(|ref m| m.filename.contains("bin/ruby"))
             .ok_or(format_err!("Couldn't find ruby map"))?;
-        Binary::from(map.start(), map.filename().as_ref().unwrap())
+        Binary::from(map.address, &map.filename)
     }
 
-    fn get_libruby_binary(maps: &Vec<MapRange>) -> Option<Binary> {
-        let maybe_map = maps.iter().find(
-            |ref m| if let Some(ref pathname) = m.filename() {
-                pathname.contains("libruby") && m.is_exec()
-            } else {
-                false
-            },
-        );
+    fn get_libruby_binary(maps: &Vec<DyldInfo>) -> Option<Binary> {
+        let maybe_map = maps.iter().find(|ref m| m.filename.contains("libruby"));
         match maybe_map.as_ref() {
-            Some(map) => Some(
-                Binary::from(map.start(), map.filename().as_ref().unwrap()).unwrap(),
-            ),
+            Some(map) => Some(Binary::from(map.address, &map.filename).unwrap()),
             None => None,
         }
     }
@@ -145,54 +158,54 @@ mod os_impl {
 mod os_impl {
     use crate::core::address_finder::AddressFinderError;
     use crate::core::initialize::IsMaybeThreadFn;
-    use crate::core::types::{Process, Pid};
-    use proc_maps::{MapRange, get_process_maps};
+    use crate::core::types::{Pid, Process};
+    use anyhow::{format_err, Context, Result};
+    use proc_maps::{get_process_maps, MapRange};
     use remoteprocess::ProcessMemory;
 
-    use elf;
-    use failure::{Error, ResultExt};
-    use std;
+    pub fn get_vm_address(pid: Pid, version: &str) -> Result<usize> {
+        let proginfo = &get_program_info(pid)?;
+
+        if version >= "2.5.0" {
+            proginfo.get_symbol_addr("ruby_current_vm_ptr")
+        } else {
+            proginfo.get_symbol_addr("ruby_current_vm")
+        }
+    }
 
     pub fn current_thread_address(
         pid: Pid,
         version: &str,
         is_maybe_thread: IsMaybeThreadFn,
-    ) -> Result<usize, Error> {
-        let proginfo = &get_program_info(pid)?;
-        match current_thread_address_symbol_table(proginfo, version) {
-            Some(addr) => Ok(addr),
-            None => {
-                debug!("Trying to find address location another way");
-                Ok(current_thread_address_search_bss(
-                    proginfo,
-                    is_maybe_thread,
-                )?)
+    ) -> Result<usize> {
+        if version >= "3.0.0" {
+            panic!("Current thread address isn't directly accessible on ruby 3 and newer");
+        } else {
+            let proginfo = &get_program_info(pid)?;
+            match current_thread_address_symbol_table(proginfo, version) {
+                Some(addr) => Ok(addr),
+                None => {
+                    debug!("Trying to find address location another way");
+                    current_thread_address_search_bss(proginfo, is_maybe_thread)
+                }
             }
         }
     }
 
-    pub fn get_ruby_version_address(pid: Pid) -> Result<usize, Error> {
+    pub fn get_ruby_version_address(pid: Pid) -> Result<usize> {
         let proginfo = &get_program_info(pid)?;
         let ruby_version_symbol = "ruby_version";
-        let symbol_addr =
-            get_symbol_addr(&proginfo.ruby_map, &proginfo.ruby_elf, ruby_version_symbol);
-        match symbol_addr {
-            Some(addr) => Ok(addr),
-            _ => {
-                get_symbol_addr(
-                    // if we have a ruby map but `ruby_version` isn't in it, we expect there to be
-                    // a libruby map. If that's not true, that's a bug.
-                    (*proginfo.libruby_map)
-                        .as_ref()
-                        .ok_or_else(|| format_err!("Missing libruby map. Please report this!"))?,
-                    proginfo
-                        .libruby_elf
-                        .as_ref()
-                        .ok_or_else(|| format_err!("Missing libruby ELF. Please report this!"))?,
-                    ruby_version_symbol,
-                ).ok_or_else(|| format_err!("Couldn't find ruby version."))
-            }
-        }
+        proginfo.get_symbol_addr(ruby_version_symbol)
+    }
+
+    pub fn get_ruby_global_symbols_address(pid: Pid, version: &str) -> Result<usize> {
+        let proginfo = &get_program_info(pid)?;
+        let symbol_name = if version >= "2.7.0" {
+            "ruby_global_symbols"
+        } else {
+            "global_symbols"
+        };
+        proginfo.get_symbol_addr(symbol_name)
     }
 
     fn elf_symbol_value(elf_file: &elf::File, symbol_name: &str) -> Option<usize> {
@@ -224,7 +237,7 @@ mod os_impl {
     fn current_thread_address_search_bss(
         proginfo: &ProgramInfo,
         is_maybe_thread: IsMaybeThreadFn,
-    ) -> Result<usize, Error> {
+    ) -> Result<usize> {
         // Used when there's no symbol table. Looks through the .bss and uses a search_bss (found in
         // `is_maybe_thread`) to find the address of the current thread.
         let map = (*proginfo.libruby_map).as_ref().expect(
@@ -241,8 +254,9 @@ mod os_impl {
         let read_addr = map.start() + bss_section.addr as usize - load_header.vaddr as usize;
 
         debug!("read_addr: {:x}", read_addr);
-        let process = Process::new(proginfo.pid).unwrap();
-        let mut data = process.copy(read_addr as usize, bss_section.size as usize)
+        let process = Process::new(proginfo.pid)?;
+        let mut data = process
+            .copy(read_addr as usize, bss_section.size as usize)
             .context(read_addr as usize)?;
         debug!("successfully read data");
         let slice: &[usize] = unsafe {
@@ -253,12 +267,22 @@ mod os_impl {
         };
 
         let i = slice
-            .iter().enumerate()
-            .position({ |(i, &x)| is_maybe_thread(x, (i as usize) * (std::mem::size_of::<usize>() as usize) + read_addr, &process, &proginfo.all_maps) })
-            .ok_or_else(|| format_err!(
-                "Current thread address not found in process {}",
-                &proginfo.pid
-            ))?;
+            .iter()
+            .enumerate()
+            .position(|(i, &x)| {
+                is_maybe_thread(
+                    x,
+                    (i as usize) * (std::mem::size_of::<usize>() as usize) + read_addr,
+                    &process,
+                    &proginfo.all_maps,
+                )
+            })
+            .ok_or_else(|| {
+                format_err!(
+                    "Current thread address not found in process {}",
+                    &proginfo.pid
+                )
+            })?;
         Ok((i as usize) * (std::mem::size_of::<usize>() as usize) + read_addr)
     }
 
@@ -268,28 +292,15 @@ mod os_impl {
         version: &str,
     ) -> Option<usize> {
         // TODO: comment this somewhere
-        if version >= "2.5.0" {
-            // TODO: make this more robust
-            get_symbol_addr(
-                &proginfo.ruby_map,
-                &proginfo.ruby_elf,
-                "ruby_current_execution_context_ptr",
-            )
+        if version >= "3.0.0" {
+            panic!("Current thread address isn't directly accessible on ruby 3 and newer");
+        } else if version >= "2.5.0" {
+            proginfo
+                .get_symbol_addr("ruby_current_execution_context_ptr")
+                .ok()
         } else {
-            get_symbol_addr(
-                &proginfo.ruby_map,
-                &proginfo.ruby_elf,
-                "ruby_current_thread",
-            )
+            proginfo.get_symbol_addr("ruby_current_thread").ok()
         }
-    }
-
-    fn get_symbol_addr(map: &MapRange, elf_file: &elf::File, symbol_name: &str) -> Option<usize> {
-        elf_symbol_value(elf_file, symbol_name).map(|addr| {
-            let load_header = elf_load_header(elf_file);
-            debug!("load header: {}", load_header);
-            map.start() + addr - load_header.vaddr as usize
-        })
     }
 
     fn elf_load_header(elf_file: &elf::File) -> elf::types::ProgramHeader {
@@ -312,12 +323,42 @@ mod os_impl {
         pub libruby_elf: Option<elf::File>,
     }
 
-    fn open_elf_file(pid: Pid, map: &MapRange) -> Result<elf::File, Error> {
+    impl ProgramInfo {
+        pub fn get_symbol_addr(&self, symbol_name: &str) -> Result<usize> {
+            if let Some(addr) = elf_symbol_value(&self.ruby_elf, symbol_name).map(|addr| {
+                let load_header = elf_load_header(&self.ruby_elf);
+                debug!("load header: {}", load_header);
+                self.ruby_map.start() + addr - load_header.vaddr as usize
+            }) {
+                return Ok(addr);
+            }
+
+            let libruby_map = (*self.libruby_map)
+                .as_ref()
+                .ok_or_else(|| format_err!("Missing libruby map. Please report this!"))?;
+            let libruby_elf = self
+                .libruby_elf
+                .as_ref()
+                .ok_or_else(|| format_err!("Missing libruby ELF. Please report this!"))?;
+            elf_symbol_value(libruby_elf, symbol_name)
+                .map(|addr| {
+                    let load_header = elf_load_header(libruby_elf);
+                    debug!("load header: {}", load_header);
+                    libruby_map.start() + addr - load_header.vaddr as usize
+                })
+                .ok_or_else(|| format_err!("Could not find address for symbol {}", symbol_name))
+        }
+    }
+
+    fn open_elf_file(pid: Pid, map: &MapRange) -> Result<elf::File> {
         // Read binaries from `/proc/PID/root` because the target process might be in a different
         // mount namespace. /proc/PID/root is the view of the filesystem that the target process
         // has. (see the proc man page for more)
         // So we read /usr/bin/ruby from /proc/PID/root/usr/bin/ruby
-        let map_path = map.filename().as_ref().expect("map's pathname shouldn't be None");
+        let map_path = map
+            .filename()
+            .as_ref()
+            .expect(&format!("[{}] map's pathname shouldn't be None", pid));
         #[cfg(target_os = "linux")]
         let elf_path = format!("/proc/{}/root{}", pid, map_path);
         #[cfg(target_os = "freebsd")]
@@ -327,21 +368,21 @@ mod os_impl {
             .map_err(|_| format_err!("Couldn't open ELF file: {:?}", elf_path))
     }
 
-    pub fn get_program_info(pid: Pid) -> Result<ProgramInfo, Error> {
+    pub fn get_program_info(pid: Pid) -> Result<ProgramInfo> {
         let all_maps = get_process_maps(pid).map_err(|x| match x.kind() {
             std::io::ErrorKind::NotFound => AddressFinderError::NoSuchProcess(pid),
             std::io::ErrorKind::PermissionDenied => AddressFinderError::PermissionDenied(pid),
             _ => AddressFinderError::ProcMapsError(pid),
         })?;
-        let ruby_map = Box::new(get_map(&all_maps, "bin/ruby")
-            .ok_or_else(|| format_err!("Ruby map not found for PID: {}", pid))?);
+        let ruby_map = Box::new(
+            get_map(&all_maps, "bin/ruby")
+                .ok_or_else(|| format_err!("Ruby map not found for PID: {}", pid))?,
+        );
         let all_maps = get_process_maps(pid).unwrap();
         let ruby_elf = open_elf_file(pid, &ruby_map)?;
         let libruby_map = Box::new(get_map(&all_maps, "libruby"));
         let libruby_elf = match *libruby_map {
-            Some(ref map) => {
-                Some(open_elf_file(pid, &map)?)
-            }
+            Some(ref map) => Some(open_elf_file(pid, &map)?),
             _ => None,
         };
         Ok(ProgramInfo {
@@ -369,21 +410,34 @@ mod os_impl {
 
 #[cfg(windows)]
 mod os_impl {
-    use failure::Error;
+    use crate::core::address_finder::AddressFinderError;
     use crate::core::initialize::IsMaybeThreadFn;
-    use proc_maps::{get_process_maps, MapRange, Pid};
+    use anyhow::{format_err, Result};
     use proc_maps::win_maps::SymbolLoader;
+    use proc_maps::{get_process_maps, MapRange, Pid};
 
-    pub fn get_ruby_version_address(pid: u32) -> Result<usize, Error> {
+    pub fn get_ruby_version_address(pid: u32) -> Result<usize> {
         get_symbol_address(pid, "ruby_version")
+    }
+
+    pub fn get_vm_address(pid: Pid, version: &str) -> Result<usize> {
+        let symbol_name = if version >= "2.5.0" {
+            "ruby_current_vm_ptr"
+        } else {
+            "ruby_current_vm"
+        };
+
+        get_symbol_address(pid, symbol_name)
     }
 
     pub fn current_thread_address(
         pid: u32,
         version: &str,
         _is_maybe_thread: IsMaybeThreadFn,
-    ) -> Result<usize, Error> {
-        let symbol_name = if version >= "2.5.0" {
+    ) -> Result<usize> {
+        let symbol_name = if version >= "3.0.0" {
+            panic!("Current thread address isn't directly accessible on ruby 3 and newer");
+        } else if version >= "2.5.0" {
             "ruby_current_execution_context_ptr"
         } else {
             "ruby_current_thread"
@@ -392,8 +446,21 @@ mod os_impl {
         get_symbol_address(pid, symbol_name)
     }
 
-    fn get_symbol_address(pid: u32, symbol_name: &str) -> Result<usize, Error> {
-        let maps = get_process_maps(pid)?;
+    pub fn get_ruby_global_symbols_address(pid: Pid, version: &str) -> Result<usize> {
+        let symbol_name = if version >= "2.7.0" {
+            "ruby_global_symbols"
+        } else {
+            "global_symbols"
+        };
+        get_symbol_address(pid, symbol_name)
+    }
+
+    fn get_symbol_address(pid: u32, symbol_name: &str) -> Result<usize> {
+        let maps = get_process_maps(pid).map_err(|e| match e.kind() {
+            std::io::ErrorKind::NotFound => AddressFinderError::NoSuchProcess(pid),
+            std::io::ErrorKind::PermissionDenied => AddressFinderError::PermissionDenied(pid),
+            _ => AddressFinderError::ProcMapsError(pid),
+        })?;
         let ruby = get_ruby_binary(&maps)?;
         if let Some(ref filename) = ruby.filename() {
             let handler = SymbolLoader::new(pid as Pid)?;
@@ -401,7 +468,11 @@ mod os_impl {
             if let Ok((base, addr)) = handler.address_from_name(symbol_name) {
                 // If we have a module base (ie from PDB), need to adjust by the offset
                 // otherwise seems like we can take address directly
-                let addr = if base == 0 { addr } else { ruby.start() as u64 + addr - base };
+                let addr = if base == 0 {
+                    addr
+                } else {
+                    ruby.start() as u64 + addr - base
+                };
                 return Ok(addr as usize);
             }
         }
@@ -412,7 +483,11 @@ mod os_impl {
                 let handler = SymbolLoader::new(pid as Pid)?;
                 let _module = handler.load_module(filename)?;
                 if let Ok((base, addr)) = handler.address_from_name(symbol_name) {
-                    let addr = if base == 0 { addr } else { libruby.start() as u64 + addr - base };
+                    let addr = if base == 0 {
+                        addr
+                    } else {
+                        libruby.start() as u64 + addr - base
+                    };
                     return Ok(addr as usize);
                 }
             }
@@ -421,25 +496,27 @@ mod os_impl {
         Err(format_err!("failed to find {} symbol", symbol_name))
     }
 
-    fn get_ruby_binary(maps: &[MapRange]) -> Result<&MapRange, Error> {
-        Ok(maps.iter()
-            .find(|ref m| if let Some(ref pathname) = m.filename() {
-                pathname.contains("ruby.exe")
-            } else {
-                false
+    fn get_ruby_binary(maps: &[MapRange]) -> Result<&MapRange> {
+        Ok(maps
+            .iter()
+            .find(|ref m| {
+                if let Some(ref pathname) = m.filename() {
+                    pathname.contains("ruby.exe")
+                } else {
+                    false
+                }
             })
             .ok_or(format_err!("Couldn't find ruby binary"))?)
     }
 
-
     fn get_libruby_binary(maps: &[MapRange]) -> Option<&MapRange> {
-        maps.iter().find(
-            |ref m| if let Some(ref pathname) = m.filename() {
+        maps.iter().find(|ref m| {
+            if let Some(ref pathname) = m.filename() {
                 // pathname is something like "C:\Ruby24-x64\bin\x64-msvcrt-ruby240.dll"
                 pathname.contains("-ruby") && pathname.ends_with(".dll")
             } else {
                 false
-            },
-        )
+            }
+        })
     }
 }

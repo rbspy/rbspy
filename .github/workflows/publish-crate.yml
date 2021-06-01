@@ -1,0 +1,37 @@
+name: Release to crates.io
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  publish-ruby-structs:
+    name: Publish rbspy-ruby-structs crate
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: publish ruby-structs crate
+        continue-on-error: true
+        run: |
+          cargo login ${{ secrets.CARGO_TOKEN }}
+          cd ruby-structs
+          cargo publish
+  publish-rbspy:
+    name: Publish rbspy crate
+    needs: [publish-ruby-structs]
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: publish rbspy crate
+        run: |
+          cargo login ${{ secrets.CARGO_TOKEN }}
+          cargo publish

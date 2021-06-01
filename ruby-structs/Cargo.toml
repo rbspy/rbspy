@@ -1,11 +1,11 @@
 [package]
 name = "rbspy-ruby-structs"
-version = "0.1.0"
-authors = ["Julia Evans <julia@jvns.ca>"]
-description = "Helper crate for rbspy. Contains Rust bindings for various internal Ruby structions for version 1.9.3 to 2.5.0"
+version = "0.6.0"
+authors = ["Adam Jensen <acjensen@gmail.com>", "Julia Evans <julia@jvns.ca>"]
+description = "Helper crate for rbspy. Contains Rust bindings for various internal Ruby structions for version 1.9.3 to 3.0.1"
 license = "MIT"
-repository = "https://github.com/jvns/rbspy"
-documentation = "https://github.com/jvns/rbspy"
-homepage = "https://github.com/jvns/rbspy"
+repository = "https://github.com/rbspy/rbspy"
+documentation = "https://github.com/rbspy/rbspy"
+homepage = "https://rbspy.github.io/"
 
 [dependencies]

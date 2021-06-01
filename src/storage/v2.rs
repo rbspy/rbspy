@@ -1,9 +1,6 @@
+use crate::core::types::{Header, StackTrace};
 use std::io::prelude::*;
 use std::io::BufReader;
-use crate::core::types::{Header, StackTrace};
-
-use failure::Error;
-use serde_json;
 
 use super::*;
 
@@ -17,7 +14,7 @@ impl Storage for Data {
         let reader = BufReader::new(r);
         let mut result = Vec::new();
         let mut lines = reader.lines();
-        let mut header_line = lines.next().unwrap().unwrap();
+        let header_line = lines.next().unwrap().unwrap();
         for line in lines {
             let trace: StackTrace = serde_json::from_str(&line?)?;
             result.push(trace);

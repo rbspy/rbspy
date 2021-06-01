@@ -1,6 +1,7 @@
 # rbspy
 
-<a href="https://travis-ci.org/rbspy/rbspy"><img src="https://travis-ci.org/rbspy/rbspy.svg"></a>
+[![crates.io](https://badgen.net/crates/v/rbspy)](https://crates.io/crates/rbspy)
+[![ci](https://github.com/rbspy/rbspy/actions/workflows/ci.yml/badge.svg)](https://github.com/rbspy/rbspy/actions/workflows/ci.yml)
 
 <img src="https://rbspy.github.io/rbspy.jpg" width="128px">
 
@@ -14,6 +15,14 @@ production**.
 
 `rbspy` lets you record profiling data, save the raw profiling data to disk, and then analyze it in
 a variety of different ways later on.
+
+## only wall-clock profiling
+
+There are 2 main ways to profile code -- you can either profile everything the
+application does (including waiting), or only profile when the application is using the CPU.
+
+rbspy profiles everything the program does (including waiting) -- there's no
+option to just profile when the program is using the CPU.
 
 ## Documentation
 
@@ -39,7 +48,8 @@ On Mac, you can install with Homebrew: `brew install rbspy`.
 
 On Linux:
 
-1. Download recent release of `rbspy` from [the GitHub releases page](https://github.com/rbspy/rbspy/releases)
+1. Download recent release of `rbspy` from [the GitHub releases page](https://github.com/rbspy/rbspy/releases).
+    * The binaries tagged with `musl` are statically linked against musl libc and can be used on most systems. The ones tagged with `gnu` are dynamically linked against GNU libc, so you will need it to be installed.
 2. Unpack it
 3. Move the `rbspy` binary to `/usr/local/bin`
 
@@ -62,8 +72,14 @@ https://www.rust-lang.org/ has great resources for learning Rust.
 
 The built binary will end up at `target/debug/rbspy`
 
-## Contributors
+## Making a new release
 
-* [Julia Evans](https://github.com/jvns)
-* [Kamal Marhubi](https://github.com/kamalmarhubi)
-* [Joel Johnson](https://github.com/liaden/)
+Here are the steps for maintainers to make a new release:
+
+1. Update `Cargo.toml` with the new version, and then run `cargo build` to ensure `Cargo.lock` is updated.
+1. Update the version number in `ruby-structs/Cargo.toml` so that it matches the new rbspy version.
+1. Push a commit (or open a PR) for the version bump. If you open a PR, wait for it to be reviewed and merged before continuing.
+1. Tag the new release, e.g. `git tag v0.3.11`, and push it: `git push --tags`.
+1. GitHub Actions workflows will build new binaries, create a new draft release, and attach the binaries.
+1. Review the draft release, editing the generated notes so that they highlight the important changes.
+1. Publish the release. GitHub Actions workflows will publish the new version to crates.io and Docker Hub.

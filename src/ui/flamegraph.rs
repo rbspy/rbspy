@@ -1,40 +1,51 @@
 use std::collections::HashMap;
-use std::io;
 use std::fs::File;
+use std::io;
 
 use crate::core::types::StackFrame;
 
-use failure::Error;
+use anyhow::Result;
 use inferno::flamegraph::{Direction, Options};
 
+#[derive(Default)]
 pub struct Stats {
     pub counts: HashMap<String, usize>,
+    pub min_width: f64,
 }
 
 impl Stats {
-    pub fn new() -> Stats {
+    pub fn new(flame_min_width: f64) -> Stats {
         Stats {
-            counts: HashMap::new(),
+            min_width: flame_min_width,
+            ..Default::default()
         }
     }
 
     pub fn record(&mut self, stack: &[StackFrame]) -> Result<(), io::Error> {
-        let frame = stack.iter().rev().map(|frame| {
-            format!("{}", frame)
-        }).collect::<Vec<String>>().join(";");
+        let frame = stack
+            .iter()
+            .rev()
+            .map(|frame| format!("{}", frame))
+            .collect::<Vec<String>>()
+            .join(";");
 
         *self.counts.entry(frame).or_insert(0) += 1;
         Ok(())
     }
 
-    pub fn write(&self, w: File) -> Result<(), Error> {
-        let mut opts =  Options {
-            direction: Direction::Inverted,
-            ..Default::default()
-        };
-
+    pub fn write(&self, w: File) -> Result<()> {
         let lines = self.get_lines();
-        inferno::flamegraph::from_lines(&mut opts, lines.iter().map(|x| x.as_str()), w).unwrap();
+
+        let mut opts = Options::default();
+        opts.direction = Direction::Inverted;
+        opts.min_width = self.min_width;
+
+        if lines.is_empty() {
+            eprintln!("Warning: no profile samples were collected");
+        } else {
+            inferno::flamegraph::from_lines(&mut opts, lines.iter().map(|x| x.as_str()), w)?;
+        }
+
         Ok(())
     }
 
@@ -46,7 +57,10 @@ impl Stats {
     }
 
     fn get_lines(&self) -> Vec<String> {
-        self.counts.iter().map(|(k, v)| format!("{} {}", k, v)).collect()
+        self.counts
+            .iter()
+            .map(|(k, v)| format!("{} {}", k, v))
+            .collect()
     }
 }
 
@@ -70,7 +84,7 @@ mod tests {
 
     #[test]
     fn test_stats() -> Result<(), io::Error> {
-        let mut stats = Stats::new();
+        let mut stats = Stats::new(0.1);
 
         stats.record(&vec![f(1)])?;
         stats.record(&vec![f(2), f(1)])?;
@@ -81,7 +95,11 @@ mod tests {
 
         let counts = &stats.counts;
         assert_contains(counts, "func1 - file1.rb:1", 1);
-        assert_contains(counts, "func1 - file1.rb:1;func3 - file3.rb:3;func2 - file2.rb:2", 3);
+        assert_contains(
+            counts,
+            "func1 - file1.rb:1;func3 - file3.rb:3;func2 - file2.rb:2",
+            3,
+        );
         assert_contains(counts, "func1 - file1.rb:1;func2 - file2.rb:2", 2);
 
         Ok(())
