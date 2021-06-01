@@ -80,7 +80,7 @@ arg_enum! {
     #[allow(non_camel_case_types)]
     pub enum OutputFormat {
         flamegraph,
-        flamegraph_stack_lines,
+        collapsed,
         callgrind,
         speedscope,
         summary,
@@ -325,7 +325,7 @@ impl OutputFormat {
             OutputFormat::flamegraph => Box::new(output::Flamegraph(ui::flamegraph::Stats::new(
                 flame_min_width,
             ))),
-            OutputFormat::flamegraph_stack_lines => Box::new(output::FlamegraphStackLines(
+            OutputFormat::collapsed => Box::new(output::Collapsed(
                 ui::flamegraph::Stats::new(flame_min_width),
             )),
             OutputFormat::callgrind => Box::new(output::Callgrind(ui::callgrind::Stats::new())),
@@ -340,7 +340,7 @@ impl OutputFormat {
     fn extension(&self) -> String {
         match *self {
             OutputFormat::flamegraph => "flamegraph.svg",
-            OutputFormat::flamegraph_stack_lines => "stack_lines.folded",
+            OutputFormat::collapsed => "collapsed.txt",
             OutputFormat::callgrind => "callgrind.txt",
             OutputFormat::speedscope => "speedscope.json",
             OutputFormat::summary => "summary.txt",

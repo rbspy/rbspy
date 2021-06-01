@@ -28,9 +28,9 @@ impl Outputter for Flamegraph {
     }
 }
 
-pub struct FlamegraphStackLines(pub flamegraph::Stats);
+pub struct Collapsed(pub flamegraph::Stats);
 
-impl Outputter for FlamegraphStackLines {
+impl Outputter for Collapsed {
     fn record(&mut self, stack: &StackTrace) -> Result<(), Error> {
         self.0.record(&stack.trace)?;
         Ok(())
