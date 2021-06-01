@@ -1,24 +1,20 @@
 use std::collections::HashMap;
-use std::fs::File;
-use std::io;
+use std::io::{self, Write};
 
 use crate::core::types::StackFrame;
 
 use anyhow::Result;
 use inferno::flamegraph::{Direction, Options};
 
+// Simple counter that maps stacks to flamegraph collapsed format
 #[derive(Default)]
 pub struct Stats {
     pub counts: HashMap<String, usize>,
-    pub min_width: f64,
 }
 
 impl Stats {
-    pub fn new(flame_min_width: f64) -> Stats {
-        Stats {
-            min_width: flame_min_width,
-            ..Default::default()
-        }
+    pub fn new() -> Stats {
+        Default::default()
     }
 
     pub fn record(&mut self, stack: &[StackFrame]) -> Result<(), io::Error> {
@@ -33,25 +29,30 @@ impl Stats {
         Ok(())
     }
 
-    pub fn write(&self, w: File) -> Result<()> {
-        let lines = self.get_lines();
-
-        let mut opts = Options::default();
-        opts.direction = Direction::Inverted;
-        opts.min_width = self.min_width;
-
-        if lines.is_empty() {
+    pub fn write_flamegraph<W: Write>(&self, w: W, min_width: f64) -> Result<()> {
+        if self.is_empty() {
             eprintln!("Warning: no profile samples were collected");
         } else {
-            inferno::flamegraph::from_lines(&mut opts, lines.iter().map(|x| x.as_str()), w)?;
+            let mut opts = Options::default();
+            opts.direction = Direction::Inverted;
+            opts.min_width = min_width;
+            inferno::flamegraph::from_lines(
+                &mut opts,
+                self.get_lines().iter().map(|x| x.as_str()),
+                w,
+            )?;
         }
 
         Ok(())
     }
 
-    pub fn write_stack_lines(&self, w: &mut dyn io::Write) -> Result<(), Error> {
-        for line in self.get_lines() {
-            writeln!(w, "{}", line)?;
+    pub fn write_collapsed<W: Write>(&self, w: &mut W) -> Result<()> {
+        if self.is_empty() {
+            eprintln!("Warning: no profile samples were collected");
+        } else {
+            self.get_lines()
+                .iter()
+                .try_for_each(|line| write!(w, "{}\n", line))?;
         }
         Ok(())
     }
@@ -59,14 +60,19 @@ impl Stats {
     fn get_lines(&self) -> Vec<String> {
         self.counts
             .iter()
-            .map(|(k, v)| format!("{} {}", k, v))
+            .map(|(frame, count)| format!("{} {}", frame, count))
             .collect()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.counts.is_empty()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::ui::flamegraph::*;
+    use std::io::Cursor;
 
     // Build a test stackframe
     fn f(i: u32) -> StackFrame {

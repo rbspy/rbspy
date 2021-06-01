@@ -322,12 +322,8 @@ fn snapshot(pid: Pid, lock_process: bool) -> Result<(), Error> {
 impl OutputFormat {
     fn outputter(self, flame_min_width: f64) -> Box<dyn ui::output::Outputter> {
         match self {
-            OutputFormat::flamegraph => Box::new(output::Flamegraph(ui::flamegraph::Stats::new(
-                flame_min_width,
-            ))),
-            OutputFormat::collapsed => Box::new(output::Collapsed(
-                ui::flamegraph::Stats::new(flame_min_width),
-            )),
+            OutputFormat::flamegraph => Box::new(output::Flamegraph::new(flame_min_width)),
+            OutputFormat::collapsed => Box::new(output::Collapsed::default()),
             OutputFormat::callgrind => Box::new(output::Callgrind(ui::callgrind::Stats::new())),
             OutputFormat::speedscope => Box::new(output::Speedscope(ui::speedscope::Stats::new())),
             OutputFormat::summary => Box::new(output::Summary(ui::summary::Stats::new())),
