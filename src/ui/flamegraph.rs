@@ -84,21 +84,25 @@ mod tests {
         }
     }
 
-    fn assert_contains(counts: &HashMap<String, usize>, s: &str, val: usize) {
-        assert_eq!(counts.get(&s.to_string()), Some(&val));
-    }
-
-    #[test]
-    fn test_stats() -> Result<(), io::Error> {
-        let mut stats = Stats::new(0.1);
-
+    // Build test stats
+    fn build_stats() -> Result<Stats, io::Error> {
+        let mut stats = Stats::new();
         stats.record(&vec![f(1)])?;
         stats.record(&vec![f(2), f(1)])?;
         stats.record(&vec![f(2), f(1)])?;
         stats.record(&vec![f(2), f(3), f(1)])?;
         stats.record(&vec![f(2), f(3), f(1)])?;
         stats.record(&vec![f(2), f(3), f(1)])?;
+        Ok(stats)
+    }
 
+    fn assert_contains(counts: &HashMap<String, usize>, s: &str, val: usize) {
+        assert_eq!(counts.get(&s.to_string()), Some(&val));
+    }
+
+    #[test]
+    fn test_stats() -> Result<(), io::Error> {
+        let stats = build_stats()?;
         let counts = &stats.counts;
         assert_contains(counts, "func1 - file1.rb:1", 1);
         assert_contains(
@@ -107,6 +111,24 @@ mod tests {
             3,
         );
         assert_contains(counts, "func1 - file1.rb:1;func2 - file2.rb:2", 2);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_flamegraph_from_collapsed() -> Result<()> {
+        let stats = build_stats()?;
+
+        let mut writer = Cursor::new(Vec::<u8>::new());
+        stats.write_collapsed(&mut writer)?;
+
+        let collapsed_reader = Cursor::new(writer.into_inner());
+        let svg_writer = Cursor::new(Vec::new());
+
+        let mut opts = Options::default();
+        opts.direction = Direction::Inverted;
+        opts.min_width = 0.1;
+        inferno::flamegraph::from_reader(&mut opts, collapsed_reader, svg_writer)?;
 
         Ok(())
     }
