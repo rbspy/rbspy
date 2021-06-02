@@ -116,6 +116,21 @@ mod tests {
     }
 
     #[test]
+    fn test_collapsed() -> Result<()> {
+        let stats = build_stats()?;
+        let mut writer = Cursor::new(Vec::<u8>::new());
+        stats.write_collapsed(&mut writer)?;
+        let collapsed_text = std::str::from_utf8(writer.get_ref())?;
+        assert!(collapsed_text.contains("func1 - file1.rb:1 1"));
+        assert!(
+            collapsed_text.contains("func1 - file1.rb:1;func3 - file3.rb:3;func2 - file2.rb:2 3")
+        );
+        assert!(collapsed_text.contains("func1 - file1.rb:1;func2 - file2.rb:2 2"));
+
+        Ok(())
+    }
+
+    #[test]
     fn test_flamegraph_from_collapsed() -> Result<()> {
         let stats = build_stats()?;
 
