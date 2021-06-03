@@ -624,16 +624,16 @@ fn parallel_record(
         }
     }
 
-    // Finish writing all data to disk
-    eprintln!("Wrote raw data to {}", raw_path.display());
-    eprintln!("Writing formatted output to {}", out_path.display());
-
     let out_file = File::create(&out_path).context(format!(
         "Failed to create output file {}",
         &out_path.display()
     ))?;
     out.complete(out_file)?;
     raw_store.complete();
+
+    // Finish writing all data to disk
+    eprintln!("Wrote raw data to {}", raw_path.display());
+    eprintln!("Writing formatted output to {}", out_path.display());
 
     // Check for errors from the child threads. Ignore errors unless every single thread
     // returned an error. If that happens, return the last error. This lets rbspy successfully
