@@ -92,6 +92,15 @@ impl PartialOrd for StackFrame {
 }
 
 impl StackTrace {
+    pub fn new_empty() -> StackTrace {
+        StackTrace {
+            pid: None,
+            trace: Vec::new(),
+            thread_id: None,
+            time: None,
+        }
+    }
+
     pub fn iter(&self) -> std::slice::Iter<StackFrame> {
         self.trace.iter()
     }

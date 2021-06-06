@@ -39,12 +39,14 @@ enum SubCmd {
         silent: bool,
         flame_min_width: f64,
         lock_process: bool,
+        on_cpu: bool,
         force_version: Option<String>,
     },
     /// Capture and print a stacktrace snapshot of process `pid`.
     Snapshot {
         pid: Pid,
         lock_process: bool,
+        on_cpu: bool,
         force_version: Option<String>,
     },
     Report {
@@ -103,9 +105,10 @@ fn do_main() -> Result<(), Error> {
         SubCmd::Snapshot {
             pid,
             lock_process,
+            on_cpu,
             force_version,
         } => {
-            let snap = recorder::snapshot(pid, lock_process, force_version)?;
+            let snap = recorder::snapshot(pid, lock_process, force_version, on_cpu)?;
             println!("{}", snap);
             Ok(())
         }
@@ -121,6 +124,7 @@ fn do_main() -> Result<(), Error> {
             silent,
             flame_min_width,
             lock_process,
+            on_cpu,
             force_version,
         } => {
             let pid = match target {
@@ -186,6 +190,7 @@ fn do_main() -> Result<(), Error> {
                 flame_min_width,
                 lock_process,
                 force_version,
+                on_cpu,
             };
 
             let recorder = Arc::<recorder::Recorder>::new(recorder::Recorder::new(config));
@@ -292,6 +297,9 @@ fn arg_parser() -> clap::Command<'static> {
                         .takes_value(true)
                         .required(false)
                 )
+                .arg(
+                    arg!(--on-cpu "Collect samples only when the application is using the CPU")
+                )
         )
         .subcommand(
             clap::Command::new("record")
@@ -368,6 +376,9 @@ fn arg_parser() -> clap::Command<'static> {
                         .takes_value(true)
                         .required(false)
                 )
+                .arg(
+                    arg!(--on-cpu "Collect samples only when the application is using the CPU")
+                )
                 .arg(arg!(<cmd> ... "command to run").required(false)),
         )
         .subcommand(
@@ -421,6 +432,7 @@ impl Args {
                 pid: get_pid(submatches)
                     .expect("this shouldn't happen because clap requires a pid"),
                 lock_process: submatches.is_present("nonblocking"),
+                on_cpu: submatches.is_present("on-cpu"),
                 force_version: match submatches.value_of("force-version") {
                     Some(version) => Some(version.to_string()),
                     None => None,
@@ -444,6 +456,7 @@ impl Args {
                 let sample_rate = ArgMatches::value_of_t(submatches, "rate").unwrap();
                 let flame_min_width =
                     ArgMatches::value_of_t(submatches, "flame-min-width").unwrap();
+                let on_cpu = submatches.is_present("on-cpu");
                 let force_version = match ArgMatches::value_of_t(submatches, "force-version") {
                     Err(_) => None,
                     Ok(v) => Some(v),
@@ -471,6 +484,7 @@ impl Args {
                     silent,
                     flame_min_width,
                     lock_process: !nonblocking,
+                    on_cpu,
                     force_version,
                 }
             }

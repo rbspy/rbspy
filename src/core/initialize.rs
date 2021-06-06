@@ -26,6 +26,7 @@ pub fn initialize(
     pid: Pid,
     lock_process: bool,
     force_version: Option<String>,
+    on_cpu: bool
 ) -> Result<StackTraceGetter> {
     #[cfg(all(windows, target_arch = "x86_64"))]
     if is_wow64_process(pid).context("check wow64 process")? {
@@ -51,6 +52,7 @@ pub fn initialize(
         reinit_count: 0,
         lock_process,
         force_version,
+        on_cpu,
     })
 }
 
@@ -64,21 +66,29 @@ pub struct StackTraceGetter {
     reinit_count: u32,
     lock_process: bool,
     force_version: Option<String>,
+    on_cpu: bool,
 }
 
 impl StackTraceGetter {
-    pub fn get_trace(&mut self) -> Result<StackTrace> {
+    pub fn get_trace(&mut self) -> Result<Option<StackTrace>> {
+        /* First, trying OS specific checks to determine whether the process is on CPU or not.
+         * This comes before locking the process because in most operating systems locking
+         * means the process is stopped */
+        if self.on_cpu && !self.is_on_cpu_os_specific()? {
+            return Ok(None);
+        }
         match self.get_trace_from_current_thread() {
-            Ok(mut trace) => {
+            Ok(Some(mut trace)) => {
                 return {
                     /* This is a spike to enrich the trace with the pid.
                      * This is needed, because remoteprocess' ProcessMemory
                      * trait does not expose pid.
                      */
                     trace.pid = Some(self.process.pid);
-                    Ok(trace)
+                    Ok(Some(trace))
                 };
             }
+            Ok(None) => return Ok(None),
             Err(MemoryCopyError::InvalidAddressError(addr))
                 if addr == self.current_thread_addr_location => {}
             Err(e) => {
@@ -95,7 +105,25 @@ impl StackTraceGetter {
             .context("get trace from current thread")?)
     }
 
-    fn get_trace_from_current_thread(&self) -> Result<StackTrace, MemoryCopyError> {
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+    fn is_on_cpu_os_specific(&self) -> Result<bool> {
+        // remoteprocess crate exposes a Thread.active() method for each of these targets
+        for thread in self.process.threads()?.iter() {
+            if thread.active()? {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    fn is_on_cpu_os_specific(&self) -> Result<bool> {
+        /* We don't have OS specific checks for these targets,
+         * so fallback to using the interpreter based check down the line */
+        Ok(true)
+    }
+
+    fn get_trace_from_current_thread(&self) -> Result<Option<StackTrace>, MemoryCopyError> {
         let stack_trace_function = &self.stack_trace_function;
 
         let _lock;
@@ -112,6 +140,7 @@ impl StackTraceGetter {
             self.global_symbols_addr_location,
             &self.process,
             self.process.pid,
+            self.on_cpu,
         )
     }
 
@@ -140,8 +169,16 @@ pub type IsMaybeThreadFn = Box<dyn Fn(usize, usize, &Process, &[MapRange]) -> bo
 
 // Everything below here is private
 
-type StackTraceFn =
-    Box<dyn Fn(usize, usize, Option<usize>, &Process, Pid) -> Result<StackTrace, MemoryCopyError>>;
+type StackTraceFn = Box<
+    dyn Fn(
+        usize,
+        usize,
+        Option<usize>,
+        &Process,
+        Pid,
+        bool,
+    ) -> Result<Option<StackTrace>, MemoryCopyError>,
+>;
 
 fn get_process_ruby_state(
     pid: Pid,
@@ -564,17 +601,39 @@ mod tests {
         result.expect("unexpected error");
     }
 
-    #[test]
-    #[cfg(target_os = "linux")]
-    fn test_get_trace() {
-        // Test getting a stack trace from a real running program using system Ruby
-        let cmd = RubyScript::new("./ci/ruby-programs/infinite.rb");
-        let pid = cmd.id() as Pid;
-        let mut getter = initialize(pid, true, None).unwrap();
-        std::thread::sleep(std::time::Duration::from_millis(50));
-        let trace = getter.get_trace();
-        assert!(trace.is_ok());
-        assert_eq!(trace.unwrap().pid, Some(pid));
+    macro_rules! generate_get_trace_tests {
+
+        ($($name:ident($lock:expr, $on_cpu:expr),)*) => {
+        $(
+            #[test]
+            #[cfg(target_os = "linux")]
+            fn $name() {
+
+                // Test getting a stack trace from a real running program using system Ruby
+                let cmd = if $on_cpu {
+                    RubyScript::new("./ci/ruby-programs/off_cpu.rb");
+                } else {
+                    RubyScript::new("./ci/ruby-programs/infinite.rb");
+                };
+                let pid = cmd.id() as Pid;
+                let mut getter = initialize(pid, $lock, None, $on_cpu).unwrap();
+                std::thread::sleep(std::time::Duration::from_millis(200));
+                let trace = getter.get_trace();
+                assert!(trace.is_ok());
+                let trace = trace.unwrap();
+                if $on_cpu {
+                    assert!(trace.is_none());
+                } else {
+                    assert_eq!(trace.pid, Some(pid));
+                }
+            }
+        )*
+        }
+    }
+
+    generate_get_trace_tests! {
+        test_get_trace(true, false),
+        test_get_trace_on_cpu(true, true),
     }
 
     #[test]
@@ -590,7 +649,7 @@ mod tests {
             .spawn()
             .unwrap();
         let pid = cmd.id() as Pid;
-        let mut getter = initialize(pid, true, None).expect("initialize");
+        let mut getter = initialize(pid, true, None, false).expect("initialize");
 
         std::thread::sleep(std::time::Duration::from_millis(50));
         let trace1 = getter.get_trace();
@@ -638,7 +697,7 @@ mod tests {
         }
 
         let mut cmd = RubyScript::new("ci/ruby-programs/infinite.rb");
-        let mut getter = crate::core::initialize::initialize(cmd.id(), true, None).unwrap();
+        let mut getter = crate::core::initialize::initialize(cmd.id(), true, None, false).unwrap();
 
         cmd.kill().expect("couldn't clean up test process");
 

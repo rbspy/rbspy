@@ -25,6 +25,7 @@ macro_rules! ruby_version_v_1_9_1(
             get_lineno_1_9_0!();
             get_stack_frame_1_9_1!();
             stack_field_1_9_0!();
+            get_thread_status_1_9_0!();
             get_thread_id_1_9_0!();
             get_cfunc_name_unsupported!();
         }
@@ -49,6 +50,7 @@ macro_rules! ruby_version_v_1_9_2_to_3(
             get_lineno_1_9_0!();
             get_stack_frame_1_9_2!();
             stack_field_1_9_0!();
+            get_thread_status_1_9_0!();
             get_thread_id_1_9_0!();
             get_cfunc_name_unsupported!();
         }
@@ -84,6 +86,7 @@ macro_rules! ruby_version_v_2_0_to_2_2(
             get_lineno_2_0_0!();
             get_stack_frame_2_0_0!();
             stack_field_1_9_0!();
+            get_thread_status_1_9_0!();
             get_thread_id_1_9_0!();
             get_cfunc_name_unsupported!();
         }
@@ -107,6 +110,7 @@ macro_rules! ruby_version_v_2_3_to_2_4(
             get_lineno_2_3_0!();
             get_stack_frame_2_3_0!();
             stack_field_1_9_0!();
+            get_thread_status_1_9_0!();
             get_thread_id_1_9_0!();
             get_cfunc_name_unsupported!();
         }
@@ -131,6 +135,7 @@ macro_rules! ruby_version_v2_5_x(
             get_stack_frame_2_5_0!();
             stack_field_2_5_0!();
             get_ruby_string_array_2_5_0!();
+            get_thread_status_2_5_0!();
             get_thread_id_2_5_0!();
             #[cfg(any(target_os = "freebsd", target_os = "macos", target_os = "windows"))]
             get_cfunc_name_unsupported!();
@@ -158,6 +163,7 @@ macro_rules! ruby_version_v2_6_x(
             get_lineno_2_6_0!();
             get_stack_frame_2_5_0!();
             stack_field_2_5_0!();
+            get_thread_status_2_6_0!();
             get_thread_id_2_5_0!();
             #[cfg(any(target_os = "freebsd", target_os = "macos", target_os = "windows"))]
             get_cfunc_name_unsupported!();
@@ -185,6 +191,7 @@ macro_rules! ruby_version_v2_7_x(
             get_lineno_2_6_0!();
             get_stack_frame_2_5_0!();
             stack_field_2_5_0!();
+            get_thread_status_2_6_0!();
             get_thread_id_2_5_0!();
             get_cfunc_name!();
         }
@@ -209,6 +216,7 @@ macro_rules! ruby_version_v3_0_x(
             get_lineno_2_6_0!();
             get_stack_frame_2_5_0!();
             stack_field_2_5_0!();
+            get_thread_status_2_6_0!();
             get_thread_id_2_5_0!();
             get_cfunc_name!();
 
@@ -236,6 +244,7 @@ macro_rules! ruby_version_v3_1_x(
             get_lineno_2_6_0!();
             get_stack_frame_2_5_0!();
             stack_field_2_5_0!();
+            get_thread_status_2_6_0!();
             get_thread_id_2_5_0!();
             get_cfunc_name!();
 
@@ -312,17 +321,28 @@ macro_rules! get_stack_trace(
             ruby_global_symbols_address_location: Option<usize>,
             source: &T,
             pid: Pid,
-        ) -> Result<StackTrace, MemoryCopyError> {
+            on_cpu: bool,
+        ) -> Result<Option<StackTrace>, MemoryCopyError> {
             let thread: $thread_type = get_execution_context(ruby_current_thread_address_location, ruby_vm_address_location, source)
                 .context(ruby_current_thread_address_location)?;
 
+            // testing the thread state in the interpreter.
+            if on_cpu && get_thread_status(&thread, source)? != rb_thread_status_THREAD_RUNNABLE /* THREAD_RUNNABLE */ {
+                /* This is in addition to any OS-specific checks for thread activity,
+                 * and provides an extra measure of reliability for targets that haven't got them.
+                 * Another added value for doing this is that it works for coredump targets. */
+                return Ok(None);
+            }
+
+            let thread_id = get_thread_id(&thread, source)?;
+
             if stack_field(&thread) as usize == 0 {
-                return Ok(StackTrace {
+                return Ok(Some(StackTrace {
                     pid: Some(pid),
                     trace: vec!(StackFrame::unknown_c_function()),
-                    thread_id: Some(get_thread_id(&thread, source)?),
+                    thread_id: Some(thread_id),
                     time: Some(SystemTime::now())
-                });
+                }));
             }
             let mut trace = Vec::new();
             let cfps = get_cfps(thread.cfp as usize, stack_base(&thread) as usize, source)?;
@@ -371,7 +391,7 @@ macro_rules! get_stack_trace(
                     }
                 }
             }
-            Ok(StackTrace{trace, pid: Some(pid), thread_id: Some(get_thread_id(&thread, source)?), time: Some(SystemTime::now())})
+            Ok(Some(StackTrace{trace, pid: Some(pid), thread_id: Some(thread_id), time: Some(SystemTime::now())}))
         }
 
         use proc_maps::{maps_contain_addr, MapRange};
@@ -405,7 +425,7 @@ macro_rules! get_stack_trace(
             }
 
             // finally, try to get an actual stack trace from the source and see if it works
-            get_stack_trace(x_addr, 0, None, source, 0).is_ok()
+            get_stack_trace(x_addr, 0, None, source, 0, false).is_ok()
         }
     )
 );
@@ -431,6 +451,40 @@ macro_rules! stack_field_2_5_0(
 
         fn stack_size_field(thread: &rb_execution_context_struct) -> i64 {
             thread.vm_stack_size as i64
+        }
+    )
+);
+
+macro_rules! get_thread_status_1_9_0(
+    () => (
+
+        fn get_thread_status<T>(thread_struct: &rb_thread_struct, _source: &T) -> Result<u32, MemoryCopyError> {
+            Ok(thread_struct.status as u32)
+        }
+    )
+);
+
+macro_rules! get_thread_status_2_5_0(
+    () => (
+
+        fn get_thread_status<T>(thread_struct: &rb_execution_context_struct, source: &T)
+                            -> Result<u32, MemoryCopyError> where T: ProcessMemory {
+            let thread: rb_thread_struct = source.copy_struct(thread_struct.thread_ptr as usize)
+                .context(thread_struct.thread_ptr as usize)?;
+            Ok(thread.status as u32)
+        }
+    )
+);
+
+// ->status changed into a bitfield
+macro_rules! get_thread_status_2_6_0(
+    () => (
+
+        fn get_thread_status<T>(thread_struct: &rb_execution_context_struct, source: &T)
+                            -> Result<u32, MemoryCopyError> where T: ProcessMemory {
+            let thread: rb_thread_struct = source.copy_struct(thread_struct.thread_ptr as usize)
+                .context(thread_struct.thread_ptr as usize)?;
+            Ok(thread.status() as u32)
         }
     )
 );
@@ -1309,7 +1363,9 @@ mod tests {
             None,
             &coredump_1_9_3(),
             0,
+            false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_1_9_3(), stack_trace.trace);
     }
@@ -1324,7 +1380,9 @@ mod tests {
             None,
             &coredump_2_1_6(),
             0,
+            false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_main(), stack_trace.trace);
     }
@@ -1340,7 +1398,9 @@ mod tests {
             None,
             &coredump_2_1_6_c_function(),
             0,
+            false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(vec!(StackFrame::unknown_c_function()), stack_trace.trace);
     }
@@ -1355,7 +1415,9 @@ mod tests {
             None,
             &coredump_2_4_0(),
             0,
+            false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace(), stack_trace.trace);
     }
@@ -1370,7 +1432,9 @@ mod tests {
             None,
             &coredump_2_5_0(),
             0,
+            false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace(), stack_trace.trace);
     }
@@ -1386,7 +1450,9 @@ mod tests {
             global_symbols_addr,
             &coredump_2_7_2(),
             0,
+            false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
@@ -1402,7 +1468,9 @@ mod tests {
             global_symbols_addr,
             &coredump_2_7_2(),
             0,
+            false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
@@ -1418,7 +1486,27 @@ mod tests {
             global_symbols_addr,
             &coredump_2_7_2(),
             0,
+            false,
         )
+        .unwrap()
+        .unwrap();
+        assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn test_get_ruby_stack_trace_2_7_4() {
+        let current_thread_addr = 0x7fdd8d626070;
+        let global_symbols_addr = Some(0x7fdd8d60eb80);
+        let stack_trace = ruby_version::ruby_2_7_4::get_stack_trace::<CoreDump>(
+            current_thread_addr,
+            0,
+            global_symbols_addr,
+            &coredump_2_7_2(),
+            0,
+            false,
+        )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
@@ -1434,6 +1522,7 @@ mod tests {
             global_symbols_addr,
             &coredump_2_7_2(),
             0,
+            false,
         )
         .unwrap();
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
@@ -1451,6 +1540,7 @@ mod tests {
             &coredump_2_7_2(),
             0,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
@@ -1467,7 +1557,9 @@ mod tests {
             global_symbols_addr,
             &source,
             0,
+            false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
@@ -1484,7 +1576,9 @@ mod tests {
             global_symbols_addr,
             &source,
             0,
+            false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
@@ -1501,7 +1595,28 @@ mod tests {
             global_symbols_addr,
             &source,
             0,
+            false,
         )
+        .unwrap()
+        .unwrap();
+        assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn test_get_ruby_stack_trace_3_0_2() {
+        let source = coredump_3_0_0();
+        let vm_addr = 0x7fdacdab7470;
+        let global_symbols_addr = Some(0x7fdacdaa9d80);
+        let stack_trace = ruby_version::ruby_3_0_2::get_stack_trace::<CoreDump>(
+            0,
+            vm_addr,
+            global_symbols_addr,
+            &source,
+            0,
+            false,
+        )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
@@ -1518,7 +1633,9 @@ mod tests {
             global_symbols_addr,
             &source,
             0,
+            false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
@@ -1535,7 +1652,9 @@ mod tests {
             global_symbols_addr,
             &source,
             0,
+            false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
@@ -1552,7 +1671,9 @@ mod tests {
             global_symbols_addr,
             &source,
             0,
+            false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_3_1_0(), stack_trace.trace);
     }
@@ -1569,7 +1690,9 @@ mod tests {
             global_symbols_addr,
             &source,
             0,
+            false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_3_1_0(), stack_trace.trace);
     }
@@ -1586,7 +1709,9 @@ mod tests {
             global_symbols_addr,
             &source,
             0,
+            false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_3_1_0(), stack_trace.trace);
     }

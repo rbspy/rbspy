@@ -16,13 +16,20 @@ production**.
 `rbspy` lets you record profiling data, save the raw profiling data to disk, and then analyze it in
 a variety of different ways later on.
 
-## only wall-clock profiling
+## profiling options
 
 There are 2 main ways to profile code -- you can either profile everything the
 application does (including waiting), or only profile when the application is using the CPU.
 
-rbspy profiles everything the program does (including waiting) -- there's no
-option to just profile when the program is using the CPU.
+By default, rbspy profiles everything the program does (including waiting).
+To sample only when the program is using the CPU, use the `--on-cpu` flag.
+
+`--on-cpu` is implemented by 2 layers of filtering using the following sources of information:
+- OS level thread information (only available for linux, macos and windows)
+- current thread state in the ruby interpreter.
+
+In addition, rbspy can either profile in a blocking or nonblocking mode.
+The latter is less accurate but does not require rbspy to stop the live process to take samples.
 
 ## Documentation
 

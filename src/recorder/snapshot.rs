@@ -8,7 +8,8 @@ pub fn snapshot(
     pid: Pid,
     lock_process: bool,
     force_version: Option<String>,
+    on_cpu: bool,
 ) -> Result<StackTrace, Error> {
-    let mut getter = initialize(pid, lock_process, force_version)?;
-    getter.get_trace()
+    let mut getter = initialize(pid, lock_process, force_version, on_cpu)?;
+    Ok(getter.get_trace()?.unwrap_or(StackTrace::new_empty()))
 }
