@@ -33,9 +33,11 @@ pub struct StackTrace {
     pub pid: Option<Pid>,
     pub thread_id: Option<usize>,
     pub time: Option<SystemTime>,
+    pub on_cpu: Option<bool>,
 }
 
-pub type StackTraceFn = fn(usize, usize, Option<usize>, &Process, Pid) -> Result<StackTrace>;
+pub type StackTraceFn =
+    fn(usize, usize, Option<usize>, &Process, Pid, bool) -> Result<Option<StackTrace>>;
 
 pub type IsMaybeThreadFn = fn(usize, usize, &Process, &[proc_maps::MapRange]) -> bool;
 
@@ -103,6 +105,16 @@ impl PartialOrd for StackFrame {
 }
 
 impl StackTrace {
+    pub fn new_empty() -> StackTrace {
+        StackTrace {
+            pid: None,
+            trace: Vec::new(),
+            thread_id: None,
+            time: None,
+            on_cpu: None,
+        }
+    }
+
     pub fn iter(&self) -> std::slice::Iter<StackFrame> {
         self.trace.iter()
     }

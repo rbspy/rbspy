@@ -42,6 +42,7 @@ impl From<Vec<StackFrame>> for StackTrace {
             trace,
             thread_id: None,
             time: None,
+            on_cpu: None,
         }
     }
 }

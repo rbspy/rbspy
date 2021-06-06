@@ -40,7 +40,7 @@ jobs:
       - name: Run Ruby script
         id: ruby-script
         run: |
-          ruby ci/ruby-programs/infinite.rb &
+          ruby ci/ruby-programs/infinite_on_cpu.rb &
           pid=$!
           echo "pid=$pid" >> $GITHUB_OUTPUT
 

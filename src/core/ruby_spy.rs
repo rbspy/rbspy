@@ -11,10 +11,11 @@ use super::address_finder::RubyVM;
 pub struct RubySpy {
     process: Process,
     vm: super::address_finder::RubyVM,
+    on_cpu_only: bool,
 }
 
 impl RubySpy {
-    pub fn new(pid: Pid, force_version: Option<String>) -> Result<Self> {
+    pub fn new(pid: Pid, force_version: Option<String>, on_cpu_only: bool) -> Result<Self> {
         #[cfg(all(windows, target_arch = "x86_64"))]
         if is_wow64_process(pid).context("check wow64 process")? {
             return Err(format_err!(
@@ -33,7 +34,11 @@ impl RubySpy {
         )
         .context("get ruby VM state")?;
 
-        Ok(Self { process, vm })
+        Ok(Self {
+            process,
+            vm,
+            on_cpu_only,
+        })
     }
 
     /// Creates a RubySpy object, retrying up to max_retries times.
@@ -48,10 +53,11 @@ impl RubySpy {
         pid: Pid,
         max_retries: u64,
         force_version: Option<String>,
+        on_cpu_only: bool,
     ) -> Result<Self, Error> {
         let mut retries = 0;
         loop {
-            let err = match Self::new(pid, force_version.clone()) {
+            let err = match Self::new(pid, force_version.clone(), on_cpu_only) {
                 Ok(mut process) => {
                     // verify that we can load a stack trace before returning success
                     match process.get_stack_trace(false) {
@@ -75,14 +81,21 @@ impl RubySpy {
         }
     }
 
-    pub fn get_stack_trace(&mut self, lock_process: bool) -> Result<StackTrace> {
+    pub fn get_stack_trace(&mut self, lock_process: bool) -> Result<Option<StackTrace>> {
+        // First, try OS-specific checks to determine whether the process is on CPU or not.
+        // This comes before locking the process because in most operating systems locking
+        // will stop the process and interfere with the on-CPU check.
+        if self.on_cpu_only && !self.is_on_cpu()? {
+            return Ok(None);
+        }
         match self.get_trace_from_current_thread(lock_process) {
-            Ok(mut trace) => {
+            Ok(Some(mut trace)) => {
                 return {
                     trace.pid = Some(self.process.pid);
-                    Ok(trace)
+                    Ok(Some(trace))
                 };
             }
+            Ok(None) => Ok(None),
             Err(e) => {
                 if self.process.exe().is_err() {
                     return Err(MemoryCopyError::ProcessEnded.into());
@@ -92,7 +105,7 @@ impl RubySpy {
         }
     }
 
-    fn get_trace_from_current_thread(&self, lock_process: bool) -> Result<StackTrace> {
+    fn get_trace_from_current_thread(&self, lock_process: bool) -> Result<Option<StackTrace>> {
         let _lock;
         if lock_process {
             _lock = self
@@ -107,7 +120,21 @@ impl RubySpy {
             self.vm.global_symbols_addr_location,
             &self.process,
             self.process.pid,
+            self.on_cpu_only,
         )
+    }
+
+    fn is_on_cpu(&self) -> Result<bool> {
+        if self
+            .process
+            .threads()?
+            .iter()
+            .any(|thread| thread.active().unwrap_or(false))
+        {
+            return Ok(true);
+        }
+
+        Ok(false)
     }
 
     pub fn inspect(&self) -> &RubyVM {
@@ -176,7 +203,7 @@ mod tests {
 
     #[test]
     fn test_initialize_with_nonexistent_process() {
-        match RubySpy::new(65535, None) {
+        match RubySpy::new(65535, None, false) {
             Ok(_) => assert!(
                 false,
                 "Expected error because process probably doesn't exist"
@@ -188,7 +215,7 @@ mod tests {
     #[test]
     #[cfg(target_os = "linux")]
     fn test_initialize_with_disallowed_process() {
-        match RubySpy::new(1, None) {
+        match RubySpy::new(1, None, false) {
             Ok(_) => assert!(
                 false,
                 "Expected error because we shouldn't be allowed to profile the init process"
@@ -204,7 +231,7 @@ mod tests {
         let mut process = Command::new("/usr/bin/ruby").spawn().unwrap();
         let pid = process.id() as Pid;
 
-        match RubySpy::new(pid, None) {
+        match RubySpy::new(pid, None, false) {
             Ok(_) => assert!(
                 false,
                 "Expected error because we shouldn't be allowed to profile system processes"
@@ -216,18 +243,35 @@ mod tests {
     }
 
     #[test]
-    fn test_get_trace() {
+    fn test_get_trace_on_cpu() {
         #[cfg(target_os = "macos")]
         if !nix::unistd::Uid::effective().is_root() {
             println!("Skipping test because we're not running as root");
             return;
         }
 
-        let cmd = RubyScript::new("./ci/ruby-programs/infinite.rb");
+        let cmd = RubyScript::new("./ci/ruby-programs/infinite_on_cpu.rb");
         let pid = cmd.id() as Pid;
-        let mut spy = RubySpy::retry_new(pid, 100, None).expect("couldn't initialize spy");
+        let mut spy = RubySpy::retry_new(pid, 100, None, false).expect("couldn't initialize spy");
         spy.get_stack_trace(false)
             .expect("couldn't get stack trace");
+    }
+
+    #[test]
+    fn test_get_trace_off_cpu() {
+        #[cfg(target_os = "macos")]
+        if !nix::unistd::Uid::effective().is_root() {
+            println!("Skipping test because we're not running as root");
+            return;
+        }
+
+        let cmd = RubyScript::new("./ci/ruby-programs/infinite_off_cpu.rb");
+        let pid = cmd.id() as Pid;
+        let mut spy = RubySpy::retry_new(pid, 100, None, true).expect("couldn't initialize spy");
+        let trace = spy
+            .get_stack_trace(false)
+            .expect("couldn't get stack trace");
+        assert!(trace.is_none());
     }
 
     #[test]
@@ -238,8 +282,8 @@ mod tests {
             return;
         }
 
-        let mut cmd = RubyScript::new("./ci/ruby-programs/infinite.rb");
-        let mut getter = RubySpy::retry_new(cmd.id(), 100, None).unwrap();
+        let mut cmd = RubyScript::new("./ci/ruby-programs/infinite_on_cpu.rb");
+        let mut getter = RubySpy::retry_new(cmd.id(), 100, None, false).unwrap();
 
         cmd.kill().expect("couldn't clean up test process");
 

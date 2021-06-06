@@ -7,7 +7,7 @@ use rbspy::OutputFormat;
 
 fn main() {
     let mut process = std::process::Command::new(path_to_ruby_binary())
-        .arg("ci/ruby-programs/infinite.rb")
+        .arg("ci/ruby-programs/infinite_on_cpu.rb")
         .spawn()
         .unwrap();
     let out_path = std::path::PathBuf::from("rbspy-out.svg");
@@ -23,6 +23,7 @@ fn main() {
         flame_min_width: 10.0,
         lock_process: true,
         force_version: None,
+        on_cpu_only: false,
     };
     let recorder = Recorder::new(config);
     match recorder.record() {

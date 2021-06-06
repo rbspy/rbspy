@@ -75,7 +75,7 @@ jobs:
           echo "Ruby version: \$(/usr/local/bin/ruby -v)"
 
           cd $GITHUB_WORKSPACE/rbspy
-          /usr/local/bin/ruby ci/ruby-programs/infinite.rb &
+          /usr/local/bin/ruby ci/ruby-programs/infinite_on_cpu.rb &
           sudo ./target/release/rbspy record --pid \$! --duration 2 --force-version $RUBY_LATEST_STABLE_VERSION --silent
 
           EOF

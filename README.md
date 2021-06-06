@@ -16,14 +16,6 @@ production**.
 `rbspy` lets you record profiling data, save the raw profiling data to disk, and then analyze it in
 a variety of different ways later on.
 
-## only wall-clock profiling
-
-There are 2 main ways to profile code -- you can either profile everything the
-application does (including waiting), or only profile when the application is using the CPU.
-
-rbspy profiles everything the program does (including waiting) -- there's no
-option to just profile when the program is using the CPU.
-
 ## Documentation
 
 => https://rbspy.github.io

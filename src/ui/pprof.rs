@@ -186,6 +186,7 @@ mod test {
             pid: Some(9),
             thread_id: Some(999),
             time: Some(time),
+            on_cpu: None,
         }
     }
 

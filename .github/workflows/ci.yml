@@ -221,7 +221,8 @@ jobs:
             target/x86_64-unknown-freebsd/release/deps/rbspy-*
             ci
             ci/ruby-programs
-            ci/ruby-programs/infinite.rb
+            ci/ruby-programs/infinite_on_cpu.rb
+            ci/ruby-programs/infinite_off_cpu.rb
             ci/ruby-programs/ruby_forks.rb
             .cargo
             .cargo/registry

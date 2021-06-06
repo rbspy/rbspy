@@ -8,6 +8,7 @@ pub fn snapshot(
     pid: Pid,
     lock_process: bool,
     force_version: Option<String>,
-) -> Result<StackTrace, Error> {
-    RubySpy::retry_new(pid, 10, force_version)?.get_stack_trace(lock_process)
+    on_cpu_only: bool,
+) -> Result<Option<StackTrace>, Error> {
+    RubySpy::retry_new(pid, 10, force_version, on_cpu_only)?.get_stack_trace(lock_process)
 }

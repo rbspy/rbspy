@@ -1,5 +1,5 @@
 def aaa()
-    sleep(0.5)
+    sleep(1000000)
 end
 
 def bbb()

@@ -59,7 +59,7 @@ pub fn report(
 }
 
 pub fn inspect(pid: Pid, force_version: Option<String>) -> Result<()> {
-    let ruby_spy = RubySpy::new(pid, force_version)?;
+    let ruby_spy = RubySpy::new(pid, force_version, false)?;
     let vm = ruby_spy.inspect();
     println!("Ruby version: {}", vm.ruby_version.semver_version);
     println!("Ruby VM address: {:#x}", vm.ruby_vm_addr_location);

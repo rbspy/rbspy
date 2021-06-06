@@ -40,12 +40,14 @@ enum SubCmd {
         flame_min_width: f64,
         lock_process: bool,
         force_version: Option<String>,
+        on_cpu_only: bool,
     },
     /// Capture and print a stacktrace snapshot of process `pid`.
     Snapshot {
         pid: Pid,
         lock_process: bool,
         force_version: Option<String>,
+        on_cpu_only: bool,
     },
     Report {
         format: OutputFormat,
@@ -108,9 +110,12 @@ fn do_main() -> Result<(), Error> {
             pid,
             lock_process,
             force_version,
+            on_cpu_only,
         } => {
-            let snap = recorder::snapshot(pid, lock_process, force_version)?;
-            println!("{}", snap);
+            match recorder::snapshot(pid, lock_process, force_version, on_cpu_only)? {
+                Some(snap) => println!("{}", snap),
+                None => println!("No stack trace was captured"),
+            };
             Ok(())
         }
         SubCmd::Record {
@@ -126,6 +131,7 @@ fn do_main() -> Result<(), Error> {
             flame_min_width,
             lock_process,
             force_version,
+            on_cpu_only,
         } => {
             let pid = match target {
                 Target::Pid { pid } => pid,
@@ -143,6 +149,7 @@ fn do_main() -> Result<(), Error> {
                 flame_min_width,
                 lock_process,
                 force_version,
+                on_cpu_only,
             };
 
             let recorder = Arc::<recorder::Recorder>::new(recorder::Recorder::new(config));
@@ -259,6 +266,14 @@ fn arg_parser() -> clap::Command {
                         .value_name("VERSION")
                         .required(false)
                 )
+                .arg(
+                    clap::Arg::new("on-cpu")
+                        .help("Only record stack traces when the process is using the CPU (EXPERIMENTAL)")
+                        .action(clap::ArgAction::SetTrue)
+                        .short('c')
+                        .long("on-cpu")
+                        .required(false),
+                )
         )
         .subcommand(
             clap::Command::new("record")
@@ -340,6 +355,14 @@ fn arg_parser() -> clap::Command {
                         .value_name("VERSION")
                         .required(false)
                 )
+                .arg(
+                    clap::Arg::new("on-cpu")
+                        .help("Only record stack traces when the process is using the CPU (EXPERIMENTAL)")
+                        .action(clap::ArgAction::SetTrue)
+                        .short('c')
+                        .long("on-cpu")
+                        .required(false),
+                )
                 .arg(arg!(<cmd> ... "command to run").required(false)),
         )
         .subcommand(
@@ -417,6 +440,7 @@ impl Args {
                     Some(version) => Some(version.to_string()),
                     None => None,
                 },
+                on_cpu_only: *submatches.get_one::<bool>("on-cpu").unwrap(),
             },
             Some(("record", submatches)) => {
                 let format: OutputFormat =
@@ -443,6 +467,7 @@ impl Args {
                 let silent = *submatches.get_one::<bool>("silent").unwrap();
                 let with_subprocesses = *submatches.get_one::<bool>("subprocesses").unwrap();
                 let nonblocking = *submatches.get_one::<bool>("nonblocking").unwrap();
+                let on_cpu_only = *submatches.get_one::<bool>("on-cpu").unwrap();
 
                 let sample_rate = *ArgMatches::get_one::<u32>(submatches, "rate").unwrap();
                 let flame_min_width =
@@ -475,6 +500,7 @@ impl Args {
                     flame_min_width,
                     lock_process: !nonblocking,
                     force_version,
+                    on_cpu_only: on_cpu_only,
                 }
             }
             Some(("report", submatches)) => {
@@ -617,6 +643,20 @@ mod tests {
             x => panic!("Unexpected: {:?}", x),
         };
 
+        // test snapshot
+        let args = Args::from(make_args("rbspy snapshot --pid 1234")).unwrap();
+        assert_eq!(
+            args,
+            Args {
+                cmd: SubCmd::Snapshot {
+                    pid: 1234,
+                    lock_process: true,
+                    force_version: None,
+                    on_cpu_only: false,
+                },
+            }
+        );
+
         // test record with subcommand
         match Args::from(make_args("rbspy record ruby blah.rb")).unwrap() {
             Args {
@@ -633,7 +673,7 @@ mod tests {
         };
 
         let args = Args::from(make_args(
-            "rbspy record --pid 1234 --file foo.txt --raw-file raw.gz",
+            "rbspy record --on-cpu --pid 1234 --file foo.txt --raw-file raw.gz",
         ))
         .unwrap();
         assert_eq!(
@@ -652,6 +692,7 @@ mod tests {
                     flame_min_width: 0.1,
                     lock_process: true,
                     force_version: None,
+                    on_cpu_only: true,
                 },
             }
         );
@@ -676,6 +717,7 @@ mod tests {
                     flame_min_width: 0.1,
                     lock_process: true,
                     force_version: None,
+                    on_cpu_only: false,
                 },
             }
         );
@@ -700,6 +742,7 @@ mod tests {
                     flame_min_width: 0.1,
                     lock_process: true,
                     force_version: None,
+                    on_cpu_only: false,
                 },
             }
         );
@@ -723,6 +766,7 @@ mod tests {
                     flame_min_width: 0.1,
                     lock_process: true,
                     force_version: None,
+                    on_cpu_only: false,
                 },
             }
         );
@@ -747,6 +791,7 @@ mod tests {
                     flame_min_width: 0.1,
                     lock_process: true,
                     force_version: None,
+                    on_cpu_only: false,
                 },
             }
         );
@@ -771,6 +816,7 @@ mod tests {
                     flame_min_width: 0.1,
                     lock_process: true,
                     force_version: None,
+                    on_cpu_only: false,
                 },
             }
         );
@@ -795,6 +841,7 @@ mod tests {
                     flame_min_width: 0.02,
                     lock_process: true,
                     force_version: None,
+                    on_cpu_only: false,
                 },
             }
         );
@@ -819,6 +866,7 @@ mod tests {
                     flame_min_width: 0.1,
                     lock_process: false,
                     force_version: None,
+                    on_cpu_only: false,
                 },
             }
         );
@@ -834,6 +882,7 @@ mod tests {
                     pid: 1234,
                     lock_process: true,
                     force_version: None,
+                    on_cpu_only: false,
                 },
             }
         );
