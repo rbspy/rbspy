@@ -104,9 +104,14 @@ enum SubCmd {
         silent: bool,
         flame_min_width: f64,
         lock_process: bool,
+        on_cpu: bool,
     },
     /// Capture and print a stacktrace snapshot of process `pid`.
-    Snapshot { pid: Pid, lock_process: bool },
+    Snapshot {
+        pid: Pid,
+        lock_process: bool,
+        on_cpu: bool,
+    },
     Report {
         format: OutputFormat,
         input: PathBuf,
@@ -144,11 +149,15 @@ fn do_main() -> Result<(), Error> {
     }
 
     match args.cmd {
-        Snapshot { pid, lock_process } => {
+        Snapshot {
+            pid,
+            lock_process,
+            on_cpu,
+        } => {
             #[cfg(all(windows, target_arch = "x86_64"))]
             check_wow64_process(pid);
 
-            snapshot(pid, lock_process)
+            snapshot(pid, lock_process, on_cpu)
         }
         Record {
             target,
@@ -162,6 +171,7 @@ fn do_main() -> Result<(), Error> {
             silent,
             flame_min_width,
             lock_process,
+            on_cpu,
         } => {
             let pid = match target {
                 Target::Pid { pid } => pid,
@@ -214,6 +224,7 @@ fn do_main() -> Result<(), Error> {
                 maybe_duration,
                 flame_min_width,
                 lock_process,
+                on_cpu,
             )
         }
         Report {
@@ -310,8 +321,8 @@ fn main() {
     }
 }
 
-fn snapshot(pid: Pid, lock_process: bool) -> Result<(), Error> {
-    let mut getter = initialize(pid, lock_process)?;
+fn snapshot(pid: Pid, lock_process: bool, on_cpu: bool) -> Result<(), Error> {
+    let mut getter = initialize(pid, lock_process, on_cpu)?;
     let trace = getter.get_trace()?;
     for x in trace.iter().rev() {
         println!("{}", x);
@@ -389,6 +400,7 @@ fn spawn_recorder_children(
     sample_rate: u32,
     maybe_stop_time: Option<Instant>,
     lock_process: bool,
+    on_cpu: bool,
 ) -> (
     Receiver<StackTrace>,
     Receiver<Result<(), Error>>,
@@ -466,6 +478,7 @@ fn spawn_recorder_children(
                             total_traces,
                             trace_sender,
                             lock_process,
+                            on_cpu,
                         );
                         error_sender.send(result).expect("couldn't send error");
                         drop(error_sender);
@@ -493,6 +506,7 @@ fn spawn_recorder_children(
                 total_traces,
                 trace_sender,
                 lock_process,
+                on_cpu,
             );
             error_sender.send(result).unwrap();
             drop(error_sender);
@@ -539,7 +553,8 @@ fn test_spawn_record_children_subprocesses() {
 
     let pid = process.id() as Pid;
 
-    let (trace_receiver, result_receiver, _, _) = spawn_recorder_children(pid, true, 5, None, true);
+    let (trace_receiver, result_receiver, _, _) =
+        spawn_recorder_children(pid, true, 5, None, true, false);
 
     let mut pids = HashSet::<Pid>::new();
     for trace in &trace_receiver {
@@ -580,6 +595,7 @@ fn parallel_record(
     maybe_duration: Option<std::time::Duration>,
     flame_min_width: f64,
     lock_process: bool,
+    on_cpu: bool,
 ) -> Result<(), Error> {
     let maybe_stop_time = match maybe_duration {
         Some(duration) => Some(std::time::Instant::now() + duration),
@@ -593,6 +609,7 @@ fn parallel_record(
             sample_rate,
             maybe_stop_time,
             lock_process,
+            on_cpu,
         );
 
     // Aggregate stack traces as we receive them from the threads that are collecting them
@@ -663,8 +680,9 @@ fn record(
     total_traces: Arc<AtomicUsize>,
     sender: SyncSender<StackTrace>,
     lock_process: bool,
+    on_cpu: bool,
 ) -> Result<(), Error> {
-    let mut getter = core::initialize::initialize(pid, lock_process)?;
+    let mut getter = core::initialize::initialize(pid, lock_process, on_cpu)?;
 
     let mut total = 0;
     let mut errors = 0;
@@ -688,7 +706,9 @@ fn record(
         let trace = getter.get_trace();
         match trace {
             Ok(ok_trace) => {
-                sender.send(ok_trace)?;
+                if on_cpu && !ok_trace.is_empty() {
+                    sender.send(ok_trace)?;
+                }
             }
             Err(x) => {
                 if let Some(MemoryCopyError::ProcessEnded) = x.downcast_ref() {
@@ -863,6 +883,9 @@ fn arg_parser() -> App<'static, 'static> {
                     Arg::from_usage("--nonblocking='Don't pause the ruby process when taking the snapshot. Setting this option will reduce \
                                                     the performance impact of sampling but may produce inaccurate results'"),
                 )
+                .arg(
+                    Arg::from_usage("--on-cpu='Collect samples only when the application is using the CPU'")
+                )
         )
         .subcommand(
             SubCommand::with_name("record")
@@ -920,6 +943,9 @@ fn arg_parser() -> App<'static, 'static> {
                     Arg::from_usage("--nonblocking='Don't pause the ruby process when collecting stack samples. Setting this option will reduce \
                                                    the performance impact of sampling but may produce inaccurate results'"),
                 )
+                .arg(
+                    Arg::from_usage("--on-cpu='Collect samples only when the application is using the CPU'")
+                )
                 .arg(Arg::from_usage("<cmd>... 'command to run'").required(false)),
         )
         .subcommand(
@@ -972,6 +998,7 @@ impl Args {
                 pid: get_pid(submatches)
                     .expect("this shouldn't happen because clap requires a pid"),
                 lock_process: get_lock_process(submatches).unwrap_or_default(),
+                on_cpu: submatches.is_present("on-cpu"),
             },
             ("record", Some(submatches)) => {
                 let format = value_t!(submatches, "format", OutputFormat).unwrap();
@@ -993,6 +1020,7 @@ impl Args {
                 let silent = submatches.is_present("silent");
                 let with_subprocesses = submatches.is_present("subprocesses");
                 let nonblocking = submatches.is_present("nonblocking");
+                let on_cpu = submatches.is_present("on-cpu");
 
                 let sample_rate = value_t!(submatches, "rate", u32).unwrap();
                 let flame_min_width = value_t!(submatches, "flame-min-width", f64).unwrap();
@@ -1019,6 +1047,7 @@ impl Args {
                     silent,
                     flame_min_width,
                     lock_process: !nonblocking,
+                    on_cpu,
                 }
             }
             ("report", Some(submatches)) => Report {
@@ -1064,7 +1093,8 @@ mod tests {
             Args {
                 cmd: Snapshot {
                     pid: 1234,
-                    lock_process: false
+                    lock_process: false,
+                    on_cpu: false,
                 },
             }
         );
@@ -1085,7 +1115,7 @@ mod tests {
         };
 
         let args = Args::from(make_args(
-            "rbspy record --pid 1234 --file foo.txt --raw-file raw.gz",
+            "rbspy record --on-cpu --pid 1234 --file foo.txt --raw-file raw.gz",
         ))
         .unwrap();
         assert_eq!(
@@ -1103,6 +1133,7 @@ mod tests {
                     silent: false,
                     flame_min_width: 0.1,
                     lock_process: true,
+                    on_cpu: true,
                 },
             }
         );
@@ -1126,6 +1157,7 @@ mod tests {
                     silent: false,
                     flame_min_width: 0.1,
                     lock_process: true,
+                    on_cpu: false,
                 },
             }
         );
@@ -1149,6 +1181,7 @@ mod tests {
                     silent: false,
                     flame_min_width: 0.1,
                     lock_process: true,
+                    on_cpu: false,
                 },
             }
         );
@@ -1171,6 +1204,7 @@ mod tests {
                     silent: false,
                     flame_min_width: 0.1,
                     lock_process: true,
+                    on_cpu: false,
                 },
             }
         );
@@ -1194,6 +1228,7 @@ mod tests {
                     silent: false,
                     flame_min_width: 0.1,
                     lock_process: true,
+                    on_cpu: false,
                 },
             }
         );
@@ -1217,6 +1252,7 @@ mod tests {
                     silent: false,
                     flame_min_width: 0.1,
                     lock_process: true,
+                    on_cpu: false,
                 },
             }
         );
@@ -1240,6 +1276,7 @@ mod tests {
                     silent: false,
                     flame_min_width: 0.02,
                     lock_process: true,
+                    on_cpu: false,
                 },
             }
         );
@@ -1263,6 +1300,7 @@ mod tests {
                     silent: false,
                     flame_min_width: 0.1,
                     lock_process: false,
+                    on_cpu: false,
                 },
             }
         );

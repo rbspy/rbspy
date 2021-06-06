@@ -21,7 +21,7 @@ use std::time::Duration;
  *   * Find the right stack trace function for the Ruby version we found
  *   * Package all that up into a struct that the user can use to get stack traces.
  */
-pub fn initialize(pid: Pid, lock_process: bool) -> Result<StackTraceGetter> {
+pub fn initialize(pid: Pid, lock_process: bool, on_cpu: bool) -> Result<StackTraceGetter> {
     let (
         process,
         current_thread_addr_location,
@@ -38,6 +38,7 @@ pub fn initialize(pid: Pid, lock_process: bool) -> Result<StackTraceGetter> {
         stack_trace_function,
         reinit_count: 0,
         lock_process,
+        on_cpu,
     })
 }
 
@@ -50,10 +51,17 @@ pub struct StackTraceGetter {
     stack_trace_function: StackTraceFn,
     reinit_count: u32,
     lock_process: bool,
+    on_cpu: bool,
 }
 
 impl StackTraceGetter {
     pub fn get_trace(&mut self) -> Result<StackTrace> {
+        /* First, trying OS specific checks to determine whether the process is on CPU or not.
+         * This comes before locking the process because in most operating systems locking
+         * means the process is stopped */
+        if self.on_cpu && !self.is_on_cpu_os_specific()? {
+            return Ok(StackTrace::new_empty());
+        }
         match self.get_trace_from_current_thread() {
             Ok(mut trace) => {
                 return {
@@ -72,6 +80,24 @@ impl StackTraceGetter {
         debug!("Thread address location invalid, reinitializing");
         self.reinitialize()?;
         Ok(self.get_trace_from_current_thread()?)
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+    fn is_on_cpu_os_specific(&self) -> Result<bool> {
+        // remoteprocess crate exposes a Thread.active() method for each of these targets
+        for thread in self.process.threads()?.iter() {
+            if thread.active()? {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    fn is_on_cpu_os_specific(&self) -> Result<bool> {
+        /* We don't have OS specific checks for these targets,
+         * so fallback to using the interpreter based check down the line */
+        Ok(false)
     }
 
     fn get_trace_from_current_thread(&self) -> Result<StackTrace, MemoryCopyError> {
@@ -119,6 +145,7 @@ impl StackTraceGetter {
             self.global_symbols_addr_location,
             &self.process,
             self.process.pid,
+            self.on_cpu,
         )
     }
 
@@ -146,8 +173,9 @@ pub type IsMaybeThreadFn = Box<dyn Fn(usize, usize, &Process, &[MapRange]) -> bo
 
 // Everything below here is private
 
-type StackTraceFn =
-    Box<dyn Fn(usize, usize, Option<usize>, &Process, Pid) -> Result<StackTrace, MemoryCopyError>>;
+type StackTraceFn = Box<
+    dyn Fn(usize, usize, Option<usize>, &Process, Pid, bool) -> Result<StackTrace, MemoryCopyError>,
+>;
 
 fn get_process_ruby_state(
     pid: Pid,
@@ -335,21 +363,48 @@ fn test_current_thread_address() {
     process.kill().unwrap();
 }
 
-#[test]
-#[cfg(target_os = "linux")]
-fn test_get_trace() {
-    // Test getting a stack trace from a real running program using system Ruby
-    let mut process = std::process::Command::new("ruby")
-        .arg("./ci/ruby-programs/infinite.rb")
-        .spawn()
-        .unwrap();
-    let pid = process.id() as Pid;
-    let mut getter = initialize(pid, true).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(50));
-    let trace = getter.get_trace();
-    assert!(trace.is_ok());
-    assert_eq!(trace.unwrap().pid, Some(pid));
-    process.kill().unwrap();
+macro_rules! generate_get_trace_tests {
+
+    ($($name:ident, $lock:expr, $on_cpu:expr,)*) => {
+    $(
+        #[test]
+        #[cfg(target_os = "linux")]
+        fn $name() {
+            // Test getting a stack trace from a real running program using system Ruby
+            let mut builder = std::process::Command::new("ruby");
+            builder.arg("./ci/ruby-programs/infinite.rb");
+            if $on_cpu {
+                builder.arg("10000000");
+            }
+            let mut process = builder.spawn().unwrap();
+            let pid = process.id() as Pid;
+            let mut getter = initialize(pid, $lock, $on_cpu).unwrap();
+            if $on_cpu {
+                // extra safety "buffer" in case we get the trace too early in the ruby initialization
+                std::thread::sleep(std::time::Duration::from_millis(500));
+            } else {
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            let trace = getter.get_trace();
+            assert!(trace.is_ok());
+            if $on_cpu {
+                // ruby program should be sleeping, thus off cpu
+                assert!(trace.unwrap().is_empty());
+            } else {
+                assert_eq!(trace.unwrap().pid, Some(pid));
+            }
+            process.kill().unwrap();
+            process.wait().unwrap();
+        }
+    )*
+    }
+}
+
+generate_get_trace_tests! {
+    test_get_trace, true, false,
+    test_get_trace_on_cpu, true, true,
+    test_get_trace_nonblocking, false, false,
+    test_get_trace_on_cpu_nonblocking, false, true,
 }
 
 #[test]
@@ -366,7 +421,7 @@ fn test_get_exec_trace() {
         .unwrap();
 
     let pid = process.id() as Pid;
-    let mut getter = initialize(pid, true).expect("initialize");
+    let mut getter = initialize(pid, true, false).expect("initialize");
 
     std::thread::sleep(std::time::Duration::from_millis(50));
     let trace1 = getter.get_trace();

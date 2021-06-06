@@ -1,12 +1,18 @@
-def aaa() 
-    sleep(0.5)
+if ARGV.length == 1
+    $sleep_time = ARGV[0].to_i
+else
+    $sleep_time = 0.5
 end
 
-def bbb() 
+def aaa()
+    sleep($sleep_time)
+end
+
+def bbb()
     aaa()
 end
 
-def ccc() 
+def ccc()
     bbb()
 end
 
