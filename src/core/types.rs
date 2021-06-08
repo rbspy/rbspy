@@ -103,10 +103,6 @@ impl StackTrace {
         }
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.trace.is_empty()
-    }
-
     pub fn iter(&self) -> std::slice::Iter<StackFrame> {
         self.trace.iter()
     }

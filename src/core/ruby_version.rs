@@ -286,7 +286,7 @@ macro_rules! get_stack_trace(
             source: &T,
             pid: Pid,
             on_cpu: bool,
-        ) -> Result<StackTrace, MemoryCopyError> {
+        ) -> Result<Option<StackTrace>, MemoryCopyError> {
             let thread: $thread_type = get_execution_context(ruby_current_thread_address_location, ruby_vm_address_location, source)
                 .context(ruby_current_thread_address_location)?;
 
@@ -298,16 +298,16 @@ macro_rules! get_stack_trace(
                 /* This is in addition to any OS-specific checks for thread activity,
                  * and provides an extra measure of reliability for targets that haven't got them.
                  * Another added value for doing this is that it works for coredump targets. */
-                return Ok(StackTrace::new_empty());
+                return Ok(None);
             }
 
             if stack_field(&thread) as usize == 0 {
-                return Ok(StackTrace {
+                return Ok(Some(StackTrace {
                     pid: Some(pid),
                     trace: vec!(StackFrame::unknown_c_function()),
                     thread_id: Some(thread_id),
                     time: Some(SystemTime::now())
-                });
+                }));
             }
             let mut trace = Vec::new();
             let cfps = get_cfps(thread.cfp as usize, stack_base(&thread) as usize, source)?;
@@ -356,7 +356,7 @@ macro_rules! get_stack_trace(
                     }
                 }
             }
-            Ok(StackTrace{trace, pid: Some(pid), thread_id: Some(thread_id), time: Some(SystemTime::now())})
+            Ok(Some(StackTrace{trace, pid: Some(pid), thread_id: Some(thread_id), time: Some(SystemTime::now())}))
         }
 
         use proc_maps::{maps_contain_addr, MapRange};
@@ -1252,6 +1252,7 @@ mod tests {
             0,
             false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_1_9_3(), stack_trace.trace);
     }
@@ -1268,6 +1269,7 @@ mod tests {
             0,
             false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_main(), stack_trace.trace);
     }
@@ -1285,6 +1287,7 @@ mod tests {
             0,
             false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(vec!(StackFrame::unknown_c_function()), stack_trace.trace);
     }
@@ -1301,6 +1304,7 @@ mod tests {
             0,
             false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace(), stack_trace.trace);
     }
@@ -1317,6 +1321,7 @@ mod tests {
             0,
             false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace(), stack_trace.trace);
     }
@@ -1334,6 +1339,7 @@ mod tests {
             0,
             false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
@@ -1351,6 +1357,7 @@ mod tests {
             0,
             false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
@@ -1369,6 +1376,7 @@ mod tests {
             0,
             false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
@@ -1387,6 +1395,7 @@ mod tests {
             0,
             false,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }

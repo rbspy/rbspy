@@ -55,24 +55,25 @@ pub struct StackTraceGetter {
 }
 
 impl StackTraceGetter {
-    pub fn get_trace(&mut self) -> Result<StackTrace> {
+    pub fn get_trace(&mut self) -> Result<Option<StackTrace>> {
         /* First, trying OS specific checks to determine whether the process is on CPU or not.
          * This comes before locking the process because in most operating systems locking
          * means the process is stopped */
         if self.on_cpu && !self.is_on_cpu_os_specific()? {
-            return Ok(StackTrace::new_empty());
+            return Ok(None);
         }
         match self.get_trace_from_current_thread() {
-            Ok(mut trace) => {
+            Ok(Some(mut trace)) => {
                 return {
                     /* This is a spike to enrich the trace with the pid.
                      * This is needed, because remoteprocess' ProcessMemory
                      * trait does not expose pid.
                      */
                     trace.pid = Some(self.process.pid);
-                    Ok(trace)
+                    Ok(Some(trace))
                 };
             }
+            Ok(None) => return Ok(None),
             Err(MemoryCopyError::InvalidAddressError(addr))
                 if addr == self.current_thread_addr_location => {}
             Err(e) => return Err(e.into()),
@@ -100,7 +101,7 @@ impl StackTraceGetter {
         Ok(false)
     }
 
-    fn get_trace_from_current_thread(&self) -> Result<StackTrace, MemoryCopyError> {
+    fn get_trace_from_current_thread(&self) -> Result<Option<StackTrace>, MemoryCopyError> {
         let stack_trace_function = &self.stack_trace_function;
 
         let _lock;
@@ -174,7 +175,14 @@ pub type IsMaybeThreadFn = Box<dyn Fn(usize, usize, &Process, &[MapRange]) -> bo
 // Everything below here is private
 
 type StackTraceFn = Box<
-    dyn Fn(usize, usize, Option<usize>, &Process, Pid, bool) -> Result<StackTrace, MemoryCopyError>,
+    dyn Fn(
+        usize,
+        usize,
+        Option<usize>,
+        &Process,
+        Pid,
+        bool,
+    ) -> Result<Option<StackTrace>, MemoryCopyError>,
 >;
 
 fn get_process_ruby_state(
@@ -389,9 +397,9 @@ macro_rules! generate_get_trace_tests {
             assert!(trace.is_ok());
             if $on_cpu {
                 // ruby program should be sleeping, thus off cpu
-                assert!(trace.unwrap().is_empty());
+                assert!(trace.unwrap().is_none());
             } else {
-                assert_eq!(trace.unwrap().pid, Some(pid));
+                assert_eq!(trace.unwrap().unwrap().pid, Some(pid));
             }
             process.kill().unwrap();
             process.wait().unwrap();
@@ -431,6 +439,8 @@ fn test_get_exec_trace() {
         "initial trace failed: {:?}",
         trace1.unwrap_err()
     );
+    let trace1 = trace1.unwrap();
+    assert!(trace1.is_some());
     assert_eq!(trace1.unwrap().pid, Some(pid));
 
     // Trigger the exec
@@ -450,6 +460,7 @@ fn test_get_exec_trace() {
             "post-exec trace failed: {:?}",
             trace2.unwrap_err()
         );
+        assert!(trace2.unwrap().is_some());
     }
 
     process.kill().unwrap();

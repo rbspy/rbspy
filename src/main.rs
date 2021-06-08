@@ -33,7 +33,6 @@ extern crate term_size;
 #[cfg(windows)]
 extern crate winapi;
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
 use anyhow::format_err;
 use anyhow::{Context, Error, Result};
 use chrono::prelude::*;
@@ -321,11 +320,17 @@ fn main() {
     }
 }
 
-fn snapshot(pid: Pid, lock_process: bool, on_cpu: bool) -> Result<(), Error> {
+fn snapshot(pid: Pid, lock_process: bool, on_cpu: bool) -> Result<()> {
     let mut getter = initialize(pid, lock_process, on_cpu)?;
     let trace = getter.get_trace()?;
-    for x in trace.iter().rev() {
-        println!("{}", x);
+    if let Some(trace) = trace {
+        for x in trace.iter().rev() {
+            println!("{}", x);
+        }
+    } else {
+        if on_cpu {
+            return Err(format_err!("Target process is off-CPU"));
+        }
     }
     Ok(())
 }
@@ -706,8 +711,8 @@ fn record(
         let trace = getter.get_trace();
         match trace {
             Ok(ok_trace) => {
-                if on_cpu && !ok_trace.is_empty() {
-                    sender.send(ok_trace)?;
+                if let Some(some_trace) = ok_trace {
+                    sender.send(some_trace)?;
                 }
             }
             Err(x) => {
