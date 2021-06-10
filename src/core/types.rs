@@ -74,7 +74,11 @@ impl StackFrame {
 
 impl fmt::Display for StackFrame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} - {}:{}", self.name, self.path(), self.lineno)
+        if self.name.contains("[c function]") {
+            write!(f, "{} - {}:{}", self.name, self.path(), self.lineno)
+        } else {
+            write!(f, "{} - {}:{}_[rb]", self.name, self.path(), self.lineno)
+        }
     }
 }
 
