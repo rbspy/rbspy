@@ -934,7 +934,7 @@ fn arg_parser() -> App<'static, 'static> {
             SubCommand::with_name("report")
                 .about("Generate visualization from raw data recorded by `rbspy record`")
                 .arg(Arg::from_usage("-i --input=<FILE> 'Input raw data to use'"))
-                .arg(Arg::from_usage("-o --output=<FILE> 'Output file'"))
+                .arg(Arg::from_usage("-o --output=<FILE> 'Output file'").default_value("-"))
                 .arg(
                     Arg::from_usage("-f --format=[FORMAT] 'Output format to write'")
                         .possible_values(&OutputFormat::variants())
