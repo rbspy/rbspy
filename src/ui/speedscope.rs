@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::fs::File;
 use std::io::Write;
 use std::time::SystemTime;
 
@@ -199,7 +198,7 @@ impl Stats {
         Ok(())
     }
 
-    pub fn write(&self, mut w: File) -> Result<()> {
+    pub fn write(&self, mut w: &mut dyn Write) -> Result<()> {
         let json = serde_json::to_string(&SpeedscopeFile::new(
             self.samples.clone(),
             self.frames.clone(),
