@@ -624,11 +624,15 @@ fn parallel_record(
         }
     }
 
-    let out_file = File::create(&out_path).context(format!(
-        "Failed to create output file {}",
-        &out_path.display()
-    ))?;
-    out.complete(out_file)?;
+    if out_path.display().to_string() == "-" {
+        out.complete(&mut std::io::stdout())?;
+    } else {
+        let mut out_file = File::create(&out_path).context(format!(
+            "Failed to create output file {}",
+            &out_path.display()
+        ))?;
+        out.complete(&mut out_file)?;
+    }
     raw_store.complete();
 
     // Finish writing all data to disk
@@ -739,7 +743,11 @@ fn report(format: OutputFormat, input: PathBuf, output: PathBuf) -> Result<(), E
     for trace in stuff {
         outputter.record(&trace)?;
     }
-    outputter.complete(File::create(output)?)?;
+    if output.display().to_string() == "-" {
+        outputter.complete(&mut std::io::stdout())?;
+    } else {
+        outputter.complete(&mut File::create(output)?)?;
+    }
     Ok(())
 }
 
