@@ -98,7 +98,7 @@ impl StackTraceGetter {
     fn is_on_cpu_os_specific(&self) -> Result<bool> {
         /* We don't have OS specific checks for these targets,
          * so fallback to using the interpreter based check down the line */
-        Ok(false)
+        Ok(true)
     }
 
     fn get_trace_from_current_thread(&self) -> Result<Option<StackTrace>, MemoryCopyError> {
