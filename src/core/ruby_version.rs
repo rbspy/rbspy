@@ -290,16 +290,15 @@ macro_rules! get_stack_trace(
             let thread: $thread_type = get_execution_context(ruby_current_thread_address_location, ruby_vm_address_location, source)
                 .context(ruby_current_thread_address_location)?;
 
-            let thread_status = get_thread_status(&thread, source)?;
-            let thread_id = get_thread_id(&thread, source)?;
-
             // testing the thread state in the interpreter.
-            if on_cpu && thread_status != 0 /* THREAD_RUNNABLE */ {
+            if on_cpu && get_thread_status(&thread, source)? != 0 /* THREAD_RUNNABLE */ {
                 /* This is in addition to any OS-specific checks for thread activity,
                  * and provides an extra measure of reliability for targets that haven't got them.
                  * Another added value for doing this is that it works for coredump targets. */
                 return Ok(None);
             }
+
+            let thread_id = get_thread_id(&thread, source)?;
 
             if stack_field(&thread) as usize == 0 {
                 return Ok(Some(StackTrace {
