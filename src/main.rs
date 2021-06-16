@@ -135,10 +135,15 @@ fn do_main() -> Result<(), Error> {
         };
         if let Some(root_cmd) = root_cmd {
             if !check_root_user() {
-                return Err(format_err!(
-                    "rbspy {} needs to run as root on Mac",
-                    root_cmd
-                ));
+                return Err(
+                    format_err!(
+                        concat!(
+                            "rbspy {} needs to run as root on Mac. Try rerunning with `sudo --preserve-env !!`. ",
+                            "If you run `sudo rbspy record ruby your-program.rb`, rbspy will drop privileges when running `ruby your-program.rb`. If you want the Ruby program to run as root, use `rbspy --no-drop-root`.",
+                        ),
+                        root_cmd
+                    )
+                );
             }
         }
     }
@@ -226,16 +231,7 @@ fn do_main() -> Result<(), Error> {
 
 #[cfg(target_os = "macos")]
 fn check_root_user() -> bool {
-    let euid = nix::unistd::Uid::effective();
-    if euid.is_root() {
-        return true;
-    } else {
-        eprintln!("rbspy only works as root on Mac. Try rerunning with `sudo --preserve-env !!`.");
-        eprintln!(
-            "If you run `sudo rbspy record ruby your-program.rb`, rbspy will drop privileges when running `ruby your-program.rb`. If you want the Ruby program to run as root, use `rbspy --no-drop-root`."
-        );
-        return false;
-    }
+    nix::unistd::Uid::effective().is_root()
 }
 
 #[cfg(all(windows, target_arch = "x86_64"))]
