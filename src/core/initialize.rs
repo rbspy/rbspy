@@ -182,6 +182,14 @@ fn get_process_ruby_state(
             );
             i += 1;
             if i > 100 {
+                match e.root_cause().downcast_ref::<std::io::Error>() {
+                    Some(root_cause)
+                        if root_cause.kind() == std::io::ErrorKind::PermissionDenied =>
+                    {
+                        return Err(e.context("Failed to initialize due to a permissions error. If you are running rbspy as a normal (non-root) user, please try running it again with `sudo --preserve-env !!`. If you are running it in a container, e.g. with Docker or Kubernetes, make sure that your container has been granted the SYS_PTRACE capability. See the rbspy documentation for more details."));
+                    }
+                    _ => {}
+                }
                 return Err(anyhow::format_err!("Couldn't get ruby version: {:?}", e));
             }
             std::thread::sleep(Duration::from_millis(1));
