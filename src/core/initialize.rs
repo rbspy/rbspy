@@ -1,4 +1,5 @@
 use crate::core::address_finder;
+#[cfg(target_os = "linux")]
 use crate::core::address_finder::*;
 use crate::core::ruby_version;
 use crate::core::types::{MemoryCopyError, Pid, Process, ProcessMemory, ProcessRetry, StackTrace};
@@ -229,36 +230,6 @@ fn get_process_ruby_state(
 }
 
 fn get_ruby_version(process: &Process) -> Result<String> {
-    match get_ruby_version_from_process(process) {
-        Err(err) => {
-            if let Some(&MemoryCopyError::PermissionDenied) =
-                err.root_cause().downcast_ref::<MemoryCopyError>()
-            {
-                return Err(err);
-            }
-            match err.root_cause().downcast_ref::<AddressFinderError>() {
-                #[cfg(not(target_os = "macos"))]
-                Some(&AddressFinderError::PermissionDenied(_)) => {
-                    return Err(err);
-                }
-                #[cfg(target_os = "macos")]
-                Some(&AddressFinderError::MacPermissionDenied(_)) => {
-                    return Err(err);
-                }
-                #[cfg(any(target_os = "linux", target_os = "freebsd"))]
-                Some(&AddressFinderError::NoSuchProcess(_)) => {
-                    return Err(err);
-                }
-                _ => return Err(err),
-            }
-        }
-        Ok(x) => {
-            return Ok(x);
-        }
-    }
-}
-
-fn get_ruby_version_from_process(process: &Process) -> Result<String> {
     let addr = address_finder::get_ruby_version_address(process.pid)
         .context("get_ruby_version_address")?;
     let x: [c_char; 15] = process.copy_struct(addr).context("retrieve ruby version")?;
