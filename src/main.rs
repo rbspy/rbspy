@@ -297,7 +297,9 @@ fn test_is_wow64_process() {
 
 fn main() {
     if let Err(x) = do_main() {
-        eprintln!("Error. Causes: ");
+        eprintln!(
+            "Something went wrong while rbspy was sampling the process. Here's what we know:"
+        );
         for c in x.chain() {
             eprintln!("- {}", c);
         }
