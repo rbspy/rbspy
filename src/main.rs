@@ -301,7 +301,6 @@ fn main() {
         for c in x.chain() {
             eprintln!("- {}", c);
         }
-        eprintln!("{:?}", x);
         std::process::exit(1);
     }
 }
