@@ -259,8 +259,9 @@ fn get_ruby_version(process: &Process) -> Result<String> {
 }
 
 fn get_ruby_version_from_process(process: &Process) -> Result<String> {
-    let addr = address_finder::get_ruby_version_address(process.pid)?;
-    let x: [c_char; 15] = process.copy_struct(addr)?;
+    let addr = address_finder::get_ruby_version_address(process.pid)
+        .context("get_ruby_version_address")?;
+    let x: [c_char; 15] = process.copy_struct(addr).context("retrieve ruby version")?;
     Ok(unsafe {
         std::ffi::CStr::from_ptr(x.as_ptr() as *mut c_char)
             .to_str()?
