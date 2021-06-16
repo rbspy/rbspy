@@ -297,7 +297,7 @@ fn test_initialize_with_disallowed_process() {
         .unwrap()
     {
         &AddressFinderError::PermissionDenied(1) => {}
-        _ => assert!(false, "Expected NoSuchProcess error"),
+        _ => assert!(false, "Expected PermissionDenied error"),
     }
 }
 
