@@ -46,10 +46,6 @@ pub enum MemoryCopyError {
     ProcessEnded,
     #[error("Copy error: {}", _0)]
     Message(String),
-    #[error("Too much memory requested when copying: {}", _0)]
-    RequestTooLarge(usize),
-    #[error("Tried to read invalid string")]
-    InvalidStringError(std::string::FromUtf8Error),
     #[error("Tried to read invalid memory address {:x}", _0)]
     InvalidAddressError(usize),
 }
