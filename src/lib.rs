@@ -48,11 +48,6 @@ mod ui;
 pub use crate::core::types::OutputFormat;
 pub use crate::core::types::Pid;
 
-#[cfg(target_os = "macos")]
-pub fn check_root_user() -> bool {
-    nix::unistd::Uid::effective().is_root()
-}
-
 #[cfg(all(windows, target_arch = "x86_64"))]
 fn check_wow64_process(pid: Pid) {
     if is_wow64_process(pid).unwrap() {

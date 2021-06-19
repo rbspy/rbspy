@@ -10,7 +10,6 @@ use rand::distributions::Alphanumeric;
 use rand::Rng;
 use rbspy::report;
 #[cfg(target_os = "macos")]
-use rbspy::check_root_user;
 use rbspy::sampler;
 use rbspy::{OutputFormat, Pid};
 use std::env;
@@ -84,7 +83,7 @@ fn do_main() -> Result<(), Error> {
             _ => None,
         };
         if let Some(root_cmd) = root_cmd {
-            if !check_root_user() {
+            if !nix::unistd::Uid::effective().is_root() {
                 return Err(
                     format_err!(
                         concat!(
