@@ -30,7 +30,7 @@ option to just profile when the program is using the CPU.
 
 ## Requirements
 
-rbspy supports Linux\*, Mac, and Windows.
+rbspy supports Linux\*, Mac, Windows, and FreeBSD.
 
 <small>
 * kernel version 3.2+ required. For Ubuntu, this means Ubuntu 12.04 or newer.
