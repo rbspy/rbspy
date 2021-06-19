@@ -178,6 +178,12 @@ fn spawn_recorder_children(
 #[cfg(not(target_os = "windows"))]
 #[test]
 fn test_spawn_record_children_subprocesses() {
+    #[cfg(target_os = "macos")]
+    if !nix::unistd::Uid::effective().is_root() {
+        println!("Skipping test because we're not running as root");
+        return;
+    }
+
     let which = if cfg!(target_os = "windows") {
         "C:\\Windows\\System32\\WHERE.exe"
     } else {
