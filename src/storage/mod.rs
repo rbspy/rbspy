@@ -4,7 +4,7 @@
 /// along with a "magic number" at the start of the file. The magic number plus
 /// version are the first 8 bytes of the file, and are represented as
 ///
-///     b"rbspyXY\n"
+///   b"rbspyXY\n"
 ///
 /// Here, `XY` is a decimal number in [0-99]
 ///
