@@ -102,7 +102,9 @@ fn do_main() -> Result<(), Error> {
             #[cfg(all(windows, target_arch = "x86_64"))]
             check_wow64_process(pid);
 
-            sampler::snapshot(pid, lock_process)
+            let snap = sampler::snapshot(pid, lock_process)?;
+            println!("{}", snap);
+            Ok(())
         }
         SubCmd::Record {
             target,
