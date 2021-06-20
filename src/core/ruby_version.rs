@@ -291,7 +291,7 @@ macro_rules! get_stack_trace(
                 .context(ruby_current_thread_address_location)?;
 
             // testing the thread state in the interpreter.
-            if on_cpu && get_thread_status(&thread, source)? != 0 /* THREAD_RUNNABLE */ {
+            if on_cpu && get_thread_status(&thread, source)? != rb_thread_status_THREAD_RUNNABLE /* THREAD_RUNNABLE */ {
                 /* This is in addition to any OS-specific checks for thread activity,
                  * and provides an extra measure of reliability for targets that haven't got them.
                  * Another added value for doing this is that it works for coredump targets. */
