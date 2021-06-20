@@ -21,7 +21,7 @@ a variety of different ways later on.
 There are 2 main ways to profile code -- you can either profile everything the
 application does (including waiting), or only profile when the application is using the CPU.
 
-By defeault, rbspy profiles everything the program does (including waiting).
+By default, rbspy profiles everything the program does (including waiting).
 There is an experimental option to profile only when the program is using the CPU. (`--on-cpu`)
 
 `--on-cpu` is implemented by 2 layers of filtering using the following sources of information:
