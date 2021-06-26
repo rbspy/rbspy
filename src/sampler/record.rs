@@ -6,6 +6,8 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, sync_channel, Receiver, SyncSender};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+#[cfg(windows)]
+use winapi::um::timeapi;
 
 use crate::core::initialize::initialize;
 use crate::core::types::{MemoryCopyError, Pid, Process, ProcessRetry, StackTrace};

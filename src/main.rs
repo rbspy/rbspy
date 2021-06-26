@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate clap;
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(target_os = "macos")]
 use anyhow::format_err;
 use anyhow::{Context, Error, Result};
 use chrono::prelude::*;
@@ -9,7 +9,6 @@ use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use rbspy::report;
-#[cfg(target_os = "macos")]
 use rbspy::sampler;
 use rbspy::{OutputFormat, Pid};
 use std::env;
@@ -99,9 +98,6 @@ fn do_main() -> Result<(), Error> {
 
     match args.cmd {
         SubCmd::Snapshot { pid, lock_process } => {
-            #[cfg(all(windows, target_arch = "x86_64"))]
-            check_wow64_process(pid);
-
             let snap = sampler::snapshot(pid, lock_process)?;
             println!("{}", snap);
             Ok(())
@@ -162,9 +158,6 @@ fn do_main() -> Result<(), Error> {
                     }
                 }
             };
-
-            #[cfg(all(windows, target_arch = "x86_64"))]
-            check_wow64_process(pid);
 
             let config = sampler::RecordConfig {
                 format,

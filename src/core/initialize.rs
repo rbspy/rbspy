@@ -6,8 +6,9 @@ use crate::core::types::{MemoryCopyError, Pid, Process, ProcessMemory, ProcessRe
 use proc_maps::MapRange;
 
 use anyhow::{Context, Result};
+#[cfg(target_os = "windows")]
+use anyhow::format_err;
 use libc::c_char;
-
 use std::time::Duration;
 
 /**
@@ -23,6 +24,11 @@ use std::time::Duration;
  *   * Package all that up into a struct that the user can use to get stack traces.
  */
 pub fn initialize(pid: Pid, lock_process: bool) -> Result<StackTraceGetter> {
+    #[cfg(all(windows, target_arch = "x86_64"))]
+    if is_wow64_process(pid).context("check wow64 process")? {
+        return Err(format_err!("Unable to profile 32-bit Ruby with 64-bit rbspy"));
+    }
+    
     let (
         process,
         current_thread_addr_location,
@@ -248,6 +254,59 @@ fn get_ruby_version(process: &Process) -> Result<String> {
             .to_str()?
             .to_owned()
     })
+}
+
+#[cfg(all(windows, target_arch = "x86_64"))]
+fn is_wow64_process(pid: Pid) -> Result<bool> {
+    use std::os::windows::io::RawHandle;
+    use winapi::shared::minwindef::{BOOL, FALSE, PBOOL};
+    use winapi::um::processthreadsapi::OpenProcess;
+    use winapi::um::winnt::PROCESS_QUERY_INFORMATION;
+    use winapi::um::wow64apiset::IsWow64Process;
+
+    let handle = unsafe { OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid) };
+
+    if handle == (0 as RawHandle) {
+        return Err(format_err!(
+            "Unable to fetch process handle for process {}",
+            pid
+        ));
+    }
+
+    let mut is_wow64: BOOL = 0;
+
+    if unsafe { IsWow64Process(handle, &mut is_wow64 as PBOOL) } == FALSE {
+        return Err(format_err!("Could not determine process bitness! {}", pid));
+    }
+
+    Ok(is_wow64 != 0)
+}
+
+#[test]
+#[cfg(all(windows, target_arch = "x86_64"))]
+fn test_is_wow64_process() {
+    let programs = vec![
+        "C:\\Program Files (x86)\\Internet Explorer\\iexplore.exe",
+        "C:\\Program Files\\Internet Explorer\\iexplore.exe",
+    ];
+
+    let results: Vec<bool> = programs
+        .iter()
+        .map(|path| {
+            let mut cmd = Command::new(path)
+                .spawn()
+                .expect("ls command failed to start");
+
+            let result = is_wow64_process(cmd.id());
+
+            cmd.kill()
+                .expect("command wasn't running or couldn't be killed");
+
+            result.unwrap()
+        })
+        .collect();
+
+    assert_eq!(results, vec![true, false]);
 }
 
 #[test]
