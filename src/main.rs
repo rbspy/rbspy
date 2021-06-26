@@ -168,8 +168,8 @@ fn do_main() -> Result<(), Error> {
 
             let config = sampler::RecordConfig {
                 format,
-                raw_path,
-                out_path,
+                raw_path: raw_path.clone(),
+                out_path: out_path.clone(),
                 pid,
                 with_subprocesses,
                 silent,
@@ -178,7 +178,18 @@ fn do_main() -> Result<(), Error> {
                 flame_min_width,
                 lock_process,
             };
-            sampler::record(config)
+
+            let output_paths_message = format!("Wrote raw data to {}\nWrote formatted output to {}", raw_path.display(), out_path.display());
+            match sampler::record(config) {
+                Ok(_) => {
+                    eprintln!("{}", output_paths_message);
+                    Ok(())
+                },
+                Err(e) => {
+                    eprintln!("{}", output_paths_message);
+                    Err(e)
+                }
+            }
         }
         SubCmd::Report {
             format,

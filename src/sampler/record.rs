@@ -301,9 +301,6 @@ pub fn parallel_record(config: Config) -> Result<(), Error> {
     }
 
     // Finish writing all data to disk
-    eprintln!("Wrote raw data to {}", config.raw_path.display());
-    eprintln!("Writing formatted output to {}", config.out_path.display());
-
     if config.out_path.display().to_string() == "-" {
         out.complete(&mut std::io::stdout())?;
     } else {
