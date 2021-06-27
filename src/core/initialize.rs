@@ -29,7 +29,7 @@ pub fn initialize(pid: Pid, lock_process: bool) -> Result<StackTraceGetter> {
         ruby_vm_addr_location,
         global_symbols_addr_location,
         stack_trace_function,
-    ) = get_process_ruby_state(pid)?;
+    ) = get_process_ruby_state(pid).context("get ruby VM state")?;
 
     Ok(StackTraceGetter {
         process,
@@ -71,8 +71,10 @@ impl StackTraceGetter {
             Err(e) => return Err(e.into()),
         }
         debug!("Thread address location invalid, reinitializing");
-        self.reinitialize()?;
-        Ok(self.get_trace_from_current_thread()?)
+        self.reinitialize().context("reinitialize")?;
+        Ok(self
+            .get_trace_from_current_thread()
+            .context("get trace from current thread")?)
     }
 
     fn get_trace_from_current_thread(&self) -> Result<StackTrace, MemoryCopyError> {
@@ -130,7 +132,7 @@ impl StackTraceGetter {
             ruby_vm_addr_location,
             ruby_global_symbols_addr_location,
             stack_trace_function,
-        ) = get_process_ruby_state(self.process.pid)?;
+        ) = get_process_ruby_state(self.process.pid).context("get ruby VM state")?;
 
         self.process = process;
         self.current_thread_addr_location = current_thread_addr_location;
@@ -174,7 +176,7 @@ fn get_process_ruby_state(
         }
         let process = process.unwrap();
 
-        let version = get_ruby_version(&process).context("Couldn't determine Ruby version");
+        let version = get_ruby_version(&process).context("get Ruby version");
         if let Err(e) = version {
             debug!(
                 "[{}] Trying again to get ruby version. Last error was: {:?}",
