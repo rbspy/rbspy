@@ -177,9 +177,10 @@ fn do_main() -> Result<(), Error> {
                         std::thread::sleep(std::time::Duration::from_millis(10));
                     }
 
+                    let context = format!("spawn subprocess '{}'", prog.clone());
+
                     #[cfg(unix)]
                     {
-                        let context = format!("spawn subprocess '{}'", prog.clone());
                         let uid_str = std::env::var("SUDO_UID");
                         if nix::unistd::Uid::effective().is_root()
                             && !no_drop_root
@@ -201,7 +202,7 @@ fn do_main() -> Result<(), Error> {
                     #[cfg(windows)]
                     {
                         let _ = no_drop_root;
-                        Command::new(prog).args(args).spawn()?.id() as Pid
+                        Command::new(prog).args(args).spawn().context(context)?.id() as Pid
                     }
                 }
             };
