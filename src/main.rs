@@ -194,7 +194,12 @@ fn do_main() -> Result<(), Error> {
                                 "Dropping permissions: running Ruby command as user {}",
                                 std::env::var("SUDO_USER").context("SUDO_USER")?
                             );
-                            Command::new(prog).uid(uid).args(args).spawn().context(context)?.id() as Pid
+                            Command::new(prog)
+                                .uid(uid)
+                                .args(args)
+                                .spawn()
+                                .context(context)?
+                                .id() as Pid
                         } else {
                             Command::new(prog).args(args).spawn().context(context)?.id() as Pid
                         }
