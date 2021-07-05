@@ -1,16 +1,16 @@
 extern crate rbspy;
 
-use rbspy::OutputFormat;
 use rbspy::sampler::{record, RecordConfig};
+use rbspy::OutputFormat;
 
 fn main() {
     let mut process = std::process::Command::new(path_to_ruby_binary())
         .arg("ci/ruby-programs/infinite.rb")
         .spawn()
         .unwrap();
-    let out_path = std::path::PathBuf::from("rbspy-out.svg"); 
+    let out_path = std::path::PathBuf::from("rbspy-out.svg");
 
-    let config = RecordConfig{
+    let config = RecordConfig {
         format: OutputFormat::flamegraph,
         raw_path: std::path::PathBuf::from("rbspy-raw.txt"),
         out_path: out_path.clone(),
@@ -23,7 +23,10 @@ fn main() {
         lock_process: true,
     };
     match record(config) {
-        Ok(_) => println!("A flamegraph was saved to {}", out_path.display().to_string()),
+        Ok(_) => println!(
+            "A flamegraph was saved to {}",
+            out_path.display().to_string()
+        ),
         Err(e) => println!("Failed to record: {:?}", e),
     }
 

@@ -172,12 +172,16 @@ fn do_main() -> Result<(), Error> {
                 lock_process,
             };
 
-            let output_paths_message = format!("Wrote raw data to {}\nWrote formatted output to {}", raw_path.display(), out_path.display());
+            let output_paths_message = format!(
+                "Wrote raw data to {}\nWrote formatted output to {}",
+                raw_path.display(),
+                out_path.display()
+            );
             match sampler::record(config) {
                 Ok(_) => {
                     eprintln!("{}", output_paths_message);
                     Ok(())
-                },
+                }
                 Err(e) => {
                     eprintln!("{}", output_paths_message);
                     Err(e)

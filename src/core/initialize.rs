@@ -5,9 +5,9 @@ use crate::core::ruby_version;
 use crate::core::types::{MemoryCopyError, Pid, Process, ProcessMemory, ProcessRetry, StackTrace};
 use proc_maps::MapRange;
 
-use anyhow::{Context, Result};
 #[cfg(target_os = "windows")]
 use anyhow::format_err;
+use anyhow::{Context, Result};
 use libc::c_char;
 use std::time::Duration;
 
@@ -26,9 +26,11 @@ use std::time::Duration;
 pub fn initialize(pid: Pid, lock_process: bool) -> Result<StackTraceGetter> {
     #[cfg(all(windows, target_arch = "x86_64"))]
     if is_wow64_process(pid).context("check wow64 process")? {
-        return Err(format_err!("Unable to profile 32-bit Ruby with 64-bit rbspy"));
+        return Err(format_err!(
+            "Unable to profile 32-bit Ruby with 64-bit rbspy"
+        ));
     }
-    
+
     let (
         process,
         current_thread_addr_location,
