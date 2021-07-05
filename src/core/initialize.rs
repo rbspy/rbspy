@@ -295,7 +295,7 @@ fn test_is_wow64_process() {
     let results: Vec<bool> = programs
         .iter()
         .map(|path| {
-            let mut cmd = Command::new(path)
+            let mut cmd = std::process::Command::new(path)
                 .spawn()
                 .expect("ls command failed to start");
 
