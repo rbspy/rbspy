@@ -8,8 +8,8 @@ use chrono::prelude::*;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use rand::distributions::Alphanumeric;
 use rand::Rng;
+use rbspy::recorder;
 use rbspy::report;
-use rbspy::sampler;
 use rbspy::{OutputFormat, Pid};
 use std::env;
 use std::fs::DirBuilder;
@@ -98,7 +98,7 @@ fn do_main() -> Result<(), Error> {
 
     match args.cmd {
         SubCmd::Snapshot { pid, lock_process } => {
-            let snap = sampler::snapshot(pid, lock_process)?;
+            let snap = recorder::snapshot(pid, lock_process)?;
             println!("{}", snap);
             Ok(())
         }
@@ -159,7 +159,7 @@ fn do_main() -> Result<(), Error> {
                 }
             };
 
-            let config = sampler::RecordConfig {
+            let config = recorder::RecordConfig {
                 format,
                 raw_path: raw_path.clone(),
                 out_path: out_path.clone(),
@@ -177,7 +177,7 @@ fn do_main() -> Result<(), Error> {
                 raw_path.display(),
                 out_path.display()
             );
-            match sampler::record(config) {
+            match recorder::record(config) {
                 Ok(_) => {
                     eprintln!("{}", output_paths_message);
                     Ok(())

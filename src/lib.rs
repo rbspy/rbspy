@@ -37,7 +37,7 @@ use std::fs::File;
 use std::path::PathBuf;
 
 mod core;
-pub mod sampler;
+pub mod recorder;
 mod storage;
 mod ui;
 

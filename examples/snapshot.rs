@@ -1,6 +1,6 @@
 extern crate rbspy;
 
-use rbspy::sampler::snapshot;
+use rbspy::recorder::snapshot;
 
 fn main() {
     let mut process = std::process::Command::new(path_to_ruby_binary())

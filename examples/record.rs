@@ -1,6 +1,6 @@
 extern crate rbspy;
 
-use rbspy::sampler::{record, RecordConfig};
+use rbspy::recorder::{record, RecordConfig};
 use rbspy::OutputFormat;
 
 fn main() {
