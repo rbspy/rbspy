@@ -16,6 +16,19 @@ use crate::ui::summary;
 
 const BILLION: u64 = 1000 * 1000 * 1000; // for nanosleep
 
+pub struct Config {
+    pub format: crate::core::types::OutputFormat,
+    pub raw_path: PathBuf,
+    pub out_path: PathBuf,
+    pub pid: Pid,
+    pub with_subprocesses: bool,
+    pub silent: bool,
+    pub sample_rate: u32,
+    pub maybe_duration: Option<std::time::Duration>,
+    pub flame_min_width: f64,
+    pub lock_process: bool,
+}
+
 // This SampleTime struct helps us sample on a regular schedule ("exactly" 100 times per second, if
 // the sample rate is 100).
 // What we do is -- when doing the 1234th sample, we calculate the exact time the 1234th sample
@@ -243,19 +256,6 @@ fn test_spawn_record_children_subprocesses() {
 
     assert_eq!(pids.len(), 4);
     process.wait().unwrap();
-}
-
-pub struct Config {
-    pub format: crate::core::types::OutputFormat,
-    pub raw_path: PathBuf,
-    pub out_path: PathBuf,
-    pub pid: Pid,
-    pub with_subprocesses: bool,
-    pub silent: bool,
-    pub sample_rate: u32,
-    pub maybe_duration: Option<std::time::Duration>,
-    pub flame_min_width: f64,
-    pub lock_process: bool,
 }
 
 pub fn parallel_record(config: Config) -> Result<(), Error> {
