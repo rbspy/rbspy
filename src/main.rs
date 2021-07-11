@@ -192,7 +192,14 @@ fn do_main() -> Result<(), Error> {
             format,
             input,
             output,
-        } => report(format, input, output),
+        } => {
+            let mut input = std::fs::File::open(input)?;
+            if output.display().to_string() == "-" {
+                report(format, &mut input, &mut std::io::stdout())
+            } else {
+                report(format, &mut input, &mut std::fs::File::create(output)?)
+            }
+        }
     }
 }
 

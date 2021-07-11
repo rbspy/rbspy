@@ -33,9 +33,6 @@ extern crate winapi;
 
 use anyhow::{Error, Result};
 
-use std::fs::File;
-use std::path::PathBuf;
-
 mod core;
 pub mod recorder;
 mod storage;
@@ -45,17 +42,16 @@ pub use crate::core::types::OutputFormat;
 pub use crate::core::types::Pid;
 
 /// Generate visualization (e.g. a flamegraph) from raw data that was previously recorded by rbspy
-pub fn report(format: OutputFormat, input: PathBuf, output: PathBuf) -> Result<(), Error> {
-    let input_file = File::open(input)?;
-    let stuff = storage::from_reader(input_file)?.traces;
+pub fn report(
+    format: OutputFormat,
+    input: &mut dyn std::io::Read,
+    output: &mut dyn std::io::Write,
+) -> Result<(), Error> {
+    let stuff = storage::from_reader(input)?.traces;
     let mut outputter = format.outputter(0.1);
     for trace in stuff {
         outputter.record(&trace)?;
     }
-    if output.display().to_string() == "-" {
-        outputter.complete(&mut std::io::stdout())?;
-    } else {
-        outputter.complete(&mut File::create(output)?)?;
-    }
+    outputter.complete(output)?;
     Ok(())
 }
