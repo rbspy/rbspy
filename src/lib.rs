@@ -47,9 +47,9 @@ pub fn report(
     input: &mut dyn std::io::Read,
     output: &mut dyn std::io::Write,
 ) -> Result<(), Error> {
-    let stuff = storage::from_reader(input)?.traces;
+    let traces = storage::from_reader(input)?.traces;
     let mut outputter = format.outputter(0.1);
-    for trace in stuff {
+    for trace in traces {
         outputter.record(&trace)?;
     }
     outputter.complete(output)?;
