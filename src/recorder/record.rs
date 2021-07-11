@@ -16,16 +16,39 @@ use crate::ui::summary;
 
 const BILLION: u64 = 1000 * 1000 * 1000; // for nanosleep
 
+/// A configuration bundle for the recorder
 pub struct Config {
+    /// The format to use for recorded traces. See `OutputFormat` for a list of available options.
     pub format: crate::core::types::OutputFormat,
+    /// Where to write rbspy's raw trace output, which can be used for later processing.
     pub raw_path: PathBuf,
+    /// Where to write rbspy's output. If `-` is given, output is written to standard output.
     pub out_path: PathBuf,
+    /// The process ID (PID) of the process to profile. This is usually a ruby process, but rbspy
+    /// will locate and profile any ruby subprocesses of the target process if `with_subprocesses`
+    /// is enabled.
     pub pid: Pid,
+    /// Whether to profile the target process (given by `pid`) as well as its child processes, and
+    /// their child processes, and so on. Default: `false`.
     pub with_subprocesses: bool,
+    /// Whether rbspy should keep its output quiet. If `true`, rbspy will only produce output when
+    /// there's an error and when it finishes recording. If `false`, it will print a snapshot of
+    /// the most recent trace every second. Default: `false`.
     pub silent: bool,
+    /// The number of traces that should be collected each second. Default: `100`.
     pub sample_rate: u32,
+    /// The length of time that the recorder should run before stopping. Default: none (run until
+    /// interrupted).
     pub maybe_duration: Option<std::time::Duration>,
+    /// Minimum flame width. Applies to flamegraph output only. If your sample has many small
+    /// functions in it and is difficult to read, then consider increasing this value.
+    /// Default: 0.1.
     pub flame_min_width: f64,
+    /// Locks the process when a sample is being taken.
+    ///
+    /// You should enable this option for the most accurate samples. However, it briefly
+    /// stops the process from executing and can affect performance. The performance impact
+    /// is most noticeable in CPU-bound ruby programs or when a high sampling rate is used.
     pub lock_process: bool,
 }
 
@@ -258,6 +281,7 @@ fn test_spawn_record_children_subprocesses() {
     process.wait().unwrap();
 }
 
+/// Records traces according to the given configuration
 pub fn parallel_record(config: Config) -> Result<(), Error> {
     let maybe_stop_time = match config.maybe_duration {
         Some(duration) => Some(std::time::Instant::now() + duration),

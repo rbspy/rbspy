@@ -144,8 +144,9 @@ impl ProcessRetry for remoteprocess::Process {
     }
 }
 
-// Formats we can write to
 arg_enum! {
+    /// File formats into which rbspy can convert its recorded traces
+
     // The values of this enum get translated directly to command line arguments. Make them
     // lowercase so that we don't have camelcase command line arguments
     #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]

@@ -44,6 +44,7 @@ mod ui;
 pub use crate::core::types::OutputFormat;
 pub use crate::core::types::Pid;
 
+/// Generate visualization (e.g. a flamegraph) from raw data that was previously recorded by rbspy
 pub fn report(format: OutputFormat, input: PathBuf, output: PathBuf) -> Result<(), Error> {
     let input_file = File::open(input)?;
     let stuff = storage::from_reader(input_file)?.traces;
