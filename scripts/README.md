@@ -14,7 +14,7 @@ You will need to have forked/cloned this repo and have several things in order t
 
 ### Executing the script
 
-Once you have satisfied dependencies. You can run the script (NOTE: you must run the script from the root of the project) like with a single argument wich represents the version you are building for (in this case 2.5.8):
+Once you have satisfied dependencies, you can run the script (NOTE: you must run the script from the root of the project) with a single argument that represents the version you are building (in this case 2.5.8):
 
 ```
 ./scripts/bindgen.sh 2_5_8
