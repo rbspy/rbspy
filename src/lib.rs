@@ -1,5 +1,3 @@
-#![cfg_attr(rustc_nightly, feature(test))]
-
 extern crate anyhow;
 #[cfg(test)]
 extern crate byteorder;
