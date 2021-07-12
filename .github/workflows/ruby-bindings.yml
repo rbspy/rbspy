@@ -78,6 +78,7 @@ jobs:
     - name: Upload Bindings
       uses: actions/upload-artifact@v2
       with:
+        if-no-files-found: ignore
         name: bindings-${{ matrix.ruby-version }}
         path: bindings-staging
 
@@ -102,7 +103,7 @@ jobs:
             machine github.com
             login ${{ github.actor }}
             password ${{ secrets.GITHUB_TOKEN }}
-    
+
             machine api.github.com
             login ${{ github.actor }}
             password ${{ secrets.GITHUB_TOKEN }}
