@@ -39,7 +39,7 @@ tempdir = "0.3"
 thiserror = "1.0.24"
 
 [target.'cfg(unix)'.dependencies]
-nix = "0.19.1"
+nix = "0.22"
 
 [target.'cfg(target_os="macos")'.dependencies]
 libproc = "0.9.1"
@@ -53,4 +53,4 @@ rbspy-testdata = { git = "https://github.com/rbspy/rbspy-testdata", branch = "ma
 tempdir = "0.3.4"
 
 [build-dependencies]
-rustc_version = "0.3.3"
+rustc_version = "0.4"
