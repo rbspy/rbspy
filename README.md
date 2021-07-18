@@ -29,7 +29,8 @@ There is an experimental option to profile only when the program is using the CP
 - current thread state in the ruby interpreter.
 
 In addition, rbspy can either profile in a blocking or nonblocking mode.
-The latter is less accurate but does not require to stop the live process to take samples.
+The latter is less accurate but does not require rbspy to stop the live process to take samples.
+
 ## Documentation
 
 => https://rbspy.github.io
