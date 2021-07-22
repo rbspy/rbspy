@@ -198,7 +198,7 @@ jobs:
           sh rustup.sh -y --default-toolchain stable
 
           $HOME/.cargo/bin/rustup run stable cargo build --release --verbose --workspace --all-targets
-          $HOME/.cargo/bin/rustup run stable cargo test --release --verbose -- --skip test_spawn_record_children_subprocesses
+          $HOME/.cargo/bin/rustup run stable cargo test --release --verbose -- --skip test_sample_subprocesses
     - name: Prepare binary for upload
       run: |
         cp target/release/rbspy rbspy-x86_64-unknown-freebsd

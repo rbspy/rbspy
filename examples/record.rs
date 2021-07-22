@@ -1,5 +1,8 @@
 extern crate rbspy;
 
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+
 use rbspy::recorder::{record, RecordConfig};
 use rbspy::OutputFormat;
 
@@ -21,6 +24,7 @@ fn main() {
         maybe_duration: Some(std::time::Duration::from_secs(1)),
         flame_min_width: 10.0,
         lock_process: true,
+        done: Arc::new(AtomicBool::new(false)),
     };
     match record(config) {
         Ok(_) => println!(
