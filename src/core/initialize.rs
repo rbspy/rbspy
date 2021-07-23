@@ -94,7 +94,7 @@ impl StackTraceGetter {
                                     std::io::ErrorKind::NotFound => {
                                         return Err(MemoryCopyError::ProcessEnded)
                                     }
-                                    // Windows
+                                    #[cfg(target_os = "windows")]
                                     std::io::ErrorKind::PermissionDenied => {
                                         return Err(MemoryCopyError::ProcessEnded)
                                     }
