@@ -80,40 +80,73 @@ impl StackTraceGetter {
     fn get_trace_from_current_thread(&self) -> Result<StackTrace, MemoryCopyError> {
         let stack_trace_function = &self.stack_trace_function;
 
+        let try_lock = |process: &Process| {
+            process
+                 .lock()
+                 .context("locking process during stack trace retrieval")
+                 .or_else(|e| {
+                     if let Some(source) = e.source() {
+                         match source.downcast_ref::<remoteprocess::Error>().ok_or(source) {
+                             Ok(remoteprocess::Error::IOError(e)) => {
+                                 match e.kind() {
+                                     std::io::ErrorKind::NotFound => {
+                                         return Err(MemoryCopyError::ProcessEnded)
+                                     }
+                                     #[cfg(target_os = "windows")]
+                                     std::io::ErrorKind::PermissionDenied => {
+                                         return Err(MemoryCopyError::ProcessEnded)
+                                     }
+                                     _ => {}
+                                 };
+                             }
+                             #[cfg(target_os = "linux")]
+                             Ok(remoteprocess::Error::NixError(e)) => match e {
+                                 nix::Error::Sys(nix::errno::Errno::EPERM) => {
+                                     return Err(MemoryCopyError::ProcessEnded);
+                                 }
+                                 nix::Error::Sys(nix::errno::Errno::ESRCH) => {
+                                     match Process::new(self.process.pid) {
+                                         Ok(_) => {
+                                             debug!("Process {} is actually alive, spurious ESRCH detected", self.process.pid);
+                                             return Err(MemoryCopyError::ProcessNotLocked);
+                                         },
+                                         Err(e) => {
+                                             debug!("ESRCH Process {} is not alive: {:?}", self.process.pid, e);
+                                             return Err(MemoryCopyError::ProcessEnded);
+                                         }
+                                     }
+                                 }
+                                 _ => {}
+                             },
+                             _ => {}
+                         }
+                     }
+                     Err(e.into())
+                 })
+        };
+
         let _lock;
         if self.lock_process {
-            _lock = self
-                .process
-                .lock()
-                .context("locking process during stack trace retrieval")
-                .or_else(|e| {
-                    if let Some(source) = e.source() {
-                        match source.downcast_ref::<remoteprocess::Error>().ok_or(source) {
-                            Ok(remoteprocess::Error::IOError(e)) => {
-                                match e.kind() {
-                                    std::io::ErrorKind::NotFound => {
-                                        return Err(MemoryCopyError::ProcessEnded)
-                                    }
-                                    // Windows
-                                    std::io::ErrorKind::PermissionDenied => {
-                                        return Err(MemoryCopyError::ProcessEnded)
-                                    }
-                                    _ => {}
-                                };
-                            }
-                            #[cfg(target_os = "linux")]
-                            Ok(remoteprocess::Error::NixError(e)) => match e {
-                                nix::Error::Sys(nix::errno::Errno::EPERM) => {
-                                    return Err(MemoryCopyError::ProcessEnded);
-                                }
-                                _ => {}
-                            },
-                            _ => {}
-                        }
+            let mut retries = 10;
+            loop {
+                match try_lock(&self.process) {
+                    Ok(l) => {
+                        _lock = l;
+                        break;
                     }
-
-                    Err(e.into())
-                })?;
+                    Err(e) => match e {
+                        MemoryCopyError::ProcessNotLocked => {
+                            if retries == 0 {
+                                return Err(e)?;
+                            }
+                            retries -= 1;
+                        }
+                        _ => {
+                            return Err(e)?;
+                        }
+                    },
+                }
+            }
         }
 
         stack_trace_function(
