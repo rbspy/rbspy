@@ -54,16 +54,11 @@ pub struct Recorder {
 
 impl Recorder {
     pub fn new(config: Config) -> Self {
-        let time_limit = match config.maybe_duration {
-            Some(duration) => Some(std::time::Instant::now() + duration),
-            None => None,
-        };
-
         let sampler = crate::sampler::Sampler::new(
             config.pid, 
             config.sample_rate, 
             config.lock_process, 
-            time_limit, 
+            config.maybe_duration, 
             config.with_subprocesses, 
         );
 

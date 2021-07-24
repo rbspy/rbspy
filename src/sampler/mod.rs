@@ -16,14 +16,14 @@ pub struct Sampler {
     lock_process: bool,
     root_pid: Pid,
     sample_rate: u32,
-    time_limit: Option<Instant>,
+    time_limit: Option<Duration>,
     timing_error_traces: Arc<AtomicUsize>,
     total_traces: Arc<AtomicUsize>,
     with_subprocesses: bool,
 }
 
 impl Sampler {
-    pub fn new(pid: Pid, sample_rate: u32, lock_process: bool, time_limit: Option<Instant>, with_subprocesses: bool) -> Self {
+    pub fn new(pid: Pid, sample_rate: u32, lock_process: bool, time_limit: Option<Duration>, with_subprocesses: bool) -> Self {
         Sampler {
             done: Arc::new(AtomicBool::new(false)),
             lock_process,
@@ -50,7 +50,10 @@ impl Sampler {
         let done = self.done.clone();
         let root_pid = self.root_pid.clone();
         let sample_rate = self.sample_rate.clone();
-        let time_limit = self.time_limit.clone();
+        let maybe_stop_time = match self.time_limit {
+            Some(duration) => Some(std::time::Instant::now() + duration),
+            None => None,
+        };
         let lock_process = self.lock_process.clone();
         let result_sender = result_sender.clone();
         let timing_error_traces = self.timing_error_traces.clone();
@@ -91,7 +94,7 @@ impl Sampler {
                             let result = sample(
                                 pid,
                                 sample_rate,
-                                time_limit,
+                                maybe_stop_time,
                                 done_thread,
                                 timing_error_traces,
                                 total_traces,
@@ -119,7 +122,7 @@ impl Sampler {
                 let result = sample(
                     root_pid,
                     sample_rate,
-                    time_limit,
+                    maybe_stop_time,
                     done,
                     timing_error_traces,
                     total_traces,
