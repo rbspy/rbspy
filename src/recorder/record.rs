@@ -40,90 +40,115 @@ pub struct Config {
     /// stops the process from executing and can affect performance. The performance impact
     /// is most noticeable in CPU-bound ruby programs or when a high sampling rate is used.
     pub lock_process: bool,
-    /// Signals to the recorder that it should stop.
-    pub done: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
-/// Records traces according to the given configuration
-pub fn record(config: Config) -> Result<(), Error> {
-    let time_limit = match config.maybe_duration {
-        Some(duration) => Some(std::time::Instant::now() + duration),
-        None => None,
-    };
+pub struct Recorder {
+    format: crate::core::types::OutputFormat,
+    flame_min_width: f64,
+    out_path: PathBuf,
+    raw_path: PathBuf,
+    sample_rate: u32,
+    silent: bool,
+    sampler: crate::sampler::Sampler,
+}
 
-    let sampler = crate::sampler::Sampler::new(
-        config.pid, 
-        config.sample_rate, 
-        config.lock_process, 
-        time_limit, 
-        config.with_subprocesses, 
-        config.done,
-    );
+impl Recorder {
+    pub fn new(config: Config) -> Self {
+        let time_limit = match config.maybe_duration {
+            Some(duration) => Some(std::time::Instant::now() + duration),
+            None => None,
+        };
 
-    // Create the sender/receiver channels and start the child threads off collecting stack traces
-    // from each target process.
-    // Give the child threads a buffer in case we fall a little behind with aggregating the stack
-    // traces, but not an unbounded buffer.
-    let (trace_sender, trace_receiver) = std::sync::mpsc::sync_channel(100);
-    let (result_sender, result_receiver) = std::sync::mpsc::channel();
-    sampler.start(trace_sender, result_sender)?;
+        let sampler = crate::sampler::Sampler::new(
+            config.pid, 
+            config.sample_rate, 
+            config.lock_process, 
+            time_limit, 
+            config.with_subprocesses, 
+        );
 
-    // Aggregate stack traces as we receive them from the threads that are collecting them
-    // Aggregate to 3 places: the raw output (`.raw.gz`), some summary statistics we display live,
-    // and the formatted output (a flamegraph or something)
-    let mut out = config.format.outputter(config.flame_min_width);
-    let mut summary_out = summary::Stats::new();
-    let mut raw_store = Store::new(&config.raw_path, config.sample_rate)?;
-    let mut summary_time = std::time::Instant::now() + Duration::from_secs(1);
-    let start_time = Instant::now();
+        Recorder {
+            format: config.format,
+            flame_min_width: config.flame_min_width,
+            out_path: config.out_path,
+            raw_path: config.raw_path,
+            sample_rate: config.sample_rate,
+            silent: config.silent,
+            sampler,
+        }
+    }
 
-    for trace in trace_receiver.iter() {
-        out.record(&trace)?;
-        summary_out.add_function_name(&trace.trace);
-        raw_store.write(&trace)?;
+    /// Records traces according to the given configuration
+    pub fn record(&self) -> Result<(), Error> {
+        // Create the sender/receiver channels and start the child threads off collecting stack traces
+        // from each target process.
+        // Give the child threads a buffer in case we fall a little behind with aggregating the stack
+        // traces, but not an unbounded buffer.
+        let (trace_sender, trace_receiver) = std::sync::mpsc::sync_channel(100);
+        let (result_sender, result_receiver) = std::sync::mpsc::channel();
+        self.sampler.start(trace_sender, result_sender)?;
 
-        if !config.silent {
-            // Print a summary every second
-            if std::time::Instant::now() > summary_time {
-                print_summary(
-                    &summary_out,
-                    &start_time,
-                    config.sample_rate,
-                    sampler.timing_error_traces(),
-                    sampler.total_traces(),
-                )?;
-                summary_time = std::time::Instant::now() + Duration::from_secs(1);
+        // Aggregate stack traces as we receive them from the threads that are collecting them
+        // Aggregate to 3 places: the raw output (`.raw.gz`), some summary statistics we display live,
+        // and the formatted output (a flamegraph or something)
+        let mut out = self.format.clone().outputter(self.flame_min_width);
+        let mut summary_out = summary::Stats::new();
+        let mut raw_store = Store::new(&self.raw_path, self.sample_rate)?;
+        let mut summary_time = std::time::Instant::now() + Duration::from_secs(1);
+        let start_time = Instant::now();
+
+        for trace in trace_receiver.iter() {
+            out.record(&trace)?;
+            summary_out.add_function_name(&trace.trace);
+            raw_store.write(&trace)?;
+
+            if !self.silent {
+                // Print a summary every second
+                if std::time::Instant::now() > summary_time {
+                    print_summary(
+                        &summary_out,
+                        &start_time,
+                        self.sample_rate,
+                        self.sampler.timing_error_traces(),
+                        self.sampler.total_traces(),
+                    )?;
+                    summary_time = std::time::Instant::now() + Duration::from_secs(1);
+                }
             }
         }
-    }
 
-    // Finish writing all data to disk
-    if config.out_path.display().to_string() == "-" {
-        out.complete(&mut std::io::stdout())?;
-    } else {
-        let mut out_file = File::create(&config.out_path).context(format!(
-            "Failed to create output file {}",
-            &config.out_path.display()
-        ))?;
-        out.complete(&mut out_file)?;
-    }
-    raw_store.complete();
-
-    // Check for errors from the child threads. Ignore errors unless every single thread
-    // returned an error. If that happens, return the last error. This lets rbspy successfully
-    // record processes even if the parent thread isn't a Ruby process.
-    let mut num_ok = 0;
-    let mut last_result = Ok(());
-    for result in result_receiver.iter() {
-        if result.is_ok() {
-            num_ok += 1;
+        // Finish writing all data to disk
+        if self.out_path.display().to_string() == "-" {
+            out.complete(&mut std::io::stdout())?;
+        } else {
+            let mut out_file = File::create(&self.out_path).context(format!(
+                "Failed to create output file {}",
+                &self.out_path.display()
+            ))?;
+            out.complete(&mut out_file)?;
         }
-        last_result = result;
+        raw_store.complete();
+
+        // Check for errors from the child threads. Ignore errors unless every single thread
+        // returned an error. If that happens, return the last error. This lets rbspy successfully
+        // record processes even if the parent thread isn't a Ruby process.
+        let mut num_ok = 0;
+        let mut last_result = Ok(());
+        for result in result_receiver.iter() {
+            if result.is_ok() {
+                num_ok += 1;
+            }
+            last_result = result;
+        }
+
+        match num_ok {
+            0 => last_result,
+            _ => Ok(()),
+        }
     }
 
-    match num_ok {
-        0 => last_result,
-        _ => Ok(()),
+    pub fn stop(&self) {
+        self.sampler.stop();
     }
 }
 

@@ -1,9 +1,6 @@
 extern crate rbspy;
 
-use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
-
-use rbspy::recorder::{record, RecordConfig};
+use rbspy::recorder::{Recorder, RecordConfig};
 use rbspy::OutputFormat;
 
 fn main() {
@@ -24,9 +21,9 @@ fn main() {
         maybe_duration: Some(std::time::Duration::from_secs(1)),
         flame_min_width: 10.0,
         lock_process: true,
-        done: Arc::new(AtomicBool::new(false)),
     };
-    match record(config) {
+    let recorder = Recorder::new(config);
+    match recorder.record() {
         Ok(_) => println!(
             "A flamegraph was saved to {}",
             out_path.display().to_string()

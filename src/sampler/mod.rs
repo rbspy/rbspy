@@ -23,9 +23,9 @@ pub struct Sampler {
 }
 
 impl Sampler {
-    pub fn new(pid: Pid, sample_rate: u32, lock_process: bool, time_limit: Option<Instant>, with_subprocesses: bool, done: Arc<AtomicBool>) -> Self {
+    pub fn new(pid: Pid, sample_rate: u32, lock_process: bool, time_limit: Option<Instant>, with_subprocesses: bool) -> Self {
         Sampler {
-            done,
+            done: Arc::new(AtomicBool::new(false)),
             lock_process,
             root_pid: pid,
             sample_rate,
@@ -135,13 +135,6 @@ impl Sampler {
     }
 
     pub fn stop(&self) {
-        // TODO: Move this logic up a layer
-        if self.done.load(Ordering::Relaxed) {
-            eprintln!("Multiple interrupts received, exiting with haste!");
-            std::process::exit(1);
-        }
-        eprintln!("Interrupted.");
-        // Trigger the end of the loop
         self.done.store(true, Ordering::Relaxed);
     }
 }
@@ -318,7 +311,6 @@ fn test_sample_subprocesses() {
         true, 
         None, 
         true,
-        Arc::<AtomicBool>::new(AtomicBool::new(false)),
     );
     let (trace_sender, trace_receiver) = std::sync::mpsc::sync_channel(100);
     let (result_sender, result_receiver) = std::sync::mpsc::channel();

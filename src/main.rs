@@ -17,7 +17,6 @@ use std::fs::DirBuilder;
 use std::os::unix::prelude::*;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 /// The kinds of things we can call `rbspy record` on.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -160,8 +159,6 @@ fn do_main() -> Result<(), Error> {
                 }
             };
 
-            let done = std::sync::Arc::<AtomicBool>::new(AtomicBool::new(false));
-            let done_handler = done.clone();
             let config = recorder::RecordConfig {
                 format,
                 raw_path: raw_path.clone(),
@@ -173,28 +170,31 @@ fn do_main() -> Result<(), Error> {
                 maybe_duration,
                 flame_min_width,
                 lock_process,
-                done,
             };
-
-            ctrlc::set_handler(move || {
-                if done_handler.load(Ordering::Relaxed) {
-                    eprintln!("Multiple interrupts received, exiting with haste!");
-                    std::process::exit(1);
-                }
-                eprintln!("Interrupted.");
-                // Trigger the end of the loop
-                done_handler.store(true, Ordering::Relaxed);
-            })
-            .expect("Error setting Ctrl-C handler");
-
-            eprintln!("Press Ctrl+C to stop");
 
             let output_paths_message = format!(
                 "Wrote raw data to {}\nWrote formatted output to {}",
                 raw_path.display(),
                 out_path.display()
             );
-            match recorder::record(config) {
+            let recorder = recorder::Recorder::new(config);
+            let recorder = std::sync::Arc::<recorder::Recorder>::new(recorder);
+            let recorder_handler = recorder.clone();
+            let mut interrupted = false;
+            ctrlc::set_handler(move || {
+                if interrupted {
+                    eprintln!("Multiple interrupts received, exiting with haste!");
+                    std::process::exit(1);
+                }
+                eprintln!("Interrupted.");
+                interrupted = true;
+                recorder_handler.stop();
+            })
+            .expect("Error setting Ctrl-C handler");
+
+            eprintln!("Press Ctrl+C to stop");
+            
+            match recorder.record() {
                 Ok(_) => {
                     eprintln!("{}", output_paths_message);
                     Ok(())
