@@ -65,7 +65,7 @@ impl StackTraceGetter {
                 };
             }
             Err(MemoryCopyError::InvalidAddressError(addr))
-            if addr == self.current_thread_addr_location => {}
+                if addr == self.current_thread_addr_location => {}
             Err(e) => return Err(e.into()),
         }
         debug!("Thread address location invalid, reinitializing");
@@ -148,7 +148,7 @@ pub type IsMaybeThreadFn = Box<dyn Fn(usize, usize, &Process, &[MapRange]) -> bo
 // Everything below here is private
 
 type StackTraceFn =
-Box<dyn Fn(usize, usize, Option<usize>, &Process, Pid) -> Result<StackTrace, MemoryCopyError>>;
+    Box<dyn Fn(usize, usize, Option<usize>, &Process, Pid) -> Result<StackTrace, MemoryCopyError>>;
 
 fn get_process_ruby_state(
     pid: Pid,
@@ -184,10 +184,10 @@ fn get_process_ruby_state(
             if i > 100 {
                 match e.root_cause().downcast_ref::<std::io::Error>() {
                     Some(root_cause)
-                    if root_cause.kind() == std::io::ErrorKind::PermissionDenied =>
-                        {
-                            return Err(e.context("Failed to initialize due to a permissions error. If you are running rbspy as a normal (non-root) user, please try running it again with `sudo --preserve-env !!`. If you are running it in a container, e.g. with Docker or Kubernetes, make sure that your container has been granted the SYS_PTRACE capability. See the rbspy documentation for more details."));
-                        }
+                        if root_cause.kind() == std::io::ErrorKind::PermissionDenied =>
+                    {
+                        return Err(e.context("Failed to initialize due to a permissions error. If you are running rbspy as a normal (non-root) user, please try running it again with `sudo --preserve-env !!`. If you are running it in a container, e.g. with Docker or Kubernetes, make sure that your container has been granted the SYS_PTRACE capability. See the rbspy documentation for more details."));
+                    }
                     _ => {}
                 }
                 return Err(anyhow::format_err!("Couldn't get ruby version: {:?}", e));
@@ -417,11 +417,11 @@ fn get_stack_trace_function(version: &str) -> StackTraceFn {
 #[cfg(test)]
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 mod test {
+    use crate::core::address_finder;
     #[cfg(target_os = "linux")]
     use crate::core::address_finder::AddressFinderError;
+    use crate::core::initialize::{get_ruby_version, is_maybe_thread_function};
     use crate::core::types::{Pid, Process};
-    use crate::core::initialize::{is_maybe_thread_function, get_ruby_version};
-    use crate::core::address_finder;
 
     #[test]
     #[cfg(target_os = "linux")]
@@ -460,7 +460,8 @@ mod test {
     fn test_current_thread_address() {
         if let Ok(mut process) = std::process::Command::new("ruby")
             .arg("./ci/ruby-programs/infinite.rb")
-            .spawn() {
+            .spawn()
+        {
             let pid = process.id() as Pid;
             let remoteprocess = Process::new(pid).expect("Failed to initialize process");
             let version;
@@ -513,7 +514,7 @@ fn test_get_trace() {
                 assert_eq!(trace.unwrap().pid, Some(pid));
                 process.kill().unwrap();
             }
-            Err(_) => process.kill().unwrap()
+            Err(_) => process.kill().unwrap(),
         }
     } else {
         assert!(false, "Can't start ruby infinite.rb");
@@ -578,20 +579,19 @@ fn test_get_exec_trace() {
     } else {
         assert!(false, "Can't start ruby infinite.rb");
     }
-}
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn test_get_nonexistent_process() {
+        assert!(Process::new(10000).is_err());
+    }
 
-#[test]
-#[cfg(target_os = "macos")]
-fn test_get_nonexistent_process() {
-    assert!(Process::new(10000).is_err());
-}
-
-#[test]
-#[cfg(target_os = "macos")]
-fn test_get_disallowed_process() {
-    // getting the ruby version isn't allowed on Mac if the process isn't running as root
-    let mut process = std::process::Command::new("/usr/bin/ruby").spawn().unwrap();
-    let pid = process.id() as Pid;
-    assert!(Process::new(pid).is_err());
-    process.kill().unwrap();
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn test_get_disallowed_process() {
+        // getting the ruby version isn't allowed on Mac if the process isn't running as root
+        let mut process = std::process::Command::new("/usr/bin/ruby").spawn().unwrap();
+        let pid = process.id() as Pid;
+        assert!(Process::new(pid).is_err());
+        process.kill().unwrap();
+    }
 }
