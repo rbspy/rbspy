@@ -1,6 +1,6 @@
 extern crate rbspy;
 
-use rbspy::recorder::{Recorder, RecordConfig};
+use rbspy::recorder::{RecordConfig, Recorder};
 use rbspy::OutputFormat;
 
 fn main() {
@@ -16,7 +16,6 @@ fn main() {
         out_path: out_path.clone(),
         pid: process.id() as rbspy::Pid,
         with_subprocesses: false,
-        silent: true,
         sample_rate: 99,
         maybe_duration: Some(std::time::Duration::from_secs(1)),
         flame_min_width: 10.0,

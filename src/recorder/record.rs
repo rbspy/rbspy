@@ -1,7 +1,9 @@
 use anyhow::{Context, Error, Result};
 use std::fs::File;
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::sync::{Arc, Mutex};
+#[cfg(windows)]
+use winapi::um::timeapi;
 
 use crate::storage::Store;
 use crate::ui::summary;
@@ -21,10 +23,6 @@ pub struct Config {
     /// Whether to profile the target process (given by `pid`) as well as its child processes, and
     /// their child processes, and so on. Default: `false`.
     pub with_subprocesses: bool,
-    /// Whether rbspy should keep its output quiet. If `true`, rbspy will only produce output when
-    /// there's an error and when it finishes recording. If `false`, it will print a snapshot of
-    /// the most recent trace every second. Default: `false`.
-    pub silent: bool,
     /// The number of traces that should be collected each second. Default: `100`.
     pub sample_rate: u32,
     /// The length of time that the recorder should run before stopping. Default: none (run until
@@ -48,18 +46,18 @@ pub struct Recorder {
     out_path: PathBuf,
     raw_path: PathBuf,
     sample_rate: u32,
-    silent: bool,
     sampler: crate::sampler::Sampler,
+    summary: Arc<Mutex<summary::Stats>>,
 }
 
 impl Recorder {
     pub fn new(config: Config) -> Self {
         let sampler = crate::sampler::Sampler::new(
-            config.pid, 
-            config.sample_rate, 
-            config.lock_process, 
-            config.maybe_duration, 
-            config.with_subprocesses, 
+            config.pid,
+            config.sample_rate,
+            config.lock_process,
+            config.maybe_duration,
+            config.with_subprocesses,
         );
 
         Recorder {
@@ -68,12 +66,12 @@ impl Recorder {
             out_path: config.out_path,
             raw_path: config.raw_path,
             sample_rate: config.sample_rate,
-            silent: config.silent,
             sampler,
+            summary: Arc::new(Mutex::new(summary::Stats::new())),
         }
     }
 
-    /// Records traces according to the given configuration
+    /// Records traces
     pub fn record(&self) -> Result<(), Error> {
         // Create the sender/receiver channels and start the child threads off collecting stack traces
         // from each target process.
@@ -87,29 +85,13 @@ impl Recorder {
         // Aggregate to 3 places: the raw output (`.raw.gz`), some summary statistics we display live,
         // and the formatted output (a flamegraph or something)
         let mut out = self.format.clone().outputter(self.flame_min_width);
-        let mut summary_out = summary::Stats::new();
         let mut raw_store = Store::new(&self.raw_path, self.sample_rate)?;
-        let mut summary_time = std::time::Instant::now() + Duration::from_secs(1);
-        let start_time = Instant::now();
 
         for trace in trace_receiver.iter() {
             out.record(&trace)?;
-            summary_out.add_function_name(&trace.trace);
+            let mut summary = self.summary.lock().unwrap();
+            summary.add_function_name(&trace.trace);
             raw_store.write(&trace)?;
-
-            if !self.silent {
-                // Print a summary every second
-                if std::time::Instant::now() > summary_time {
-                    print_summary(
-                        &summary_out,
-                        &start_time,
-                        self.sample_rate,
-                        self.sampler.timing_error_traces(),
-                        self.sampler.total_traces(),
-                    )?;
-                    summary_time = std::time::Instant::now() + Duration::from_secs(1);
-                }
-            }
         }
 
         // Finish writing all data to disk
@@ -145,33 +127,32 @@ impl Recorder {
     pub fn stop(&self) {
         self.sampler.stop();
     }
-}
 
-fn print_summary(
-    summary_out: &crate::ui::summary::Stats,
-    start_time: &Instant,
-    sample_rate: u32,
-    timing_error_traces: usize,
-    total_traces: usize,
-) -> Result<(), Error> {
-    let width = match term_size::dimensions() {
-        Some((w, _)) => Some(w as usize),
-        None => None,
-    };
-    println!("{}[2J", 27 as char); // clear screen
-    println!("{}[0;0H", 27 as char); // go to 0,0
-    eprintln!(
-        "Time since start: {}s. Press Ctrl+C to stop.",
-        start_time.elapsed().as_secs()
-    );
-    let percent_timing_error = (timing_error_traces as f64) / (total_traces as f64) * 100.0;
-    eprintln!("Summary of profiling data so far:");
-    summary_out.print_top_n(20, width)?;
+    pub fn print_summary(&self) -> Result<(), Error> {
+        let width = match term_size::dimensions() {
+            Some((w, _)) => Some(w as usize),
+            None => None,
+        };
+        let timing_error_traces = self.sampler.timing_error_traces();
+        let total_traces = self.sampler.total_traces();
+        let percent_timing_error = (timing_error_traces as f64) / (total_traces as f64) * 100.0;
 
-    if total_traces > 100 && percent_timing_error > 0.5 {
-        // Only print if timing errors are more than 0.5% of total traces -- it's a statistical
-        // profiler so smaller differences don't really matter
-        eprintln!("{:.1}% ({}/{}) of stack traces were sampled late because we couldn't sample at expected rate, results may be inaccurate. Current rate: {}. Try sampling at a lower rate with `--rate`.", percent_timing_error, timing_error_traces, total_traces, sample_rate);
+        println!("{}[2J", 27 as char); // clear screen
+        println!("{}[0;0H", 27 as char); // go to 0,0
+        let summary = self.summary.lock().unwrap();
+        eprintln!(
+            "Time since start: {}s. Press Ctrl+C to stop.",
+            summary.elapsed_time().as_secs()
+        );
+
+        eprintln!("Summary of profiling data so far:");
+        summary.print_top_n(20, width)?;
+
+        if total_traces > 100 && percent_timing_error > 0.5 {
+            // Only print if timing errors are more than 0.5% of total traces -- it's a statistical
+            // profiler so smaller differences don't really matter
+            eprintln!("{:.1}% ({}/{}) of stack traces were sampled late because we couldn't sample at expected rate, results may be inaccurate. Current rate: {}. Try sampling at a lower rate with `--rate`.", percent_timing_error, timing_error_traces, total_traces, self.sample_rate);
+        }
+        Ok(())
     }
-    Ok(())
 }

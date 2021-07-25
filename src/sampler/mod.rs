@@ -23,7 +23,13 @@ pub struct Sampler {
 }
 
 impl Sampler {
-    pub fn new(pid: Pid, sample_rate: u32, lock_process: bool, time_limit: Option<Duration>, with_subprocesses: bool) -> Self {
+    pub fn new(
+        pid: Pid,
+        sample_rate: u32,
+        lock_process: bool,
+        time_limit: Option<Duration>,
+        with_subprocesses: bool,
+    ) -> Self {
         Sampler {
             done: Arc::new(AtomicBool::new(false)),
             lock_process,
@@ -46,7 +52,11 @@ impl Sampler {
 
     /// Start thread(s) recording a PID and possibly its children. Tracks new processes
     /// Returns a pair of Receivers from which you can consume recorded stacktraces and errors
-    pub fn start(&self, trace_sender: SyncSender<StackTrace>, result_sender: Sender<Result<(), Error>>) -> Result<(), Error> {
+    pub fn start(
+        &self,
+        trace_sender: SyncSender<StackTrace>,
+        result_sender: Sender<Result<(), Error>>,
+    ) -> Result<(), Error> {
         let done = self.done.clone();
         let root_pid = self.root_pid.clone();
         let sample_rate = self.sample_rate.clone();
@@ -134,7 +144,7 @@ impl Sampler {
             });
         }
 
-        return Ok(())
+        return Ok(());
     }
 
     pub fn stop(&self) {
@@ -308,16 +318,12 @@ fn test_sample_subprocesses() {
 
     let pid = process.id() as Pid;
 
-    let sampler = Sampler::new(
-        pid, 
-        5, 
-        true, 
-        None, 
-        true,
-    );
+    let sampler = Sampler::new(pid, 5, true, None, true);
     let (trace_sender, trace_receiver) = std::sync::mpsc::sync_channel(100);
     let (result_sender, result_receiver) = std::sync::mpsc::channel();
-    sampler.start(trace_sender, result_sender).expect("sampler failed to start");
+    sampler
+        .start(trace_sender, result_sender)
+        .expect("sampler failed to start");
 
     let mut pids = HashSet::<Pid>::new();
     for trace in trace_receiver {

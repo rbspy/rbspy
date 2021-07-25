@@ -17,6 +17,9 @@ use std::fs::DirBuilder;
 use std::os::unix::prelude::*;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 /// The kinds of things we can call `rbspy record` on.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -165,45 +168,72 @@ fn do_main() -> Result<(), Error> {
                 out_path: out_path.clone(),
                 pid,
                 with_subprocesses,
-                silent,
                 sample_rate,
                 maybe_duration,
                 flame_min_width,
                 lock_process,
             };
 
-            let output_paths_message = format!(
-                "Wrote raw data to {}\nWrote formatted output to {}",
-                raw_path.display(),
-                out_path.display()
-            );
-            let recorder = recorder::Recorder::new(config);
-            let recorder = std::sync::Arc::<recorder::Recorder>::new(recorder);
+            let recorder = Arc::<recorder::Recorder>::new(recorder::Recorder::new(config));
             let recorder_handler = recorder.clone();
-            let mut interrupted = false;
+            let recorder_summary = recorder.clone();
+            let interrupted = Arc::<AtomicBool>::new(AtomicBool::new(false));
+            let interrupted_handler = interrupted.clone();
+            let interrupted_summary = interrupted.clone();
             ctrlc::set_handler(move || {
-                if interrupted {
+                if interrupted_handler.load(Ordering::Relaxed) {
                     eprintln!("Multiple interrupts received, exiting with haste!");
                     std::process::exit(1);
                 }
                 eprintln!("Interrupted.");
-                interrupted = true;
+                interrupted_handler.store(true, Ordering::Relaxed);
                 recorder_handler.stop();
             })
             .expect("Error setting Ctrl-C handler");
 
             eprintln!("Press Ctrl+C to stop");
-            
-            match recorder.record() {
-                Ok(_) => {
-                    eprintln!("{}", output_paths_message);
-                    Ok(())
+
+            let summary_thread = std::thread::spawn(move || {
+                if silent {
+                    return;
                 }
-                Err(e) => {
-                    eprintln!("{}", output_paths_message);
-                    Err(e)
+
+                let mut summary_time = Instant::now() + Duration::from_secs(1);
+                loop {
+                    if interrupted_summary.load(Ordering::Relaxed) {
+                        break;
+                    }
+
+                    // Print a summary every second
+                    if std::time::Instant::now() > summary_time {
+                        match recorder_summary.print_summary() {
+                            Ok(()) => {}
+                            Err(e) => {
+                                eprintln!("Failed to print summary: {}", e);
+                                break;
+                            }
+                        };
+                        summary_time = Instant::now() + Duration::from_secs(1);
+                    }
+
+                    std::thread::sleep(Duration::from_millis(250));
                 }
-            }
+            });
+
+            let recording_result = recorder.record();
+
+            interrupted.store(true, Ordering::Relaxed);
+            summary_thread.join().expect("couldn't join summary thread");
+            eprintln!(
+                "{}",
+                format!(
+                    "Wrote raw data to {}\nWrote formatted output to {}",
+                    raw_path.display(),
+                    out_path.display()
+                )
+            );
+
+            recording_result
         }
         SubCmd::Report {
             format,
