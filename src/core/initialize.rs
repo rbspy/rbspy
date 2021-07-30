@@ -130,7 +130,7 @@ impl StackTraceGetter {
 
         let _lock;
         if self.lock_process {
-            let mut retries = 10;
+            let mut retries = 20;
             loop {
                 match try_lock(&self.process) {
                     Ok(l) => {
