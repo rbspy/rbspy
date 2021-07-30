@@ -90,6 +90,7 @@ impl StackTraceGetter {
                              Ok(remoteprocess::Error::IOError(e)) => {
                                  match e.kind() {
                                      std::io::ErrorKind::NotFound => {
+                                         debug!("Process {} was not found : {:?}", self.process.pid, e);
                                          return Err(MemoryCopyError::ProcessEnded)
                                      }
                                      #[cfg(target_os = "windows")]
@@ -102,7 +103,8 @@ impl StackTraceGetter {
                              #[cfg(target_os = "linux")]
                              Ok(remoteprocess::Error::NixError(e)) => match e {
                                  nix::Error::Sys(nix::errno::Errno::EPERM) => {
-                                     return Err(MemoryCopyError::ProcessEnded);
+                                     debug!("EPERM for process {} : {:?}", self.process.pid, e);
+                                     return Err(MemoryCopyError::ProcessNotLocked);
                                  }
                                  nix::Error::Sys(nix::errno::Errno::ESRCH) => {
                                      match Process::new(self.process.pid) {
@@ -121,6 +123,7 @@ impl StackTraceGetter {
                              _ => {}
                          }
                      }
+                     debug!("Unhandled error {:?}", e);
                      Err(e.into())
                  })
         };
@@ -131,17 +134,21 @@ impl StackTraceGetter {
             loop {
                 match try_lock(&self.process) {
                     Ok(l) => {
+                        debug!("Was able to lock process {} ", self.process.pid);
                         _lock = l;
                         break;
                     }
                     Err(e) => match e {
                         MemoryCopyError::ProcessNotLocked => {
                             if retries == 0 {
+                                debug!("Exhausted retries to lock process");
                                 return Err(e)?;
                             }
+                            debug!("Retrying lock");
                             retries -= 1;
                         }
                         _ => {
+                            debug!("Error is not process lock error {:?}", e);
                             return Err(e)?;
                         }
                     },
