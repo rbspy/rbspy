@@ -104,7 +104,7 @@ impl StackTraceGetter {
                              Ok(remoteprocess::Error::NixError(e)) => match e {
                                  nix::Error::Sys(nix::errno::Errno::EPERM) => {
                                      debug!("EPERM for process {} : {:?}", self.process.pid, e);
-                                     return Err(MemoryCopyError::ProcessNotLocked);
+                                     return Err(MemoryCopyError::PermissionError);
                                  }
                                  nix::Error::Sys(nix::errno::Errno::ESRCH) => {
                                      match Process::new(self.process.pid) {
@@ -142,10 +142,17 @@ impl StackTraceGetter {
                         break;
                     }
                     Err(e) => match e {
-                        MemoryCopyError::ProcessNotLocked => {
+                        MemoryCopyError::ProcessNotLocked | MemoryCopyError::PermissionError => {
                             if retries == 0 {
                                 debug!("Exhausted retries to lock process");
-                                return Err(e)?;
+                                match e {
+                                    MemoryCopyError::PermissionError => {
+                                        return Err(MemoryCopyError::ProcessEnded)
+                                    }
+                                    _ => {
+                                        return Err(e)?;
+                                    }
+                                }
                             }
                             debug!("Retrying lock");
                             retries -= 1;

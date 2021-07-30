@@ -42,6 +42,8 @@ pub enum MemoryCopyError {
     Io(usize, std::io::Error),
     #[error("Process isn't running")]
     ProcessEnded,
+    #[error("Permission error")]
+    PermissionError,
     #[error("Couldn't lock the process")]
     ProcessNotLocked,
     #[error("Copy error: {}", _0)]
