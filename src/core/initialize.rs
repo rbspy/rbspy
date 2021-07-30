@@ -134,7 +134,10 @@ impl StackTraceGetter {
             loop {
                 match try_lock(&self.process) {
                     Ok(l) => {
-                        debug!("Was able to lock process {} ", self.process.pid);
+                        debug!(
+                            "Was able to lock process {}, {} retries remained ",
+                            self.process.pid, retries
+                        );
                         _lock = l;
                         break;
                     }
@@ -425,6 +428,42 @@ fn test_get_exec_trace() {
         getter.reinit_count, 1,
         "Trace getter should have detected one reinit"
     );
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn test_thread_churn() {
+    // Test that even a program churning threads can be locked to be traced
+    // Success / error criteria here should match those from `fn record` main.rs
+    let mut process = std::process::Command::new("ruby")
+        .arg("./ci/ruby-programs/thread_churn.rb")
+        .spawn()
+        .unwrap();
+    let pid = process.id() as Pid;
+    let mut getter = initialize(pid, true).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    let total_samples = 1000;
+    let mut errors = 0;
+    for _ in 0..total_samples {
+        std::thread::sleep(std::time::Duration::from_millis(1));
+        match getter.get_trace() {
+            Ok(_t) => {}
+            Err(e) => match e.downcast_ref() {
+                Some(MemoryCopyError::ProcessEnded) => {
+                    panic!("Spurious process exit while testing thread churn");
+                }
+                _ => {
+                    errors += 1;
+                }
+            },
+        }
+    }
+
+    // These assertions are based on those from the record function in main.rs
+    assert!(errors <= 20);
+    assert!((errors as f64) / (total_samples as f64) <= 0.5);
+    process.kill().unwrap();
 }
 
 #[test]
