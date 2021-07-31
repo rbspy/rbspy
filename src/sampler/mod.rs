@@ -279,74 +279,77 @@ impl SampleTime {
     }
 }
 
-// TODO: Find a more reliable way to test this on Windows hosts
-#[cfg(not(target_os = "windows"))]
-#[test]
-fn test_sample_subprocesses() {
-    #[cfg(target_os = "macos")]
-    if !nix::unistd::Uid::effective().is_root() {
-        println!("Skipping test because we're not running as root");
-        return;
-    }
-
-    let which = if cfg!(target_os = "windows") {
-        "C:\\Windows\\System32\\WHERE.exe"
-    } else {
-        "/usr/bin/which"
-    };
-
-    let output = std::process::Command::new(which)
-        .arg("ruby")
-        .output()
-        .expect("failed to execute process");
-
-    let ruby_binary_path = String::from_utf8(output.stdout).unwrap();
-
-    let ruby_binary_path_str = ruby_binary_path
-        .lines()
-        .next()
-        .expect("failed to execute ruby process");
-
-    let coordination_dir = tempdir::TempDir::new("").unwrap();
-    let coordination_dir_name = coordination_dir.path().to_str().unwrap();
-
-    let mut process = std::process::Command::new(ruby_binary_path_str)
-        .arg("ci/ruby-programs/ruby_forks.rb")
-        .arg(coordination_dir_name)
-        .spawn()
-        .unwrap();
-
-    let pid = process.id() as Pid;
-
-    let sampler = Sampler::new(pid, 5, true, None, true);
-    let (trace_sender, trace_receiver) = std::sync::mpsc::sync_channel(100);
-    let (result_sender, result_receiver) = std::sync::mpsc::channel();
-    sampler
-        .start(trace_sender, result_sender)
-        .expect("sampler failed to start");
-
-    let mut pids = HashSet::<Pid>::new();
-    for trace in trace_receiver {
-        let pid = trace.pid.unwrap();
-        if !pids.contains(&pid) {
-            // Now that we have a stack trace for this PID, signal to the corresponding
-            // ruby process that it can exit
-            let coordination_filename = format!("rbspy_ack.{}", pid);
-            std::fs::File::create(coordination_dir.path().join(coordination_filename.clone()))
-                .expect("couldn't create coordination file");
-            pids.insert(pid);
+#[cfg(test)]
+mod tests {
+    // TODO: Find a more reliable way to test this on Windows hosts
+    #[cfg(not(target_os = "windows"))]
+    #[test]
+    fn test_sample_subprocesses() {
+        #[cfg(target_os = "macos")]
+        if !nix::unistd::Uid::effective().is_root() {
+            println!("Skipping test because we're not running as root");
+            return;
         }
 
-        if pids.len() == 4 {
-            break;
+        let which = if cfg!(target_os = "windows") {
+            "C:\\Windows\\System32\\WHERE.exe"
+        } else {
+            "/usr/bin/which"
+        };
+
+        let output = std::process::Command::new(which)
+            .arg("ruby")
+            .output()
+            .expect("failed to execute process");
+
+        let ruby_binary_path = String::from_utf8(output.stdout).unwrap();
+
+        let ruby_binary_path_str = ruby_binary_path
+            .lines()
+            .next()
+            .expect("failed to execute ruby process");
+
+        let coordination_dir = tempdir::TempDir::new("").unwrap();
+        let coordination_dir_name = coordination_dir.path().to_str().unwrap();
+
+        let mut process = std::process::Command::new(ruby_binary_path_str)
+            .arg("ci/ruby-programs/ruby_forks.rb")
+            .arg(coordination_dir_name)
+            .spawn()
+            .unwrap();
+
+        let pid = process.id() as Pid;
+
+        let sampler = Sampler::new(pid, 5, true, None, true);
+        let (trace_sender, trace_receiver) = std::sync::mpsc::sync_channel(100);
+        let (result_sender, result_receiver) = std::sync::mpsc::channel();
+        sampler
+            .start(trace_sender, result_sender)
+            .expect("sampler failed to start");
+
+        let mut pids = HashSet::<Pid>::new();
+        for trace in trace_receiver {
+            let pid = trace.pid.unwrap();
+            if !pids.contains(&pid) {
+                // Now that we have a stack trace for this PID, signal to the corresponding
+                // ruby process that it can exit
+                let coordination_filename = format!("rbspy_ack.{}", pid);
+                std::fs::File::create(coordination_dir.path().join(coordination_filename.clone()))
+                    .expect("couldn't create coordination file");
+                pids.insert(pid);
+            }
+
+            if pids.len() == 4 {
+                break;
+            }
         }
-    }
 
-    let results: Vec<_> = result_receiver.iter().take(4).collect();
-    for r in results {
-        r.expect("unexpected error");
-    }
+        let results: Vec<_> = result_receiver.iter().take(4).collect();
+        for r in results {
+            r.expect("unexpected error");
+        }
 
-    assert_eq!(pids.len(), 4);
-    process.wait().unwrap();
+        assert_eq!(pids.len(), 4);
+        process.wait().unwrap();
+    }
 }
