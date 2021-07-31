@@ -281,6 +281,121 @@ impl SampleTime {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
+    use crate::core::types::Pid;
+    use crate::sampler::Sampler;
+
+    #[test]
+    fn test_sample_single_process() {
+        #[cfg(target_os = "macos")]
+        if !nix::unistd::Uid::effective().is_root() {
+            println!("Skipping test because we're not running as root");
+            return;
+        }
+
+        let which = if cfg!(target_os = "windows") {
+            "C:\\Windows\\System32\\WHERE.exe"
+        } else {
+            "/usr/bin/which"
+        };
+
+        let output = std::process::Command::new(which)
+            .arg("ruby")
+            .output()
+            .expect("failed to execute process");
+
+        let ruby_binary_path = String::from_utf8(output.stdout).unwrap();
+
+        let ruby_binary_path_str = ruby_binary_path
+            .lines()
+            .next()
+            .expect("failed to execute ruby process");
+
+        let mut process = std::process::Command::new(ruby_binary_path_str)
+            .arg("ci/ruby-programs/infinite.rb")
+            .spawn()
+            .unwrap();
+
+        let pid = process.id() as Pid;
+
+        let sampler = Sampler::new(pid, 100, true, None, false);
+        let (trace_sender, trace_receiver) = std::sync::mpsc::sync_channel(100);
+        let (result_sender, result_receiver) = std::sync::mpsc::channel();
+        sampler
+            .start(trace_sender, result_sender)
+            .expect("sampler failed to start");
+
+        let trace = trace_receiver.recv().expect("failed to receive trace");
+        assert_eq!(trace.pid.unwrap(), pid);
+
+        process.kill().expect("failed to kill process");
+
+        let result = result_receiver.recv().expect("failed to receive result");
+        result.expect("unexpected error");
+
+        process.wait().unwrap();
+    }
+
+    #[test]
+    fn test_sample_single_process_with_time_limit() {
+        #[cfg(target_os = "macos")]
+        if !nix::unistd::Uid::effective().is_root() {
+            println!("Skipping test because we're not running as root");
+            return;
+        }
+
+        let which = if cfg!(target_os = "windows") {
+            "C:\\Windows\\System32\\WHERE.exe"
+        } else {
+            "/usr/bin/which"
+        };
+
+        let output = std::process::Command::new(which)
+            .arg("ruby")
+            .output()
+            .expect("failed to execute process");
+
+        let ruby_binary_path = String::from_utf8(output.stdout).unwrap();
+
+        let ruby_binary_path_str = ruby_binary_path
+            .lines()
+            .next()
+            .expect("failed to execute ruby process");
+
+        let mut process = std::process::Command::new(ruby_binary_path_str)
+            .arg("ci/ruby-programs/infinite.rb")
+            .spawn()
+            .unwrap();
+
+        let pid = process.id() as Pid;
+
+        let sampler = Sampler::new(
+            pid,
+            100,
+            true,
+            Some(std::time::Duration::from_millis(500)),
+            false,
+        );
+        let (trace_sender, trace_receiver) = std::sync::mpsc::sync_channel(100);
+        let (result_sender, result_receiver) = std::sync::mpsc::channel();
+        sampler
+            .start(trace_sender, result_sender)
+            .expect("sampler failed to start");
+
+        for trace in trace_receiver {
+            assert_eq!(trace.pid.unwrap(), pid);
+        }
+
+        // At this point the sampler has halted, so we can kill the process
+        process.kill().expect("failed to kill process");
+
+        let result = result_receiver.recv().expect("failed to receive result");
+        result.expect("unexpected error");
+
+        process.wait().unwrap();
+    }
+
     // TODO: Find a more reliable way to test this on Windows hosts
     #[cfg(not(target_os = "windows"))]
     #[test]
