@@ -30,7 +30,7 @@ log = "0.4.6"
 proc-maps = "0.1.8"
 rand = "0.8.3"
 rbspy-ruby-structs = { path = "ruby-structs", version="0.8.0" }
-remoteprocess = "0.4.4"
+remoteprocess = "0.4.5"
 serde = "1"
 serde_derive = "1"
 serde_json = "1"
