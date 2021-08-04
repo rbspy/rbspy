@@ -96,7 +96,7 @@ impl StackTraceGetter {
                                     }
                                     // Windows
                                     std::io::ErrorKind::PermissionDenied => {
-                                        return Err(MemoryCopyError::ProcessEnded)
+                                        return Err(MemoryCopyError::ProcessNotLocked)
                                     }
                                     _ => {}
                                 };
@@ -104,7 +104,7 @@ impl StackTraceGetter {
                             #[cfg(target_os = "linux")]
                             Ok(remoteprocess::Error::NixError(e)) => match e {
                                 nix::errno::Errno::EPERM => {
-                                    return Err(MemoryCopyError::ProcessEnded);
+                                    return Err(MemoryCopyError::ProcessNotLocked);
                                 }
                                 _ => {}
                             },
