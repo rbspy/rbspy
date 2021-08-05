@@ -562,6 +562,13 @@ fn test_spawn_record_children_subprocesses() {
         }
     }
 
+    // It is possible that the spawned children can become defunct, which may
+    // cause the root process to block forever if we wait on it.
+    // This will clean them up preemptively, since we should already have their results.
+    for pid in &pids {
+        let _ = nix::sys::signal::kill(nix::unistd::Pid::from_raw(*pid), nix::sys::signal::SIGKILL);
+    }
+
     process.wait().unwrap();
 
     let results: Vec<_> = result_receiver.iter().take(4).collect();
