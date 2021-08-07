@@ -453,10 +453,6 @@ mod tests {
                     .expect("couldn't create coordination file");
                 pids.insert(pid);
             }
-
-            if pids.len() == 4 {
-                break;
-            }
         }
 
         process.wait().unwrap();
