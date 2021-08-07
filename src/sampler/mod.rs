@@ -459,12 +459,13 @@ mod tests {
             }
         }
 
+        process.wait().unwrap();
+
         let results: Vec<_> = result_receiver.iter().take(4).collect();
         for r in results {
             r.expect("unexpected error");
         }
 
         assert_eq!(pids.len(), 4);
-        process.wait().unwrap();
     }
 }
