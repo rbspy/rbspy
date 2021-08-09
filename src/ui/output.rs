@@ -1,7 +1,7 @@
 #[cfg(test)]
 extern crate tempdir;
 
-use std::fs::File;
+use std::io::Write;
 
 use crate::core::types::{StackFrame, StackTrace};
 use crate::ui::{callgrind, flamegraph, speedscope, summary};
@@ -10,7 +10,7 @@ use anyhow::Result;
 
 pub trait Outputter {
     fn record(&mut self, stack: &StackTrace) -> Result<()>;
-    fn complete(&mut self, file: File) -> Result<()>;
+    fn complete(&mut self, write: &mut dyn Write) -> Result<()>;
 }
 
 // Uses Inferno to visualize stack traces
@@ -25,8 +25,8 @@ impl Outputter for Flamegraph {
         Ok(())
     }
 
-    fn complete(&mut self, file: File) -> Result<()> {
-        self.stats.write_flamegraph(file, self.min_width)?;
+    fn complete(&mut self, write: &mut dyn Write) -> Result<()> {
+        self.stats.write_flamegraph(write, self.min_width)?;
         Ok(())
     }
 }
@@ -51,8 +51,8 @@ impl Outputter for Collapsed {
         Ok(())
     }
 
-    fn complete(&mut self, mut file: File) -> Result<()> {
-        self.0.write_collapsed(&mut file)?;
+    fn complete(&mut self, mut write: &mut dyn Write) -> Result<()> {
+        self.0.write_collapsed(&mut write)?;
         Ok(())
     }
 }
@@ -65,9 +65,9 @@ impl Outputter for Callgrind {
         Ok(())
     }
 
-    fn complete(&mut self, mut file: File) -> Result<()> {
+    fn complete(&mut self, mut write: &mut dyn Write) -> Result<()> {
         self.0.finish();
-        self.0.write(&mut file)?;
+        self.0.write(&mut write)?;
         Ok(())
     }
 }
@@ -80,8 +80,8 @@ impl Outputter for Summary {
         Ok(())
     }
 
-    fn complete(&mut self, mut file: File) -> Result<()> {
-        self.0.write(&mut file)?;
+    fn complete(&mut self, mut write: &mut dyn Write) -> Result<()> {
+        self.0.write(&mut write)?;
         Ok(())
     }
 }
@@ -94,8 +94,8 @@ impl Outputter for SummaryLine {
         Ok(())
     }
 
-    fn complete(&mut self, mut file: File) -> Result<()> {
-        self.0.write(&mut file)?;
+    fn complete(&mut self, mut write: &mut dyn Write) -> Result<()> {
+        self.0.write(&mut write)?;
         Ok(())
     }
 }
@@ -108,8 +108,8 @@ impl Outputter for Speedscope {
         Ok(())
     }
 
-    fn complete(&mut self, file: File) -> Result<()> {
-        self.0.write(file)?;
+    fn complete(&mut self, write: &mut dyn Write) -> Result<()> {
+        self.0.write(write)?;
         Ok(())
     }
 }

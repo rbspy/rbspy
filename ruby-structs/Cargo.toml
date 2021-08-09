@@ -1,8 +1,8 @@
 [package]
 name = "rbspy-ruby-structs"
-version = "0.6.0"
+version = "0.8.1"
 authors = ["Adam Jensen <acjensen@gmail.com>", "Julia Evans <julia@jvns.ca>"]
-description = "Helper crate for rbspy. Contains Rust bindings for various internal Ruby structions for version 1.9.3 to 3.0.1"
+description = "Helper crate for rbspy. Contains Rust bindings for various internal Ruby structions for version 1.9.3 to 3.0.2"
 license = "MIT"
 repository = "https://github.com/rbspy/rbspy"
 documentation = "https://github.com/rbspy/rbspy"

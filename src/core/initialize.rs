@@ -1,4 +1,5 @@
 use crate::core::address_finder;
+#[cfg(target_os = "linux")]
 use crate::core::address_finder::*;
 use crate::core::ruby_version;
 use crate::core::types::{MemoryCopyError, Pid, Process, ProcessMemory, ProcessRetry, StackTrace};
@@ -28,7 +29,7 @@ pub fn initialize(pid: Pid, lock_process: bool, on_cpu: bool) -> Result<StackTra
         ruby_vm_addr_location,
         global_symbols_addr_location,
         stack_trace_function,
-    ) = get_process_ruby_state(pid)?;
+    ) = get_process_ruby_state(pid).context("get ruby VM state")?;
 
     Ok(StackTraceGetter {
         process,
@@ -79,8 +80,10 @@ impl StackTraceGetter {
             Err(e) => return Err(e.into()),
         }
         debug!("Thread address location invalid, reinitializing");
-        self.reinitialize()?;
-        Ok(self.get_trace_from_current_thread()?)
+        self.reinitialize().context("reinitialize")?;
+        Ok(self
+            .get_trace_from_current_thread()
+            .context("get trace from current thread")?)
     }
 
     #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
@@ -127,7 +130,7 @@ impl StackTraceGetter {
                             }
                             #[cfg(target_os = "linux")]
                             Ok(remoteprocess::Error::NixError(e)) => match e {
-                                nix::Error::Sys(nix::errno::Errno::EPERM) => {
+                                nix::errno::Errno::EPERM => {
                                     return Err(MemoryCopyError::ProcessEnded);
                                 }
                                 _ => {}
@@ -157,7 +160,7 @@ impl StackTraceGetter {
             ruby_vm_addr_location,
             ruby_global_symbols_addr_location,
             stack_trace_function,
-        ) = get_process_ruby_state(self.process.pid)?;
+        ) = get_process_ruby_state(self.process.pid).context("get ruby VM state")?;
 
         self.process = process;
         self.current_thread_addr_location = current_thread_addr_location;
@@ -209,7 +212,7 @@ fn get_process_ruby_state(
         }
         let process = process.unwrap();
 
-        let version = get_ruby_version(&process).context("Couldn't determine Ruby version");
+        let version = get_ruby_version(&process).context("get Ruby version");
         if let Err(e) = version {
             debug!(
                 "[{}] Trying again to get ruby version. Last error was: {:?}",
@@ -217,6 +220,14 @@ fn get_process_ruby_state(
             );
             i += 1;
             if i > 100 {
+                match e.root_cause().downcast_ref::<std::io::Error>() {
+                    Some(root_cause)
+                        if root_cause.kind() == std::io::ErrorKind::PermissionDenied =>
+                    {
+                        return Err(e.context("Failed to initialize due to a permissions error. If you are running rbspy as a normal (non-root) user, please try running it again with `sudo --preserve-env !!`. If you are running it in a container, e.g. with Docker or Kubernetes, make sure that your container has been granted the SYS_PTRACE capability. See the rbspy documentation for more details."));
+                    }
+                    _ => {}
+                }
                 return Err(anyhow::format_err!("Couldn't get ruby version: {:?}", e));
             }
             std::thread::sleep(Duration::from_millis(1));
@@ -265,38 +276,9 @@ fn get_process_ruby_state(
 }
 
 fn get_ruby_version(process: &Process) -> Result<String> {
-    match get_ruby_version_from_process(process) {
-        Err(err) => {
-            if let Some(&MemoryCopyError::PermissionDenied) =
-                err.root_cause().downcast_ref::<MemoryCopyError>()
-            {
-                return Err(err);
-            }
-            match err.root_cause().downcast_ref::<AddressFinderError>() {
-                #[cfg(not(target_os = "macos"))]
-                Some(&AddressFinderError::PermissionDenied(_)) => {
-                    return Err(err);
-                }
-                #[cfg(target_os = "macos")]
-                Some(&AddressFinderError::MacPermissionDenied(_)) => {
-                    return Err(err);
-                }
-                #[cfg(any(target_os = "linux", target_os = "freebsd"))]
-                Some(&AddressFinderError::NoSuchProcess(_)) => {
-                    return Err(err);
-                }
-                _ => return Err(err),
-            }
-        }
-        Ok(x) => {
-            return Ok(x);
-        }
-    }
-}
-
-fn get_ruby_version_from_process(process: &Process) -> Result<String> {
-    let addr = address_finder::get_ruby_version_address(process.pid)?;
-    let x: [c_char; 15] = process.copy_struct(addr)?;
+    let addr = address_finder::get_ruby_version_address(process.pid)
+        .context("get_ruby_version_address")?;
+    let x: [c_char; 15] = process.copy_struct(addr).context("retrieve ruby version")?;
     Ok(unsafe {
         std::ffi::CStr::from_ptr(x.as_ptr() as *mut c_char)
             .to_str()?
@@ -332,7 +314,7 @@ fn test_initialize_with_disallowed_process() {
         .unwrap()
     {
         &AddressFinderError::PermissionDenied(1) => {}
-        _ => assert!(false, "Expected NoSuchProcess error"),
+        _ => assert!(false, "Expected PermissionDenied error"),
     }
 }
 
@@ -553,12 +535,15 @@ fn is_maybe_thread_function(version: &str) -> IsMaybeThreadFn {
         "2.6.5" => ruby_version::ruby_2_6_5::is_maybe_thread,
         "2.6.6" => ruby_version::ruby_2_6_6::is_maybe_thread,
         "2.6.7" => ruby_version::ruby_2_6_7::is_maybe_thread,
+        "2.6.8" => ruby_version::ruby_2_6_8::is_maybe_thread,
         "2.7.0" => ruby_version::ruby_2_7_0::is_maybe_thread,
         "2.7.1" => ruby_version::ruby_2_7_1::is_maybe_thread,
         "2.7.2" => ruby_version::ruby_2_7_2::is_maybe_thread,
         "2.7.3" => ruby_version::ruby_2_7_3::is_maybe_thread,
+        "2.7.4" => ruby_version::ruby_2_7_4::is_maybe_thread,
         "3.0.0" => ruby_version::ruby_3_0_0::is_maybe_thread,
         "3.0.1" => ruby_version::ruby_3_0_1::is_maybe_thread,
+        "3.0.2" => ruby_version::ruby_3_0_2::is_maybe_thread,
         _ => panic!(
             "Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!",
             version
@@ -633,12 +618,15 @@ fn get_stack_trace_function(version: &str) -> StackTraceFn {
         "2.6.5" => ruby_version::ruby_2_6_5::get_stack_trace,
         "2.6.6" => ruby_version::ruby_2_6_6::get_stack_trace,
         "2.6.7" => ruby_version::ruby_2_6_7::get_stack_trace,
+        "2.6.8" => ruby_version::ruby_2_6_8::get_stack_trace,
         "2.7.0" => ruby_version::ruby_2_7_0::get_stack_trace,
         "2.7.1" => ruby_version::ruby_2_7_1::get_stack_trace,
         "2.7.2" => ruby_version::ruby_2_7_2::get_stack_trace,
         "2.7.3" => ruby_version::ruby_2_7_3::get_stack_trace,
+        "2.7.4" => ruby_version::ruby_2_7_4::get_stack_trace,
         "3.0.0" => ruby_version::ruby_3_0_0::get_stack_trace,
         "3.0.1" => ruby_version::ruby_3_0_1::get_stack_trace,
+        "3.0.2" => ruby_version::ruby_3_0_2::get_stack_trace,
         _ => panic!(
             "Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!",
             version

@@ -139,10 +139,15 @@ fn do_main() -> Result<(), Error> {
         };
         if let Some(root_cmd) = root_cmd {
             if !check_root_user() {
-                return Err(format_err!(
-                    "rbspy {} needs to run as root on Mac",
-                    root_cmd
-                ));
+                return Err(
+                    format_err!(
+                        concat!(
+                            "rbspy {} needs to run as root on Mac. Try rerunning with `sudo --preserve-env !!`. ",
+                            "If you run `sudo rbspy record ruby your-program.rb`, rbspy will drop privileges when running `ruby your-program.rb`. If you want the Ruby program to run as root, use `rbspy --no-drop-root`.",
+                        ),
+                        root_cmd
+                    )
+                );
             }
         }
     }
@@ -181,6 +186,8 @@ fn do_main() -> Result<(), Error> {
                         std::thread::sleep(std::time::Duration::from_millis(10));
                     }
 
+                    let context = format!("spawn subprocess '{}'", prog.clone());
+
                     #[cfg(unix)]
                     {
                         let uid_str = std::env::var("SUDO_UID");
@@ -196,15 +203,20 @@ fn do_main() -> Result<(), Error> {
                                 "Dropping permissions: running Ruby command as user {}",
                                 std::env::var("SUDO_USER").context("SUDO_USER")?
                             );
-                            Command::new(prog).uid(uid).args(args).spawn()?.id() as Pid
+                            Command::new(prog)
+                                .uid(uid)
+                                .args(args)
+                                .spawn()
+                                .context(context)?
+                                .id() as Pid
                         } else {
-                            Command::new(prog).args(args).spawn()?.id() as Pid
+                            Command::new(prog).args(args).spawn().context(context)?.id() as Pid
                         }
                     }
                     #[cfg(windows)]
                     {
                         let _ = no_drop_root;
-                        Command::new(prog).args(args).spawn()?.id() as Pid
+                        Command::new(prog).args(args).spawn().context(context)?.id() as Pid
                     }
                 }
             };
@@ -236,16 +248,7 @@ fn do_main() -> Result<(), Error> {
 
 #[cfg(target_os = "macos")]
 fn check_root_user() -> bool {
-    let euid = nix::unistd::Uid::effective();
-    if euid.is_root() {
-        return true;
-    } else {
-        eprintln!("rbspy only works as root on Mac. Try rerunning with `sudo --preserve-env !!`.");
-        eprintln!(
-            "If you run `sudo rbspy record ruby your-program.rb`, rbspy will drop privileges when running `ruby your-program.rb`. If you want the Ruby program to run as root, use `rbspy --no-drop-root`."
-        );
-        return false;
-    }
+    nix::unistd::Uid::effective().is_root()
 }
 
 #[cfg(all(windows, target_arch = "x86_64"))]
@@ -311,11 +314,12 @@ fn test_is_wow64_process() {
 
 fn main() {
     if let Err(x) = do_main() {
-        eprintln!("Error. Causes: ");
+        eprintln!(
+            "Something went wrong while rbspy was sampling the process. Here's what we know:"
+        );
         for c in x.chain() {
             eprintln!("- {}", c);
         }
-        eprintln!("{:?}", x);
         std::process::exit(1);
     }
 }
@@ -646,16 +650,20 @@ fn parallel_record(
         }
     }
 
+    if out_path.display().to_string() == "-" {
+        out.complete(&mut std::io::stdout())?;
+    } else {
+        let mut out_file = File::create(&out_path).context(format!(
+            "Failed to create output file {}",
+            &out_path.display()
+        ))?;
+        out.complete(&mut out_file)?;
+    }
+    raw_store.complete();
+
     // Finish writing all data to disk
     eprintln!("Wrote raw data to {}", raw_path.display());
     eprintln!("Writing formatted output to {}", out_path.display());
-
-    let out_file = File::create(&out_path).context(format!(
-        "Failed to create output file {}",
-        &out_path.display()
-    ))?;
-    out.complete(out_file)?;
-    raw_store.complete();
 
     // Check for errors from the child threads. Ignore errors unless every single thread
     // returned an error. If that happens, return the last error. This lets rbspy successfully
@@ -764,7 +772,11 @@ fn report(format: OutputFormat, input: PathBuf, output: PathBuf) -> Result<(), E
     for trace in stuff {
         outputter.record(&trace)?;
     }
-    outputter.complete(File::create(output)?)?;
+    if output.display().to_string() == "-" {
+        outputter.complete(&mut std::io::stdout())?;
+    } else {
+        outputter.complete(&mut File::create(output)?)?;
+    }
     Ok(())
 }
 
@@ -957,7 +969,7 @@ fn arg_parser() -> App<'static, 'static> {
             SubCommand::with_name("report")
                 .about("Generate visualization from raw data recorded by `rbspy record`")
                 .arg(Arg::from_usage("-i --input=<FILE> 'Input raw data to use'"))
-                .arg(Arg::from_usage("-o --output=<FILE> 'Output file'"))
+                .arg(Arg::from_usage("-o --output=<FILE> 'Output file'").default_value("-"))
                 .arg(
                     Arg::from_usage("-f --format=[FORMAT] 'Output format to write'")
                         .possible_values(&OutputFormat::variants())
