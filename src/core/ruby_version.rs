@@ -1430,6 +1430,7 @@ mod tests {
             global_symbols_addr,
             &source,
             0,
+            false,
         )
         .unwrap();
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
