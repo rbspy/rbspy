@@ -8,7 +8,8 @@ use std::time::{Duration, Instant};
 use winapi::um::timeapi;
 
 use crate::core::initialize::initialize;
-use crate::core::types::{MemoryCopyError, Pid, Process, ProcessRetry, StackTrace};
+use crate::core::process::{Pid, Process, ProcessRetry};
+use crate::core::types::{MemoryCopyError, StackTrace};
 
 #[derive(Debug)]
 pub struct Sampler {
@@ -283,7 +284,7 @@ impl SampleTime {
 mod tests {
     use std::collections::HashSet;
 
-    use crate::core::types::Pid;
+    use crate::core::process::Pid;
     use crate::sampler::Sampler;
 
     #[test]

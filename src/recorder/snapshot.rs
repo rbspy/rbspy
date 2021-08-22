@@ -1,5 +1,6 @@
 use crate::core::initialize::initialize;
-use crate::core::types::{Pid, StackTrace};
+use crate::core::process::Pid;
+use crate::core::types::StackTrace;
 use anyhow::{Error, Result};
 
 /// Captures a single trace from the process belonging to `pid`

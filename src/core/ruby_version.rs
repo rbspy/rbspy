@@ -14,7 +14,7 @@ macro_rules! ruby_version_v_1_9_1(
             use std;
             use anyhow::{Context, format_err, Result};
             use bindings::$ruby_version::*;
-            use crate::core::types::ProcessMemory;
+            use crate::core::process::ProcessMemory;
 
             get_stack_trace!(rb_thread_struct);
             get_execution_context_from_thread!(rb_thread_struct);
@@ -37,7 +37,7 @@ macro_rules! ruby_version_v_1_9_2_to_3(
             use std;
             use anyhow::{Context, format_err, Result};
             use bindings::$ruby_version::*;
-            use crate::core::types::ProcessMemory;
+            use crate::core::process::ProcessMemory;
 
             get_stack_trace!(rb_thread_struct);
             get_execution_context_from_thread!(rb_thread_struct);
@@ -59,7 +59,7 @@ macro_rules! ruby_version_v_2_0_to_2_2(
            use std;
            use anyhow::{Context, format_err, Result};
            use bindings::$ruby_version::*;
-           use crate::core::types::ProcessMemory;
+           use crate::core::process::ProcessMemory;
 
             // These 4 functions are the
             // core of how the program works. They're essentially a straight port of
@@ -93,7 +93,7 @@ macro_rules! ruby_version_v_2_3_to_2_4(
            use std;
            use anyhow::{Context, format_err, Result};
            use bindings::$ruby_version::*;
-           use crate::core::types::ProcessMemory;
+           use crate::core::process::ProcessMemory;
 
             get_stack_trace!(rb_thread_struct);
             get_execution_context_from_thread!(rb_thread_struct);
@@ -115,7 +115,7 @@ macro_rules! ruby_version_v2_5_x(
            use std;
            use anyhow::{Context, format_err, Result};
            use bindings::$ruby_version::*;
-           use crate::core::types::ProcessMemory;
+           use crate::core::process::ProcessMemory;
 
             get_stack_trace!(rb_execution_context_struct);
             get_execution_context_from_thread!(rb_execution_context_struct);
@@ -141,7 +141,7 @@ macro_rules! ruby_version_v2_6_x(
            use std;
            use anyhow::{Context, format_err, Result};
            use bindings::$ruby_version::*;
-           use crate::core::types::ProcessMemory;
+           use crate::core::process::ProcessMemory;
 
             get_stack_trace!(rb_execution_context_struct);
             get_execution_context_from_thread!(rb_execution_context_struct);
@@ -167,7 +167,7 @@ macro_rules! ruby_version_v2_7_x(
             use std;
             use anyhow::{Context, format_err, Result};
             use bindings::$ruby_version::*;
-            use crate::core::types::ProcessMemory;
+            use crate::core::process::ProcessMemory;
 
             get_stack_trace!(rb_execution_context_struct);
             get_execution_context_from_thread!(rb_execution_context_struct);
@@ -190,7 +190,7 @@ macro_rules! ruby_version_v3_0_x(
             use std;
             use anyhow::{Context, format_err, Result};
             use bindings::$ruby_version::*;
-            use crate::core::types::ProcessMemory;
+            use crate::core::process::ProcessMemory;
 
             get_stack_trace!(rb_execution_context_struct);
             get_execution_context_from_vm!();
@@ -268,8 +268,8 @@ macro_rules! get_execution_context_from_vm(
 
 macro_rules! get_stack_trace(
     ($thread_type:ident) => (
-        use crate::core::types::*;
-        use crate::core::types::StackFrame;
+        use crate::core::process::Pid;
+        use crate::core::types::{StackFrame, StackTrace, MemoryCopyError};
 
         pub fn get_stack_trace<T: ProcessMemory>(
             ruby_current_thread_address_location: usize,

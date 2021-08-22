@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::time::SystemTime;
 
-use crate::core::types::{Pid, StackFrame, StackTrace};
+use crate::core::process::Pid;
+use crate::core::types::{StackFrame, StackTrace};
 
 use anyhow::Result;
 

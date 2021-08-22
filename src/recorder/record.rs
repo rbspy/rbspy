@@ -19,7 +19,7 @@ pub struct Config {
     /// The process ID (PID) of the process to profile. This is usually a ruby process, but rbspy
     /// will locate and profile any ruby subprocesses of the target process if `with_subprocesses`
     /// is enabled.
-    pub pid: crate::core::types::Pid,
+    pub pid: crate::core::process::Pid,
     /// Whether to profile the target process (given by `pid`) as well as its child processes, and
     /// their child processes, and so on. Default: `false`.
     pub with_subprocesses: bool,

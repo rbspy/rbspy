@@ -39,8 +39,8 @@ mod sampler;
 mod storage;
 mod ui;
 
+pub use crate::core::process::Pid;
 pub use crate::core::types::OutputFormat;
-pub use crate::core::types::Pid;
 
 /// Generate visualization (e.g. a flamegraph) from raw data that was previously recorded by rbspy
 pub fn report(

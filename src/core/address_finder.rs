@@ -1,5 +1,5 @@
 pub use self::os_impl::*;
-use crate::core::types::Pid;
+use crate::core::process::Pid;
 use thiserror::Error;
 
 /*
@@ -30,7 +30,7 @@ pub enum AddressFinderError {
 mod os_impl {
     use crate::core::address_finder::AddressFinderError;
     use crate::core::initialize::IsMaybeThreadFn;
-    use crate::core::types::Pid;
+    use crate::core::process::Pid;
 
     use anyhow::{format_err, Result};
     use proc_maps::mac_maps::{get_dyld_info, get_symbols, DyldInfo, Symbol};
@@ -158,7 +158,7 @@ mod os_impl {
 mod os_impl {
     use crate::core::address_finder::AddressFinderError;
     use crate::core::initialize::IsMaybeThreadFn;
-    use crate::core::types::{Pid, Process};
+    use crate::core::process::{Pid, Process};
     use anyhow::{format_err, Context, Result};
     use proc_maps::{get_process_maps, MapRange};
     use remoteprocess::ProcessMemory;
