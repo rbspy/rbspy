@@ -97,6 +97,13 @@ impl StackTrace {
     }
 }
 
+impl fmt::Display for StackTrace {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let frames: Vec<String> = self.iter().rev().map(|s| s.to_string()).collect();
+        write!(f, "{}", frames.join("\n"))
+    }
+}
+
 impl From<Error> for MemoryCopyError {
     fn from(error: Error) -> Self {
         let addr = *error.downcast_ref::<usize>().unwrap_or(&0);
