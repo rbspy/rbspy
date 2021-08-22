@@ -1,6 +1,4 @@
 use crate::core::address_finder;
-#[cfg(target_os = "linux")]
-use crate::core::address_finder::*;
 use crate::core::ruby_version;
 use crate::core::types::{MemoryCopyError, Pid, Process, ProcessMemory, ProcessRetry, StackTrace};
 use proc_maps::MapRange;
