@@ -71,7 +71,7 @@ impl Recorder {
         }
     }
 
-    /// Records traces
+    /// Records traces until the process exits or the stop function is called
     pub fn record(&self) -> Result<(), Error> {
         // Create the sender/receiver channels and start the child threads off collecting stack traces
         // from each target process.
@@ -124,10 +124,12 @@ impl Recorder {
         }
     }
 
+    /// Stops the recorder
     pub fn stop(&self) {
         self.sampler.stop();
     }
 
+    /// Prints a summary of collected traces to standard error
     pub fn print_summary(&self) -> Result<(), Error> {
         let width = match term_size::dimensions() {
             Some((w, _)) => Some(w as usize),
