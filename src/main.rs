@@ -484,30 +484,31 @@ fn output_filename(
     Ok(path)
 }
 
-#[test]
-fn test_output_filename() {
-    let d = tempdir::TempDir::new("temp").unwrap();
-    let dirname = d.path().to_str().unwrap();
-    assert_eq!(
-        output_filename("", Some("foo"), "txt").unwrap(),
-        Path::new("foo")
-    );
-    let generated_filename = output_filename(dirname, None, "txt").unwrap();
-
-    let filename_pattern = if cfg!(target_os = "windows") {
-        ".cache\\rbspy\\records\\rbspy-"
-    } else {
-        ".cache/rbspy/records/rbspy-"
-    };
-
-    assert!(generated_filename
-        .to_string_lossy()
-        .contains(filename_pattern));
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_output_filename() {
+        let d = tempdir::TempDir::new("temp").unwrap();
+        let dirname = d.path().to_str().unwrap();
+        assert_eq!(
+            output_filename("", Some("foo"), "txt").unwrap(),
+            Path::new("foo")
+        );
+        let generated_filename = output_filename(dirname, None, "txt").unwrap();
+
+        let filename_pattern = if cfg!(target_os = "windows") {
+            ".cache\\rbspy\\records\\rbspy-"
+        } else {
+            ".cache/rbspy/records/rbspy-"
+        };
+
+        assert!(generated_filename
+            .to_string_lossy()
+            .contains(filename_pattern));
+    }
+
     fn make_args(args: &str) -> Vec<String> {
         args.split_whitespace().map(|s| s.to_string()).collect()
     }
