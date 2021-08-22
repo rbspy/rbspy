@@ -1,4 +1,7 @@
 use crate::core::address_finder;
+#[cfg(test)]
+#[cfg(target_os = "linux")]
+use crate::core::address_finder::AddressFinderError;
 use crate::core::process::{Pid, Process, ProcessMemory, ProcessRetry};
 use crate::core::ruby_version;
 use crate::core::types::{MemoryCopyError, StackTrace};
@@ -318,10 +321,10 @@ fn test_initialize_with_nonexistent_process() {
     match version
         .unwrap_err()
         .root_cause()
-        .downcast_ref::<crate::core::address_finder::AddressFinderError>()
+        .downcast_ref::<AddressFinderError>()
         .unwrap()
     {
-        &crate::core::address_finder::AddressFinderError::NoSuchProcess(10000) => {}
+        &AddressFinderError::NoSuchProcess(10000) => {}
         _ => assert!(false, "Expected NoSuchProcess error"),
     }
 }
@@ -334,10 +337,10 @@ fn test_initialize_with_disallowed_process() {
     match version
         .unwrap_err()
         .root_cause()
-        .downcast_ref::<crate::core::address_finder::AddressFinderError>()
+        .downcast_ref::<AddressFinderError>()
         .unwrap()
     {
-        &crate::core::address_finder::AddressFinderError::PermissionDenied(1) => {}
+        &AddressFinderError::PermissionDenied(1) => {}
         _ => assert!(false, "Expected PermissionDenied error"),
     }
 }
