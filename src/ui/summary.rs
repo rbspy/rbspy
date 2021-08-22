@@ -8,9 +8,9 @@ struct Counts {
     total: u64,
 }
 
-#[derive(Default)]
 pub struct Stats {
     counts: HashMap<String, Counts>,
+    start_time: std::time::Instant,
     total_traces: u32,
 }
 
@@ -18,7 +18,11 @@ impl Stats {
     const HEADER: &'static str = "% self  % total  name";
 
     pub fn new() -> Stats {
-        Default::default()
+        Stats {
+            counts: HashMap::new(),
+            start_time: std::time::Instant::now(),
+            total_traces: 0,
+        }
     }
 
     fn inc_self(&mut self, name: String) {
@@ -83,6 +87,10 @@ impl Stats {
 
     pub fn print_top_n(&self, n: usize, truncate: Option<usize>) -> io::Result<()> {
         self.write_counts(&mut ::std::io::stdout(), Some(n), truncate)
+    }
+
+    pub fn elapsed_time(&self) -> std::time::Duration {
+        std::time::Instant::now() - self.start_time
     }
 
     fn write_counts(

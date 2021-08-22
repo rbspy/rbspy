@@ -13,10 +13,6 @@ pub struct Stats {
 }
 
 impl Stats {
-    pub fn new() -> Stats {
-        Default::default()
-    }
-
     pub fn record(&mut self, stack: &[StackFrame]) -> Result<(), io::Error> {
         let frame = stack
             .iter()
@@ -86,7 +82,7 @@ mod tests {
 
     // Build test stats
     fn build_stats() -> Result<Stats, io::Error> {
-        let mut stats = Stats::new();
+        let mut stats = Stats::default();
         stats.record(&vec![f(1)])?;
         stats.record(&vec![f(2), f(1)])?;
         stats.record(&vec![f(2), f(1)])?;

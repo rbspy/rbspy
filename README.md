@@ -44,6 +44,8 @@ motivation :)
 
 ## Installing
 
+### Standalone binary
+
 On Mac, you can install with Homebrew: `brew install rbspy`.
 
 On Linux:
@@ -54,6 +56,17 @@ On Linux:
 3. Move the `rbspy` binary to `/usr/local/bin`
 
 Or have a look at [Installing rbspy](https://rbspy.github.io/installing/) on our documentation.
+
+### As a Rust library
+
+To use rbspy in your Rust project, add the following to your Cargo.toml:
+
+```toml
+[dependencies]
+rbspy = "0.8"
+```
+
+**WARNING**: The rbspy crate's API is not stable yet. We will follow [semantic versioning](https://semver.org/) after rbspy reaches version 1.0.
 
 ## Contributing
 

@@ -96,7 +96,7 @@ jobs:
         echo "target flag is: ${{ env.TARGET_FLAGS }}"
 
     - name: Build rbspy
-      run: ${{ env.CARGO }} build --release --locked --verbose --workspace ${{ env.TARGET_FLAGS }}
+      run: ${{ env.CARGO }} build --release --locked --verbose --workspace --all-targets ${{ env.TARGET_FLAGS }}
 
     - name: Prepare binary for upload
       if: runner.os != 'windows'
@@ -197,8 +197,11 @@ jobs:
           curl https://sh.rustup.rs -sSf --output rustup.sh
           sh rustup.sh -y --default-toolchain stable
 
-          $HOME/.cargo/bin/rustup run stable cargo build --release --verbose --workspace
-          $HOME/.cargo/bin/rustup run stable cargo test --release --verbose -- --skip test_spawn_record_children_subprocesses
+          $HOME/.cargo/bin/rustup run stable cargo build --release --verbose --workspace --all-targets
+          $HOME/.cargo/bin/rustup run stable cargo test --release --verbose -- \
+            --skip test_sample_single_process \
+            --skip test_sample_single_process_with_time_limit \
+            --skip test_sample_subprocesses
     - name: Prepare binary for upload
       run: |
         cp target/release/rbspy rbspy-x86_64-unknown-freebsd
