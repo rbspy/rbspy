@@ -1,7 +1,4 @@
 use crate::core::address_finder;
-#[cfg(test)]
-#[cfg(target_os = "linux")]
-use crate::core::address_finder::AddressFinderError;
 use crate::core::process::{Pid, Process, ProcessMemory, ProcessRetry};
 use crate::core::ruby_version;
 use crate::core::types::{MemoryCopyError, StackTrace};
@@ -286,186 +283,6 @@ fn is_wow64_process(pid: Pid) -> Result<bool> {
     Ok(is_wow64 != 0)
 }
 
-#[test]
-#[cfg(all(windows, target_arch = "x86_64"))]
-fn test_is_wow64_process() {
-    let programs = vec![
-        "C:\\Program Files (x86)\\Internet Explorer\\iexplore.exe",
-        "C:\\Program Files\\Internet Explorer\\iexplore.exe",
-    ];
-
-    let results: Vec<bool> = programs
-        .iter()
-        .map(|path| {
-            let mut cmd = std::process::Command::new(path)
-                .spawn()
-                .expect("ls command failed to start");
-
-            let result = is_wow64_process(cmd.id());
-
-            cmd.kill()
-                .expect("command wasn't running or couldn't be killed");
-
-            result.unwrap()
-        })
-        .collect();
-
-    assert_eq!(results, vec![true, false]);
-}
-
-#[test]
-#[cfg(target_os = "linux")]
-fn test_initialize_with_nonexistent_process() {
-    let process = Process::new(10000).expect("Failed to initialize process");
-    let version = get_ruby_version(&process);
-    match version
-        .unwrap_err()
-        .root_cause()
-        .downcast_ref::<AddressFinderError>()
-        .unwrap()
-    {
-        &AddressFinderError::NoSuchProcess(10000) => {}
-        _ => assert!(false, "Expected NoSuchProcess error"),
-    }
-}
-
-#[test]
-#[cfg(target_os = "linux")]
-fn test_initialize_with_disallowed_process() {
-    let process = Process::new(1).expect("Failed to initialize process");
-    let version = get_ruby_version(&process);
-    match version
-        .unwrap_err()
-        .root_cause()
-        .downcast_ref::<AddressFinderError>()
-        .unwrap()
-    {
-        &AddressFinderError::PermissionDenied(1) => {}
-        _ => assert!(false, "Expected PermissionDenied error"),
-    }
-}
-
-#[test]
-#[cfg(target_os = "linux")]
-fn test_current_thread_address() {
-    let mut process = std::process::Command::new("ruby")
-        .arg("./ci/ruby-programs/infinite.rb")
-        .spawn()
-        .unwrap();
-    let pid = process.id() as Pid;
-    let remoteprocess = Process::new(pid).expect("Failed to initialize process");
-    let version;
-    let mut i = 0;
-    loop {
-        // It can take a moment for the process to become ready, so retry as needed
-        let r = get_ruby_version(&remoteprocess);
-        if r.is_ok() {
-            version = r.unwrap();
-            break;
-        }
-        if i > 100 {
-            panic!("couldn't get ruby version");
-        }
-        i += 1;
-        std::thread::sleep(Duration::from_millis(1));
-    }
-    if version >= String::from("3.0.0") {
-        // We won't be able to get the thread address directly, so skip this
-        return;
-    }
-
-    let is_maybe_thread = is_maybe_thread_function(&version);
-    let result = address_finder::current_thread_address(pid, &version, is_maybe_thread);
-    result.expect("unexpected error");
-    process.kill().unwrap();
-}
-
-#[test]
-#[cfg(target_os = "linux")]
-fn test_get_trace() {
-    // Test getting a stack trace from a real running program using system Ruby
-    let mut process = std::process::Command::new("ruby")
-        .arg("./ci/ruby-programs/infinite.rb")
-        .spawn()
-        .unwrap();
-    let pid = process.id() as Pid;
-    let mut getter = initialize(pid, true).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(50));
-    let trace = getter.get_trace();
-    assert!(trace.is_ok());
-    assert_eq!(trace.unwrap().pid, Some(pid));
-    process.kill().unwrap();
-}
-
-#[test]
-#[cfg(target_os = "linux")]
-fn test_get_exec_trace() {
-    use std::io::Write;
-
-    // Test collecting stack samples across an exec call
-    let mut process = std::process::Command::new("ruby")
-        .arg("./ci/ruby-programs/ruby_exec.rb")
-        .arg("ruby")
-        .stdin(std::process::Stdio::piped())
-        .spawn()
-        .unwrap();
-
-    let pid = process.id() as Pid;
-    let mut getter = initialize(pid, true).expect("initialize");
-
-    std::thread::sleep(std::time::Duration::from_millis(50));
-    let trace1 = getter.get_trace();
-
-    assert!(
-        trace1.is_ok(),
-        "initial trace failed: {:?}",
-        trace1.unwrap_err()
-    );
-    assert_eq!(trace1.unwrap().pid, Some(pid));
-
-    // Trigger the exec
-    writeln!(process.stdin.as_mut().unwrap()).expect("write to exec");
-
-    let allowed_attempts = 20;
-    for _ in 0..allowed_attempts {
-        std::thread::sleep(std::time::Duration::from_millis(50));
-        let trace2 = getter.get_trace();
-
-        if getter.reinit_count == 0 {
-            continue;
-        }
-
-        assert!(
-            trace2.is_ok(),
-            "post-exec trace failed: {:?}",
-            trace2.unwrap_err()
-        );
-    }
-
-    process.kill().unwrap();
-
-    assert_eq!(
-        getter.reinit_count, 1,
-        "Trace getter should have detected one reinit"
-    );
-}
-
-#[test]
-#[cfg(target_os = "macos")]
-fn test_get_nonexistent_process() {
-    assert!(Process::new(10000).is_err());
-}
-
-#[test]
-#[cfg(target_os = "macos")]
-fn test_get_disallowed_process() {
-    // getting the ruby version isn't allowed on Mac if the process isn't running as root
-    let mut process = std::process::Command::new("/usr/bin/ruby").spawn().unwrap();
-    let pid = process.id() as Pid;
-    assert!(Process::new(pid).is_err());
-    process.kill().unwrap();
-}
-
 fn is_maybe_thread_function(version: &str) -> IsMaybeThreadFn {
     let function = match version {
         "1.9.1" => ruby_version::ruby_1_9_1_0::is_maybe_thread,
@@ -630,4 +447,193 @@ fn get_stack_trace_function(version: &str) -> StackTraceFn {
         ),
     };
     Box::new(stack_trace_function)
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(target_os = "linux")]
+    use crate::core::address_finder::AddressFinderError;
+    #[cfg(target_os = "linux")]
+    use crate::core::initialize::*;
+    use crate::core::process::{Pid, Process};
+
+    #[test]
+    #[cfg(all(windows, target_arch = "x86_64"))]
+    fn test_is_wow64_process() {
+        let programs = vec![
+            "C:\\Program Files (x86)\\Internet Explorer\\iexplore.exe",
+            "C:\\Program Files\\Internet Explorer\\iexplore.exe",
+        ];
+
+        let results: Vec<bool> = programs
+            .iter()
+            .map(|path| {
+                let mut cmd = std::process::Command::new(path)
+                    .spawn()
+                    .expect("ls command failed to start");
+
+                let result = crate::core::initialize::is_wow64_process(cmd.id());
+
+                cmd.kill()
+                    .expect("command wasn't running or couldn't be killed");
+
+                result.unwrap()
+            })
+            .collect();
+
+        assert_eq!(results, vec![true, false]);
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn test_initialize_with_nonexistent_process() {
+        let process = Process::new(10000).expect("Failed to initialize process");
+        let version = get_ruby_version(&process);
+        match version
+            .unwrap_err()
+            .root_cause()
+            .downcast_ref::<AddressFinderError>()
+            .unwrap()
+        {
+            &AddressFinderError::NoSuchProcess(10000) => {}
+            _ => assert!(false, "Expected NoSuchProcess error"),
+        }
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn test_initialize_with_disallowed_process() {
+        let process = Process::new(1).expect("Failed to initialize process");
+        let version = get_ruby_version(&process);
+        match version
+            .unwrap_err()
+            .root_cause()
+            .downcast_ref::<AddressFinderError>()
+            .unwrap()
+        {
+            &AddressFinderError::PermissionDenied(1) => {}
+            _ => assert!(false, "Expected PermissionDenied error"),
+        }
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn test_current_thread_address() {
+        let mut process = std::process::Command::new("ruby")
+            .arg("./ci/ruby-programs/infinite.rb")
+            .spawn()
+            .unwrap();
+        let pid = process.id() as Pid;
+        let remoteprocess = Process::new(pid).expect("Failed to initialize process");
+        let version;
+        let mut i = 0;
+        loop {
+            // It can take a moment for the process to become ready, so retry as needed
+            let r = get_ruby_version(&remoteprocess);
+            if r.is_ok() {
+                version = r.unwrap();
+                break;
+            }
+            if i > 100 {
+                panic!("couldn't get ruby version");
+            }
+            i += 1;
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        if version >= String::from("3.0.0") {
+            // We won't be able to get the thread address directly, so skip this
+            return;
+        }
+
+        let is_maybe_thread = is_maybe_thread_function(&version);
+        let result = address_finder::current_thread_address(pid, &version, is_maybe_thread);
+        result.expect("unexpected error");
+        process.kill().unwrap();
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn test_get_trace() {
+        // Test getting a stack trace from a real running program using system Ruby
+        let mut process = std::process::Command::new("ruby")
+            .arg("./ci/ruby-programs/infinite.rb")
+            .spawn()
+            .unwrap();
+        let pid = process.id() as Pid;
+        let mut getter = initialize(pid, true).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        let trace = getter.get_trace();
+        assert!(trace.is_ok());
+        assert_eq!(trace.unwrap().pid, Some(pid));
+        process.kill().unwrap();
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn test_get_exec_trace() {
+        use std::io::Write;
+
+        // Test collecting stack samples across an exec call
+        let mut process = std::process::Command::new("ruby")
+            .arg("./ci/ruby-programs/ruby_exec.rb")
+            .arg("ruby")
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+
+        let pid = process.id() as Pid;
+        let mut getter = initialize(pid, true).expect("initialize");
+
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        let trace1 = getter.get_trace();
+
+        assert!(
+            trace1.is_ok(),
+            "initial trace failed: {:?}",
+            trace1.unwrap_err()
+        );
+        assert_eq!(trace1.unwrap().pid, Some(pid));
+
+        // Trigger the exec
+        writeln!(process.stdin.as_mut().unwrap()).expect("write to exec");
+
+        let allowed_attempts = 20;
+        for _ in 0..allowed_attempts {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            let trace2 = getter.get_trace();
+
+            if getter.reinit_count == 0 {
+                continue;
+            }
+
+            assert!(
+                trace2.is_ok(),
+                "post-exec trace failed: {:?}",
+                trace2.unwrap_err()
+            );
+        }
+
+        process.kill().unwrap();
+
+        assert_eq!(
+            getter.reinit_count, 1,
+            "Trace getter should have detected one reinit"
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn test_get_nonexistent_process() {
+        assert!(Process::new(10000).is_err());
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn test_get_disallowed_process() {
+        // getting the ruby version isn't allowed on Mac if the process isn't running as root
+        let mut process = std::process::Command::new("/usr/bin/ruby").spawn().unwrap();
+        let pid = process.id() as Pid;
+        assert!(Process::new(pid).is_err());
+        process.kill().unwrap();
+    }
 }
