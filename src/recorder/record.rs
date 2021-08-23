@@ -2,8 +2,6 @@ use anyhow::{Context, Error, Result};
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-#[cfg(windows)]
-use winapi::um::timeapi;
 
 use crate::storage::Store;
 use crate::ui::summary;

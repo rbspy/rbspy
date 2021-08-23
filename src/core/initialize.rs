@@ -455,6 +455,7 @@ mod tests {
     use crate::core::address_finder::AddressFinderError;
     #[cfg(target_os = "linux")]
     use crate::core::initialize::*;
+    #[cfg(unix)]
     use crate::core::process::{Pid, Process};
 
     #[test]

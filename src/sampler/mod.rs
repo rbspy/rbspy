@@ -282,6 +282,7 @@ impl SampleTime {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(not(target_os = "windows"))]
     use std::collections::HashSet;
 
     use crate::core::process::Pid;
