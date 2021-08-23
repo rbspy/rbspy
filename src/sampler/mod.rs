@@ -336,7 +336,7 @@ mod tests {
         let result = result_receiver.recv().expect("failed to receive result");
         result.expect("unexpected error");
 
-        process.wait().unwrap();
+        let _ =  process.wait();
     }
 
     #[test]
@@ -395,7 +395,7 @@ mod tests {
         let result = result_receiver.recv().expect("failed to receive result");
         result.expect("unexpected error");
 
-        process.wait().unwrap();
+        let _ =  process.wait();
     }
 
     // TODO: Find a more reliable way to test this on Windows hosts
@@ -457,7 +457,7 @@ mod tests {
             }
         }
 
-        process.wait().unwrap();
+        let _ =  process.wait();
 
         let results: Vec<_> = result_receiver.iter().take(4).collect();
         for r in results {
