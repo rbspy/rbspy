@@ -26,3 +26,38 @@ impl ProcessRetry for remoteprocess::Process {
         }
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use std::ops::{Deref, DerefMut};
+    use std::process::Child;
+
+    pub struct ManagedProcess(pub Child);
+
+    impl Drop for ManagedProcess {
+        fn drop(&mut self) {
+            match self.0.kill() {
+                Err(e) => debug!("Failed to kill process {}: {:?}", self.0.id(), e),
+                _ => (),
+            }
+            match self.0.wait() {
+                Err(e) => debug!("Failed to wait for process {}: {:?}", self.0.id(), e),
+                _ => (),
+            }
+        }
+    }
+
+    impl Deref for ManagedProcess {
+        type Target = Child;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl DerefMut for ManagedProcess {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0
+        }
+    }
+}
