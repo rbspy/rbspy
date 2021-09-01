@@ -284,8 +284,9 @@ impl SampleTime {
 mod tests {
     #[cfg(not(target_os = "windows"))]
     use std::collections::HashSet;
+    use std::process::Command;
 
-    use crate::core::process::Pid;
+    use crate::core::process::{tests::ManagedProcess, Pid};
     use crate::sampler::Sampler;
 
     #[test]
@@ -302,7 +303,7 @@ mod tests {
             "/usr/bin/which"
         };
 
-        let output = std::process::Command::new(which)
+        let output = Command::new(which)
             .arg("ruby")
             .output()
             .expect("failed to execute process");
@@ -314,11 +315,12 @@ mod tests {
             .next()
             .expect("failed to execute ruby process");
 
-        let mut process = std::process::Command::new(ruby_binary_path_str)
-            .arg("ci/ruby-programs/infinite.rb")
-            .spawn()
-            .unwrap();
-
+        let mut process = ManagedProcess(
+            Command::new(ruby_binary_path_str)
+                .arg("ci/ruby-programs/infinite.rb")
+                .spawn()
+                .unwrap(),
+        );
         let pid = process.id() as Pid;
 
         let sampler = Sampler::new(pid, 100, true, None, false);
@@ -353,7 +355,7 @@ mod tests {
             "/usr/bin/which"
         };
 
-        let output = std::process::Command::new(which)
+        let output = Command::new(which)
             .arg("ruby")
             .output()
             .expect("failed to execute process");
@@ -365,11 +367,12 @@ mod tests {
             .next()
             .expect("failed to execute ruby process");
 
-        let mut process = std::process::Command::new(ruby_binary_path_str)
-            .arg("ci/ruby-programs/infinite.rb")
-            .spawn()
-            .unwrap();
-
+        let mut process = ManagedProcess(
+            Command::new(ruby_binary_path_str)
+                .arg("ci/ruby-programs/infinite.rb")
+                .spawn()
+                .unwrap(),
+        );
         let pid = process.id() as Pid;
 
         let sampler = Sampler::new(
@@ -414,7 +417,7 @@ mod tests {
             "/usr/bin/which"
         };
 
-        let output = std::process::Command::new(which)
+        let output = Command::new(which)
             .arg("ruby")
             .output()
             .expect("failed to execute process");
@@ -429,12 +432,13 @@ mod tests {
         let coordination_dir = tempdir::TempDir::new("").unwrap();
         let coordination_dir_name = coordination_dir.path().to_str().unwrap();
 
-        let mut process = std::process::Command::new(ruby_binary_path_str)
-            .arg("ci/ruby-programs/ruby_forks.rb")
-            .arg(coordination_dir_name)
-            .spawn()
-            .unwrap();
-
+        let mut process = ManagedProcess(
+            Command::new(ruby_binary_path_str)
+                .arg("ci/ruby-programs/ruby_forks.rb")
+                .arg(coordination_dir_name)
+                .spawn()
+                .unwrap(),
+        );
         let pid = process.id() as Pid;
 
         let sampler = Sampler::new(pid, 5, true, None, true);
