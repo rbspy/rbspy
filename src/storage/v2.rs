@@ -5,6 +5,7 @@ use std::io::BufReader;
 use super::*;
 
 pub(crate) struct Data {
+    #[allow(dead_code)]
     pub header: Header,
     pub traces: Vec<StackTrace>,
 }
