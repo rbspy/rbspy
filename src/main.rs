@@ -206,6 +206,8 @@ fn do_main() -> Result<(), Error> {
 
                     // Print a summary every second
                     if std::time::Instant::now() > summary_time {
+                        println!("{}[2J", 27 as char); // clear screen
+                        println!("{}[0;0H", 27 as char); // go to 0,0
                         match recorder_summary.write_summary(&mut std::io::stderr()) {
                             Ok(()) => {}
                             Err(e) => {

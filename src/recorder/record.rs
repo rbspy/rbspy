@@ -152,8 +152,6 @@ impl Recorder {
         let total_traces = self.sampler.total_traces();
         let percent_timing_error = (timing_error_traces as f64) / (total_traces as f64) * 100.0;
 
-        println!("{}[2J", 27 as char); // clear screen
-        println!("{}[0;0H", 27 as char); // go to 0,0
         let summary = self.summary.lock().unwrap();
         writeln!(
             w,
