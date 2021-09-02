@@ -12,8 +12,8 @@ fn main() {
 
     let config = RecordConfig {
         format: OutputFormat::flamegraph,
-        raw_path: std::path::PathBuf::from("rbspy-raw.txt"),
-        out_path: out_path.clone(),
+        raw_path: Some(std::path::PathBuf::from("rbspy-raw.txt")),
+        out_path: Some(out_path.clone()),
         pid: process.id() as rbspy::Pid,
         with_subprocesses: false,
         sample_rate: 99,

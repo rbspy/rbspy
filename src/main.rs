@@ -164,8 +164,8 @@ fn do_main() -> Result<(), Error> {
 
             let config = recorder::RecordConfig {
                 format,
-                raw_path: raw_path.clone(),
-                out_path: out_path.clone(),
+                raw_path: Some(raw_path.clone()),
+                out_path: Some(out_path.clone()),
                 pid,
                 with_subprocesses,
                 sample_rate,

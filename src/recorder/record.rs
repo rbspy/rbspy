@@ -11,9 +11,9 @@ pub struct Config {
     /// The format to use for recorded traces. See `OutputFormat` for a list of available options.
     pub format: crate::core::types::OutputFormat,
     /// Where to write rbspy's raw trace output, which can be used for later processing.
-    pub raw_path: PathBuf,
+    pub raw_path: Option<PathBuf>,
     /// Where to write rbspy's output. If `-` is given, output is written to standard output.
-    pub out_path: PathBuf,
+    pub out_path: Option<PathBuf>,
     /// The process ID (PID) of the process to profile. This is usually a ruby process, but rbspy
     /// will locate and profile any ruby subprocesses of the target process if `with_subprocesses`
     /// is enabled.
@@ -41,8 +41,8 @@ pub struct Config {
 pub struct Recorder {
     format: crate::core::types::OutputFormat,
     flame_min_width: f64,
-    out_path: PathBuf,
-    raw_path: PathBuf,
+    out_path: Option<PathBuf>,
+    raw_path: Option<PathBuf>,
     sample_rate: u32,
     sampler: crate::sampler::Sampler,
     summary: Arc<Mutex<summary::Stats>>,
@@ -82,27 +82,42 @@ impl Recorder {
         // Aggregate stack traces as we receive them from the threads that are collecting them
         // Aggregate to 3 places: the raw output (`.raw.gz`), some summary statistics we display live,
         // and the formatted output (a flamegraph or something)
-        let mut out = self.format.clone().outputter(self.flame_min_width);
-        let mut raw_store = Store::new(&self.raw_path, self.sample_rate)?;
+        let mut out = None;
+        if self.out_path.is_some() {
+            out = Some(self.format.clone().outputter(self.flame_min_width));
+        }
+        let mut raw_store = None;
+        if let Some(raw_path) = &self.raw_path {
+            raw_store = Some(Store::new(&raw_path, self.sample_rate)?);
+        }
 
         for trace in trace_receiver {
-            out.record(&trace)?;
+            if let Some(out) = &mut out {
+                out.record(&trace)?;
+            }
+            if let Some(raw_store) = &mut raw_store {
+                raw_store.write(&trace)?;
+            }
+
             let mut summary = self.summary.lock().unwrap();
             summary.add_function_name(&trace.trace);
-            raw_store.write(&trace)?;
         }
 
         // Finish writing all data to disk
-        if self.out_path.display().to_string() == "-" {
-            out.complete(&mut std::io::stdout())?;
-        } else {
-            let mut out_file = File::create(&self.out_path).context(format!(
-                "Failed to create output file {}",
-                &self.out_path.display()
-            ))?;
-            out.complete(&mut out_file)?;
+        if let (Some(out), Some(out_path)) = (&mut out, self.out_path.as_ref()) {
+            if out_path.display().to_string() == "-" {
+                out.complete(&mut std::io::stdout())?;
+            } else {
+                let mut out_file = File::create(&out_path).context(format!(
+                    "Failed to create output file {}",
+                    &out_path.display()
+                ))?;
+                out.complete(&mut out_file)?;
+            }
         }
-        raw_store.complete();
+        if let Some(raw_store) = raw_store {
+            raw_store.complete();
+        }
 
         // Check for errors from the child threads. Ignore errors unless every single thread
         // returned an error. If that happens, return the last error. This lets rbspy successfully
