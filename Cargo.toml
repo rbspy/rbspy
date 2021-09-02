@@ -10,6 +10,7 @@ readme = "README.md"
 documentation = "https://github.com/rbspy/rbspy"
 homepage = "https://rbspy.github.io/"
 edition = "2018"
+exclude = ["/.github/", "/scripts/", "/ci/"]
 
 [workspace]
 members = [
