@@ -206,7 +206,7 @@ fn do_main() -> Result<(), Error> {
 
                     // Print a summary every second
                     if std::time::Instant::now() > summary_time {
-                        match recorder_summary.print_summary() {
+                        match recorder_summary.write_summary(&mut std::io::stderr()) {
                             Ok(()) => {}
                             Err(e) => {
                                 eprintln!("Failed to print summary: {}", e);

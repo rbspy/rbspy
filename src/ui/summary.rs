@@ -85,8 +85,13 @@ impl Stats {
         self.write_counts(w, None, None)
     }
 
-    pub fn print_top_n(&self, n: usize, truncate: Option<usize>) -> io::Result<()> {
-        self.write_counts(&mut ::std::io::stdout(), Some(n), truncate)
+    pub fn write_top_n(
+        &self,
+        w: &mut dyn io::Write,
+        n: usize,
+        truncate: Option<usize>,
+    ) -> io::Result<()> {
+        self.write_counts(w, Some(n), truncate)
     }
 
     pub fn elapsed_time(&self) -> std::time::Duration {

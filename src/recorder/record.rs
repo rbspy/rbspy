@@ -142,8 +142,8 @@ impl Recorder {
         self.sampler.stop();
     }
 
-    /// Prints a summary of collected traces to standard error
-    pub fn print_summary(&self) -> Result<(), Error> {
+    /// Writes a summary of collected traces
+    pub fn write_summary(&self, w: &mut dyn std::io::Write) -> Result<(), Error> {
         let width = match term_size::dimensions() {
             Some((w, _)) => Some(w as usize),
             None => None,
@@ -155,18 +155,19 @@ impl Recorder {
         println!("{}[2J", 27 as char); // clear screen
         println!("{}[0;0H", 27 as char); // go to 0,0
         let summary = self.summary.lock().unwrap();
-        eprintln!(
+        writeln!(
+            w,
             "Time since start: {}s. Press Ctrl+C to stop.",
             summary.elapsed_time().as_secs()
-        );
+        )?;
 
-        eprintln!("Summary of profiling data so far:");
-        summary.print_top_n(20, width)?;
+        writeln!(w, "Summary of profiling data so far:")?;
+        summary.write_top_n(w, 20, width)?;
 
         if total_traces > 100 && percent_timing_error > 0.5 {
-            // Only print if timing errors are more than 0.5% of total traces -- it's a statistical
-            // profiler so smaller differences don't really matter
-            eprintln!("{:.1}% ({}/{}) of stack traces were sampled late because we couldn't sample at expected rate, results may be inaccurate. Current rate: {}. Try sampling at a lower rate with `--rate`.", percent_timing_error, timing_error_traces, total_traces, self.sample_rate);
+            // Only include this warning if timing errors are more than 0.5% of total traces. rbspy
+            // is a statistical profiler, so smaller differences don't really matter.
+            writeln!(w, "{:.1}% ({}/{}) of stack traces were sampled late because we couldn't sample at expected rate; results may be inaccurate. Current rate: {}. Try sampling at a lower rate with `--rate`.", percent_timing_error, timing_error_traces, total_traces, self.sample_rate)?;
         }
         Ok(())
     }
