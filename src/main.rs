@@ -191,7 +191,7 @@ fn do_main() -> Result<(), Error> {
             })
             .expect("Error setting Ctrl-C handler");
 
-            eprintln!("Press Ctrl+C to stop");
+            eprintln!("rbspy is recording traces. Press Ctrl+C to stop.");
 
             let summary_thread = std::thread::spawn(move || {
                 if silent {
