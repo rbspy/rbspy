@@ -85,7 +85,7 @@ impl Recorder {
         let mut out = self.format.clone().outputter(self.flame_min_width);
         let mut raw_store = Store::new(&self.raw_path, self.sample_rate)?;
 
-        for trace in trace_receiver.iter() {
+        for trace in trace_receiver {
             out.record(&trace)?;
             let mut summary = self.summary.lock().unwrap();
             summary.add_function_name(&trace.trace);
@@ -109,7 +109,7 @@ impl Recorder {
         // record processes even if the parent thread isn't a Ruby process.
         let mut num_ok = 0;
         let mut last_result = Ok(());
-        for result in result_receiver.iter() {
+        for result in result_receiver {
             if result.is_ok() {
                 num_ok += 1;
             }
