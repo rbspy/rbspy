@@ -156,3 +156,9 @@ impl Recorder {
         Ok(())
     }
 }
+
+impl Drop for Recorder {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
