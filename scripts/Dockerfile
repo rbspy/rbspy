@@ -6,7 +6,7 @@ RUN apt-get install -y clang libclang-dev curl
 
 RUN git clone https://github.com/ruby/ruby.git ~/clones/ruby
 
-ENV RUBY_VERSION=2_7_2
+ENV RUBY_VERSION=3.0.2
 
 WORKDIR /root/clones/ruby
 RUN git checkout v${RUBY_VERSION}
@@ -20,7 +20,7 @@ RUN git clone https://github.com/rbspy/rbspy.git /opt/rbspy
 WORKDIR /opt/rbspy
 ENV PATH=~/clones/ruby:${PATH}
 
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly-2020-10-08
+RUN curl --proto '=https' --tlsv1.3 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 RUN ~/.cargo/bin/cargo install bindgen
 ENV PATH=~/.cargo/bin:${PATH}
 
