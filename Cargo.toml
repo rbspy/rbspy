@@ -29,6 +29,7 @@ flate2 = "1.0.20"
 libc = "0.2.34"
 log = "0.4.6"
 proc-maps = "0.2.0"
+prost = "0.9"
 rand = "0.8.3"
 rbspy-ruby-structs = { path = "ruby-structs", version="0.8.0" }
 remoteprocess = "0.4.5"
