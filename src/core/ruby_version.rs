@@ -1003,6 +1003,7 @@ ruby_version_v3_0_x!(ruby_3_0_0);
 ruby_version_v3_0_x!(ruby_3_0_1);
 ruby_version_v3_0_x!(ruby_3_0_2);
 
+#[cfg(not(debug_assertions))]
 #[cfg(test)]
 mod tests {
     use rbspy_testdata::*;
