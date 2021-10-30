@@ -183,12 +183,12 @@ jobs:
         restore-keys: |
           freebsd-x86_64-cargo-
     - name: Build
-      uses: vmactions/freebsd-vm@v0.1.4
+      uses: vmactions/freebsd-vm@v0.1.5
       timeout-minutes: 30
       with:
         mem: 4096
         usesh: true
-        prepare: pkg install -y curl ruby
+        prepare: pkg install -y curl ruby llvm
         run: |
           set -euo pipefail
 
