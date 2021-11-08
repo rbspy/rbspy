@@ -1,2 +1,7 @@
 target
 .ruby-version
+
+# Example Related files
+flamegraph.svg
+rbspy-out.svg
+rbspy-raw.txt
