@@ -110,7 +110,7 @@ impl StackTraceGetter {
                             }
                             #[cfg(target_os = "linux")]
                             Ok(remoteprocess::Error::NixError(e)) => match e {
-                                nix::errno::Errno::EPERM => {
+                                nix::Error::EPERM => {
                                     return Err(MemoryCopyError::ProcessEnded);
                                 }
                                 _ => {}
