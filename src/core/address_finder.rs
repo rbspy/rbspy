@@ -140,15 +140,17 @@ mod os_impl {
     fn get_ruby_binary(maps: &Vec<DyldInfo>) -> Result<Binary> {
         let map: &DyldInfo = maps
             .iter()
-            .find(|ref m| m.filename.contains("bin/ruby"))
+            .find(|ref m| m.filename.to_string_lossy().contains("bin/ruby"))
             .ok_or(format_err!("Couldn't find ruby map"))?;
-        Binary::from(map.address, &map.filename)
+        Binary::from(map.address, &map.filename.to_string_lossy())
     }
 
     fn get_libruby_binary(maps: &Vec<DyldInfo>) -> Option<Binary> {
-        let maybe_map = maps.iter().find(|ref m| m.filename.contains("libruby"));
+        let maybe_map = maps
+            .iter()
+            .find(|ref m| m.filename.to_string_lossy().contains("libruby"));
         match maybe_map.as_ref() {
-            Some(map) => Some(Binary::from(map.address, &map.filename).unwrap()),
+            Some(map) => Some(Binary::from(map.address, &map.filename.to_string_lossy()).unwrap()),
             None => None,
         }
     }
@@ -357,10 +359,9 @@ mod os_impl {
         // So we read /usr/bin/ruby from /proc/PID/root/usr/bin/ruby
         let map_path = map
             .filename()
-            .as_ref()
             .expect(&format!("[{}] map's pathname shouldn't be None", pid));
         #[cfg(target_os = "linux")]
-        let elf_path = format!("/proc/{}/root{}", pid, map_path);
+        let elf_path = format!("/proc/{}/root{}", pid, map_path.display());
         #[cfg(target_os = "freebsd")]
         let elf_path = map_path;
 
@@ -399,7 +400,7 @@ mod os_impl {
         maps.iter()
             .find(|ref m| {
                 if let Some(ref pathname) = m.filename() {
-                    pathname.contains(contains) && m.is_exec()
+                    pathname.to_string_lossy().contains(contains) && m.is_exec()
                 } else {
                     false
                 }
@@ -499,9 +500,9 @@ mod os_impl {
     fn get_ruby_binary(maps: &[MapRange]) -> Result<&MapRange> {
         Ok(maps
             .iter()
-            .find(|ref m| {
-                if let Some(ref pathname) = m.filename() {
-                    pathname.contains("ruby.exe")
+            .find(|m| {
+                if let Some(pathname) = m.filename() {
+                    pathname.to_string_lossy().contains("ruby.exe")
                 } else {
                     false
                 }
@@ -510,9 +511,10 @@ mod os_impl {
     }
 
     fn get_libruby_binary(maps: &[MapRange]) -> Option<&MapRange> {
-        maps.iter().find(|ref m| {
-            if let Some(ref pathname) = m.filename() {
+        maps.iter().find(|m| {
+            if let Some(pathname) = m.filename() {
                 // pathname is something like "C:\Ruby24-x64\bin\x64-msvcrt-ruby240.dll"
+                let pathname = pathname.to_string_lossy();
                 pathname.contains("-ruby") && pathname.ends_with(".dll")
             } else {
                 false

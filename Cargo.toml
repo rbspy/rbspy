@@ -28,7 +28,7 @@ inferno = "0.10.3"
 flate2 = "1.0.20"
 libc = "0.2.34"
 log = "0.4.6"
-proc-maps = "0.1.8"
+proc-maps = "0.2.0"
 rand = "0.8.3"
 rbspy-ruby-structs = { path = "ruby-structs", version="0.8.0" }
 remoteprocess = "0.4.5"
@@ -40,7 +40,7 @@ tempdir = "0.3"
 thiserror = "1.0.24"
 
 [target.'cfg(unix)'.dependencies]
-nix = "0.23.0"
+nix = "0.22.0"
 
 [target.'cfg(target_os="macos")'.dependencies]
 libproc = "0.10.0"
