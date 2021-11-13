@@ -472,7 +472,7 @@ mod tests {
         let results: Vec<bool> = programs
             .iter()
             .map(|path| {
-                let mut cmd = ManagedProcess(
+                let cmd = ManagedProcess(
                     Command::new(path)
                         .spawn()
                         .expect("ls command failed to start"),
