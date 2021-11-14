@@ -197,6 +197,7 @@ jobs:
 
           $HOME/.cargo/bin/rustup run stable cargo build --release --verbose --workspace --all-targets
           $HOME/.cargo/bin/rustup run stable cargo test --release --verbose -- \
+            --skip test_get_trace_when_process_has_exited \
             --skip test_sample_single_process \
             --skip test_sample_single_process_with_time_limit \
             --skip test_sample_subprocesses

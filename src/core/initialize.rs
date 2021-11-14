@@ -592,6 +592,40 @@ mod tests {
     }
 
     #[test]
+    fn test_get_trace_when_process_has_exited() {
+        #[cfg(target_os = "macos")]
+        if !nix::unistd::Uid::effective().is_root() {
+            println!("Skipping test because we're not running as root");
+            return;
+        }
+
+        let mut cmd = RubyScript::new("ci/ruby-programs/infinite.rb");
+        let mut getter = crate::core::initialize::initialize(cmd.id(), true).unwrap();
+
+        cmd.kill().expect("couldn't clean up test process");
+
+        let mut i = 0;
+        loop {
+            match getter.get_trace() {
+                Err(e) => {
+                    if let Some(crate::core::types::MemoryCopyError::ProcessEnded) =
+                        e.downcast_ref()
+                    {
+                        // This is the expected error
+                        return;
+                    }
+                }
+                _ => {}
+            };
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            i += 1;
+            if i > 50 {
+                panic!("Didn't get ProcessEnded in a reasonable amount of time");
+            }
+        }
+    }
+
+    #[test]
     #[cfg(target_os = "macos")]
     fn test_get_nonexistent_process() {
         assert!(Process::new(10000).is_err());
