@@ -190,8 +190,8 @@ fn sample(
             Ok(ok_trace) => {
                 sender.send(ok_trace).context("send trace")?;
             }
-            Err(x) => {
-                if let Some(MemoryCopyError::ProcessEnded) = x.downcast_ref() {
+            Err(e) => {
+                if let Some(MemoryCopyError::ProcessEnded) = e.downcast_ref() {
                     debug!("Process {} ended", pid);
                     return Ok(());
                 }
@@ -200,7 +200,7 @@ fn sample(
                 if errors > 20 && (errors as f64) / (total as f64) > 0.5 {
                     // TODO: Return error type instead of printing here
                     print_errors(errors, total);
-                    return Err(x);
+                    return Err(e);
                 }
             }
         }

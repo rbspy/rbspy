@@ -51,7 +51,7 @@ pub fn initialize(pid: Pid, lock_process: bool) -> Result<StackTraceGetter> {
 
 // Use a StackTraceGetter to get stack traces
 pub struct StackTraceGetter {
-    process: Process,
+    pub process: Process,
     current_thread_addr_location: usize,
     ruby_vm_addr_location: usize,
     global_symbols_addr_location: Option<usize>,
@@ -75,7 +75,12 @@ impl StackTraceGetter {
             }
             Err(MemoryCopyError::InvalidAddressError(addr))
                 if addr == self.current_thread_addr_location => {}
-            Err(e) => return Err(e.into()),
+            Err(e) => {
+                if self.process.exe().is_err() {
+                    return Err(MemoryCopyError::ProcessEnded.into());
+                }
+                return Err(e.into());
+            }
         }
         debug!("Thread address location invalid, reinitializing");
         self.reinitialize().context("reinitialize")?;
@@ -92,35 +97,7 @@ impl StackTraceGetter {
             _lock = self
                 .process
                 .lock()
-                .context("locking process during stack trace retrieval")
-                .or_else(|e| {
-                    if let Some(source) = e.source() {
-                        match source.downcast_ref::<remoteprocess::Error>().ok_or(source) {
-                            Ok(remoteprocess::Error::IOError(e)) => {
-                                match e.kind() {
-                                    std::io::ErrorKind::NotFound => {
-                                        return Err(MemoryCopyError::ProcessEnded)
-                                    }
-                                    // Windows
-                                    std::io::ErrorKind::PermissionDenied => {
-                                        return Err(MemoryCopyError::ProcessEnded)
-                                    }
-                                    _ => {}
-                                };
-                            }
-                            #[cfg(target_os = "linux")]
-                            Ok(remoteprocess::Error::NixError(e)) => match e {
-                                nix::Error::EPERM => {
-                                    return Err(MemoryCopyError::ProcessEnded);
-                                }
-                                _ => {}
-                            },
-                            _ => {}
-                        }
-                    }
-
-                    Err(e.into())
-                })?;
+                .context("locking process during stack trace retrieval")?;
         }
 
         stack_trace_function(

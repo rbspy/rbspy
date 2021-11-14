@@ -115,9 +115,6 @@ impl From<Error> for MemoryCopyError {
         match error.raw_os_error() {
             // Sometimes Windows returns this error code
             Some(0) => MemoryCopyError::OperationSucceeded,
-            /* On Mac, 60 seems to correspond to the process ended */
-            /* On Windows, 299 happens when the process ended */
-            Some(3) | Some(60) | Some(299) => MemoryCopyError::ProcessEnded,
             // On *nix EFAULT means that the address was invalid
             Some(14) => MemoryCopyError::InvalidAddressError(addr),
             _ => MemoryCopyError::Io(addr, error),
