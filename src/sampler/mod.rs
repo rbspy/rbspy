@@ -284,9 +284,10 @@ impl SampleTime {
 mod tests {
     #[cfg(not(target_os = "windows"))]
     use std::collections::HashSet;
+    #[cfg(unix)]
     use std::process::Command;
 
-    use crate::core::process::{tests::ManagedProcess, Pid};
+    use crate::core::process::{tests::RubyScript, Pid};
     use crate::sampler::Sampler;
 
     #[test]
@@ -297,30 +298,7 @@ mod tests {
             return;
         }
 
-        let which = if cfg!(target_os = "windows") {
-            "C:\\Windows\\System32\\WHERE.exe"
-        } else {
-            "/usr/bin/which"
-        };
-
-        let output = Command::new(which)
-            .arg("ruby")
-            .output()
-            .expect("failed to execute process");
-
-        let ruby_binary_path = String::from_utf8(output.stdout).unwrap();
-
-        let ruby_binary_path_str = ruby_binary_path
-            .lines()
-            .next()
-            .expect("failed to execute ruby process");
-
-        let mut process = ManagedProcess(
-            Command::new(ruby_binary_path_str)
-                .arg("ci/ruby-programs/infinite.rb")
-                .spawn()
-                .unwrap(),
-        );
+        let mut process = RubyScript::new("ci/ruby-programs/infinite.rb");
         let pid = process.id() as Pid;
 
         let sampler = Sampler::new(pid, 100, true, None, false);
@@ -337,8 +315,6 @@ mod tests {
 
         let result = result_receiver.recv().expect("failed to receive result");
         result.expect("unexpected error");
-
-        let _ = process.wait();
     }
 
     #[test]
@@ -349,30 +325,7 @@ mod tests {
             return;
         }
 
-        let which = if cfg!(target_os = "windows") {
-            "C:\\Windows\\System32\\WHERE.exe"
-        } else {
-            "/usr/bin/which"
-        };
-
-        let output = Command::new(which)
-            .arg("ruby")
-            .output()
-            .expect("failed to execute process");
-
-        let ruby_binary_path = String::from_utf8(output.stdout).unwrap();
-
-        let ruby_binary_path_str = ruby_binary_path
-            .lines()
-            .next()
-            .expect("failed to execute ruby process");
-
-        let mut process = ManagedProcess(
-            Command::new(ruby_binary_path_str)
-                .arg("ci/ruby-programs/infinite.rb")
-                .spawn()
-                .unwrap(),
-        );
+        let mut process = RubyScript::new("ci/ruby-programs/infinite.rb");
         let pid = process.id() as Pid;
 
         let sampler = Sampler::new(
@@ -397,8 +350,6 @@ mod tests {
 
         let result = result_receiver.recv().expect("failed to receive result");
         result.expect("unexpected error");
-
-        let _ = process.wait();
     }
 
     // TODO: Find a more reliable way to test this on Windows hosts
@@ -432,13 +383,11 @@ mod tests {
         let coordination_dir = tempdir::TempDir::new("").unwrap();
         let coordination_dir_name = coordination_dir.path().to_str().unwrap();
 
-        let mut process = ManagedProcess(
-            Command::new(ruby_binary_path_str)
-                .arg("ci/ruby-programs/ruby_forks.rb")
-                .arg(coordination_dir_name)
-                .spawn()
-                .unwrap(),
-        );
+        let mut process = Command::new(ruby_binary_path_str)
+            .arg("ci/ruby-programs/ruby_forks.rb")
+            .arg(coordination_dir_name)
+            .spawn()
+            .unwrap();
         let pid = process.id() as Pid;
 
         let sampler = Sampler::new(pid, 5, true, None, true);

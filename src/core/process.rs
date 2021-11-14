@@ -29,35 +29,79 @@ impl ProcessRetry for remoteprocess::Process {
 
 #[cfg(test)]
 pub mod tests {
+    use crate::core::process::{Pid, Process};
     use std::ops::{Deref, DerefMut};
-    use std::process::Child;
+    use std::process::{Child, Command};
 
-    pub struct ManagedProcess(pub Child);
+    use super::ProcessRetry;
 
-    impl Drop for ManagedProcess {
+    pub struct RubyScript {
+        pub child: Child,
+        pub process: Process,
+    }
+
+    impl RubyScript {
+        pub fn new(ruby_script_path: &str) -> Self {
+            let which = if cfg!(target_os = "windows") {
+                "C:\\Windows\\System32\\WHERE.exe"
+            } else {
+                "/usr/bin/which"
+            };
+
+            let output = Command::new(which)
+                .arg("ruby")
+                .output()
+                .expect("failed to execute process");
+
+            let ruby_binary_path = String::from_utf8(output.stdout).unwrap();
+
+            let ruby_binary_path_str = ruby_binary_path
+                .lines()
+                .next()
+                .expect("failed to execute ruby process");
+
+            let child = Command::new(ruby_binary_path_str)
+                .arg(ruby_script_path)
+                .stdin(std::process::Stdio::piped())
+                .spawn()
+                .unwrap();
+            let process = Process::new_with_retry(child.id() as _).unwrap();
+            RubyScript { child, process }
+        }
+
+        pub fn id(&self) -> Pid {
+            self.child.id() as _
+        }
+
+        pub fn kill(&mut self) -> std::io::Result<()> {
+            self.child.kill()
+        }
+    }
+
+    impl Drop for RubyScript {
         fn drop(&mut self) {
-            match self.0.kill() {
-                Err(e) => debug!("Failed to kill process {}: {:?}", self.0.id(), e),
+            match self.child.kill() {
+                Err(e) => debug!("Failed to kill process {}: {:?}", self.id(), e),
                 _ => (),
             }
-            match self.0.wait() {
-                Err(e) => debug!("Failed to wait for process {}: {:?}", self.0.id(), e),
+            match self.child.wait() {
+                Err(e) => debug!("Failed to wait for process {}: {:?}", self.id(), e),
                 _ => (),
             }
         }
     }
 
-    impl Deref for ManagedProcess {
-        type Target = Child;
+    impl Deref for RubyScript {
+        type Target = Process;
 
         fn deref(&self) -> &Self::Target {
-            &self.0
+            &self.process
         }
     }
 
-    impl DerefMut for ManagedProcess {
+    impl DerefMut for RubyScript {
         fn deref_mut(&mut self) -> &mut Self::Target {
-            &mut self.0
+            &mut self.process
         }
     }
 }

@@ -428,13 +428,14 @@ fn get_stack_trace_function(version: &str) -> StackTraceFn {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(target_os = "macos")]
     use std::process::Command;
 
     #[cfg(target_os = "linux")]
     use crate::core::address_finder::AddressFinderError;
     #[cfg(target_os = "linux")]
     use crate::core::initialize::*;
-    use crate::core::process::tests::ManagedProcess;
+    use crate::core::process::tests::RubyScript;
     #[cfg(unix)]
     use crate::core::process::{Pid, Process};
 
@@ -449,13 +450,13 @@ mod tests {
         let results: Vec<bool> = programs
             .iter()
             .map(|path| {
-                let cmd = ManagedProcess(
-                    Command::new(path)
-                        .spawn()
-                        .expect("ls command failed to start"),
-                );
+                let mut cmd = std::process::Command::new(path)
+                    .spawn()
+                    .expect("iexplore failed to start");
 
-                crate::core::initialize::is_wow64_process(cmd.id()).unwrap()
+                let is_wow64 = crate::core::initialize::is_wow64_process(cmd.id()).unwrap();
+                cmd.kill().expect("couldn't clean up test process");
+                is_wow64
             })
             .collect();
 
@@ -497,13 +498,8 @@ mod tests {
     #[test]
     #[cfg(target_os = "linux")]
     fn test_current_thread_address() {
-        let process = ManagedProcess(
-            Command::new("ruby")
-                .arg("./ci/ruby-programs/infinite.rb")
-                .spawn()
-                .unwrap(),
-        );
-        let pid = process.id() as Pid;
+        let cmd = RubyScript::new("./ci/ruby-programs/infinite.rb");
+        let pid = cmd.id() as Pid;
         let remoteprocess = Process::new(pid).expect("Failed to initialize process");
         let version;
         let mut i = 0;
@@ -534,13 +530,8 @@ mod tests {
     #[cfg(target_os = "linux")]
     fn test_get_trace() {
         // Test getting a stack trace from a real running program using system Ruby
-        let process = ManagedProcess(
-            Command::new("ruby")
-                .arg("./ci/ruby-programs/infinite.rb")
-                .spawn()
-                .unwrap(),
-        );
-        let pid = process.id() as Pid;
+        let cmd = RubyScript::new("./ci/ruby-programs/infinite.rb");
+        let pid = cmd.id() as Pid;
         let mut getter = initialize(pid, true).unwrap();
         std::thread::sleep(std::time::Duration::from_millis(50));
         let trace = getter.get_trace();
@@ -554,15 +545,13 @@ mod tests {
         use std::io::Write;
 
         // Test collecting stack samples across an exec call
-        let mut process = ManagedProcess(
-            Command::new("ruby")
-                .arg("./ci/ruby-programs/ruby_exec.rb")
-                .arg("ruby")
-                .stdin(std::process::Stdio::piped())
-                .spawn()
-                .unwrap(),
-        );
-        let pid = process.id() as Pid;
+        let mut cmd = std::process::Command::new("ruby")
+            .arg("./ci/ruby-programs/ruby_exec.rb")
+            .arg("ruby")
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        let pid = cmd.id() as Pid;
         let mut getter = initialize(pid, true).expect("initialize");
 
         std::thread::sleep(std::time::Duration::from_millis(50));
@@ -576,7 +565,7 @@ mod tests {
         assert_eq!(trace1.unwrap().pid, Some(pid));
 
         // Trigger the exec
-        writeln!(process.stdin.as_mut().unwrap()).expect("write to exec");
+        writeln!(cmd.stdin.as_mut().unwrap()).expect("write to exec");
 
         let allowed_attempts = 20;
         for _ in 0..allowed_attempts {
@@ -598,6 +587,8 @@ mod tests {
             getter.reinit_count, 1,
             "Trace getter should have detected one reinit"
         );
+
+        cmd.kill().expect("couldn't clean up test process");
     }
 
     #[test]
@@ -610,8 +601,9 @@ mod tests {
     #[cfg(target_os = "macos")]
     fn test_get_disallowed_process() {
         // getting the ruby version isn't allowed on Mac if the process isn't running as root
-        let process = ManagedProcess(Command::new("/usr/bin/ruby").spawn().unwrap());
+        let mut process = Command::new("/usr/bin/ruby").spawn().unwrap();
         let pid = process.id() as Pid;
         assert!(Process::new(pid).is_err());
+        process.kill().expect("couldn't clean up test process");
     }
 }
