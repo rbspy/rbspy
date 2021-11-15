@@ -196,7 +196,13 @@ fn get_process_ruby_state(
         let global_symbols_address =
             address_finder::get_ruby_global_symbols_address(process.pid, &version);
 
-        let addresses_status = format!("version: {:x?}\ncurrent thread address: {:#x?}\nVM address: {:#x?}\nglobal symbols address: {:#x?}\n", version, &current_thread_address, &vm_address, global_symbols_address);
+        let addresses_status = format!(
+            "version: {:x?}\n\
+            current thread address: {:#x?}\n\
+            VM address: {:#x?}\n\
+            global symbols address: {:#x?}\n",
+            version, &current_thread_address, &vm_address, global_symbols_address
+        );
 
         // The global symbols address lookup is allowed to fail (e.g. on older rubies)
         if (&current_thread_address).is_ok() && (&vm_address).is_ok() {
