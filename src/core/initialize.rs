@@ -150,15 +150,16 @@ fn get_process_ruby_state(
      */
     let mut i = 0;
     loop {
-        let process = Process::new_with_retry(pid);
-        if let Err(e) = process {
-            return Err(anyhow::format_err!(
-                "Couldn't find process with PID {}. Is it running? Error was {:?}",
-                pid,
-                e
-            ));
-        }
-        let process = process.unwrap();
+        let process = match Process::new_with_retry(pid) {
+            Ok(p) => p,
+            Err(e) => {
+                return Err(anyhow::format_err!(
+                    "Couldn't find process with PID {}. Is it running? Error was {:?}",
+                    pid,
+                    e
+                ))
+            }
+        };
 
         let version = get_ruby_version(&process).context("get Ruby version");
         if let Err(e) = version {
