@@ -3,7 +3,7 @@
 rbspy is a little complicated. I want other people to be able to contribute to it easily, so here is
 an architecture document to help you understand how it works.
 
-Here’s what happens you run `rbspy snapshot --pid $PID`. This is the simplest subcommand (it takes a
+Here’s what happens when you run `rbspy snapshot --pid $PID`. This is the simplest subcommand (it takes a
 PID and gets you the current stack trace from that PID), and if you understand how `snapshot` works
 you can relatively easily understand how the rest of the `rbspy` subcommands work as well.
 
@@ -39,7 +39,7 @@ Here's what happens when you call `initialize(pid)`.
 `get_ruby_version`.
 
 **Step 2**: **Find the address of the `ruby_current_thread` global variable**. This address is the
-starting point for getting a stack trace from our Ruby process -- we start there every. How we do
+starting point for getting a stack trace from our Ruby process -- we start there every time. How we do
 this depends on 2 things -- whether the Ruby process we’re profiling has symbols, and the Ruby
 version (in 2.5.0+ there are some small differences).
 
