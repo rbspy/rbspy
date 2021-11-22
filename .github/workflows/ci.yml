@@ -168,47 +168,53 @@ jobs:
         path: rbspy-${{ matrix.target }}
 
   build-freebsd:
-    runs-on: macos-10.15
     name: Build, test, and upload binaries (freebsd-x86_64)
+    runs-on: macos-10.15
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        box:
+          - fbsd_12_2
     steps:
-    - uses: actions/checkout@v2
-    - name: Cargo Cache
-      uses: actions/cache@v2.1.4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: freebsd-x86_64-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          freebsd-x86_64-cargo-
-    - name: Build
-      uses: vmactions/freebsd-vm@v0.1.5
-      timeout-minutes: 30
-      with:
-        mem: 4096
-        usesh: true
-        prepare: pkg install -y curl ruby llvm
+      - uses: actions/checkout@v2
+      - name: Cache Vagrant box
+        uses: actions/cache@v2
+        with:
+          path: ~/.vagrant.d
+          key: ${{ matrix.box }}-vagrant-boxes-${{ hashFiles('ci/Vagrantfile') }}
+          restore-keys: |
+            ${{ matrix.box }}-vagrant-
+      - name: Cache Cargo and build artifacts
+        uses: actions/cache@v2.1.4
+        with:
+          path: build-artifacts.tar
+          key: ${{ matrix.box }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ matrix.box }}-cargo-
+      - name: Set up VM
         run: |
-          set -euo pipefail
+          ln -sf ci/Vagrantfile Vagrantfile
 
-          curl https://sh.rustup.rs -sSf --output rustup.sh
-          sh rustup.sh -y --default-toolchain stable
-
-          $HOME/.cargo/bin/rustup run stable cargo build --release --verbose --workspace --all-targets
-          $HOME/.cargo/bin/rustup run stable cargo test --release --verbose -- \
-            --skip test_get_trace_when_process_has_exited \
-            --skip test_sample_single_process \
-            --skip test_sample_single_process_with_time_limit \
-            --skip test_sample_subprocesses
-    - name: Prepare binary for upload
-      run: |
-        cp target/release/rbspy rbspy-x86_64-unknown-freebsd
-    - name: Upload Binaries
-      uses: actions/upload-artifact@v2
-      with:
-        name: rbspy-x86_64-unknown-freebsd
-        path: rbspy-x86_64-unknown-freebsd
+          if [ ! -d ~/.vagrant.d/boxes/rbspy-VAGRANTSLASH-FreeBSD-12.2-STABLE ]; then
+            vagrant box add rbspy/FreeBSD-12.2-STABLE https://github.com/rbspy/freebsd-vagrant-box/releases/download/20211124/fbsd_12_2.box
+          fi
+          vagrant up ${{ matrix.box }}
+      - name: Build and test
+        run: vagrant ssh ${{ matrix.box }} -- bash /vagrant/ci/freebsd-build.sh
+      - name: Retrieve build artifacts for caching purposes
+        run: |
+          vagrant ssh-config --host "default" > config.txt
+          scp -F config.txt default:/vagrant/build-artifacts.tar .
+          ls -ahl build-artifacts.tar
+      - name: Prepare binary for upload
+        run: |
+          tar xf build-artifacts.tar  target/release/rbspy
+          mv target/release/rbspy rbspy-x86_64-unknown-freebsd
+      - name: Upload Binaries
+        uses: actions/upload-artifact@v2
+        with:
+          name: rbspy-x86_64-unknown-freebsd
+          path: rbspy-x86_64-unknown-freebsd
 
   release:
     name: Publish release
