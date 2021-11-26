@@ -9,7 +9,7 @@ repository = "https://github.com/rbspy/rbspy"
 readme = "README.md"
 documentation = "https://github.com/rbspy/rbspy"
 homepage = "https://rbspy.github.io/"
-edition = "2018"
+edition = "2021"
 exclude = ["/.github/", "/scripts/", "/ci/"]
 
 [workspace]
