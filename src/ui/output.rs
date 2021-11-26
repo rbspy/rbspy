@@ -4,7 +4,7 @@ extern crate tempdir;
 use std::io::Write;
 
 use crate::core::types::{StackFrame, StackTrace};
-use crate::ui::{callgrind, flamegraph, speedscope, summary};
+use crate::ui::{callgrind, flamegraph, pprof, speedscope, summary};
 
 use anyhow::Result;
 
@@ -105,6 +105,20 @@ pub struct Speedscope(pub speedscope::Stats);
 impl Outputter for Speedscope {
     fn record(&mut self, stack: &StackTrace) -> Result<()> {
         self.0.record(&stack)?;
+        Ok(())
+    }
+
+    fn complete(&mut self, write: &mut dyn Write) -> Result<()> {
+        self.0.write(write)?;
+        Ok(())
+    }
+}
+
+pub struct Pprof(pub pprof::Stats);
+
+impl Outputter for Pprof {
+    fn record(&mut self, stack: &StackTrace) -> Result<()> {
+        self.0.record(stack)?;
         Ok(())
     }
 
