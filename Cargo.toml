@@ -10,11 +10,12 @@ readme = "README.md"
 documentation = "https://github.com/rbspy/rbspy"
 homepage = "https://rbspy.github.io/"
 edition = "2021"
-exclude = ["/.github/", "/scripts/", "/ci/"]
+exclude = ["/.github/", "/scripts/", "/ci/", "/xtask/"]
 
 [workspace]
 members = [
     "ruby-structs",
+    "xtask",
 ]
 
 [dependencies]

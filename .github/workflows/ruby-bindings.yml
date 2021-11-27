@@ -2,14 +2,42 @@ name: ruby-bindings
 on:
   workflow_dispatch:
 jobs:
+  xtask:
+    name: Build xtask
+    runs-on: ubuntu-20.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v2
+      - name: Cargo Cache
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+      - name: Build xtask
+        run: cargo xtask
+      - name: Upload xtask binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: xtask
+          path: target/release/xtask
   generate:
     name: Generate Ruby bindings
+    runs-on: ${{ matrix.os }}
+    needs: [xtask]
+    timeout-minutes: 20
     env:
       CARGO: cargo
       TARGET_FLAGS: --target ${{ matrix.target }}
       RUST_BACKTRACE: 1
-    timeout-minutes: 20
-    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -33,16 +61,6 @@ jobs:
       uses: actions/checkout@v2
       with:
           path: "rbspy"
-    - name: Checkout ruby repository
-      uses: actions/checkout@v2
-      with:
-        repository: "ruby/ruby"
-        path: "ruby"
-        ref: v${{ matrix.ruby-version }}
-    - name: Install Ruby
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: 2.7.2
     - name: Install Rust
       uses: actions-rs/toolchain@v1
       with:
@@ -52,29 +70,22 @@ jobs:
     - name: Install Rust toolchain target
       run: |
         rustup target add ${{ matrix.target }}
-    - name: Compile ruby include headers
-      run: |
-        set -euo pipefail
-
-        cd $GITHUB_WORKSPACE/ruby
-        autoconf
-        ./configure --disable-install-doc
-        make -j$(( $(nproc) + 1 )) incs
+    - name: Download xtask binary
+      uses: actions/download-artifact@v2
+      with:
+        name: xtask
     - name: Generate bindings for ruby ${{ matrix.ruby-version }}
       run: |
         set -euo pipefail
 
-        mkdir ~/clones
-        ln -s $GITHUB_WORKSPACE/ruby ~/clones/ruby
-        (
-          cd $GITHUB_WORKSPACE/rbspy
-          sh scripts/bindgen.sh ${{ matrix.ruby-version }}
+        cd $GITHUB_WORKSPACE/rbspy
+        chmod u+x ../xtask
+        ../xtask bindgen v${{ matrix.ruby-version }}
 
-          mkdir ../bindings-staging
-          # Add new files to the index so that they get picked up
-          git add ruby-structs/src
-          cp $(git diff --name-only --staged | xargs) ../bindings-staging || echo "No new or modified files - bindings are up to date"
-        )
+        mkdir ../bindings-staging
+        # Add new files to the index so that they get picked up
+        git add ruby-structs/src
+        cp $(git diff --name-only --staged | xargs) ../bindings-staging || echo "No new or modified files - bindings are up to date"
     - name: Upload Bindings
       uses: actions/upload-artifact@v2
       with:
