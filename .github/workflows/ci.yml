@@ -139,6 +139,7 @@ jobs:
   build-linux-cross:
     runs-on: ubuntu-20.04
     strategy:
+      fail-fast: false
       matrix:
         target: [i686-musl, armv7-musleabihf, aarch64-musl, x86_64-musl]
     container:
