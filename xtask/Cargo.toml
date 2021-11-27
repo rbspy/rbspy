@@ -8,6 +8,5 @@ edition = "2021"
 [dependencies]
 anyhow = "1"
 bindgen = "0.59"
-git2 = "0.13"
 log = "0.4"
 tempdir = "0.3"
