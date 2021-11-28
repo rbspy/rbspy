@@ -1,0 +1,20 @@
+name: Bump Homebrew Formula
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  bump-formula-pr:
+    name: Bump Homebrew formula
+    runs-on: macos-10.15
+    steps:
+      - uses: actions/checkout@v2
+      - name: Update Homebrew formula
+        uses: dawidd6/action-homebrew-bump-formula@dd221ff435f42fa8102b5871bb1929af9d76476c # 3.8.0
+        with:
+          token: ${{ secrets.HOMEBREW_GITHUB_TOKEN }}
+          formula: rbspy
+          tag: ${{ github.ref }}
+          revision: ${{ github.sha }}
