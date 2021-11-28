@@ -84,7 +84,7 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name }}
       - name: Sync README to Docker Hub
-        uses: ms-jpq/sync-dockerhub-readme@v1
+        uses: ms-jpq/sync-dockerhub-readme@0c8d5cd2a45de29ab6d890d78ee19a332be3503e # v1
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
