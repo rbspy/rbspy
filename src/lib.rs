@@ -35,9 +35,9 @@ use anyhow::{Error, Result};
 
 mod core;
 pub mod recorder;
-mod sampler;
+pub mod sampler;
 mod storage;
-mod ui;
+pub mod ui;
 
 pub use crate::core::process::Pid;
 pub use crate::core::types::OutputFormat;
