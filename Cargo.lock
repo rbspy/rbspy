@@ -864,7 +864,7 @@ dependencies = [
 
 [[package]]
 name = "rbspy"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "anyhow",
  "byteorder 1.4.3",
@@ -897,7 +897,7 @@ dependencies = [
 
 [[package]]
 name = "rbspy-ruby-structs"
-version = "0.9.0"
+version = "0.9.1"
 
 [[package]]
 name = "rbspy-testdata"
