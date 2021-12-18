@@ -25,8 +25,12 @@ impl Stats {
     pub fn new() -> Stats {
         Stats {
             profile: Profile {
-                // string index 0 must point to "" according to the .proto spec, while "wall" and "ns" are for our sample_type field
-                string_table: vec!["".to_string(), "wall".to_string(), "ns".to_string()],
+                // string index 0 must point to "" according to the .proto spec, while "wall" and "nanoseconds" are for our sample_type field
+                string_table: vec![
+                    "".to_string(),
+                    "wall".to_string(),
+                    "nanoseconds".to_string(),
+                ],
                 sample_type: vec![ValueType { r#type: 1, unit: 2 }], // 1 and 2 are indexes from string_table
                 ..Profile::default()
             },
@@ -414,7 +418,7 @@ mod test {
             string_table: vec![
                 "".to_string(),
                 "wall".to_string(),
-                "ns".to_string(),
+                "nanoseconds".to_string(),
                 "func1".to_string(),
                 "file1.rb".to_string(),
                 "pid".to_string(),
