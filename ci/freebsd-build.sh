@@ -22,4 +22,6 @@ cargo test --release -- \
     --skip core::initialize::tests \
     --skip sampler::tests
 
-tar cf build-artifacts.tar .cargo/{git,registry} target
+tar cf build-artifacts.tar target
+tar rf build-artifacts.tar .cargo/git || true
+tar rf build-artifacts.tar .cargo/registry || true
