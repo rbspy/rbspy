@@ -18,6 +18,7 @@ macro_rules! ruby_version_v_1_9_1(
 
             get_stack_trace!(rb_thread_struct);
             get_execution_context_from_thread!(rb_thread_struct);
+            rstring_as_array_1_9_1!();
             get_ruby_string!();
             get_cfps!();
             get_pos!(rb_iseq_struct);
@@ -41,6 +42,7 @@ macro_rules! ruby_version_v_1_9_2_to_3(
 
             get_stack_trace!(rb_thread_struct);
             get_execution_context_from_thread!(rb_thread_struct);
+            rstring_as_array_1_9_1!();
             get_ruby_string!();
             get_cfps!();
             get_pos!(rb_iseq_struct);
@@ -75,6 +77,7 @@ macro_rules! ruby_version_v_2_0_to_2_2(
             // on how it's stored
             get_stack_trace!(rb_thread_struct);
             get_execution_context_from_thread!(rb_thread_struct);
+            rstring_as_array_1_9_1!();
             get_ruby_string!();
             get_cfps!();
             get_pos!(rb_iseq_struct);
@@ -97,6 +100,7 @@ macro_rules! ruby_version_v_2_3_to_2_4(
 
             get_stack_trace!(rb_thread_struct);
             get_execution_context_from_thread!(rb_thread_struct);
+            rstring_as_array_1_9_1!();
             get_ruby_string!();
             get_cfps!();
             get_pos!(rb_iseq_constant_body);
@@ -119,6 +123,7 @@ macro_rules! ruby_version_v2_5_x(
 
             get_stack_trace!(rb_execution_context_struct);
             get_execution_context_from_thread!(rb_execution_context_struct);
+            rstring_as_array_1_9_1!();
             get_ruby_string!();
             get_cfps!();
             get_pos!(rb_iseq_constant_body);
@@ -145,13 +150,14 @@ macro_rules! ruby_version_v2_6_x(
 
             get_stack_trace!(rb_execution_context_struct);
             get_execution_context_from_thread!(rb_execution_context_struct);
+            rstring_as_array_1_9_1!();
             get_ruby_string!();
+            get_ruby_string_array_2_5_0!();
             get_cfps!();
             get_pos!(rb_iseq_constant_body);
             get_lineno_2_6_0!();
             get_stack_frame_2_5_0!();
             stack_field_2_5_0!();
-            get_ruby_string_array_2_5_0!();
             get_thread_id_2_5_0!();
             #[cfg(any(target_os = "freebsd", target_os = "macos", target_os = "windows"))]
             get_cfunc_name_unsupported!();
@@ -171,13 +177,14 @@ macro_rules! ruby_version_v2_7_x(
 
             get_stack_trace!(rb_execution_context_struct);
             get_execution_context_from_thread!(rb_execution_context_struct);
+            rstring_as_array_1_9_1!();
             get_ruby_string!();
+            get_ruby_string_array_2_5_0!();
             get_cfps!();
             get_pos!(rb_iseq_constant_body);
             get_lineno_2_6_0!();
             get_stack_frame_2_5_0!();
             stack_field_2_5_0!();
-            get_ruby_string_array_2_5_0!();
             get_thread_id_2_5_0!();
             get_cfunc_name!();
         }
@@ -194,13 +201,14 @@ macro_rules! ruby_version_v3_0_x(
 
             get_stack_trace!(rb_execution_context_struct);
             get_execution_context_from_vm!();
+            rstring_as_array_1_9_1!();
             get_ruby_string!();
+            get_ruby_string_array_2_5_0!();
             get_cfps!();
             get_pos!(rb_iseq_constant_body);
             get_lineno_2_6_0!();
             get_stack_frame_2_5_0!();
             stack_field_2_5_0!();
-            get_ruby_string_array_2_5_0!();
             get_thread_id_2_5_0!();
             get_cfunc_name!();
 
@@ -450,6 +458,14 @@ macro_rules! get_ruby_string_array_2_5_0(
     )
 );
 
+macro_rules! rstring_as_array_1_9_1(
+    () => (
+        unsafe fn rstring_as_array(rstring: RString) -> [::std::os::raw::c_char; 24usize] {
+            rstring.as_.ary
+        }
+    )
+);
+
 macro_rules! get_ruby_string(
     () => (
         use std::ffi::CStr;
@@ -464,7 +480,7 @@ macro_rules! get_ruby_string(
                 let basic = rstring.basic;
                 let is_array = basic.flags & 1 << 13 == 0;
                 if is_array {
-                    unsafe { CStr::from_ptr(rstring.as_.ary.as_ref().as_ptr() as *const libc::c_char) }
+                    unsafe { CStr::from_ptr(rstring_as_array(rstring).as_ref().as_ptr() as *const libc::c_char) }
                     .to_bytes()
                     .to_vec()
                 } else {
