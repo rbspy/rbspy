@@ -47,18 +47,22 @@ jobs:
         include:
         - build: linux-x86_64
           os: ubuntu-20.04
+          ruby-version: 3.1.0
           run-tests: 'true'
           target: x86_64-unknown-linux-gnu
         - build: linux-aarch64
           os: ubuntu-20.04
+          ruby-version: 3.1.0
           run-tests: 'false'
           target: aarch64-unknown-linux-gnu
         - build: macos
           os: macos-10.15
+          ruby-version: 3.1.0
           run-tests: 'true'
           target: x86_64-apple-darwin
         - build: windows
           os: windows-2019
+          ruby-version: 2.7.2
           run-tests: 'true'
           target: x86_64-pc-windows-msvc
     steps:
@@ -67,7 +71,7 @@ jobs:
     - name: Install Ruby
       uses: ruby/setup-ruby@v1
       with:
-        ruby-version: 2.7.2
+        ruby-version: ${{ matrix.ruby-version }}
     - name: Install Rust
       uses: actions-rs/toolchain@v1
       with:
@@ -199,7 +203,7 @@ jobs:
           ln -sf ci/Vagrantfile Vagrantfile
 
           if [ ! -d ~/.vagrant.d/boxes/rbspy-VAGRANTSLASH-FreeBSD-12.2-STABLE ]; then
-            vagrant box add rbspy/FreeBSD-12.2-STABLE https://github.com/rbspy/freebsd-vagrant-box/releases/download/20211124/fbsd_12_2.box
+            vagrant box add rbspy/FreeBSD-12.2-STABLE https://github.com/rbspy/freebsd-vagrant-box/releases/download/20211228/fbsd_12_2.box
           fi
           vagrant up ${{ matrix.box }}
       - name: Build and test
