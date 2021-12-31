@@ -31,6 +31,7 @@ impl Stats {
         } else {
             let mut opts = Options::default();
             opts.direction = Direction::Inverted;
+            opts.hash = true;
             opts.min_width = min_width;
             inferno::flamegraph::from_lines(
                 &mut opts,
