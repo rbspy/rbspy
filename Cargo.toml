@@ -11,6 +11,7 @@ documentation = "https://github.com/rbspy/rbspy"
 homepage = "https://rbspy.github.io/"
 edition = "2021"
 exclude = ["/.github/", "/scripts/", "/ci/", "/xtask/"]
+rust-version = "1.56"
 
 [workspace]
 members = [
@@ -54,6 +55,3 @@ winapi = { version = "0.3", features = ["timeapi", "wow64apiset"] }
 byteorder = "1.4.3"
 rbspy-testdata = "0.1.5"
 tempdir = "0.3.4"
-
-[build-dependencies]
-rustc_version = "0.4"
