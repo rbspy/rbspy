@@ -55,7 +55,7 @@ On Linux:
 2. Unpack it
 3. Move the `rbspy` binary to `/usr/local/bin`
 
-Or have a look at [Installing rbspy](https://rbspy.github.io/installing/) on our documentation.
+Or have a look at [Installing rbspy](https://rbspy.github.io/installing.html) on our documentation.
 
 ### As a Rust library
 
