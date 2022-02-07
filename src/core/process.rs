@@ -11,7 +11,7 @@ impl ProcessRetry for remoteprocess::Process {
     // especially common in CI environments.
     fn new_with_retry(pid: Pid) -> Result<Process> {
         let retry_interval = std::time::Duration::from_millis(10);
-        let mut retries = 500;
+        let mut retries = 200;
         loop {
             match Process::new(pid) {
                 Ok(p) => return Ok(p),
