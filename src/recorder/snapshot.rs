@@ -1,5 +1,5 @@
-use crate::core::initialize::initialize;
 use crate::core::process::Pid;
+use crate::core::ruby_spy::RubySpy;
 use crate::core::types::StackTrace;
 use anyhow::{Error, Result};
 
@@ -9,6 +9,5 @@ pub fn snapshot(
     lock_process: bool,
     force_version: Option<String>,
 ) -> Result<StackTrace, Error> {
-    let mut getter = initialize(pid, lock_process, force_version)?;
-    getter.get_trace()
+    RubySpy::retry_new(pid, 10, force_version)?.get_stack_trace(lock_process)
 }

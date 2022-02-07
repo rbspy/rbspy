@@ -4,11 +4,12 @@ use std::fmt;
 use std::time::SystemTime;
 use std::{self, convert::From};
 
-use anyhow::Error;
+use anyhow::{Error, Result};
 use clap::ArgEnum;
 use remoteprocess::Pid;
 use thiserror::Error;
 
+use crate::core::process::Process;
 use crate::ui::*;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
@@ -33,6 +34,13 @@ pub struct StackTrace {
     pub thread_id: Option<usize>,
     pub time: Option<SystemTime>,
 }
+
+pub type StackTraceFn =
+    Box<dyn Fn(usize, usize, Option<usize>, &Process, Pid) -> Result<StackTrace, MemoryCopyError>>;
+
+pub type IsMaybeThreadFn = Box<dyn Fn(usize, usize, &Process, &[proc_maps::MapRange]) -> bool>;
+
+pub type GetExecutionContextFn = Box<dyn Fn(usize, usize, &Process) -> Result<usize>>;
 
 #[derive(Error, Debug)]
 pub enum MemoryCopyError {

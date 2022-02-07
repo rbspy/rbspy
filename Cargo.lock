@@ -53,9 +53,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.55"
+version = "1.0.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "159bb86af3a200e19a068f4224eae4c8bb2d0fa054c7e5d1cacd5cef95e684cd"
+checksum = "bb07d2053ccdbe10e2af2995a2f116c1330396493dc1269f6a91d0ae82e19704"
 
 [[package]]
 name = "arrayvec"
@@ -293,7 +293,7 @@ version = "3.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a19c6cedffdc8c03a3346d723eb20bd85a13362bb96dc2ac000842c6381ec7bf"
 dependencies = [
- "nix",
+ "nix 0.23.1",
  "winapi",
 ]
 
@@ -436,7 +436,18 @@ checksum = "32401e89c6446dcd28185931a01b1093726d0356820ac744023e6850689bf926"
 dependencies = [
  "log",
  "plain",
- "scroll",
+ "scroll 0.10.2",
+]
+
+[[package]]
+name = "goblin"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfeb764aa29a0774d290c2df134a37ab2e3c1ba59009162626658aabefda321a"
+dependencies = [
+ "log",
+ "plain",
+ "scroll 0.11.0",
 ]
 
 [[package]]
@@ -535,9 +546,9 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libc"
-version = "0.2.119"
+version = "0.2.126"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bf2e165bb3457c8e098ea76f3e3bc9db55f87aa90d52d0e6be741470916aaa4"
+checksum = "349d5a591cd28b49e1d1037471617a32ddcda5731b99419008085f72d5a53836"
 
 [[package]]
 name = "libloading"
@@ -560,6 +571,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "libproc"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b799ad155d75ce914c467ee5627b62247c20d4aedbd446f821484cebf3cded7"
+dependencies = [
+ "bindgen 0.59.2",
+ "errno",
+ "libc",
+]
+
+[[package]]
 name = "lock_api"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -570,9 +592,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.14"
+version = "0.4.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51b9bbe6c47d51fc3e1a9b945965946b4c44142ab8792c50835a980d362c2710"
+checksum = "abb12e687cfb44aa40f41fc3978ef76448f9b6038cad6aef4259d3c095a2382e"
 dependencies = [
  "cfg-if",
 ]
@@ -582,6 +604,15 @@ name = "mach"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b823e83b2affd8f40a9ee8c29dbc56404c1e34cd2710921f2801e2cf29527afa"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "mach2"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d0d1830bcd151a6fc4aea1369af235b36c1528fe976b8ff678683c9995eade8"
 dependencies = [
  "libc",
 ]
@@ -606,6 +637,15 @@ checksum = "6585fd95e7bb50d6cc31e20d4cf9afb4e2ba16c5846fc76793f11218da9c475b"
 dependencies = [
  "libc",
  "winapi",
+]
+
+[[package]]
+name = "memmap2"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d5172b50c23043ff43dd53e51392f36519d9b35a8f3a410d30ece5d1aedd58ae"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
@@ -641,6 +681,18 @@ checksum = "9f866317acbd3a240710c63f065ffb1e4fd466259045ccb504130b7f668f35c6"
 dependencies = [
  "bitflags",
  "cc",
+ "cfg-if",
+ "libc",
+ "memoffset",
+]
+
+[[package]]
+name = "nix"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f17df307904acd05aa8e32e97bb20f2a0df1728bbc2d771ae8f9a90463441e9"
+dependencies = [
+ "bitflags",
  "cfg-if",
  "libc",
  "memoffset",
@@ -803,15 +855,15 @@ dependencies = [
 
 [[package]]
 name = "proc-maps"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d01e71493938bee4c460ec61aabbf0801e08cd2714d1677365b4d7f81475353"
+checksum = "a2f62c16ccc63ce2f590b17b8b9b33616f59631b8982ad52ed21e7f6d936c409"
 dependencies = [
  "anyhow",
  "bindgen 0.59.2",
  "libc",
- "libproc",
- "mach",
+ "libproc 0.10.0",
+ "mach2",
  "winapi",
 ]
 
@@ -927,20 +979,25 @@ dependencies = [
  "elf",
  "env_logger",
  "flate2",
+ "goblin 0.4.3",
  "inferno",
+ "lazy_static",
  "libc",
- "libproc",
+ "libproc 0.10.0",
  "log",
- "nix",
+ "memmap2",
+ "nix 0.23.1",
  "proc-maps",
  "prost",
  "rand 0.8.5",
  "rbspy-ruby-structs",
  "rbspy-testdata",
  "remoteprocess",
+ "semver",
  "serde",
  "serde_derive",
  "serde_json",
+ "spytools",
  "tempdir",
  "term_size",
  "thiserror",
@@ -1024,20 +1081,20 @@ checksum = "49b3de9ec5dc0a3417da371aab17d729997c15010e7fd24ff707773a33bddb64"
 
 [[package]]
 name = "remoteprocess"
-version = "0.4.8"
+version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae11432cfd7424585639bc42948e795716371e35e48c91ffc8e3c47453b173cf"
+checksum = "d9f13e22b81d40176f4d7ed41c029fd2c7306b182db9838a44d88aeb97a7c6d6"
 dependencies = [
  "addr2line",
- "goblin",
+ "goblin 0.5.2",
  "lazy_static",
  "libc",
- "libproc",
+ "libproc 0.12.0",
  "log",
  "mach",
  "mach_o_sys",
  "memmap",
- "nix",
+ "nix 0.24.1",
  "object",
  "proc-maps",
  "read-process-memory",
@@ -1093,7 +1150,16 @@ version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fda28d4b4830b807a8b43f7b0e6b5df875311b3e7621d84577188c175b6ec1ec"
 dependencies = [
- "scroll_derive",
+ "scroll_derive 0.10.5",
+]
+
+[[package]]
+name = "scroll"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04c565b551bafbef4157586fa379538366e4385d42082f255bfd96e4fe8519da"
+dependencies = [
+ "scroll_derive 0.11.0",
 ]
 
 [[package]]
@@ -1106,6 +1172,23 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "scroll_derive"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bdbda6ac5cd1321e724fa9cee216f3a61885889b896f073b8f82322789c5250e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "semver"
+version = "1.0.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a41d061efea015927ac527063765e73601444cdc344ba855bc7bd44578b25e1c"
 
 [[package]]
 name = "serde"
@@ -1146,6 +1229,23 @@ name = "smallvec"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2dd574626839106c320a323308629dcb1acfc96e32a8cba364ddc61ac23ee83"
+
+[[package]]
+name = "spytools"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45b961f30d001a348d26722ae6f1e7c283f3578dad16229a5c4369d8c11d3c8f"
+dependencies = [
+ "anyhow",
+ "goblin 0.5.2",
+ "lazy_static",
+ "libc",
+ "log",
+ "memmap2",
+ "proc-maps",
+ "regex",
+ "remoteprocess",
+]
 
 [[package]]
 name = "stable_deref_trait"
