@@ -9,7 +9,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Cargo Cache
-        uses: actions/cache@v2.1.4
+        uses: actions/cache@v2.1.7
         with:
           path: |
             ~/.cargo/registry
@@ -17,7 +17,7 @@ jobs:
             target
           key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f # v1.0.6
         with:
           toolchain: stable
           profile: minimal
@@ -63,7 +63,7 @@ jobs:
       with:
           path: "rbspy"
     - name: Install Rust
-      uses: actions-rs/toolchain@v1
+      uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f # v1.0.6
       with:
         toolchain: stable
         profile: minimal

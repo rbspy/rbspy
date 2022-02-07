@@ -18,7 +18,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
     - name: Install Rust
-      uses: actions-rs/toolchain@v1
+      uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f # v1.0.6
       with:
         toolchain: stable
         override: true
@@ -73,7 +73,7 @@ jobs:
       with:
         ruby-version: ${{ matrix.ruby-version }}
     - name: Install Rust
-      uses: actions-rs/toolchain@v1
+      uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f # v1.0.6
       with:
         toolchain: stable
         profile: minimal
@@ -86,7 +86,7 @@ jobs:
       run: |
         sudo apt update -qq && sudo apt install -qq -y gcc-aarch64-linux-gnu
     - name: Cargo Cache
-      uses: actions/cache@v2.1.4
+      uses: actions/cache@v2.1.7
       with:
         path: |
           ~/.cargo/registry
@@ -154,7 +154,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Cargo Cache
-      uses: actions/cache@v2.1.4
+      uses: actions/cache@v2.1.7
       with:
         path: |
           ~/.cargo/registry
@@ -185,14 +185,14 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Cache Vagrant box
-        uses: actions/cache@v2
+        uses: actions/cache@v2.1.7
         with:
           path: ~/.vagrant.d
           key: ${{ matrix.box }}-vagrant-boxes-20220115-2-${{ hashFiles('ci/Vagrantfile') }}
           restore-keys: |
             ${{ matrix.box }}-vagrant-boxes-20220115-2-
       - name: Cache Cargo and build artifacts
-        uses: actions/cache@v2.1.4
+        uses: actions/cache@v2.1.7
         with:
           path: build-artifacts.tar
           key: ${{ matrix.box }}-cargo-${{ hashFiles('**/Cargo.lock') }}
@@ -251,7 +251,7 @@ jobs:
             fi
           done
 
-      - uses: "marvinpinto/action-automatic-releases@v1.1.1"
+      - uses: marvinpinto/action-automatic-releases@919008cf3f741b179569b7a6fb4d8860689ab7f0 # v1.1.1
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           draft: true
