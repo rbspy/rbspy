@@ -4,7 +4,6 @@ extern crate byteorder;
 extern crate chrono;
 extern crate clap;
 extern crate ctrlc;
-extern crate elf;
 extern crate env_logger;
 extern crate inferno;
 extern crate libc;

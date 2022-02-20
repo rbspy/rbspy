@@ -976,7 +976,6 @@ dependencies = [
  "clap 3.1.6",
  "ctrlc",
  "directories",
- "elf",
  "env_logger",
  "flate2",
  "goblin 0.4.3",
