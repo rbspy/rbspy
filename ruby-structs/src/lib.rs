@@ -77,3 +77,4 @@ pub mod ruby_3_0_1;
 pub mod ruby_3_0_2;
 pub mod ruby_3_0_3;
 pub mod ruby_3_1_0;
+pub mod ruby_3_1_1;
