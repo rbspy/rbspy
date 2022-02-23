@@ -8,7 +8,7 @@ We use the `bindgen` tool to generate the glue code, also known as bindings, tha
 
 1. If you're not a maintainer, fork the rbspy repository
 1. Create a new git branch
-1. Add the new Ruby version(s) to the [ruby-bindings workflow](https://github.com/rbspy/rbspy/blob/master/.github/workflows/ruby-bindings.yml). ([example](https://github.com/rbspy/rbspy/commit/a5871fe7e7a2cc93e57b5b3aca8c197497a7b2ae))
+1. Add the new Ruby version(s) to the [ruby-bindings workflow](https://github.com/rbspy/rbspy/blob/master/.github/workflows/ruby-bindings.yml) and [ruby-version-tests workflow](https://github.com/rbspy/rbspy/blob/master/.github/workflows/ruby-version-tests.yml). ([example](https://github.com/rbspy/rbspy/commit/ba2508841476673c670350f87878fa7604ea6de1))
 1. Commit the change and push your branch
 1. Browse to the [ruby-bindings workflow](https://github.com/rbspy/rbspy/actions/workflows/ruby-bindings.yml), click "Run workflow", select your branch from the list, and click "Run workflow" again. (If you're working in a fork of the rbspy repository, then you'll need to run the workflow in your fork.)
     * Under the hood, this workflow runs `cargo bindgen <ruby version tag>` for every version that rbspy supports, including the ones you just added. This process usually takes 5-10 minutes.
