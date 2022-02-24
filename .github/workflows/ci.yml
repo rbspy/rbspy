@@ -195,9 +195,9 @@ jobs:
         uses: actions/cache@v2.1.7
         with:
           path: build-artifacts.tar
-          key: ${{ matrix.box }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ matrix.box }}-cargo-20220224-0-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ matrix.box }}-cargo-
+            ${{ matrix.box }}-cargo-20220224-0-
       - name: Set up VM
         run: |
           ln -sf ci/Vagrantfile Vagrantfile
