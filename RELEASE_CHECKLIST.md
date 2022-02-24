@@ -1,9 +1,9 @@
 # Release Checklist
 
 1. Make sure your local copy is up to date with respect to the upstream repository (GitHub).
-1. Run `cargo update` to upgrade crate dependencies. Commit the changes to `Cargo.lock`.
+1. Run `cargo update` to upgrade crate dependencies. Study the changelog for each dependency that was upgraded, watching for any that seem risky. Then, commit the changes to `Cargo.lock`.
 1. Update the version number in `ruby-structs/Cargo.toml` so that it matches the new rbspy version.
-1. Update `Cargo.toml` with the new rbspy version, and then run `cargo build` to ensure `Cargo.lock` is updated. Commit the changes.
+1. Update `Cargo.toml` with the new rbspy and ruby-structs versions, and then run `cargo build` to ensure `Cargo.lock` is updated. Commit the changes.
 1. Push the commits (or open a PR). If you open a PR, wait for it to be reviewed and merged before continuing.
 1. Wait for CI to finish and verify that all checks passed.
 1. Tag the new release, e.g. `git tag v0.3.11`, and push it: `git push --tags`.
