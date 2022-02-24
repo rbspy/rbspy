@@ -188,9 +188,9 @@ jobs:
         uses: actions/cache@v2.1.7
         with:
           path: ~/.vagrant.d
-          key: ${{ matrix.box }}-vagrant-boxes-20220115-2-${{ hashFiles('ci/Vagrantfile') }}
+          key: ${{ matrix.box }}-vagrant-boxes-20220223-0-${{ hashFiles('ci/Vagrantfile') }}
           restore-keys: |
-            ${{ matrix.box }}-vagrant-boxes-20220115-2-
+            ${{ matrix.box }}-vagrant-boxes-20220223-0-
       - name: Cache Cargo and build artifacts
         uses: actions/cache@v2.1.7
         with:
