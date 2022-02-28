@@ -3,7 +3,7 @@
 [![crates.io](https://badgen.net/crates/v/rbspy)](https://crates.io/crates/rbspy)
 [![ci](https://github.com/rbspy/rbspy/actions/workflows/ci.yml/badge.svg)](https://github.com/rbspy/rbspy/actions/workflows/ci.yml)
 
-<img src="https://rbspy.github.io/rbspy.jpg" width="128px">
+<img src="https://rbspy.github.io/static/images/rbspy.jpg" width="128px">
 
 Have a running Ruby program that you want to profile without restarting it? Want to profile a Ruby
 command line program really easily? You want `rbspy`! rbspy can profile any Ruby program just by
