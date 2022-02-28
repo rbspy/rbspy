@@ -517,6 +517,11 @@ mod tests {
 
     #[test]
     fn test_arg_parsing() {
+        // Workaround to avoid modifying read-only directories, e.g. on Nix
+        let d = tempdir::TempDir::new("temp").unwrap();
+        let dirname = d.path().to_str().unwrap();
+        std::env::set_var("HOME", dirname);
+
         match Args::from(make_args("rbspy record --pid 1234")).unwrap() {
             Args {
                 cmd:
