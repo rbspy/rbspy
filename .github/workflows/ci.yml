@@ -134,7 +134,7 @@ jobs:
       if: runner.os == 'macOS' && matrix.run-tests == 'true'
     - name: Run tests
       timeout-minutes: 5
-      run: "PATH=$PATH" ${{ env.CARGO }} test --release --verbose ${{ env.TARGET_FLAGS }} -- --skip sampler::tests
+      run: ${{ env.CARGO }} test --release --verbose ${{ env.TARGET_FLAGS }} -- --skip sampler::tests
       if: runner.os == 'windows' && matrix.run-tests == 'true'
     - name: Run rbspy with alternative mallocs
       if: runner.os == 'linux' && matrix.run-tests == 'true'
