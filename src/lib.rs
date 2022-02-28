@@ -41,6 +41,7 @@ pub mod ui;
 
 pub use crate::core::process::Pid;
 pub use crate::core::types::OutputFormat;
+pub use crate::core::types::StackFrame;
 pub use crate::core::types::StackTrace;
 
 /// Generate visualization (e.g. a flamegraph) from raw data that was previously recorded by rbspy
