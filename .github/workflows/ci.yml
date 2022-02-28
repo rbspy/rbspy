@@ -126,11 +126,11 @@ jobs:
 
     - name: Run tests
       timeout-minutes: 5
-      run: ${{ env.CARGO }} test --release --verbose  ${{ env.TARGET_FLAGS }}
+      run: ${{ env.CARGO }} test --release --verbose ${{ env.TARGET_FLAGS }}
       if: runner.os != 'macOS' && matrix.run-tests == 'true'
     - name: Run tests
       timeout-minutes: 5
-      run: sudo "PATH=$PATH" ${{ env.CARGO }} test --release --verbose  ${{ env.TARGET_FLAGS }}
+      run: sudo "PATH=$PATH" ${{ env.CARGO }} test --release --verbose ${{ env.TARGET_FLAGS }}
       if: runner.os == 'macOS' && matrix.run-tests == 'true'
     - name: Run tests
       timeout-minutes: 5
