@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate clap;
 
-#[cfg(target_os = "macos")]
 use anyhow::format_err;
 use anyhow::{Context, Error, Result};
 use chrono::prelude::*;
@@ -15,7 +14,7 @@ use std::env;
 use std::fs::DirBuilder;
 #[cfg(unix)]
 use std::os::unix::prelude::*;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -394,14 +393,8 @@ impl Args {
             ("record", Some(submatches)) => {
                 let format = value_t!(submatches, "format", OutputFormat).unwrap();
 
-                #[cfg(unix)]
-                let home = &std::env::var("HOME").context("HOME")?;
-                #[cfg(windows)]
-                let home = &std::env::var("userprofile").context("userprofile")?;
-
-                let raw_path = output_filename(home, submatches.value_of("raw-file"), "raw.gz")?;
-                let out_path =
-                    output_filename(home, submatches.value_of("file"), &format.extension())?;
+                let raw_path = output_filename(submatches.value_of("raw-file"), "raw.gz")?;
+                let out_path = output_filename(submatches.value_of("file"), &format.extension())?;
                 let maybe_duration = match value_t!(submatches, "duration", u64) {
                     Err(_) => None,
                     Ok(integer_duration) => Some(std::time::Duration::from_secs(integer_duration)),
@@ -455,61 +448,35 @@ impl Args {
     }
 }
 
-fn output_filename(
-    base_dir: &str,
-    maybe_filename: Option<&str>,
-    extension: &str,
-) -> Result<PathBuf, Error> {
-    let path = match maybe_filename {
-        Some(filename) => filename.into(),
+fn output_filename(maybe_filename: Option<&str>, extension: &str) -> Result<PathBuf, Error> {
+    match maybe_filename {
+        Some(filename) => Ok(filename.into()),
         None => {
             let s: String = rand::thread_rng()
                 .sample_iter(&Alphanumeric)
                 .take(10)
                 .map(char::from)
                 .collect();
-            let filename = format!(
-                "{}-{}-{}.{}",
-                "rbspy",
-                Utc::now().format("%Y-%m-%d"),
-                s,
-                extension
-            );
-            let dirname = Path::new(base_dir)
-                .join(".cache")
-                .join("rbspy")
-                .join("records");
-            DirBuilder::new().recursive(true).create(&dirname)?;
-            dirname.join(&filename)
+            let filename = format!("{}-{}.{}", Utc::now().format("%Y-%m-%d"), s, extension);
+            let dirs = match directories::ProjectDirs::from("", "", "rbspy") {
+                Some(dirs) => dirs,
+                None => {
+                    return Err(format_err!(
+                        "Couldn't find a home directory. You might need to set $HOME."
+                    ))
+                }
+            };
+            DirBuilder::new()
+                .recursive(true)
+                .create(&dirs.cache_dir())?;
+            Ok(dirs.cache_dir().join(&filename))
         }
-    };
-    Ok(path)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_output_filename() {
-        let d = tempdir::TempDir::new("temp").unwrap();
-        let dirname = d.path().to_str().unwrap();
-        assert_eq!(
-            output_filename("", Some("foo"), "txt").unwrap(),
-            Path::new("foo")
-        );
-        let generated_filename = output_filename(dirname, None, "txt").unwrap();
-
-        let filename_pattern = if cfg!(target_os = "windows") {
-            ".cache\\rbspy\\records\\rbspy-"
-        } else {
-            ".cache/rbspy/records/rbspy-"
-        };
-
-        assert!(generated_filename
-            .to_string_lossy()
-            .contains(filename_pattern));
-    }
 
     fn make_args(args: &str) -> Vec<String> {
         args.split_whitespace().map(|s| s.to_string()).collect()
