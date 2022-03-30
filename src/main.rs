@@ -1,10 +1,7 @@
-#[macro_use]
-extern crate clap;
-
 use anyhow::format_err;
 use anyhow::{Context, Error, Result};
 use chrono::prelude::*;
-use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
+use clap::{arg, ArgMatches};
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use rbspy::recorder;
@@ -15,7 +12,6 @@ use std::fs::DirBuilder;
 #[cfg(unix)]
 use std::os::unix::prelude::*;
 use std::path::PathBuf;
-use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -143,20 +139,28 @@ fn do_main() -> Result<(), Error> {
                                 "Dropping permissions: running Ruby command as user {}",
                                 std::env::var("SUDO_USER").context("SUDO_USER")?
                             );
-                            Command::new(prog)
+                            std::process::Command::new(prog)
                                 .uid(uid)
                                 .args(args)
                                 .spawn()
                                 .context(context)?
                                 .id() as Pid
                         } else {
-                            Command::new(prog).args(args).spawn().context(context)?.id() as Pid
+                            std::process::Command::new(prog)
+                                .args(args)
+                                .spawn()
+                                .context(context)?
+                                .id() as Pid
                         }
                     }
                     #[cfg(windows)]
                     {
                         let _ = no_drop_root;
-                        Command::new(prog).args(args).spawn().context(context)?.id() as Pid
+                        std::process::Command::new(prog)
+                            .args(args)
+                            .spawn()
+                            .context(context)?
+                            .id() as Pid
                     }
                 }
             };
@@ -251,91 +255,104 @@ fn do_main() -> Result<(), Error> {
     }
 }
 
-fn arg_parser() -> App<'static, 'static> {
-    App::new("rbspy")
+fn arg_parser() -> clap::Command<'static> {
+    clap::Command::new("rbspy")
         .version(env!("CARGO_PKG_VERSION"))
         .about("Sampling profiler for Ruby programs")
-        .setting(AppSettings::SubcommandRequired)
+        .subcommand_required(true)
         .subcommand(
-            SubCommand::with_name("snapshot")
+            clap::Command::new("snapshot")
                 .about("Snapshot a single stack trace")
                 .arg(
-                    Arg::from_usage("-p --pid=[PID] 'PID of the Ruby process you want to profile'")
+                    arg!(-p --pid <PID> "PID of the Ruby process you want to profile")
                         .validator(validate_pid)
                         .required(true)
                 )
                 .arg(
-                    Arg::from_usage("--nonblocking='Don't pause the ruby process when taking the snapshot. Setting this option will reduce \
-                                                    the performance impact of sampling but may produce inaccurate results'"),
+                    arg!(--nonblocking "Don't pause the ruby process when taking the snapshot. Setting this option will reduce \
+                                                    the performance impact of sampling but may produce inaccurate results")
+                        .required(false),
                 )
         )
         .subcommand(
-            SubCommand::with_name("record")
+            clap::Command::new("record")
                 .about("Record process")
                 .arg(
-                    Arg::from_usage(
-                        "-p --pid=[PID] 'PID of the Ruby process you want to profile'")
+                    arg!(-p --pid <PID> "PID of the Ruby process you want to profile")
                     .validator(validate_pid)
                     // It's a bit confusing but this is how to get exactly-one-of behaviour
                     // for `--pid` and `cmd`.
-                    .required_unless("cmd")
+                    .required_unless_present("cmd")
                     .conflicts_with("cmd"),
                 )
                 .arg(
-                    Arg::from_usage("--raw-file=[FILE] 'File to write raw data to (will be gzipped)'")
+                    clap::Arg::new("raw-file")
+                        .help("File to write raw data to (will be gzipped)")
+                        .long("raw-file")
+                        .takes_value(true)
                         .required(false),
                 )
                 .arg(
-                    Arg::from_usage("-f --file=[FILE] 'File to write formatted output to'")
+                    arg!(-f --file <FILE> "File to write formatted output to")
                         .required(false),
                 )
                 .arg(
-                    Arg::from_usage("-r --rate=[RATE] 'Samples per second collected'")
+                    arg!(-r --rate <RATE> "Samples per second collected")
+                        .required(false)
                         .default_value("100"),
                 )
                 .arg(
-                    Arg::from_usage("--no-drop-root 'Don't drop root privileges when running a Ruby program as a subprocess'")
+                    clap::Arg::new("no-drop-root")
+                        .help("Don't drop root privileges when running a Ruby program as a subprocess")
+                        .short('n')
+                        .long("no-drop-root")
                         .required(false),
                 )
                 .arg(
-                    Arg::from_usage("--format=[FORMAT] 'Output format to write'")
-                        .possible_values(&OutputFormat::variants())
-                        .case_insensitive(true)
+                    arg!(-o --format <FORMAT> "Output format to write")
+                        .possible_values(OutputFormat::possible_values())
+                        .ignore_case(true)
+                        .required(false)
                         .default_value("flamegraph"),
                 )
                 .arg(
-                    Arg::from_usage(
-                        "-d --duration=[DURATION] 'Number of seconds to record for'",
-                    ).conflicts_with("cmd")
+                    arg!(-d --duration <DURATION> "Number of seconds to record for")
+                        .conflicts_with("cmd")
                         .required(false),
                 )
                 .arg(
-                    Arg::from_usage( "-s --subprocesses='Record all subprocesses of the given PID or command'")
+                    arg!(-s --subprocesses "Record all subprocesses of the given PID or command")
                         .required(false)
                 )
                 .arg(
-                    Arg::from_usage( "--silent='Don't print the summary profiling data every second'")
+                    arg!(--silent "Don't print the summary profiling data every second")
                         .required(false)
                 )
                 .arg(
-                    Arg::from_usage("--flame-min-width='Minimum flame width in %'")
+                    clap::Arg::new("flame-min-width")
+                        .help("Minimum flame width in %")
+                        .long("flame-min-width")
+                        .takes_value(true)
+                        .required(false)
                         .default_value("0.1"),
                 )
                 .arg(
-                    Arg::from_usage("--nonblocking='Don't pause the ruby process when collecting stack samples. Setting this option will reduce \
-                                                   the performance impact of sampling but may produce inaccurate results'"),
+                    arg!(--nonblocking "Don't pause the ruby process when collecting stack samples. Setting this option will reduce \
+                                                   the performance impact of sampling but may produce inaccurate results")
+                        .required(false),
                 )
-                .arg(Arg::from_usage("<cmd>... 'command to run'").required(false)),
+                .arg(arg!(<cmd> ... "command to run").required(false)),
         )
         .subcommand(
-            SubCommand::with_name("report")
+            clap::Command::new("report")
                 .about("Generate visualization from raw data recorded by `rbspy record`")
-                .arg(Arg::from_usage("-i --input=<FILE> 'Input raw data to use'"))
-                .arg(Arg::from_usage("-o --output=<FILE> 'Output file'").default_value("-"))
+                .arg(arg!(-i --input <FILE> "Input raw data to use").required(true))
+                .arg(arg!(-o --output <FILE> "Output file").required(false).default_value("-"))
                 .arg(
-                    Arg::from_usage("-f --format=[FORMAT] 'Output format to write'")
-                        .possible_values(&OutputFormat::variants())
-                        .case_insensitive(true)
+                    arg!(-f --format <FORMAT> "Output format to write")
+                        .possible_values(OutputFormat::possible_values())
+                        .ignore_case(true)
+                        .required(false)
                         .default_value("flamegraph"),
                 )
         )
@@ -343,7 +360,7 @@ fn arg_parser() -> App<'static, 'static> {
 
 /// Check `s` is a positive integer.
 // This assumes a process group isn't a sensible thing to snapshot; could be wrong!
-fn validate_pid(s: String) -> Result<(), String> {
+fn validate_pid(s: &str) -> Result<(), String> {
     let pid: Pid = s
         .parse()
         .map_err(|_| "PID must be an integer".to_string())?;
@@ -358,7 +375,7 @@ impl Args {
     // TODO(TryFrom): Replace with TryFrom whenever that stabilizes.
     // TODO(maybe): Consider replacing with one of the derive-based arg thingies.
     fn from<'a, I: IntoIterator<Item = String> + 'a>(args: I) -> Result<Args, Error> {
-        let matches: ArgMatches<'a> = arg_parser().get_matches_from(args);
+        let matches: ArgMatches = arg_parser().get_matches_from(args);
 
         fn get_pid(matches: &ArgMatches) -> Option<Pid> {
             if let Some(pid_str) = matches.value_of("pid") {
@@ -373,17 +390,17 @@ impl Args {
         }
 
         let cmd = match matches.subcommand() {
-            ("snapshot", Some(submatches)) => SubCmd::Snapshot {
+            Some(("snapshot", submatches)) => SubCmd::Snapshot {
                 pid: get_pid(submatches)
                     .expect("this shouldn't happen because clap requires a pid"),
                 lock_process: submatches.is_present("nonblocking"),
             },
-            ("record", Some(submatches)) => {
-                let format = value_t!(submatches, "format", OutputFormat).unwrap();
+            Some(("record", submatches)) => {
+                let format: OutputFormat = ArgMatches::value_of_t(submatches, "format").unwrap();
 
                 let raw_path = output_filename(submatches.value_of("raw-file"), "raw.gz")?;
                 let out_path = output_filename(submatches.value_of("file"), &format.extension())?;
-                let maybe_duration = match value_t!(submatches, "duration", u64) {
+                let maybe_duration = match ArgMatches::value_of_t(submatches, "duration") {
                     Err(_) => None,
                     Ok(integer_duration) => Some(std::time::Duration::from_secs(integer_duration)),
                 };
@@ -393,8 +410,9 @@ impl Args {
                 let with_subprocesses = submatches.is_present("subprocesses");
                 let nonblocking = submatches.is_present("nonblocking");
 
-                let sample_rate = value_t!(submatches, "rate", u32).unwrap();
-                let flame_min_width = value_t!(submatches, "flame-min-width", f64).unwrap();
+                let sample_rate = ArgMatches::value_of_t(submatches, "rate").unwrap();
+                let flame_min_width =
+                    ArgMatches::value_of_t(submatches, "flame-min-width").unwrap();
                 let target = if let Some(pid) = get_pid(submatches) {
                     Target::Pid { pid }
                 } else {
@@ -420,11 +438,16 @@ impl Args {
                     lock_process: !nonblocking,
                 }
             }
-            ("report", Some(submatches)) => SubCmd::Report {
-                format: value_t!(submatches, "format", OutputFormat).unwrap(),
-                input: value_t!(submatches, "input", String).unwrap().into(),
-                output: value_t!(submatches, "output", String).unwrap().into(),
-            },
+            Some(("report", submatches)) => {
+                let format = ArgMatches::value_of_t(submatches, "format");
+                let input = ArgMatches::value_of_t(submatches, "input");
+                let output = ArgMatches::value_of_t(submatches, "output");
+                SubCmd::Report {
+                    format: format.unwrap(),
+                    input: input.unwrap(),
+                    output: output.unwrap(),
+                }
+            }
             _ => panic!("this shouldn't happen, please report the command you ran!"),
         };
 

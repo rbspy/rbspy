@@ -2,7 +2,6 @@ extern crate anyhow;
 #[cfg(test)]
 extern crate byteorder;
 extern crate chrono;
-#[macro_use]
 extern crate clap;
 extern crate ctrlc;
 extern crate elf;

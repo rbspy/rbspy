@@ -5,6 +5,7 @@ use std::time::SystemTime;
 use std::{self, convert::From};
 
 use anyhow::Error;
+use clap::ArgEnum;
 use remoteprocess::Pid;
 use thiserror::Error;
 
@@ -122,22 +123,20 @@ impl From<Error> for MemoryCopyError {
     }
 }
 
-arg_enum! {
-    /// File formats into which rbspy can convert its recorded traces
+/// File formats into which rbspy can convert its recorded traces
 
-    // The values of this enum get translated directly to command line arguments. Make them
-    // lowercase so that we don't have camelcase command line arguments
-    #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-    #[allow(non_camel_case_types)]
-    pub enum OutputFormat {
-        flamegraph,
-        collapsed,
-        callgrind,
-        speedscope,
-        pprof,
-        summary,
-        summary_by_line,
-    }
+// The values of this enum get translated directly to command line arguments. Make them
+// lowercase so that we don't have camelcase command line arguments
+#[derive(ArgEnum, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[allow(non_camel_case_types)]
+pub enum OutputFormat {
+    flamegraph,
+    collapsed,
+    callgrind,
+    speedscope,
+    pprof,
+    summary,
+    summary_by_line,
 }
 
 impl OutputFormat {
@@ -164,5 +163,28 @@ impl OutputFormat {
             OutputFormat::summary_by_line => "summary_by_line.txt",
         }
         .to_string()
+    }
+
+    pub fn possible_values() -> impl Iterator<Item = clap::PossibleValue<'static>> {
+        Self::value_variants()
+            .iter()
+            .filter_map(ArgEnum::to_possible_value)
+    }
+}
+
+impl std::str::FromStr for OutputFormat {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().as_str() {
+            "flamegraph" => Ok(OutputFormat::flamegraph),
+            "collapsed" => Ok(OutputFormat::collapsed),
+            "callgrind" => Ok(OutputFormat::callgrind),
+            "speedscope" => Ok(OutputFormat::speedscope),
+            "pprof" => Ok(OutputFormat::pprof),
+            "summary" => Ok(OutputFormat::summary),
+            "summary_by_line" => Ok(OutputFormat::summary_by_line),
+            _ => Err(anyhow::format_err!("Unknown output format: {}", s)),
+        }
     }
 }

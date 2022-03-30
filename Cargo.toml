@@ -22,7 +22,7 @@ members = [
 [dependencies]
 anyhow = "1.0.40"
 chrono = "0.4.19"
-clap = "2.34.0"
+clap = "3.1.6"
 ctrlc = "3.1.0"
 directories = "4.0.1"
 elf = "0.0.10"
