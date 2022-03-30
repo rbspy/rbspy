@@ -372,23 +372,11 @@ impl Args {
             }
         }
 
-        fn get_lock_process(matches: &ArgMatches) -> Option<bool> {
-            if let Some(lock_process_str) = matches.value_of("lock_process") {
-                Some(
-                    lock_process_str
-                        .parse()
-                        .expect("this shouldn't happen because clap validated the arg"),
-                )
-            } else {
-                None
-            }
-        }
-
         let cmd = match matches.subcommand() {
             ("snapshot", Some(submatches)) => SubCmd::Snapshot {
                 pid: get_pid(submatches)
                     .expect("this shouldn't happen because clap requires a pid"),
-                lock_process: get_lock_process(submatches).unwrap_or_default(),
+                lock_process: submatches.is_present("nonblocking"),
             },
             ("record", Some(submatches)) => {
                 let format = value_t!(submatches, "format", OutputFormat).unwrap();
