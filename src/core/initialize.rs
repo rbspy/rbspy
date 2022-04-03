@@ -22,7 +22,11 @@ use std::time::Duration;
  *   * Find the right stack trace function for the Ruby version we found
  *   * Package all that up into a struct that the user can use to get stack traces.
  */
-pub fn initialize(pid: Pid, lock_process: bool) -> Result<StackTraceGetter> {
+pub fn initialize(
+    pid: Pid,
+    lock_process: bool,
+    force_version: Option<String>,
+) -> Result<StackTraceGetter> {
     #[cfg(all(windows, target_arch = "x86_64"))]
     if is_wow64_process(pid).context("check wow64 process")? {
         return Err(format_err!(
@@ -36,7 +40,7 @@ pub fn initialize(pid: Pid, lock_process: bool) -> Result<StackTraceGetter> {
         ruby_vm_addr_location,
         global_symbols_addr_location,
         stack_trace_function,
-    ) = get_process_ruby_state(pid).context("get ruby VM state")?;
+    ) = get_process_ruby_state(pid, force_version.clone()).context("get ruby VM state")?;
 
     Ok(StackTraceGetter {
         process,
@@ -46,6 +50,7 @@ pub fn initialize(pid: Pid, lock_process: bool) -> Result<StackTraceGetter> {
         stack_trace_function,
         reinit_count: 0,
         lock_process,
+        force_version,
     })
 }
 
@@ -58,6 +63,7 @@ pub struct StackTraceGetter {
     stack_trace_function: StackTraceFn,
     reinit_count: u32,
     lock_process: bool,
+    force_version: Option<String>,
 }
 
 impl StackTraceGetter {
@@ -116,7 +122,8 @@ impl StackTraceGetter {
             ruby_vm_addr_location,
             ruby_global_symbols_addr_location,
             stack_trace_function,
-        ) = get_process_ruby_state(self.process.pid).context("get ruby VM state")?;
+        ) = get_process_ruby_state(self.process.pid, self.force_version.clone())
+            .context("get ruby VM state")?;
 
         self.process = process;
         self.current_thread_addr_location = current_thread_addr_location;
@@ -138,6 +145,7 @@ type StackTraceFn =
 
 fn get_process_ruby_state(
     pid: Pid,
+    force_version: Option<String>,
 ) -> Result<(Process, usize, usize, Option<usize>, StackTraceFn)> {
     /* This retry loop exists because:
      * a) Sometimes rbenv takes a while to exec the right Ruby binary.
@@ -161,28 +169,33 @@ fn get_process_ruby_state(
             }
         };
 
-        let version = get_ruby_version(&process).context("get Ruby version");
-        if let Err(e) = version {
-            debug!(
-                "[{}] Trying again to get ruby version. Last error was: {:?}",
-                process.pid, e
-            );
-            i += 1;
-            if i > 100 {
-                match e.root_cause().downcast_ref::<std::io::Error>() {
-                    Some(root_cause)
-                        if root_cause.kind() == std::io::ErrorKind::PermissionDenied =>
-                    {
-                        return Err(e.context("Failed to initialize due to a permissions error. If you are running rbspy as a normal (non-root) user, please try running it again with `sudo --preserve-env !!`. If you are running it in a container, e.g. with Docker or Kubernetes, make sure that your container has been granted the SYS_PTRACE capability. See the rbspy documentation for more details."));
+        let version = match force_version {
+            Some(ref v) => v.clone(),
+            None => {
+                let v = get_ruby_version(&process).context("get Ruby version");
+                if let Err(e) = v {
+                    debug!(
+                        "[{}] Trying again to get ruby version. Last error was: {:?}",
+                        process.pid, e
+                    );
+                    i += 1;
+                    if i > 100 {
+                        match e.root_cause().downcast_ref::<std::io::Error>() {
+                            Some(root_cause)
+                                if root_cause.kind() == std::io::ErrorKind::PermissionDenied =>
+                            {
+                                return Err(e.context("Failed to initialize due to a permissions error. If you are running rbspy as a normal (non-root) user, please try running it again with `sudo --preserve-env !!`. If you are running it in a container, e.g. with Docker or Kubernetes, make sure that your container has been granted the SYS_PTRACE capability. See the rbspy documentation for more details."));
+                            }
+                            _ => {}
+                        }
+                        return Err(anyhow::format_err!("Couldn't get ruby version: {:?}", e));
                     }
-                    _ => {}
+                    std::thread::sleep(Duration::from_millis(1));
+                    continue;
                 }
-                return Err(anyhow::format_err!("Couldn't get ruby version: {:?}", e));
+                v.unwrap()
             }
-            std::thread::sleep(Duration::from_millis(1));
-            continue;
         };
-        let version = version.unwrap();
 
         let current_thread_address = if version.as_str() >= "3.0.0" {
             // There's no symbol for the current thread address on ruby 3+, so we look it up
@@ -549,7 +562,7 @@ mod tests {
         // Test getting a stack trace from a real running program using system Ruby
         let cmd = RubyScript::new("./ci/ruby-programs/infinite.rb");
         let pid = cmd.id() as Pid;
-        let mut getter = initialize(pid, true).unwrap();
+        let mut getter = initialize(pid, true, None).unwrap();
         std::thread::sleep(std::time::Duration::from_millis(50));
         let trace = getter.get_trace();
         assert!(trace.is_ok());
@@ -569,7 +582,7 @@ mod tests {
             .spawn()
             .unwrap();
         let pid = cmd.id() as Pid;
-        let mut getter = initialize(pid, true).expect("initialize");
+        let mut getter = initialize(pid, true, None).expect("initialize");
 
         std::thread::sleep(std::time::Duration::from_millis(50));
         let trace1 = getter.get_trace();
@@ -617,7 +630,7 @@ mod tests {
         }
 
         let mut cmd = RubyScript::new("ci/ruby-programs/infinite.rb");
-        let mut getter = crate::core::initialize::initialize(cmd.id(), true).unwrap();
+        let mut getter = crate::core::initialize::initialize(cmd.id(), true, None).unwrap();
 
         cmd.kill().expect("couldn't clean up test process");
 

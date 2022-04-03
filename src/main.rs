@@ -39,9 +39,14 @@ enum SubCmd {
         silent: bool,
         flame_min_width: f64,
         lock_process: bool,
+        force_version: Option<String>,
     },
     /// Capture and print a stacktrace snapshot of process `pid`.
-    Snapshot { pid: Pid, lock_process: bool },
+    Snapshot {
+        pid: Pid,
+        lock_process: bool,
+        force_version: Option<String>,
+    },
     Report {
         format: OutputFormat,
         input: PathBuf,
@@ -95,8 +100,12 @@ fn do_main() -> Result<(), Error> {
     }
 
     match args.cmd {
-        SubCmd::Snapshot { pid, lock_process } => {
-            let snap = recorder::snapshot(pid, lock_process)?;
+        SubCmd::Snapshot {
+            pid,
+            lock_process,
+            force_version,
+        } => {
+            let snap = recorder::snapshot(pid, lock_process, force_version)?;
             println!("{}", snap);
             Ok(())
         }
@@ -112,6 +121,7 @@ fn do_main() -> Result<(), Error> {
             silent,
             flame_min_width,
             lock_process,
+            force_version,
         } => {
             let pid = match target {
                 Target::Pid { pid } => pid,
@@ -175,6 +185,7 @@ fn do_main() -> Result<(), Error> {
                 maybe_duration,
                 flame_min_width,
                 lock_process,
+                force_version,
             };
 
             let recorder = Arc::<recorder::Recorder>::new(recorder::Recorder::new(config));
@@ -273,6 +284,14 @@ fn arg_parser() -> clap::Command<'static> {
                                                     the performance impact of sampling but may produce inaccurate results")
                         .required(false),
                 )
+                .arg(
+                    clap::Arg::new("force-version")
+                        .help("Assume that the Ruby version is <VERSION>. This is useful when the Ruby \
+                            version is not yet supported by rbspy, e.g. a release candidate")
+                        .long("force-version")
+                        .takes_value(true)
+                        .required(false)
+                )
         )
         .subcommand(
             clap::Command::new("record")
@@ -341,6 +360,14 @@ fn arg_parser() -> clap::Command<'static> {
                                                    the performance impact of sampling but may produce inaccurate results")
                         .required(false),
                 )
+                .arg(
+                    clap::Arg::new("force-version")
+                        .help("Assume that the Ruby version is <VERSION>. This is useful when the Ruby \
+                            version is not yet supported by rbspy, e.g. a release candidate")
+                        .long("force-version")
+                        .takes_value(true)
+                        .required(false)
+                )
                 .arg(arg!(<cmd> ... "command to run").required(false)),
         )
         .subcommand(
@@ -394,6 +421,10 @@ impl Args {
                 pid: get_pid(submatches)
                     .expect("this shouldn't happen because clap requires a pid"),
                 lock_process: submatches.is_present("nonblocking"),
+                force_version: match submatches.value_of("force-version") {
+                    Some(version) => Some(version.to_string()),
+                    None => None,
+                },
             },
             Some(("record", submatches)) => {
                 let format: OutputFormat = ArgMatches::value_of_t(submatches, "format").unwrap();
@@ -413,6 +444,10 @@ impl Args {
                 let sample_rate = ArgMatches::value_of_t(submatches, "rate").unwrap();
                 let flame_min_width =
                     ArgMatches::value_of_t(submatches, "flame-min-width").unwrap();
+                let force_version = match ArgMatches::value_of_t(submatches, "force-version") {
+                    Err(_) => None,
+                    Ok(v) => Some(v),
+                };
                 let target = if let Some(pid) = get_pid(submatches) {
                     Target::Pid { pid }
                 } else {
@@ -436,6 +471,7 @@ impl Args {
                     silent,
                     flame_min_width,
                     lock_process: !nonblocking,
+                    force_version,
                 }
             }
             Some(("report", submatches)) => {
@@ -518,7 +554,8 @@ mod tests {
             Args {
                 cmd: SubCmd::Snapshot {
                     pid: 1234,
-                    lock_process: false
+                    lock_process: false,
+                    force_version: None,
                 },
             }
         );
@@ -557,6 +594,7 @@ mod tests {
                     silent: false,
                     flame_min_width: 0.1,
                     lock_process: true,
+                    force_version: None,
                 },
             }
         );
@@ -580,6 +618,7 @@ mod tests {
                     silent: false,
                     flame_min_width: 0.1,
                     lock_process: true,
+                    force_version: None,
                 },
             }
         );
@@ -603,6 +642,7 @@ mod tests {
                     silent: false,
                     flame_min_width: 0.1,
                     lock_process: true,
+                    force_version: None,
                 },
             }
         );
@@ -625,6 +665,7 @@ mod tests {
                     silent: false,
                     flame_min_width: 0.1,
                     lock_process: true,
+                    force_version: None,
                 },
             }
         );
@@ -648,6 +689,7 @@ mod tests {
                     silent: false,
                     flame_min_width: 0.1,
                     lock_process: true,
+                    force_version: None,
                 },
             }
         );
@@ -671,6 +713,7 @@ mod tests {
                     silent: false,
                     flame_min_width: 0.1,
                     lock_process: true,
+                    force_version: None,
                 },
             }
         );
@@ -694,6 +737,7 @@ mod tests {
                     silent: false,
                     flame_min_width: 0.02,
                     lock_process: true,
+                    force_version: None,
                 },
             }
         );
@@ -717,6 +761,7 @@ mod tests {
                     silent: false,
                     flame_min_width: 0.1,
                     lock_process: false,
+                    force_version: None,
                 },
             }
         );
