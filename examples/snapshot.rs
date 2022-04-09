@@ -1,8 +1,8 @@
 mod include;
 extern crate rbspy;
 
-use rbspy::recorder::snapshot;
 use crate::include::path_to_ruby_binary;
+use rbspy::recorder::snapshot;
 
 fn main() {
     let mut process = std::process::Command::new(path_to_ruby_binary())

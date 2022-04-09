@@ -1,9 +1,9 @@
 mod include;
 extern crate rbspy;
 
+use crate::include::path_to_ruby_binary;
 use rbspy::recorder::{RecordConfig, Recorder};
 use rbspy::OutputFormat;
-use crate::include::path_to_ruby_binary;
 
 fn main() {
     let mut process = std::process::Command::new(path_to_ruby_binary())
