@@ -21,6 +21,7 @@ pub struct Sampler {
     timing_error_traces: Arc<AtomicUsize>,
     total_traces: Arc<AtomicUsize>,
     with_subprocesses: bool,
+    force_version: Option<String>,
 }
 
 impl Sampler {
@@ -30,6 +31,7 @@ impl Sampler {
         lock_process: bool,
         time_limit: Option<Duration>,
         with_subprocesses: bool,
+        force_version: Option<String>,
     ) -> Self {
         Sampler {
             done: Arc::new(AtomicBool::new(false)),
@@ -40,6 +42,7 @@ impl Sampler {
             timing_error_traces: Arc::new(AtomicUsize::new(0)),
             total_traces: Arc::new(AtomicUsize::new(0)),
             with_subprocesses,
+            force_version,
         }
     }
 
@@ -66,6 +69,7 @@ impl Sampler {
             None => None,
         };
         let lock_process = self.lock_process.clone();
+        let force_version = self.force_version.clone();
         let result_sender = result_sender.clone();
         let timing_error_traces = self.timing_error_traces.clone();
         let total_traces = self.total_traces.clone();
@@ -101,6 +105,7 @@ impl Sampler {
                         let timing_error_traces = timing_error_traces.clone();
                         let total_traces = total_traces.clone();
                         let trace_sender_clone = trace_sender.clone();
+                        let force_version = force_version.clone();
                         std::thread::spawn(move || {
                             let result = sample(
                                 pid,
@@ -111,6 +116,7 @@ impl Sampler {
                                 total_traces,
                                 trace_sender_clone,
                                 lock_process,
+                                force_version,
                             );
                             result_sender.send(result).expect("couldn't send error");
                             drop(result_sender);
@@ -139,6 +145,7 @@ impl Sampler {
                     total_traces,
                     trace_sender,
                     lock_process,
+                    force_version,
                 );
                 result_sender.send(result).unwrap();
                 drop(result_sender);
@@ -163,8 +170,9 @@ fn sample(
     total_traces: Arc<AtomicUsize>,
     sender: SyncSender<StackTrace>,
     lock_process: bool,
+    force_version: Option<String>,
 ) -> Result<(), Error> {
-    let mut getter = initialize(pid, lock_process).context("initialize")?;
+    let mut getter = initialize(pid, lock_process, force_version).context("initialize")?;
 
     let mut total = 0;
     let mut errors = 0;
@@ -301,7 +309,7 @@ mod tests {
         let mut process = RubyScript::new("ci/ruby-programs/infinite.rb");
         let pid = process.id() as Pid;
 
-        let sampler = Sampler::new(pid, 100, true, None, false);
+        let sampler = Sampler::new(pid, 100, true, None, false, None);
         let (trace_sender, trace_receiver) = std::sync::mpsc::sync_channel(100);
         let (result_sender, result_receiver) = std::sync::mpsc::channel();
         sampler
@@ -334,6 +342,7 @@ mod tests {
             true,
             Some(std::time::Duration::from_millis(500)),
             false,
+            None,
         );
         let (trace_sender, trace_receiver) = std::sync::mpsc::sync_channel(100);
         let (result_sender, result_receiver) = std::sync::mpsc::channel();
@@ -390,7 +399,7 @@ mod tests {
             .unwrap();
         let pid = process.id() as Pid;
 
-        let sampler = Sampler::new(pid, 5, true, None, true);
+        let sampler = Sampler::new(pid, 5, true, None, true, None);
         let (trace_sender, trace_receiver) = std::sync::mpsc::sync_channel(100);
         let (result_sender, result_receiver) = std::sync::mpsc::channel();
         sampler

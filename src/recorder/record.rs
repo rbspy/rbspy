@@ -36,6 +36,11 @@ pub struct Config {
     /// stops the process from executing and can affect performance. The performance impact
     /// is most noticeable in CPU-bound ruby programs or when a high sampling rate is used.
     pub lock_process: bool,
+    /// Forces the recorder to use the given Ruby version. If not given, rbspy will attempt to
+    /// determine the Ruby version from the running process.
+    ///
+    /// This option shouldn't be needed unless you're testing a pre-release Ruby version.
+    pub force_version: Option<String>,
 }
 
 pub struct Recorder {
@@ -56,6 +61,7 @@ impl Recorder {
             config.lock_process,
             config.maybe_duration,
             config.with_subprocesses,
+            config.force_version,
         );
 
         Recorder {
