@@ -361,7 +361,7 @@ fn is_maybe_thread_function(version: &str) -> IsMaybeThreadFn {
         "3.1.0" => ruby_version::ruby_3_1_0::is_maybe_thread,
         "3.1.1" => ruby_version::ruby_3_1_1::is_maybe_thread,
         _ => panic!(
-            "Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!",
+            "The target process's Ruby version is not supported yet. In the meantime, you can try using `--force-version {}`.",
             version
         ),
     };
@@ -449,7 +449,7 @@ fn get_stack_trace_function(version: &str) -> StackTraceFn {
         "3.1.0" => ruby_version::ruby_3_1_0::get_stack_trace,
         "3.1.1" => ruby_version::ruby_3_1_1::get_stack_trace,
         _ => panic!(
-            "Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!",
+            "The target process's Ruby version is not supported yet. In the meantime, you can try using `--force-version {}`.",
             version
         ),
     };
