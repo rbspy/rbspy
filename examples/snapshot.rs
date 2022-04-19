@@ -11,7 +11,7 @@ fn main() {
         .unwrap();
     let pid = process.id() as rbspy::Pid;
 
-    match snapshot(pid, true) {
+    match snapshot(pid, true, None) {
         Ok(s) => println!("{}", s),
         Err(e) => println!("Failed to get snapshot: {:?}", e),
     }

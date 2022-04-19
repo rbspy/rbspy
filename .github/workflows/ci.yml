@@ -47,17 +47,17 @@ jobs:
         include:
         - build: linux-x86_64
           os: ubuntu-20.04
-          ruby-version: 3.1.0
+          ruby-version: 3.1.2
           run-tests: 'true'
           target: x86_64-unknown-linux-gnu
         - build: linux-aarch64
           os: ubuntu-20.04
-          ruby-version: 3.1.0
+          ruby-version: 3.1.2
           run-tests: 'false'
           target: aarch64-unknown-linux-gnu
         - build: macos
           os: macos-10.15
-          ruby-version: 3.1.0
+          ruby-version: 3.1.2
           run-tests: 'true'
           target: x86_64-apple-darwin
         - build: windows

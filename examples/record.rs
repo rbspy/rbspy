@@ -22,6 +22,7 @@ fn main() {
         maybe_duration: Some(std::time::Duration::from_secs(1)),
         flame_min_width: 10.0,
         lock_process: true,
+        force_version: None,
     };
     let recorder = Recorder::new(config);
     match recorder.record() {
