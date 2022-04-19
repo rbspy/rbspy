@@ -1,4 +1,4 @@
-pub(crate) fn path_to_ruby_binary() -> String {
+pub fn path_to_ruby_binary() -> String {
     let which = get_which();
 
     let output = std::process::Command::new(which)
