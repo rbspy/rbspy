@@ -58,41 +58,41 @@ jobs:
         os: ["ubuntu-20.04"]
         target: ["x86_64-unknown-linux-gnu"]
     steps:
-    - name: Checkout rbspy repository
-      uses: actions/checkout@v2
-      with:
-          path: "rbspy"
-    - name: Install Rust
-      uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f # v1.0.6
-      with:
-        toolchain: stable
-        profile: minimal
-        override: true
-    - name: Install Rust toolchain target
-      run: |
-        rustup target add ${{ matrix.target }}
-    - name: Download xtask binary
-      uses: actions/download-artifact@v2
-      with:
-        name: xtask
-    - name: Generate bindings for ruby ${{ matrix.ruby-version }}
-      run: |
-        set -euo pipefail
+      - name: Checkout rbspy repository
+        uses: actions/checkout@v2
+        with:
+            path: "rbspy"
+      - name: Install Rust
+        uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f # v1.0.6
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+      - name: Install Rust toolchain target
+        run: |
+          rustup target add ${{ matrix.target }}
+      - name: Download xtask binary
+        uses: actions/download-artifact@v2
+        with:
+          name: xtask
+      - name: Generate bindings for ruby ${{ matrix.ruby-version }}
+        run: |
+          set -euo pipefail
 
-        cd $GITHUB_WORKSPACE/rbspy
-        chmod u+x ../xtask
-        ../xtask bindgen v${{ matrix.ruby-version }}
+          cd $GITHUB_WORKSPACE/rbspy
+          chmod u+x ../xtask
+          ../xtask bindgen v${{ matrix.ruby-version }}
 
-        mkdir ../bindings-staging
-        # Add new files to the index so that they get picked up
-        git add ruby-structs/src
-        cp $(git diff --name-only --staged | xargs) ../bindings-staging || echo "No new or modified files - bindings are up to date"
-    - name: Upload Bindings
-      uses: actions/upload-artifact@v2
-      with:
-        if-no-files-found: ignore
-        name: bindings-${{ matrix.ruby-version }}
-        path: bindings-staging
+          mkdir ../bindings-staging
+          # Add new files to the index so that they get picked up
+          git add ruby-structs/src
+          cp $(git diff --name-only --staged | xargs) ../bindings-staging || echo "No new or modified files - bindings are up to date"
+      - name: Upload Bindings
+        uses: actions/upload-artifact@v2
+        with:
+          if-no-files-found: ignore
+          name: bindings-${{ matrix.ruby-version }}
+          path: bindings-staging
 
   create-branch:
     name: Create branch with updated bindings

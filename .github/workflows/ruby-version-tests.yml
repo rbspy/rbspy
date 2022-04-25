@@ -13,33 +13,33 @@ jobs:
       fail-fast: false
       matrix:
         build:
-        - linux
+          - linux
         include:
-        - build: linux
-          os: ubuntu-20.04
-          target: x86_64-unknown-linux-gnu
+          - build: linux
+            os: ubuntu-20.04
+            target: x86_64-unknown-linux-gnu
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-    - name: Install Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        profile: minimal
-        override: true
-    - name: Install Rust toolchain target
-      run: |
-        rustup target add ${{ matrix.target }}
-    - name: Prepare test binary for upload
-      run: |
-        test_binary_path=$(cargo test --release --locked --no-run --message-format=json 2>/dev/null | grep '"executable":' | tail -1 | jq '.executable' | tr -d '"')
-        echo "Test binary path is $test_binary_path"
-        cp $test_binary_path rbspy-test
-    - name: Upload binaries
-      uses: actions/upload-artifact@v2
-      with:
-        name: rbspy-test
-        path: rbspy-test
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+      - name: Install Rust toolchain target
+        run: |
+          rustup target add ${{ matrix.target }}
+      - name: Prepare test binary for upload
+        run: |
+          test_binary_path=$(cargo test --release --locked --no-run --message-format=json 2>/dev/null | grep '"executable":' | tail -1 | jq '.executable' | tr -d '"')
+          echo "Test binary path is $test_binary_path"
+          cp $test_binary_path rbspy-test
+      - name: Upload binaries
+        uses: actions/upload-artifact@v2
+        with:
+          name: rbspy-test
+          path: rbspy-test
 
   ruby-version-tests:
     runs-on: ubuntu-20.04
@@ -59,28 +59,28 @@ jobs:
           3.1.0, 3.1.1, 3.1.2
         ]
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-    - name: Install Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        profile: minimal
-        override: true
-    - name: Install Ruby
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: ${{ matrix.ruby_version }}
-    - uses: actions/download-artifact@v2
-    - name: Run tests
-      timeout-minutes: 5
-      run: |
-        set -euo pipefail
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+      - name: Install Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby_version }}
+      - uses: actions/download-artifact@v2
+      - name: Run tests
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
 
-        echo "Ruby version is $(ruby -v)"
+          echo "Ruby version is $(ruby -v)"
 
-        # TODO: This is just to put rbspy-testdata in the right place. Is there a leaner way?
-        cargo fetch
+          # TODO: This is just to put rbspy-testdata in the right place. Is there a leaner way?
+          cargo fetch
 
-        chmod u+x ./rbspy-test/rbspy-test
-        ./rbspy-test/rbspy-test
+          chmod u+x ./rbspy-test/rbspy-test
+          ./rbspy-test/rbspy-test

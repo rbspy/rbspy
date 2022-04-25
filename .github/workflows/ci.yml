@@ -4,29 +4,29 @@ on:
   pull_request:
   push:
     branches:
-    - master
+      - master
     tags:
-    - v*
+      - v*
   schedule:
-  - cron: '0 0 * * 0'
+    - cron: '0 0 * * 0'
   workflow_dispatch:
 jobs:
   format:
     name: Check code formatting
     runs-on: ubuntu-20.04
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-    - name: Install Rust
-      uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f # v1.0.6
-      with:
-        toolchain: stable
-        override: true
-        profile: minimal
-        components: rustfmt
-    - name: Run cargo fmt
-      run: |
-        cargo fmt --all -- --check
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f # v1.0.6
+        with:
+          toolchain: stable
+          override: true
+          profile: minimal
+          components: rustfmt
+      - name: Run cargo fmt
+        run: |
+          cargo fmt --all -- --check
 
   build:
     name: Build, test, and upload binaries
@@ -40,109 +40,109 @@ jobs:
       fail-fast: false
       matrix:
         build:
-        - linux-x86_64
-        - linux-aarch64
-        - macos
-        - windows
+          - linux-x86_64
+          - linux-aarch64
+          - macos
+          - windows
         include:
-        - build: linux-x86_64
-          os: ubuntu-20.04
-          ruby-version: 3.1.2
-          run-tests: 'true'
-          target: x86_64-unknown-linux-gnu
-        - build: linux-aarch64
-          os: ubuntu-20.04
-          ruby-version: 3.1.2
-          run-tests: 'false'
-          target: aarch64-unknown-linux-gnu
-        - build: macos
-          os: macos-10.15
-          ruby-version: 3.1.2
-          run-tests: 'true'
-          target: x86_64-apple-darwin
-        - build: windows
-          os: windows-2019
-          ruby-version: 2.7.2
-          run-tests: 'true'
-          target: x86_64-pc-windows-msvc
+          - build: linux-x86_64
+            os: ubuntu-20.04
+            ruby-version: 3.1.2
+            run-tests: 'true'
+            target: x86_64-unknown-linux-gnu
+          - build: linux-aarch64
+            os: ubuntu-20.04
+            ruby-version: 3.1.2
+            run-tests: 'false'
+            target: aarch64-unknown-linux-gnu
+          - build: macos
+            os: macos-10.15
+            ruby-version: 3.1.2
+            run-tests: 'true'
+            target: x86_64-apple-darwin
+          - build: windows
+            os: windows-2019
+            ruby-version: 2.7.2
+            run-tests: 'true'
+            target: x86_64-pc-windows-msvc
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-    - name: Install Ruby
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: ${{ matrix.ruby-version }}
-    - name: Install Rust
-      uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f # v1.0.6
-      with:
-        toolchain: stable
-        profile: minimal
-        override: true
-    - name: Install Rust toolchain target
-      run: |
-        rustup target add ${{ matrix.target }}
-    - name: Install cross-compile toolchain
-      if: matrix.target == 'aarch64-unknown-linux-gnu'
-      run: |
-        sudo apt update -qq && sudo apt install -qq -y gcc-aarch64-linux-gnu
-    - name: Cargo Cache
-      uses: actions/cache@v2.1.7
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-        key: ${{ runner.os }}-${{ matrix.target }}-cargo0-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-${{ matrix.target }}-cargo0-
-    - name: Show command used for Cargo
-      run: |
-        echo "cargo command is: ${{ env.CARGO }}"
-        echo "target flag is: ${{ env.TARGET_FLAGS }}"
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Install Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby-version }}
+      - name: Install Rust
+        uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f # v1.0.6
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+      - name: Install Rust toolchain target
+        run: |
+          rustup target add ${{ matrix.target }}
+      - name: Install cross-compile toolchain
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt update -qq && sudo apt install -qq -y gcc-aarch64-linux-gnu
+      - name: Cargo Cache
+        uses: actions/cache@v2.1.7
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo0-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-cargo0-
+      - name: Show command used for Cargo
+        run: |
+          echo "cargo command is: ${{ env.CARGO }}"
+          echo "target flag is: ${{ env.TARGET_FLAGS }}"
 
-    - name: Build rbspy
-      run: ${{ env.CARGO }} build --release --locked --verbose --workspace --all-targets ${{ env.TARGET_FLAGS }}
+      - name: Build rbspy
+        run: ${{ env.CARGO }} build --release --locked --verbose --workspace --all-targets ${{ env.TARGET_FLAGS }}
 
-    - name: Prepare binary for upload
-      if: runner.os != 'windows'
-      run: |
-        cp target/${{ matrix.target }}/release/rbspy rbspy-${{ matrix.target }}
-    - name: Prepare binary for upload
-      if: runner.os == 'windows'
-      run: |
-        copy target/${{ matrix.target }}/release/rbspy.exe rbspy-${{ matrix.target }}.exe
+      - name: Prepare binary for upload
+        if: runner.os != 'windows'
+        run: |
+          cp target/${{ matrix.target }}/release/rbspy rbspy-${{ matrix.target }}
+      - name: Prepare binary for upload
+        if: runner.os == 'windows'
+        run: |
+          copy target/${{ matrix.target }}/release/rbspy.exe rbspy-${{ matrix.target }}.exe
 
-    - name: Upload Linux and macOS Binaries
-      if: runner.os != 'windows'
-      uses: actions/upload-artifact@v2
-      with:
-        name: rbspy-${{ matrix.target }}
-        path: rbspy-${{ matrix.target }}
-    - name: Upload Windows Binaries
-      if: runner.os == 'windows'
-      uses: actions/upload-artifact@v2
-      with:
-        name: rbspy-${{ matrix.target }}.exe
-        path: rbspy-${{ matrix.target }}.exe
+      - name: Upload Linux and macOS Binaries
+        if: runner.os != 'windows'
+        uses: actions/upload-artifact@v2
+        with:
+          name: rbspy-${{ matrix.target }}
+          path: rbspy-${{ matrix.target }}
+      - name: Upload Windows Binaries
+        if: runner.os == 'windows'
+        uses: actions/upload-artifact@v2
+        with:
+          name: rbspy-${{ matrix.target }}.exe
+          path: rbspy-${{ matrix.target }}.exe
 
-    - name: Run tests
-      timeout-minutes: 5
-      run: ${{ env.CARGO }} test --release --verbose ${{ env.TARGET_FLAGS }}
-      if: runner.os == 'linux' && matrix.run-tests == 'true'
-    - name: Run tests
-      timeout-minutes: 5
-      run: sudo "PATH=$PATH" ${{ env.CARGO }} test --release --verbose ${{ env.TARGET_FLAGS }}
-      if: runner.os == 'macOS' && matrix.run-tests == 'true'
-    - name: Run tests
-      timeout-minutes: 5
-      run: ${{ env.CARGO }} test --release --verbose ${{ env.TARGET_FLAGS }} -- --skip sampler::tests
-      if: runner.os == 'windows' && matrix.run-tests == 'true'
-    - name: Run rbspy with alternative mallocs
-      if: runner.os == 'linux' && matrix.run-tests == 'true'
-      run: |
-        set -e
-        sudo apt install -y libjemalloc2 libtcmalloc-minimal4
-        target/${{ matrix.target }}/release/rbspy record env LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2 ruby ci/ruby-programs/short_program.rb
-        target/${{ matrix.target }}/release/rbspy record env LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4 ruby ci/ruby-programs/short_program.rb
+      - name: Run tests
+        timeout-minutes: 5
+        run: ${{ env.CARGO }} test --release --verbose ${{ env.TARGET_FLAGS }}
+        if: runner.os == 'linux' && matrix.run-tests == 'true'
+      - name: Run tests
+        timeout-minutes: 5
+        run: sudo "PATH=$PATH" ${{ env.CARGO }} test --release --verbose ${{ env.TARGET_FLAGS }}
+        if: runner.os == 'macOS' && matrix.run-tests == 'true'
+      - name: Run tests
+        timeout-minutes: 5
+        run: ${{ env.CARGO }} test --release --verbose ${{ env.TARGET_FLAGS }} -- --skip sampler::tests
+        if: runner.os == 'windows' && matrix.run-tests == 'true'
+      - name: Run rbspy with alternative mallocs
+        if: runner.os == 'linux' && matrix.run-tests == 'true'
+        run: |
+          set -e
+          sudo apt install -y libjemalloc2 libtcmalloc-minimal4
+          target/${{ matrix.target }}/release/rbspy record env LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2 ruby ci/ruby-programs/short_program.rb
+          target/${{ matrix.target }}/release/rbspy record env LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4 ruby ci/ruby-programs/short_program.rb
 
   build-linux-cross:
     runs-on: ubuntu-20.04
@@ -156,27 +156,27 @@ jobs:
         RUSTUP_HOME: /root/.rustup
         CARGO_HOME: /root/.cargo
     steps:
-    - uses: actions/checkout@v2
-    - name: Cargo Cache
-      uses: actions/cache@v2.1.7
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-${{ matrix.target }}-cargo0-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-${{ matrix.target }}-cargo0-
-    - name: Build
-      run: cargo build --release --locked
-    - name: Prepare binary for upload
-      run: |
-        cp target/*/release/rbspy rbspy-${{ matrix.target }}
-    - name: Upload Binaries
-      uses: actions/upload-artifact@v2
-      with:
-        name: rbspy-${{ matrix.target }}
-        path: rbspy-${{ matrix.target }}
+      - uses: actions/checkout@v2
+      - name: Cargo Cache
+        uses: actions/cache@v2.1.7
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo0-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-cargo0-
+      - name: Build
+        run: cargo build --release --locked
+      - name: Prepare binary for upload
+        run: |
+          cp target/*/release/rbspy rbspy-${{ matrix.target }}
+      - name: Upload Binaries
+        uses: actions/upload-artifact@v2
+        with:
+          name: rbspy-${{ matrix.target }}
+          path: rbspy-${{ matrix.target }}
 
   build-freebsd:
     name: Build, test, and upload binaries (freebsd-x86_64)
