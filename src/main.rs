@@ -273,7 +273,7 @@ fn arg_parser() -> clap::Command<'static> {
         .subcommand_required(true)
         .subcommand(
             clap::Command::new("snapshot")
-                .about("Snapshot a single stack trace")
+                .about("Capture a single stack trace from a running Ruby program")
                 .arg(
                     arg!(-p --pid <PID> "PID of the Ruby process you want to profile")
                         .validator(validate_pid)
@@ -295,7 +295,7 @@ fn arg_parser() -> clap::Command<'static> {
         )
         .subcommand(
             clap::Command::new("record")
-                .about("Record process")
+                .about("Continuously capture traces from a Ruby process")
                 .arg(
                     arg!(-p --pid <PID> "PID of the Ruby process you want to profile")
                     .validator(validate_pid)
