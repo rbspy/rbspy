@@ -32,7 +32,7 @@ fn print_help() {
     eprintln!(
         "Tasks:
 
-bindgen <ruby version tag>      Generates Rust bindings for various Ruby VM versions
+bindgen <ruby version tag>      Generates Rust bindings for the given Ruby VM version
 "
     )
 }
