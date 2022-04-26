@@ -183,7 +183,7 @@ impl std::str::FromStr for OutputFormat {
             "speedscope" => Ok(OutputFormat::speedscope),
             "pprof" => Ok(OutputFormat::pprof),
             "summary" => Ok(OutputFormat::summary),
-            "summary_by_line" => Ok(OutputFormat::summary_by_line),
+            "summary-by-line" => Ok(OutputFormat::summary_by_line),
             _ => Err(anyhow::format_err!("Unknown output format: {}", s)),
         }
     }
