@@ -519,9 +519,8 @@ macro_rules! get_ruby_string(
                     .to_bytes()
                     .to_vec()
                 } else {
-                    unsafe {
-                        let addr = rstring.as_.heap.ptr as usize;
-                        let len = rstring.as_.heap.len as usize;
+                        let addr = unsafe { rstring.as_.heap.ptr as usize };
+                        let len = unsafe { rstring.as_.heap.len as usize };
                         let result = source.copy(addr as usize, len);
                         match result {
                             Err(x) => {
@@ -530,7 +529,6 @@ macro_rules! get_ruby_string(
                             }
                             Ok(x) => x
                         }
-                    }
                 }
             };
 
