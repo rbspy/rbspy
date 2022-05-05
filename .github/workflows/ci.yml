@@ -251,6 +251,7 @@ jobs:
               zip -j ../archives/$target.zip $target
             else
               echo "Found unix binary for target $target"
+              chmod a+x $target
               tar czf ../archives/$target.tar.gz $target
             fi
           done
