@@ -25,7 +25,7 @@ jobs:
           path: ruby
           repository: ruby/ruby
           ref: master
-          depth: 1
+          fetch-depth: 1
       - name: Build and install latest Ruby
         run: |
           # Workaround for missing digest gem. https://github.com/ruby/psych/issues/552
