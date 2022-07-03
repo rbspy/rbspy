@@ -206,6 +206,9 @@ jobs:
             ${{ matrix.box }}-cargo-20220607-0-
       - name: Set up VM
         run: |
+          vagrant plugin install vagrant-vbguest
+          vagrant plugin install vagrant-scp
+
           ln -sf ci/Vagrantfile Vagrantfile
 
           if [ ! -d ~/.vagrant.d/boxes/rbspy-VAGRANTSLASH-${{ matrix.release }} ]; then
@@ -216,8 +219,7 @@ jobs:
         run: vagrant ssh ${{ matrix.box }} -- bash /vagrant/ci/freebsd-build.sh
       - name: Retrieve build artifacts for caching purposes
         run: |
-          vagrant ssh-config --host "default" > config.txt
-          scp -F config.txt default:/vagrant/build-artifacts.tar .
+          vagrant scp ${{ matrix.box }}:/vagrant/build-artifacts.tar build-artifacts.tar
           ls -ahl build-artifacts.tar
       - name: Prepare binary for upload
         run: |
