@@ -47,6 +47,9 @@ pub fn generate_ruby_bindings(
         ])
         .header(wrapper_path.to_string_lossy())
         .impl_debug(true)
+        // Skip deriving Debug as a workaround for https://github.com/rust-lang/rust-bindgen/issues/2221
+        .no_debug("iseq_catch_table")
+        .no_debug("rb_method_definition_struct")
         .generate_comments(false)
         .generate();
     let bindings = match bindings {
