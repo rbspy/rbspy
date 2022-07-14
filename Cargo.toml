@@ -49,7 +49,7 @@ winapi = { version = "0.3", features = ["timeapi", "wow64apiset"] }
 
 [dev-dependencies]
 byteorder = "1.4.3"
-rbspy-testdata = { git = "https://github.com/rbspy/rbspy-testdata", branch = "master" }
+rbspy-testdata = { git = "https://github.com/rbspy/rbspy-testdata", rev = "9f75d1ea" }
 tempdir = "0.3.4"
 
 [build-dependencies]
