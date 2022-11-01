@@ -36,7 +36,7 @@ pub struct StackTrace {
 }
 
 pub type StackTraceFn =
-    Box<dyn Fn(usize, usize, Option<usize>, &Process, Pid) -> Result<StackTrace, MemoryCopyError>>;
+    Box<dyn Fn(usize, usize, Option<usize>, &Process, Pid) -> Result<StackTrace>>;
 
 pub type IsMaybeThreadFn = Box<dyn Fn(usize, usize, &Process, &[proc_maps::MapRange]) -> bool>;
 

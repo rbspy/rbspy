@@ -306,7 +306,7 @@ macro_rules! get_execution_context_from_vm(
 macro_rules! get_stack_trace(
     ($thread_type:ident) => (
         use crate::core::process::Pid;
-        use crate::core::types::{StackFrame, StackTrace, MemoryCopyError};
+        use crate::core::types::{StackFrame, StackTrace};
 
         pub fn get_stack_trace<T: ProcessMemory>(
             ruby_current_thread_address_location: usize,
@@ -314,7 +314,7 @@ macro_rules! get_stack_trace(
             ruby_global_symbols_address_location: Option<usize>,
             source: &T,
             pid: Pid,
-        ) -> Result<StackTrace, MemoryCopyError> {
+        ) -> Result<StackTrace, anyhow::Error> {
             let current_thread_addr: usize = get_execution_context(ruby_current_thread_address_location, ruby_vm_address_location, source)
                 .context("couldn't get execution context")?;
             let thread: $thread_type = source.copy_struct(current_thread_addr)
@@ -442,7 +442,7 @@ macro_rules! stack_field_2_5_0(
 macro_rules! get_thread_id_1_9_0(
     () => (
 
-        fn get_thread_id<T>(thread_struct: &rb_thread_struct, _source: &T) -> Result<usize, MemoryCopyError> {
+        fn get_thread_id<T>(thread_struct: &rb_thread_struct, _source: &T) -> Result<usize> {
             Ok(thread_struct.thread_id as usize)
         }
     )
@@ -452,7 +452,7 @@ macro_rules! get_thread_id_2_5_0(
     () => (
 
         fn get_thread_id<T>(thread_struct: &rb_execution_context_struct, source: &T)
-                            -> Result<usize, MemoryCopyError> where T: ProcessMemory {
+                            -> Result<usize> where T: ProcessMemory {
             let thread: rb_thread_struct = source.copy_struct(thread_struct.thread_ptr as usize)
                 .context(thread_struct.thread_ptr as usize)?;
             Ok(thread.thread_id as usize)
@@ -463,7 +463,7 @@ macro_rules! get_thread_id_2_5_0(
 macro_rules! get_ruby_string_array_2_5_0(
     () => (
         // Returns (path, absolute_path)
-        fn get_ruby_string_array<T>(addr: usize, string_class: usize, source: &T) -> Result<(String, String), MemoryCopyError> where T: ProcessMemory {
+        fn get_ruby_string_array<T>(addr: usize, string_class: usize, source: &T) -> Result<(String, String)> where T: ProcessMemory {
             // todo: we're doing an extra copy here for no reason
             let rstring: RString = source.copy_struct(addr)
                 .context(addr)?;
@@ -512,7 +512,7 @@ macro_rules! get_ruby_string(
         fn get_ruby_string<T>(
             addr: usize,
             source: &T
-        ) -> Result<String, MemoryCopyError> where T: ProcessMemory {
+        ) -> Result<String> where T: ProcessMemory {
             let vec = {
                 let rstring: RString = source.copy_struct(addr)
                     .context(addr)?;
@@ -539,9 +539,9 @@ macro_rules! get_ruby_string(
             };
 
             let error =
-                MemoryCopyError::Message("Ruby string is invalid".to_string());
+                crate::core::types::MemoryCopyError::Message("Ruby string is invalid".to_string());
 
-            String::from_utf8(vec).or(Err(error))
+            String::from_utf8(vec).or(Err(error.into()))
         }
     )
 );
@@ -552,7 +552,7 @@ macro_rules! get_stack_frame_1_9_1(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-            ) -> Result<StackFrame, MemoryCopyError> where T: ProcessMemory {
+            ) -> Result<StackFrame> where T: ProcessMemory {
             Ok(StackFrame{
                 name: get_ruby_string(iseq_struct.name as usize, source)?,
                 relative_path: get_ruby_string(iseq_struct.filename as usize, source)?,
@@ -569,7 +569,7 @@ macro_rules! get_stack_frame_1_9_2(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-            ) -> Result<StackFrame, MemoryCopyError> where T: ProcessMemory {
+            ) -> Result<StackFrame> where T: ProcessMemory {
             Ok(StackFrame{
                 name: get_ruby_string(iseq_struct.name as usize, source)?,
                 relative_path: get_ruby_string(iseq_struct.filename as usize, source)?,
@@ -586,7 +586,7 @@ macro_rules! get_lineno_1_9_0(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-        ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
+        ) -> Result<u32> where T: ProcessMemory {
             let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.insn_info_size as usize;
             if t_size == 0 {
@@ -617,7 +617,7 @@ macro_rules! get_lineno_2_0_0(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-        ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
+        ) -> Result<u32> where T: ProcessMemory {
             let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.line_info_size as usize;
             if t_size == 0 {
@@ -648,7 +648,7 @@ macro_rules! get_lineno_2_3_0(
             iseq_struct: &rb_iseq_constant_body,
             cfp: &rb_control_frame_t,
             source: &T,
-        ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
+        ) -> Result<u32> where T: ProcessMemory {
             let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.line_info_size as usize;
             if t_size == 0 {
@@ -676,9 +676,9 @@ macro_rules! get_lineno_2_3_0(
 macro_rules! get_pos(
     ($iseq_type:ident) => (
         #[allow(unused)] // this doesn't get used in every ruby version
-        fn get_pos(iseq_struct: &$iseq_type, cfp: &rb_control_frame_t) -> Result<usize, MemoryCopyError> {
+        fn get_pos(iseq_struct: &$iseq_type, cfp: &rb_control_frame_t) -> Result<usize> {
             if (cfp.pc as usize) < (iseq_struct.iseq_encoded as usize) {
-                return Err(MemoryCopyError::Message(format!("program counter and iseq are out of sync")));
+                return Err(crate::core::types::MemoryCopyError::Message(format!("program counter and iseq are out of sync")).into());
             }
             let mut pos = cfp.pc as usize - iseq_struct.iseq_encoded as usize;
             if pos != 0 {
@@ -695,7 +695,7 @@ macro_rules! get_lineno_2_5_0(
             iseq_struct: &rb_iseq_constant_body,
             cfp: &rb_control_frame_t,
             source: &T,
-        ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
+        ) -> Result<u32> where T: ProcessMemory {
             let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.insns_info_size as usize;
             if t_size == 0 {
@@ -726,7 +726,7 @@ macro_rules! get_lineno_2_6_0(
             iseq_struct: &rb_iseq_constant_body,
             _cfp: &rb_control_frame_t,
             source: &T,
-        ) -> Result<u32, MemoryCopyError> where T: ProcessMemory {
+        ) -> Result<u32> where T: ProcessMemory {
             //let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.insns_info.size as usize;
             if t_size == 0 {
@@ -759,7 +759,7 @@ macro_rules! get_stack_frame_2_0_0(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-        ) -> Result<StackFrame, MemoryCopyError> where T: ProcessMemory {
+        ) -> Result<StackFrame> where T: ProcessMemory {
             Ok(StackFrame{
                 name: get_ruby_string(iseq_struct.location.label as usize, source)?,
                 relative_path: get_ruby_string(iseq_struct.location.path as usize, source)?,
@@ -776,7 +776,7 @@ macro_rules! get_stack_frame_2_3_0(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-        ) -> Result<StackFrame, MemoryCopyError> where T: ProcessMemory {
+        ) -> Result<StackFrame> where T: ProcessMemory {
             let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
                 .context(iseq_struct.body as usize)?;
             Ok(StackFrame{
@@ -795,7 +795,7 @@ macro_rules! get_stack_frame_2_5_0(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-        ) -> Result<StackFrame, MemoryCopyError> where T: ProcessMemory {
+        ) -> Result<StackFrame> where T: ProcessMemory {
             let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
                 .context(iseq_struct.body as usize)?;
             let rstring: RString = source.copy_struct(body.location.label as usize)
@@ -826,11 +826,11 @@ macro_rules! get_cfps(
             cfp_address: usize,
             stack_base: usize,
             source: &T
-        ) -> Result<Vec<rb_control_frame_t>, MemoryCopyError> where T: ProcessMemory {
+        ) -> Result<Vec<rb_control_frame_t>> where T: ProcessMemory {
             if (stack_base as usize) <= cfp_address {
                 // this probably means we've hit some kind of race, return an error so we can try
                 // again
-                return Err(MemoryCopyError::Message(format!("stack base and cfp address out of sync. stack base: {:x}, cfp address: {:x}", stack_base as usize, cfp_address)));
+                return Err(crate::core::types::MemoryCopyError::Message(format!("stack base and cfp address out of sync. stack base: {:x}, cfp address: {:x}", stack_base as usize, cfp_address)).into());
             }
 
             Ok(
@@ -844,7 +844,7 @@ macro_rules! get_cfps(
 
 macro_rules! get_cfunc_name_unsupported(
     () => (
-        fn get_cfunc_name<T: ProcessMemory>(_cfp: &rb_control_frame_t, _global_symbols_address: usize, _source: &T, _pid: Pid) -> Result<String, MemoryCopyError> {
+        fn get_cfunc_name<T: ProcessMemory>(_cfp: &rb_control_frame_t, _global_symbols_address: usize, _source: &T, _pid: Pid) -> Result<String> {
             return Err(format_err!("C function resolution is not supported for this version of Ruby").into());
         }
     )
@@ -855,7 +855,7 @@ macro_rules! get_cfunc_name(
         fn check_method_entry<T: ProcessMemory>(
             raw_imemo: usize,
             source: &T
-        ) -> Result<*const rb_method_entry_struct, MemoryCopyError> {
+        ) -> Result<*const rb_method_entry_struct> {
             let imemo: rb_method_entry_struct = source.copy_struct(raw_imemo).context(raw_imemo)?;
 
             // These type constants are defined in ruby's internal/imemo.h
@@ -875,7 +875,7 @@ macro_rules! get_cfunc_name(
             global_symbols_address: usize,
             source: &T,
             _pid: Pid
-        ) -> Result<String, MemoryCopyError> {
+        ) -> Result<String> {
             // The logic in this function is adapted from the .gdbinit script in
             // github.com/ruby/ruby, in particular the print_id function.
 

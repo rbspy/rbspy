@@ -106,10 +106,7 @@ impl RubySpy {
         }
     }
 
-    fn get_trace_from_current_thread(
-        &self,
-        lock_process: bool,
-    ) -> Result<StackTrace, MemoryCopyError> {
+    fn get_trace_from_current_thread(&self, lock_process: bool) -> Result<StackTrace> {
         let _lock;
         if lock_process {
             _lock = self
