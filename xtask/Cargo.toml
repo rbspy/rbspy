@@ -7,6 +7,6 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.40"
-bindgen = "0.60.1"
+bindgen = "0.61.0"
 log = "0.4.6"
 tempdir = "0.3.7"
