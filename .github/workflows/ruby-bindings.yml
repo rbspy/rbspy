@@ -7,9 +7,9 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Cargo Cache
-        uses: actions/cache@v2.1.7
+        uses: actions/cache@v3
         with:
           path: |
             ~/.cargo/registry
@@ -25,7 +25,7 @@ jobs:
       - name: Build xtask
         run: cargo xtask
       - name: Upload xtask binary
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: xtask
           path: target/release/xtask
@@ -59,7 +59,7 @@ jobs:
         target: ["x86_64-unknown-linux-gnu"]
     steps:
       - name: Checkout rbspy repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
             path: "rbspy"
       - name: Install Rust
@@ -72,7 +72,7 @@ jobs:
         run: |
           rustup target add ${{ matrix.target }}
       - name: Download xtask binary
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: xtask
       - name: Generate bindings for ruby ${{ matrix.ruby-version }}
@@ -88,7 +88,7 @@ jobs:
           git add ruby-structs/src
           cp $(git diff --name-only --staged | xargs) ../bindings-staging || echo "No new or modified files - bindings are up to date"
       - name: Upload Bindings
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           if-no-files-found: ignore
           name: bindings-${{ matrix.ruby-version }}
@@ -100,11 +100,11 @@ jobs:
     needs: [generate]
     steps:
       - name: Checkout rbspy repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
             path: "rbspy"
             fetch-depth: 0
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
       - name: Copy bindings into place
         run: |
           cp bindings-*/ruby*.rs rbspy/ruby-structs/src/
