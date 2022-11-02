@@ -8,7 +8,7 @@ on:
 jobs:
   publish-ruby-structs:
     name: Publish rbspy-ruby-structs crate
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v1
       - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f # v1.0.6
@@ -24,7 +24,7 @@ jobs:
   publish-rbspy:
     name: Publish rbspy crate
     needs: [publish-ruby-structs]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v1
       - uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f # v1.0.6

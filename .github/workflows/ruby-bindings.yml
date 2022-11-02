@@ -4,7 +4,7 @@ on:
 jobs:
   xtask:
     name: Build xtask
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v2
@@ -55,7 +55,7 @@ jobs:
           3_0_0, 3_0_1, 3_0_2, 3_0_3, 3_0_4,
           3_1_0, 3_1_1, 3_1_2
         ]
-        os: ["ubuntu-20.04"]
+        os: ["ubuntu-22.04"]
         target: ["x86_64-unknown-linux-gnu"]
     steps:
       - name: Checkout rbspy repository
@@ -96,7 +96,7 @@ jobs:
 
   create-branch:
     name: Create branch with updated bindings
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs: [generate]
     steps:
       - name: Checkout rbspy repository

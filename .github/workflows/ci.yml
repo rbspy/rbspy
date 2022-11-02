@@ -13,7 +13,7 @@ on:
 jobs:
   format:
     name: Check code formatting
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -46,12 +46,12 @@ jobs:
           - windows
         include:
           - build: linux-x86_64
-            os: ubuntu-20.04
+            os: ubuntu-22.04
             ruby-version: 3.1.2
             run-tests: 'true'
             target: x86_64-unknown-linux-gnu
           - build: linux-aarch64
-            os: ubuntu-20.04
+            os: ubuntu-22.04
             ruby-version: 3.1.2
             run-tests: 'false'
             target: aarch64-unknown-linux-gnu
@@ -145,7 +145,7 @@ jobs:
           target/${{ matrix.target }}/release/rbspy record env LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4 ruby ci/ruby-programs/short_program.rb
 
   build-linux-cross:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
@@ -234,7 +234,7 @@ jobs:
 
   release:
     name: Create draft release
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     if: "startsWith(github.ref, 'refs/tags/')"
     needs: [build, build-freebsd, build-linux-cross]
     steps:
