@@ -286,19 +286,18 @@ macro_rules! get_execution_context_from_vm(
             let main_ractor_address = vm.ractor.main_ractor as usize;
             let candidate_addresses: [usize; ADDRESSES_TO_CHECK] =
                 source.copy_struct(main_ractor_address + initial_offset)
-                    .context(main_ractor_address)?;
-            let matching_index =
-                candidate_addresses
-                .iter()
-                .position(|&addr| addr == vm.ractor.main_thread as usize)
-                .ok_or(format_err!("couldn't find current execution context"))?;
-            let running_ec_address = candidate_addresses[matching_index - 1];
-            let ec: rb_execution_context_struct = source.copy_struct(running_ec_address as usize)
-                .context("coludn't read execution context pointer")?;
-            if ec.thread_ptr != vm.ractor.main_thread {
-                return Err(format_err!("EC thread didn't match ractor main thread")).context("get_execution_context_from_vm");
-            }
-            Ok(running_ec_address)
+                    .context("couldn't read main ractor struct")?;
+
+            candidate_addresses
+            .iter()
+            .enumerate()
+            .filter(|(_, &addr)| addr == vm.ractor.main_thread as usize)
+            .map(|(i, _)| candidate_addresses[i - 1])
+            .filter(|&addr| addr != 0)
+            .filter(|&addr| source.copy_struct::<rb_execution_context_struct>(addr as usize).is_ok())
+            .collect::<Vec<usize>>()
+            .pop()
+            .ok_or(format_err!("couldn't find main thread execution context"))
         }
     )
 );
