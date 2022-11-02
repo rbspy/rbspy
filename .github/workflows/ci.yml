@@ -91,9 +91,9 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-${{ matrix.target }}-cargo0-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-20221101-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.target }}-cargo0-
+            ${{ runner.os }}-${{ matrix.target }}-cargo-20221101
       - name: Show command used for Cargo
         run: |
           echo "cargo command is: ${{ env.CARGO }}"
@@ -201,7 +201,7 @@ jobs:
         uses: actions/cache@v3.0.4
         with:
           path: build-artifacts.tar
-          key: ${{ matrix.box }}-cargo-20220607-0-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ matrix.box }}-cargo-20221101-0-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ matrix.box }}-cargo-20220607-0-
       - name: Set up VM
