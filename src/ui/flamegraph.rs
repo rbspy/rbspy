@@ -1,10 +1,9 @@
-use std::collections::HashMap;
-use std::io::{self, Write};
-
-use crate::core::types::StackFrame;
-
 use anyhow::Result;
 use inferno::flamegraph::{Direction, Options};
+use std::collections::HashMap;
+use std::io::Write;
+
+use crate::core::types::StackFrame;
 
 // Simple counter that maps stacks to flamegraph collapsed format
 #[derive(Default)]
@@ -13,7 +12,7 @@ pub struct Stats {
 }
 
 impl Stats {
-    pub fn record(&mut self, stack: &[StackFrame]) -> Result<(), io::Error> {
+    pub fn record(&mut self, stack: &[StackFrame]) -> Result<()> {
         let frame = stack
             .iter()
             .rev()
@@ -82,7 +81,7 @@ mod tests {
     }
 
     // Build test stats
-    fn build_stats() -> Result<Stats, io::Error> {
+    fn build_stats() -> Result<Stats> {
         let mut stats = Stats::default();
         stats.record(&vec![f(1)])?;
         stats.record(&vec![f(2), f(1)])?;
@@ -98,7 +97,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stats() -> Result<(), io::Error> {
+    fn test_stats() -> Result<()> {
         let stats = build_stats()?;
         let counts = &stats.counts;
         assert_contains(counts, "func1 - file1.rb:1", 1);

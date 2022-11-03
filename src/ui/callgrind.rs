@@ -1,3 +1,4 @@
+use anyhow::Result;
 use std::cmp::min;
 use std::collections::{BTreeMap, HashMap};
 use std::io;
@@ -250,7 +251,7 @@ impl Stats {
 
     // Write a callgrind file based on the stats collected.
     // SEe the format docs here: http://kcachegrind.sourceforge.net/html/CallgrindFormat.html
-    pub fn write(&self, w: &mut dyn io::Write) -> io::Result<()> {
+    pub fn write(&self, w: &mut dyn io::Write) -> Result<()> {
         // Write a header.
         writeln!(w, "# callgrind format")?;
         writeln!(w, "version: 1")?;

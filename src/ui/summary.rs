@@ -1,3 +1,4 @@
+use anyhow::Result;
 use std::collections::{HashMap, HashSet};
 use std::io;
 
@@ -81,7 +82,7 @@ impl Stats {
         }
     }
 
-    pub fn write(&self, w: &mut dyn io::Write) -> io::Result<()> {
+    pub fn write(&self, w: &mut dyn io::Write) -> Result<()> {
         self.write_counts(w, None, None)
     }
 
@@ -90,7 +91,7 @@ impl Stats {
         w: &mut dyn io::Write,
         n: usize,
         truncate: Option<usize>,
-    ) -> io::Result<()> {
+    ) -> Result<()> {
         self.write_counts(w, Some(n), truncate)
     }
 
@@ -103,7 +104,7 @@ impl Stats {
         w: &mut dyn io::Write,
         top: Option<usize>,
         truncate: Option<usize>,
-    ) -> io::Result<()> {
+    ) -> Result<()> {
         let top = top.unwrap_or(::std::usize::MAX);
         let truncate = truncate.unwrap_or(::std::usize::MAX);
         let mut sorted: Vec<(u64, u64, &str)> = self
