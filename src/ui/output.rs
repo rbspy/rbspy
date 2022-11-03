@@ -21,20 +21,18 @@ pub struct Flamegraph {
 
 impl Outputter for Flamegraph {
     fn record(&mut self, stack: &StackTrace) -> Result<()> {
-        self.stats.record(&stack.trace)?;
-        Ok(())
+        self.stats.record(&stack.trace)
     }
 
     fn complete(&mut self, write: &mut dyn Write) -> Result<()> {
-        self.stats.write_flamegraph(write, self.min_width)?;
-        Ok(())
+        self.stats.write_flamegraph(write, self.min_width)
     }
 }
 
 impl Flamegraph {
     pub fn new(min_width: f64) -> Flamegraph {
         Flamegraph {
-            min_width: min_width,
+            min_width,
             stats: Default::default(),
         }
     }
@@ -47,13 +45,11 @@ pub struct Collapsed(pub flamegraph::Stats);
 
 impl Outputter for Collapsed {
     fn record(&mut self, stack: &StackTrace) -> Result<()> {
-        self.0.record(&stack.trace)?;
-        Ok(())
+        self.0.record(&stack.trace)
     }
 
     fn complete(&mut self, mut write: &mut dyn Write) -> Result<()> {
-        self.0.write_collapsed(&mut write)?;
-        Ok(())
+        self.0.write_collapsed(&mut write)
     }
 }
 
@@ -67,8 +63,7 @@ impl Outputter for Callgrind {
 
     fn complete(&mut self, mut write: &mut dyn Write) -> Result<()> {
         self.0.finish();
-        self.0.write(&mut write)?;
-        Ok(())
+        self.0.write(&mut write)
     }
 }
 
@@ -81,8 +76,7 @@ impl Outputter for Summary {
     }
 
     fn complete(&mut self, mut write: &mut dyn Write) -> Result<()> {
-        self.0.write(&mut write)?;
-        Ok(())
+        self.0.write(&mut write)
     }
 }
 
@@ -95,8 +89,7 @@ impl Outputter for SummaryLine {
     }
 
     fn complete(&mut self, mut write: &mut dyn Write) -> Result<()> {
-        self.0.write(&mut write)?;
-        Ok(())
+        self.0.write(&mut write)
     }
 }
 
@@ -104,13 +97,11 @@ pub struct Speedscope(pub speedscope::Stats);
 
 impl Outputter for Speedscope {
     fn record(&mut self, stack: &StackTrace) -> Result<()> {
-        self.0.record(&stack)?;
-        Ok(())
+        self.0.record(&stack)
     }
 
     fn complete(&mut self, write: &mut dyn Write) -> Result<()> {
-        self.0.write(write)?;
-        Ok(())
+        self.0.write(write)
     }
 }
 
@@ -118,13 +109,11 @@ pub struct Pprof(pub pprof::Stats);
 
 impl Outputter for Pprof {
     fn record(&mut self, stack: &StackTrace) -> Result<()> {
-        self.0.record(stack)?;
-        Ok(())
+        self.0.record(stack)
     }
 
     fn complete(&mut self, write: &mut dyn Write) -> Result<()> {
-        self.0.write(write)?;
-        Ok(())
+        self.0.write(write)
     }
 }
 
