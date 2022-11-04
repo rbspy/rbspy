@@ -390,6 +390,14 @@ macro_rules! get_stack_trace(
         }
 
         fn stack_base(thread: &$thread_type) -> i64 {
+            // Ruby stack grows down, starting at
+            //   ruby_current_thread->stack + ruby_current_thread->stack_size - 1 * sizeof(rb_control_frame_t)
+            // I don't know what the -1 is about. Also note that the stack_size is *not* in bytes! stack is a
+            // VALUE*, and so stack_size is in units of sizeof(VALUE).
+            //
+            // The base of the call stack is therefore at
+            //   stack + stack_size * sizeof(VALUE) - sizeof(rb_control_frame_t)
+            // (with everything in bytes).
             stack_field(thread) + stack_size_field(thread) * std::mem::size_of::<VALUE>() as i64 - 1 * std::mem::size_of::<rb_control_frame_t>() as i64
         }
 
@@ -813,14 +821,6 @@ macro_rules! get_stack_frame_2_5_0(
 
 macro_rules! get_cfps(
     () => (
-        // Ruby stack grows down, starting at
-        //   ruby_current_thread->stack + ruby_current_thread->stack_size - 1 * sizeof(rb_control_frame_t)
-        // I don't know what the -1 is about. Also note that the stack_size is *not* in bytes! stack is a
-        // VALUE*, and so stack_size is in units of sizeof(VALUE).
-        //
-        // The base of the call stack is therefore at
-        //   stack + stack_size * sizeof(VALUE) - sizeof(rb_control_frame_t)
-        // (with everything in bytes).
         fn get_cfps<T>(
             cfp_address: usize,
             stack_base: usize,
