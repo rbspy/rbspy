@@ -33,7 +33,7 @@ jobs:
     env:
       CARGO: cargo
       TARGET_FLAGS: --target ${{ matrix.target }}
-      RUST_BACKTRACE: 1
+      RUST_BACKTRACE: full
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
