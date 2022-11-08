@@ -220,6 +220,15 @@ mod test {
     }
 
     #[test]
+    fn tolerate_stacktrace_timestamps_arriving_out_of_order() {
+        let mut stats = Stats::new();
+        let mut time = SystemTime::now();
+        stats.record(&s(vec![f(1)], time)).unwrap();
+        time -= Duration::new(0, 200);
+        stats.record(&s(vec![f(3), f(2), f(1)], time)).unwrap();
+    }
+
+    #[test]
     fn can_collect_traces_and_write_to_pprof_format() {
         let mut gz_stats_buf: Vec<u8> = Vec::new();
         let mut stats = test_stats();
