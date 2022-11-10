@@ -41,7 +41,15 @@ impl Stats {
     pub fn record(&mut self, stack: &StackTrace) -> Result<()> {
         let this_time = stack.time.unwrap_or_else(SystemTime::now);
         let ns_since_last_sample = match self.prev_time {
-            Some(prev_time) => this_time.duration_since(prev_time)?.as_nanos(),
+            Some(prev_time) => match this_time.duration_since(prev_time) {
+                Ok(duration) => duration.as_nanos(),
+                Err(e) => {
+                    // It's possible that samples will arrive out of order, e.g. if we're sampling
+                    // from multiple processes.
+                    warn!("sample arrived out of order: {}", e);
+                    0
+                }
+            },
             None => 0,
         } as i64;
         self.add_sample(stack, ns_since_last_sample);
@@ -217,6 +225,15 @@ mod test {
         stats.record(&s(vec![f(3), fdup(), f(1)], time)).unwrap();
 
         stats
+    }
+
+    #[test]
+    fn tolerate_stacktrace_timestamps_arriving_out_of_order() {
+        let mut stats = Stats::new();
+        let mut time = SystemTime::now();
+        stats.record(&s(vec![f(1)], time)).unwrap();
+        time -= Duration::new(0, 200);
+        stats.record(&s(vec![f(3), f(2), f(1)], time)).unwrap();
     }
 
     #[test]
