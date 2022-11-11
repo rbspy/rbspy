@@ -826,17 +826,17 @@ macro_rules! get_cfps(
             stack_base: usize,
             source: &T
         ) -> Result<Vec<rb_control_frame_t>> where T: ProcessMemory {
+            // If we fail these safety checks, it probably means we've hit some kind of
+            // race condition. Return an error so that we can try again.
             if (stack_base as usize) <= cfp_address {
-                // this probably means we've hit some kind of race, return an error so we can try
-                // again
                 return Err(crate::core::types::MemoryCopyError::Message(format!("stack base and cfp address out of sync. stack base: {:x}, cfp address: {:x}", stack_base as usize, cfp_address)).into());
             }
+            let cfp_size = (stack_base as usize - cfp_address) as usize / std::mem::size_of::<rb_control_frame_t>();
+            if cfp_size > 1_000_000 {
+                return Err(crate::core::types::MemoryCopyError::Message(format!("invalid cfp vector length")).into());
+            }
 
-            Ok(
-                source
-                    .copy_vec(cfp_address, (stack_base as usize - cfp_address) as usize / std::mem::size_of::<rb_control_frame_t>())
-                    .context(cfp_address)?
-            )
+            source.copy_vec(cfp_address, cfp_size).context("couldn't copy cfp vector")
         }
     )
 );
