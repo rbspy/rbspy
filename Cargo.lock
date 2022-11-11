@@ -1357,9 +1357,9 @@ checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
 
 [[package]]
 name = "spytools"
-version = "0.1.3"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ee79cfcb12b5a3c82c744cfbc48fa8263d448166ef9618e57e8492e3276c29e"
+checksum = "c04c26ba0b990e198276595f99839a3233a95190d04beb23f9adc9b188dff695"
 dependencies = [
  "anyhow",
  "goblin 0.6.0",
