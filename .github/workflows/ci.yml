@@ -18,12 +18,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
       - name: Install Rust
-        uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f # v1.0.6
-        with:
-          toolchain: stable
-          override: true
-          profile: minimal
-          components: rustfmt
+        uses: dtolnay/rust-toolchain@984d158d699777abbaa79de23de3134e60c187fa # stable branch
       - name: Run cargo fmt
         run: |
           cargo fmt --all -- --check
@@ -73,11 +68,7 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby-version }}
       - name: Install Rust
-        uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f # v1.0.6
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
+        uses: dtolnay/rust-toolchain@984d158d699777abbaa79de23de3134e60c187fa # stable branch
       - name: Install Rust toolchain target
         run: |
           rustup target add ${{ matrix.target }}

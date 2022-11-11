@@ -22,11 +22,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
+        uses: dtolnay/rust-toolchain@984d158d699777abbaa79de23de3134e60c187fa # stable branch
       - name: Install Rust toolchain target
         run: |
           rustup target add ${{ matrix.target }}
@@ -62,11 +58,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
+        uses: dtolnay/rust-toolchain@984d158d699777abbaa79de23de3134e60c187fa # stable branch
       - name: Install Ruby
         uses: ruby/setup-ruby@v1
         with:
