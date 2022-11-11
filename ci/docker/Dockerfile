@@ -21,7 +21,7 @@ RUN case $TARGETPLATFORM in \
 
 RUN rbspy --version
 
-FROM ubuntu:focal-20210416 as gnu
+FROM ubuntu:jammy-20221101 as gnu
 
 ARG TARGETPLATFORM
 ARG VERSION
