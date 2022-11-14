@@ -833,7 +833,7 @@ macro_rules! get_cfps(
             }
             let cfp_size = (stack_base as usize - cfp_address) as usize / std::mem::size_of::<rb_control_frame_t>();
             if cfp_size > 1_000_000 {
-                return Err(crate::core::types::MemoryCopyError::Message(format!("invalid cfp vector length")).into());
+                return Err(crate::core::types::MemoryCopyError::Message(format!("invalid cfp vector length: {}", cfp_size)).into());
             }
 
             source.copy_vec(cfp_address, cfp_size).context("couldn't copy cfp vector")
