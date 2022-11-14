@@ -178,23 +178,23 @@ jobs:
         include:
           - box: fbsd_13_1
             release: FreeBSD-13.1-STABLE
-            url: https://github.com/rbspy/freebsd-vagrant-box/releases/download/20220703/fbsd_13_1.box
+            url: https://github.com/rbspy/freebsd-vagrant-box/releases/download/20221112/fbsd_13_1.box
     steps:
       - uses: actions/checkout@v3
       - name: Cache Vagrant box
         uses: actions/cache@v3.0.4
         with:
           path: ~/.vagrant.d
-          key: ${{ matrix.box }}-vagrant-boxes-${{ hashFiles('ci/Vagrantfile') }}
+          key: ${{ matrix.box }}-vagrant-boxes-20221112-${{ hashFiles('ci/Vagrantfile') }}
           restore-keys: |
-            ${{ matrix.box }}-vagrant-boxes-
+            ${{ matrix.box }}-vagrant-boxes-20221112-
       - name: Cache Cargo and build artifacts
         uses: actions/cache@v3.0.4
         with:
           path: build-artifacts.tar
-          key: ${{ matrix.box }}-cargo-20221101-0-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ matrix.box }}-cargo-20221112-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ matrix.box }}-cargo-20220607-0-
+            ${{ matrix.box }}-cargo-20221112-
       - name: Set up VM
         run: |
           brew install vagrant
@@ -215,7 +215,7 @@ jobs:
           ls -ahl build-artifacts.tar
       - name: Prepare binary for upload
         run: |
-          tar xf build-artifacts.tar  target/release/rbspy
+          tar xf build-artifacts.tar target/release/rbspy
           mv target/release/rbspy rbspy-x86_64-unknown-freebsd
       - name: Upload Binaries
         uses: actions/upload-artifact@v3

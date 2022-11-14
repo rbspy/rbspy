@@ -7,8 +7,6 @@ set -e
 ruby -v
 cargo --version
 
-sudo pkg install -y llvm
-
 export CARGO_HOME="/vagrant/.cargo"
 mkdir -p $CARGO_HOME
 
