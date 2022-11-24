@@ -461,7 +461,7 @@ macro_rules! get_thread_id_2_5_0(
         fn get_thread_id<T>(thread_struct: &rb_execution_context_struct, source: &T)
                             -> Result<usize> where T: ProcessMemory {
             let thread: rb_thread_struct = source.copy_struct(thread_struct.thread_ptr as usize)
-                .context(thread_struct.thread_ptr as usize)?;
+                .context("couldn't copy thread struct")?;
             Ok(thread.thread_id as usize)
         }
     )
@@ -473,7 +473,7 @@ macro_rules! get_ruby_string_array_2_5_0(
         fn get_ruby_string_array<T>(addr: usize, string_class: usize, source: &T) -> Result<(String, String)> where T: ProcessMemory {
             // todo: we're doing an extra copy here for no reason
             let rstring: RString = source.copy_struct(addr)
-                .context(addr)?;
+                .context("couldn't copy RString")?;
             if rstring.basic.klass as usize == string_class {
                 let s = get_ruby_string(addr, source)?;
                 return Ok((s.clone(), s))
@@ -522,9 +522,8 @@ macro_rules! get_ruby_string(
         ) -> Result<String> where T: ProcessMemory {
             let vec = {
                 let rstring: RString = source.copy_struct(addr)
-                    .context(addr)?;
-                let basic = rstring.basic;
-                let is_array = basic.flags & 1 << 13 == 0;
+                    .context("couldn't copy rstring")?;
+                let is_array = rstring.basic.flags & 1 << 13 == 0;
                 if is_array {
                     unsafe { CStr::from_ptr(rstring_as_array(rstring).as_ref().as_ptr() as *const libc::c_char) }
                     .to_bytes()
@@ -536,8 +535,8 @@ macro_rules! get_ruby_string(
                         let result = source.copy(addr as usize, len);
                         match result {
                             Err(x) => {
-                                debug!("Error: Failed to get ruby string.\nrstring: {:?}, addr: {}, len: {}", rstring, addr, len);
-                                return Err(x).context(addr)?;
+                                debug!("Error: Failed to copy ruby string from heap.\nrstring: {:?}, addr: {}, len: {}", rstring, addr, len);
+                                return Err(x).context("couldn't copy ruby string from heap")?;
                             }
                             Ok(x) => x
                         }
@@ -545,10 +544,7 @@ macro_rules! get_ruby_string(
                 }
             };
 
-            let error =
-                crate::core::types::MemoryCopyError::Message("Ruby string is invalid".to_string());
-
-            String::from_utf8(vec).or(Err(error.into()))
+            String::from_utf8(vec).context("couldn't convert ruby string bytes to string")
         }
     )
 );
@@ -804,9 +800,9 @@ macro_rules! get_stack_frame_2_5_0(
             source: &T,
         ) -> Result<StackFrame> where T: ProcessMemory {
             let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
-                .context(iseq_struct.body as usize)?;
+                .context("couldn't copy rb_iseq_constant_body")?;
             let rstring: RString = source.copy_struct(body.location.label as usize)
-                .context(body.location.label as usize)?;
+                .context("couldn't copy RString")?;
 
             let (path, absolute_path) = get_ruby_string_array(body.location.pathobj as usize, rstring.basic.klass as usize, source)?;
             Ok(StackFrame{
