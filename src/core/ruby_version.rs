@@ -292,12 +292,13 @@ macro_rules! get_execution_context_from_vm(
             .iter()
             .enumerate()
             .filter(|(_, &addr)| addr == vm.ractor.main_thread as usize)
-            .map(|(i, _)| candidate_addresses[i - 1])
+            .map(|(idx, _)| candidate_addresses[idx - 1])
             .filter(|&addr| addr != 0)
             .filter(|&addr| source.copy_struct::<rb_execution_context_struct>(addr as usize).is_ok())
             .collect::<Vec<usize>>()
-            .pop()
-            .ok_or(format_err!("couldn't find main thread execution context"))
+            .first()
+            .map(|&addr| addr as usize)
+            .ok_or_else(|| format_err!("couldn't find execution context"))
         }
     )
 );
