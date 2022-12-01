@@ -1057,14 +1057,17 @@ ruby_version_v2_7_x!(ruby_2_7_3);
 ruby_version_v2_7_x!(ruby_2_7_4);
 ruby_version_v2_7_x!(ruby_2_7_5);
 ruby_version_v2_7_x!(ruby_2_7_6);
+ruby_version_v2_7_x!(ruby_2_7_7);
 ruby_version_v3_0_x!(ruby_3_0_0);
 ruby_version_v3_0_x!(ruby_3_0_1);
 ruby_version_v3_0_x!(ruby_3_0_2);
 ruby_version_v3_0_x!(ruby_3_0_3);
 ruby_version_v3_0_x!(ruby_3_0_4);
+ruby_version_v3_0_x!(ruby_3_0_5);
 ruby_version_v3_1_x!(ruby_3_1_0);
 ruby_version_v3_1_x!(ruby_3_1_1);
 ruby_version_v3_1_x!(ruby_3_1_2);
+ruby_version_v3_1_x!(ruby_3_1_3);
 
 pub fn get_execution_context(version: &Version) -> crate::core::types::GetExecutionContextFn {
     let function = match version {
@@ -1513,6 +1516,12 @@ pub fn get_execution_context(version: &Version) -> crate::core::types::GetExecut
             ..
         } => ruby_2_7_6::get_execution_context,
         Version {
+            major: 2,
+            minor: 7,
+            patch: 7,
+            ..
+        } => ruby_2_7_7::get_execution_context,
+        Version {
             major: 3,
             minor: 0,
             patch: 0,
@@ -1544,6 +1553,12 @@ pub fn get_execution_context(version: &Version) -> crate::core::types::GetExecut
         } => ruby_3_0_4::get_execution_context,
         Version {
             major: 3,
+            minor: 0,
+            patch: 5,
+            ..
+        } => ruby_3_0_5::get_execution_context,
+        Version {
+            major: 3,
             minor: 1,
             patch: 0,
             ..
@@ -1560,6 +1575,12 @@ pub fn get_execution_context(version: &Version) -> crate::core::types::GetExecut
             patch: 2,
             ..
         } => ruby_3_1_2::get_execution_context,
+        Version {
+            major: 3,
+            minor: 1,
+            patch: 3,
+            ..
+        } => ruby_3_1_3::get_execution_context,
         _ => panic!(
             "Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!",
             version
@@ -2016,6 +2037,12 @@ pub fn is_maybe_thread_function(version: &Version) -> crate::core::types::IsMayb
             ..
         } => ruby_2_7_6::is_maybe_thread,
         Version {
+            major: 2,
+            minor: 7,
+            patch: 7,
+            ..
+        } => ruby_2_7_7::is_maybe_thread,
+        Version {
             major: 3,
             minor: 0,
             patch: 0,
@@ -2047,6 +2074,12 @@ pub fn is_maybe_thread_function(version: &Version) -> crate::core::types::IsMayb
         } => ruby_3_0_4::is_maybe_thread,
         Version {
             major: 3,
+            minor: 0,
+            patch: 5,
+            ..
+        } => ruby_3_0_5::is_maybe_thread,
+        Version {
+            major: 3,
             minor: 1,
             patch: 0,
             ..
@@ -2063,6 +2096,12 @@ pub fn is_maybe_thread_function(version: &Version) -> crate::core::types::IsMayb
             patch: 2,
             ..
         } => ruby_3_1_2::is_maybe_thread,
+        Version {
+            major: 3,
+            minor: 1,
+            patch: 3,
+            ..
+        } => ruby_3_1_3::is_maybe_thread,
         _ => panic!(
             "Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!",
             version
@@ -2518,6 +2557,12 @@ pub fn get_stack_trace_function(version: &Version) -> crate::core::types::StackT
             ..
         } => ruby_2_7_6::get_stack_trace,
         Version {
+            major: 2,
+            minor: 7,
+            patch: 7,
+            ..
+        } => ruby_2_7_7::get_stack_trace,
+        Version {
             major: 3,
             minor: 0,
             patch: 0,
@@ -2549,6 +2594,12 @@ pub fn get_stack_trace_function(version: &Version) -> crate::core::types::StackT
         } => ruby_3_0_4::get_stack_trace,
         Version {
             major: 3,
+            minor: 0,
+            patch: 5,
+            ..
+        } => ruby_3_0_5::get_stack_trace,
+        Version {
+            major: 3,
             minor: 1,
             patch: 0,
             ..
@@ -2565,6 +2616,12 @@ pub fn get_stack_trace_function(version: &Version) -> crate::core::types::StackT
             patch: 2,
             ..
         } => ruby_3_1_2::get_stack_trace,
+        Version {
+            major: 3,
+            minor: 1,
+            patch: 3,
+            ..
+        } => ruby_3_1_3::get_stack_trace,
         _ => panic!(
             "Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!",
             version
@@ -2967,6 +3024,22 @@ mod tests {
 
     #[cfg(target_pointer_width = "64")]
     #[test]
+    fn test_get_ruby_stack_trace_2_7_7() {
+        let current_thread_addr = 0x7fdd8d626070;
+        let global_symbols_addr = Some(0x7fdd8d60eb80);
+        let stack_trace = ruby_version::ruby_2_7_7::get_stack_trace::<CoreDump>(
+            current_thread_addr,
+            0,
+            global_symbols_addr,
+            &coredump_2_7_2(),
+            0,
+        )
+        .unwrap();
+        assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
     fn test_get_ruby_stack_trace_3_0_0() {
         let source = coredump_3_0_0();
         let vm_addr = 0x7fdacdab7470;
@@ -3052,6 +3125,23 @@ mod tests {
 
     #[cfg(target_pointer_width = "64")]
     #[test]
+    fn test_get_ruby_stack_trace_3_0_5() {
+        let source = coredump_3_0_0();
+        let vm_addr = 0x7fdacdab7470;
+        let global_symbols_addr = Some(0x7fdacdaa9d80);
+        let stack_trace = ruby_version::ruby_3_0_5::get_stack_trace::<CoreDump>(
+            0,
+            vm_addr,
+            global_symbols_addr,
+            &source,
+            0,
+        )
+        .unwrap();
+        assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
     fn test_get_ruby_stack_trace_3_1_0() {
         let source = coredump_3_1_0();
         let vm_addr = 0x7f0dc0c83c58;
@@ -3091,6 +3181,23 @@ mod tests {
         let vm_addr = 0x7f0dc0c83c58;
         let global_symbols_addr = Some(0x7f0dc0c75e80);
         let stack_trace = ruby_version::ruby_3_1_2::get_stack_trace::<CoreDump>(
+            0,
+            vm_addr,
+            global_symbols_addr,
+            &source,
+            0,
+        )
+        .unwrap();
+        assert_eq!(real_stack_trace_3_1_0(), stack_trace.trace);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn test_get_ruby_stack_trace_3_1_3() {
+        let source = coredump_3_1_0();
+        let vm_addr = 0x7f0dc0c83c58;
+        let global_symbols_addr = Some(0x7f0dc0c75e80);
+        let stack_trace = ruby_version::ruby_3_1_3::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
             global_symbols_addr,
