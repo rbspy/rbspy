@@ -4,7 +4,7 @@ on:
 jobs:
   xtask:
     name: Build xtask
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v3
@@ -51,7 +51,7 @@ jobs:
           3_0_0, 3_0_1, 3_0_2, 3_0_3, 3_0_4, 3_0_5,
           3_1_0, 3_1_1, 3_1_2, 3_1_3
         ]
-        os: ["ubuntu-22.04"]
+        os: ["ubuntu-20.04"]
         target: ["x86_64-unknown-linux-gnu"]
     steps:
       - name: Checkout rbspy repository
