@@ -584,6 +584,65 @@ macro_rules! get_stack_frame_1_9_2(
     )
 );
 
+macro_rules! get_stack_frame_2_0_0(
+    () => (
+        fn get_stack_frame<T>(
+            iseq_struct: &rb_iseq_struct,
+            cfp: &rb_control_frame_t,
+            source: &T,
+        ) -> Result<StackFrame> where T: ProcessMemory {
+            Ok(StackFrame{
+                name: get_ruby_string(iseq_struct.location.label as usize, source)?,
+                relative_path: get_ruby_string(iseq_struct.location.path as usize, source)?,
+                absolute_path: Some(get_ruby_string(iseq_struct.location.absolute_path as usize, source)?),
+                lineno: get_lineno(iseq_struct, cfp, source)?,
+            })
+        }
+    )
+);
+
+macro_rules! get_stack_frame_2_3_0(
+    () => (
+        fn get_stack_frame<T>(
+            iseq_struct: &rb_iseq_struct,
+            cfp: &rb_control_frame_t,
+            source: &T,
+        ) -> Result<StackFrame> where T: ProcessMemory {
+            let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
+                .context(iseq_struct.body as usize)?;
+            Ok(StackFrame{
+                name: get_ruby_string(body.location.label as usize, source)?,
+                relative_path: get_ruby_string(body.location.path as usize, source)?,
+                absolute_path: Some(get_ruby_string(body.location.absolute_path as usize, source)?),
+                lineno: get_lineno(&body, cfp, source)?,
+            })
+        }
+    )
+);
+
+macro_rules! get_stack_frame_2_5_0(
+    () => (
+        fn get_stack_frame<T>(
+            iseq_struct: &rb_iseq_struct,
+            cfp: &rb_control_frame_t,
+            source: &T,
+        ) -> Result<StackFrame> where T: ProcessMemory {
+            let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
+                .context("couldn't copy rb_iseq_constant_body")?;
+            let rstring: RString = source.copy_struct(body.location.label as usize)
+                .context("couldn't copy RString")?;
+
+            let (path, absolute_path) = get_ruby_string_array(body.location.pathobj as usize, rstring.basic.klass as usize, source)?;
+            Ok(StackFrame{
+                name: get_ruby_string(body.location.label as usize, source)?,
+                relative_path: path,
+                absolute_path: Some(absolute_path),
+                lineno: get_lineno(&body, cfp, source)?,
+            })
+        }
+    )
+);
+
 macro_rules! get_lineno_1_9_0(
     () => (
         fn get_lineno<T>(
@@ -753,65 +812,6 @@ macro_rules! get_lineno_2_6_0(
                 }*/
                 Ok(table[t_size-1].line_no as u32)
             }
-        }
-    )
-);
-
-macro_rules! get_stack_frame_2_0_0(
-    () => (
-        fn get_stack_frame<T>(
-            iseq_struct: &rb_iseq_struct,
-            cfp: &rb_control_frame_t,
-            source: &T,
-        ) -> Result<StackFrame> where T: ProcessMemory {
-            Ok(StackFrame{
-                name: get_ruby_string(iseq_struct.location.label as usize, source)?,
-                relative_path: get_ruby_string(iseq_struct.location.path as usize, source)?,
-                absolute_path: Some(get_ruby_string(iseq_struct.location.absolute_path as usize, source)?),
-                lineno: get_lineno(iseq_struct, cfp, source)?,
-            })
-        }
-    )
-);
-
-macro_rules! get_stack_frame_2_3_0(
-    () => (
-        fn get_stack_frame<T>(
-            iseq_struct: &rb_iseq_struct,
-            cfp: &rb_control_frame_t,
-            source: &T,
-        ) -> Result<StackFrame> where T: ProcessMemory {
-            let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
-                .context(iseq_struct.body as usize)?;
-            Ok(StackFrame{
-                name: get_ruby_string(body.location.label as usize, source)?,
-                relative_path: get_ruby_string(body.location.path as usize, source)?,
-                absolute_path: Some(get_ruby_string(body.location.absolute_path as usize, source)?),
-                lineno: get_lineno(&body, cfp, source)?,
-            })
-        }
-    )
-);
-
-macro_rules! get_stack_frame_2_5_0(
-    () => (
-        fn get_stack_frame<T>(
-            iseq_struct: &rb_iseq_struct,
-            cfp: &rb_control_frame_t,
-            source: &T,
-        ) -> Result<StackFrame> where T: ProcessMemory {
-            let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
-                .context("couldn't copy rb_iseq_constant_body")?;
-            let rstring: RString = source.copy_struct(body.location.label as usize)
-                .context("couldn't copy RString")?;
-
-            let (path, absolute_path) = get_ruby_string_array(body.location.pathobj as usize, rstring.basic.klass as usize, source)?;
-            Ok(StackFrame{
-                name: get_ruby_string(body.location.label as usize, source)?,
-                relative_path: path,
-                absolute_path: Some(absolute_path),
-                lineno: get_lineno(&body, cfp, source)?,
-            })
         }
     )
 );
