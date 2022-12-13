@@ -40,6 +40,7 @@ enum SubCmd {
         flame_min_width: f64,
         lock_process: bool,
         force_version: Option<String>,
+        native_tracing: bool
     },
     /// Capture and print a stacktrace snapshot of process `pid`.
     Snapshot {
@@ -122,6 +123,7 @@ fn do_main() -> Result<(), Error> {
             flame_min_width,
             lock_process,
             force_version,
+            native_tracing
         } => {
             let pid = match target {
                 Target::Pid { pid } => pid,
@@ -186,6 +188,7 @@ fn do_main() -> Result<(), Error> {
                 flame_min_width,
                 lock_process,
                 force_version,
+                native_tracing
             };
 
             let recorder = Arc::<recorder::Recorder>::new(recorder::Recorder::new(config));
@@ -368,6 +371,12 @@ fn arg_parser() -> clap::Command<'static> {
                         .takes_value(true)
                         .required(false)
                 )
+                .arg(
+                    clap::Arg::new("native_tracing")
+                        .help("Enable profiling from the native stack")
+                        .long("native_tracing")
+                        .required(false),
+                )
                 .arg(arg!(<cmd> ... "command to run").required(false)),
         )
         .subcommand(
@@ -437,6 +446,8 @@ impl Args {
                 };
 
                 let no_drop_root = submatches.occurrences_of("no-drop-root") == 1;
+                let native_tracing = submatches.occurrences_of("native_tracing") == 1;
+
                 let silent = submatches.is_present("silent");
                 let with_subprocesses = submatches.is_present("subprocesses");
                 let nonblocking = submatches.is_present("nonblocking");
@@ -472,6 +483,7 @@ impl Args {
                     flame_min_width,
                     lock_process: !nonblocking,
                     force_version,
+                    native_tracing
                 }
             }
             Some(("report", submatches)) => {
@@ -595,6 +607,7 @@ mod tests {
                     flame_min_width: 0.1,
                     lock_process: true,
                     force_version: None,
+                    native_tracing: false
                 },
             }
         );
@@ -619,6 +632,7 @@ mod tests {
                     flame_min_width: 0.1,
                     lock_process: true,
                     force_version: None,
+                    native_tracing: false
                 },
             }
         );
@@ -643,6 +657,7 @@ mod tests {
                     flame_min_width: 0.1,
                     lock_process: true,
                     force_version: None,
+                    native_tracing: false
                 },
             }
         );
@@ -666,6 +681,7 @@ mod tests {
                     flame_min_width: 0.1,
                     lock_process: true,
                     force_version: None,
+                    native_tracing: false
                 },
             }
         );
@@ -690,6 +706,7 @@ mod tests {
                     flame_min_width: 0.1,
                     lock_process: true,
                     force_version: None,
+                    native_tracing: false
                 },
             }
         );
@@ -714,6 +731,7 @@ mod tests {
                     flame_min_width: 0.1,
                     lock_process: true,
                     force_version: None,
+                    native_tracing: false
                 },
             }
         );
@@ -738,6 +756,7 @@ mod tests {
                     flame_min_width: 0.02,
                     lock_process: true,
                     force_version: None,
+                    native_tracing: false
                 },
             }
         );
@@ -762,6 +781,7 @@ mod tests {
                     flame_min_width: 0.1,
                     lock_process: false,
                     force_version: None,
+                    native_tracing: false
                 },
             }
         );

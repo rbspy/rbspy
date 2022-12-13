@@ -12,10 +12,11 @@ pub struct RubySpy {
     ruby_vm_addr_location: usize,
     global_symbols_addr_location: Option<usize>,
     stack_trace_function: crate::core::types::StackTraceFn,
+    native_tracing: bool
 }
 
 impl RubySpy {
-    pub fn new(pid: Pid, force_version: Option<String>) -> Result<Self> {
+    pub fn new(pid: Pid, force_version: Option<String>, native_tracing: bool) -> Result<Self> {
         #[cfg(all(windows, target_arch = "x86_64"))]
         if is_wow64_process(pid).context("check wow64 process")? {
             return Err(format_err!(
@@ -47,6 +48,7 @@ impl RubySpy {
             ruby_vm_addr_location,
             global_symbols_addr_location,
             stack_trace_function,
+            native_tracing
         })
     }
 
@@ -62,10 +64,11 @@ impl RubySpy {
         pid: Pid,
         max_retries: u64,
         force_version: Option<String>,
+        native_tracing: bool
     ) -> Result<Self, Error> {
         let mut retries = 0;
         loop {
-            let err = match Self::new(pid, force_version.clone()) {
+            let err = match Self::new(pid, force_version.clone(), native_tracing) {
                 Ok(mut process) => {
                     // verify that we can load a stack trace before returning success
                     match process.get_stack_trace(false) {
@@ -186,7 +189,7 @@ mod tests {
 
     #[test]
     fn test_initialize_with_nonexistent_process() {
-        match RubySpy::new(65535, None) {
+        match RubySpy::new(65535, None, false) {
             Ok(_) => assert!(
                 false,
                 "Expected error because process probably doesn't exist"
@@ -214,7 +217,7 @@ mod tests {
         let mut process = Command::new("/usr/bin/ruby").spawn().unwrap();
         let pid = process.id() as Pid;
 
-        match RubySpy::new(pid, None) {
+        match RubySpy::new(pid, None, false) {
             Ok(_) => assert!(
                 false,
                 "Expected error because we shouldn't be allowed to profile system processes"
@@ -235,7 +238,7 @@ mod tests {
 
         let cmd = RubyScript::new("./ci/ruby-programs/infinite.rb");
         let pid = cmd.id() as Pid;
-        let mut spy = RubySpy::retry_new(pid, 100, None).expect("couldn't initialize spy");
+        let mut spy = RubySpy::retry_new(pid, 100, None, false).expect("couldn't initialize spy");
         spy.get_stack_trace(false)
             .expect("couldn't get stack trace");
     }
@@ -249,7 +252,7 @@ mod tests {
         }
 
         let mut cmd = RubyScript::new("./ci/ruby-programs/infinite.rb");
-        let mut getter = RubySpy::retry_new(cmd.id(), 100, None).unwrap();
+        let mut getter = RubySpy::retry_new(cmd.id(), 100, None, false).unwrap();
 
         cmd.kill().expect("couldn't clean up test process");
 

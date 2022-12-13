@@ -41,6 +41,8 @@ pub struct Config {
     ///
     /// This option shouldn't be needed unless you're testing a pre-release Ruby version.
     pub force_version: Option<String>,
+    /// Turn on native stack tracing as well
+    pub native_tracing: bool
 }
 
 pub struct Recorder {
@@ -62,6 +64,7 @@ impl Recorder {
             config.maybe_duration,
             config.with_subprocesses,
             config.force_version,
+            config.native_tracing
         );
 
         Recorder {
