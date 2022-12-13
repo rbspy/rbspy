@@ -3,6 +3,8 @@ use anyhow::format_err;
 use anyhow::{Context, Error, Result};
 use spytools::ProcessInfo;
 
+use crate::StackFrame;
+use std::time::{Duration, Instant};
 use crate::core::process::{Pid, Process, ProcessRetry};
 use crate::core::types::{MemoryCopyError, StackTrace};
 
@@ -12,7 +14,11 @@ pub struct RubySpy {
     ruby_vm_addr_location: usize,
     global_symbols_addr_location: Option<usize>,
     stack_trace_function: crate::core::types::StackTraceFn,
-    native_tracing: bool
+    native_tracing: bool,
+    #[cfg(all(feature = "native_profiling", target_os = "linux", target_arch = "x86_64"))]
+    unwinder: remoteprocess::Unwinder,
+    #[cfg(all(feature = "native_profiling", target_os = "linux", target_arch = "x86_64"))]
+    symbolicator: remoteprocess::Symbolicator
 }
 
 impl RubySpy {
@@ -40,15 +46,23 @@ impl RubySpy {
         )
         .context("get ruby VM state")?;
 
-        let stack_trace_function = crate::core::ruby_version::get_stack_trace_function(&version);
+        #[cfg(all(feature = "native_profiling", target_os = "linux", target_arch = "x86_64"))]
+        let unwinder = process.unwinder()?;
+        #[cfg(all(feature = "native_profiling", target_os = "linux", target_arch = "x86_64"))]
+        let mut symbolicator = process.symbolicator()?;
 
+        let stack_trace_function = crate::core::ruby_version::get_stack_trace_function(&version);
         Ok(Self {
             process,
             current_thread_addr_location,
             ruby_vm_addr_location,
             global_symbols_addr_location,
             stack_trace_function,
-            native_tracing
+            native_tracing,
+            #[cfg(all(feature = "native_profiling", target_os = "linux", target_arch = "x86_64"))]
+            unwinder,
+            #[cfg(all(feature = "native_profiling", target_os = "linux", target_arch = "x86_64"))]
+            symbolicator,
         })
     }
 
@@ -111,21 +125,96 @@ impl RubySpy {
 
     fn get_trace_from_current_thread(&self, lock_process: bool) -> Result<StackTrace> {
         let _lock;
-        if lock_process {
+        if lock_process || self.native_tracing {
             _lock = self
                 .process
                 .lock()
                 .context("locking process during stack trace retrieval")?;
         }
 
-        (&self.stack_trace_function)(
+        let result = (&self.stack_trace_function)(
             self.current_thread_addr_location,
             self.ruby_vm_addr_location,
             self.global_symbols_addr_location,
             &self.process,
             self.process.pid,
-        )
+        )?;
+
+        if !self.native_tracing {
+            Ok(result)
+        } else {
+            #[cfg(all(feature = "native_profiling", target_os = "linux", target_arch = "x86_64"))]
+            return self.merge_ruby_and_native_frames(result);
+
+            #[cfg(not(all(feature = "native_profiling", target_os = "linux", target_arch = "x86_64")))]
+            Ok(result)
+        }
     }
+
+    #[cfg(all(feature = "native_profiling", target_os = "linux", target_arch = "x86_64"))]
+    fn merge_ruby_and_native_frames(&self, mut ruby_trace: StackTrace) -> Result<StackTrace> {
+        if let Some(thread_id) = ruby_trace.thread_id {
+            let start = Instant::now();
+            let thread = self.process.threads().unwrap_or_default()[0];
+
+            // if let Some(thread) = thread {
+                    // Iterate over the callstack for the current thread
+                let mut native_frames: Vec<StackFrame> = Vec::new();
+                for ip in self.unwinder.cursor(&thread)? {
+                    let ip = ip?;
+
+                    // Lookup the current stack frame containing a filename/function/linenumber etc
+                    // for the current address
+                    self.symbolicator.symbolicate(ip, true, &mut |sf| {
+                        native_frames.push(StackFrame {
+                            name: sf.function.clone().unwrap_or_else(|| "cfunc (unnamed)".to_string()),
+                            relative_path: sf.filename.clone().unwrap_or_default(),
+                            absolute_path: None,
+                            lineno: sf.line.unwrap_or_default() as u32,
+                        });
+                    })?;
+                }
+                ruby_trace.trace = merge_ruby_and_native_frames(&ruby_trace.trace, &native_frames);
+                let duration = start.elapsed();
+
+                println!("Time elapsed in expensive_function() is: {:?}", duration);
+
+                Ok(ruby_trace)
+            // } else {
+                // Ok(ruby_trace)
+            // }
+        } else {
+            Ok(ruby_trace)
+        }
+    }
+}
+
+#[cfg(all(feature = "native_profiling", target_os = "linux", target_arch = "x86_64"))]
+fn merge_ruby_and_native_frames(ruby_frames: &[StackFrame], native_frames: &[StackFrame]) -> Vec<StackFrame> {
+    let mut native_frames_iter = native_frames.iter();
+    let mut frames = vec![];
+    for (i, ruby_frame) in ruby_frames.iter().enumerate() {
+        let is_cfunc = ruby_frame.name.contains("[c function]");
+        let mut found_start_of_cfunc = false || (i == 0 && is_cfunc);
+        if is_cfunc {
+            while let Some(native_frame) = native_frames_iter.next() {
+                if native_frame.name == "vm_call_cfunc_with_frame" {
+                    native_frames_iter.next();
+                    break;
+                }
+
+                if found_start_of_cfunc {
+                    frames.push(native_frame.clone());
+                }
+
+                if native_frame.name == "rb_vm_exec" {
+                    found_start_of_cfunc = true;
+                }
+            }
+        }
+        frames.push(ruby_frame.clone())
+    }
+    frames
 }
 
 #[cfg(all(windows, target_arch = "x86_64"))]
@@ -201,7 +290,7 @@ mod tests {
     #[test]
     #[cfg(target_os = "linux")]
     fn test_initialize_with_disallowed_process() {
-        match RubySpy::new(1, None) {
+        match RubySpy::new(1, None, false) {
             Ok(_) => assert!(
                 false,
                 "Expected error because we shouldn't be allowed to profile the init process"
