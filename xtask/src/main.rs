@@ -18,6 +18,7 @@ fn try_main() -> Result<()> {
                 bindgen::generate_ruby_bindings(
                     std::path::PathBuf::from("ruby-source"),
                     &version_tag,
+                    env::args().nth(3).as_deref(),
                 )?;
             } else {
                 return Err(anyhow!("please provide a ruby tag parameter, e.g. v3_0_3"));
@@ -32,7 +33,7 @@ fn print_help() {
     eprintln!(
         "Tasks:
 
-bindgen <ruby version tag>      Generates Rust bindings for the given Ruby VM version
+bindgen <ruby version tag> [optional-filename.rs]     Generates Rust bindings for the given Ruby VM version
 "
     )
 }

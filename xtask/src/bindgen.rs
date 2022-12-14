@@ -6,6 +6,7 @@ use std::process::{Command, Stdio};
 pub fn generate_ruby_bindings(
     ruby_source_path: std::path::PathBuf,
     version_tag: &str,
+    output_filename: Option<&str>,
 ) -> Result<()> {
     prepare_ruby_source(&ruby_source_path, version_tag)
         .context("prepare ruby source repository")?;
@@ -58,7 +59,9 @@ pub fn generate_ruby_bindings(
     };
 
     let version_number = version_tag.trim_start_matches("v");
-    let bindings_path = format!("ruby-structs/src/ruby_{}.rs", version_number);
+    let default_filename = format!("ruby_{}.rs", version_number);
+    let output_filename = output_filename.unwrap_or(default_filename.as_str());
+    let bindings_path = format!("ruby-structs/src/{}", output_filename);
     bindings.write_to_file(&bindings_path)?;
 
     postprocess_bindings_for_windows(&PathBuf::from(bindings_path.clone()))?;
