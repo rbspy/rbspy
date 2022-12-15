@@ -298,7 +298,7 @@ fn arg_parser() -> clap::Command<'static> {
                         .required(false)
                 )
                 .arg(
-                    arg!(--on-cpu "Collect samples only when the application is using the CPU")
+                    arg!(--oncpu "Collect samples only when the application is using the CPU")
                 )
         )
         .subcommand(
@@ -377,7 +377,7 @@ fn arg_parser() -> clap::Command<'static> {
                         .required(false)
                 )
                 .arg(
-                    arg!(--on-cpu "Collect samples only when the application is using the CPU")
+                    arg!(--oncpu "Collect samples only when the application is using the CPU")
                 )
                 .arg(arg!(<cmd> ... "command to run").required(false)),
         )
@@ -432,7 +432,7 @@ impl Args {
                 pid: get_pid(submatches)
                     .expect("this shouldn't happen because clap requires a pid"),
                 lock_process: submatches.is_present("nonblocking"),
-                on_cpu: submatches.is_present("on-cpu"),
+                on_cpu: submatches.is_present("oncpu"),
                 force_version: match submatches.value_of("force-version") {
                     Some(version) => Some(version.to_string()),
                     None => None,
@@ -456,7 +456,7 @@ impl Args {
                 let sample_rate = ArgMatches::value_of_t(submatches, "rate").unwrap();
                 let flame_min_width =
                     ArgMatches::value_of_t(submatches, "flame-min-width").unwrap();
-                let on_cpu = submatches.is_present("on-cpu");
+                let on_cpu = submatches.is_present("oncpu");
                 let force_version = match ArgMatches::value_of_t(submatches, "force-version") {
                     Err(_) => None,
                     Ok(v) => Some(v),

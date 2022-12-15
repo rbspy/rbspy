@@ -41,7 +41,7 @@ pub struct Config {
     ///
     /// This option shouldn't be needed unless you're testing a pre-release Ruby version.
     pub force_version: Option<String>,
-    /// Drop traces when the thread is not on-cpu
+    /// Drop traces when the thread is not oncpu
     pub on_cpu: bool,
 }
 
