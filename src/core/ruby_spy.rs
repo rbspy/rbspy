@@ -5,6 +5,10 @@ use spytools::ProcessInfo;
 
 use crate::core::process::{Pid, Process, ProcessRetry};
 use crate::core::types::{MemoryCopyError, StackTrace};
+use crate::StackFrame;
+use std::collections::HashSet;
+use symbolic::common::Name;
+use symbolic::demangle::{Demangle, DemangleOptions};
 
 pub struct RubySpy {
     process: Process,
@@ -12,10 +16,16 @@ pub struct RubySpy {
     ruby_vm_addr_location: usize,
     global_symbols_addr_location: Option<usize>,
     stack_trace_function: crate::core::types::StackTraceFn,
+    native_profiling: bool,
+    visited_ips: HashSet<u64>,
+    #[cfg(any(windows, target_os = "linux"))]
+    unwinder: remoteprocess::Unwinder,
+    #[cfg(any(windows, target_os = "linux"))]
+    symbolicator: remoteprocess::Symbolicator,
 }
 
 impl RubySpy {
-    pub fn new(pid: Pid, force_version: Option<String>) -> Result<Self> {
+    pub fn new(pid: Pid, force_version: Option<String>, native_profiling: bool) -> Result<Self> {
         #[cfg(all(windows, target_arch = "x86_64"))]
         if is_wow64_process(pid).context("check wow64 process")? {
             return Err(format_err!(
@@ -39,14 +49,24 @@ impl RubySpy {
         )
         .context("get ruby VM state")?;
 
-        let stack_trace_function = crate::core::ruby_version::get_stack_trace_function(&version);
+        #[cfg(any(windows, target_os = "linux"))]
+        let unwinder = process.unwinder()?;
+        #[cfg(any(windows, target_os = "linux"))]
+        let symbolicator = process.symbolicator()?;
 
+        let stack_trace_function = crate::core::ruby_version::get_stack_trace_function(&version);
         Ok(Self {
             process,
             current_thread_addr_location,
             ruby_vm_addr_location,
             global_symbols_addr_location,
             stack_trace_function,
+            native_profiling,
+            visited_ips: HashSet::new(),
+            #[cfg(any(windows, target_os = "linux"))]
+            unwinder,
+            #[cfg(any(windows, target_os = "linux"))]
+            symbolicator,
         })
     }
 
@@ -62,10 +82,11 @@ impl RubySpy {
         pid: Pid,
         max_retries: u64,
         force_version: Option<String>,
+        native_profiling: bool,
     ) -> Result<Self, Error> {
         let mut retries = 0;
         loop {
-            let err = match Self::new(pid, force_version.clone()) {
+            let err = match Self::new(pid, force_version.clone(), native_profiling) {
                 Ok(mut process) => {
                     // verify that we can load a stack trace before returning success
                     match process.get_stack_trace(false) {
@@ -106,7 +127,25 @@ impl RubySpy {
         }
     }
 
-    fn get_trace_from_current_thread(&self, lock_process: bool) -> Result<StackTrace> {
+    fn get_trace_from_current_thread(&mut self, lock_process: bool) -> Result<StackTrace> {
+        if self.native_profiling && cfg!(any(windows, target_os = "linux")) {
+            let thread = self
+                .process
+                .threads()
+                .unwrap_or_default()
+                .into_iter()
+                .find(|t| t.active().unwrap_or_default());
+            if let Some(thread) = thread {
+                let lock = self
+                    .process
+                    .lock()
+                    .context("locking process during stack trace retrieval")?;
+                let ruby_trace = self.get_ruby_trace()?;
+
+                let native_frames = self.get_native_frames(thread, lock)?;
+                return Ok(merge_ruby_and_native_frames(ruby_trace, native_frames));
+            }
+        }
         let _lock;
         if lock_process {
             _lock = self
@@ -114,7 +153,10 @@ impl RubySpy {
                 .lock()
                 .context("locking process during stack trace retrieval")?;
         }
+        self.get_ruby_trace()
+    }
 
+    fn get_ruby_trace(&mut self) -> Result<StackTrace> {
         (&self.stack_trace_function)(
             self.current_thread_addr_location,
             self.ruby_vm_addr_location,
@@ -123,6 +165,103 @@ impl RubySpy {
             self.process.pid,
         )
     }
+
+    #[cfg(any(windows, target_os = "linux"))]
+    fn get_native_frames(
+        &mut self,
+        thread: remoteprocess::Thread,
+        lock: remoteprocess::Lock,
+    ) -> Result<Vec<StackFrame>> {
+        let mut native_ips: Vec<u64> = Vec::new();
+        for ip in self.unwinder.cursor(&thread)? {
+            let ip = ip?;
+            native_ips.push(ip)
+        }
+
+        drop(lock);
+
+        let mut native_frames: Vec<StackFrame> = Vec::new();
+        for ip in native_ips {
+            self.symbolicate(ip, &mut |sf| {
+                let name: &str = sf
+                    .function
+                    .as_ref()
+                    .map(|s| s as &str)
+                    .unwrap_or_else(|| "cfunc (unnamed)".into());
+                let name = Name::from(name);
+                let name = name.try_demangle(DemangleOptions::complete());
+
+                native_frames.push(StackFrame {
+                    name: name.into(),
+                    relative_path: sf.filename.clone().unwrap_or_default(),
+                    absolute_path: None,
+                    lineno: sf.line.unwrap_or_default() as u32,
+                });
+            })
+            .unwrap_or_else(|_| {
+                native_frames.push(StackFrame {
+                    name: format!("0x{:x}", ip),
+                    relative_path: "".to_string(),
+                    absolute_path: None,
+                    lineno: 0,
+                });
+            });
+        }
+        Ok(native_frames)
+    }
+
+    fn symbolicate(
+        &mut self,
+        ip: u64,
+        func: &mut dyn FnMut(&remoteprocess::StackFrame),
+    ) -> Result<(), remoteprocess::Error> {
+        match self.symbolicator.symbolicate(ip, true, func) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                // Do not reload more than once per IP which is not found
+                if self.visited_ips.contains(&ip) {
+                    return Err(e);
+                }
+                self.symbolicator.reload()?;
+                self.visited_ips.insert(ip);
+                self.symbolicator.symbolicate(ip, true, func)
+            }
+        }
+    }
+}
+
+#[cfg(any(windows, target_os = "linux"))]
+fn merge_ruby_and_native_frames(
+    mut ruby_trace: StackTrace,
+    native_frames: Vec<StackFrame>,
+) -> StackTrace {
+    let ruby_frames = ruby_trace.trace;
+    let mut native_frames_iter = native_frames.iter();
+    let mut frames = vec![];
+    for (i, ruby_frame) in ruby_frames.iter().enumerate() {
+        let is_cfunc = ruby_frame.name.contains("[c function]");
+        let mut found_start_of_cfunc = false || (i == 0 && is_cfunc);
+        if is_cfunc {
+            while let Some(native_frame) = native_frames_iter.next() {
+                if native_frame.name == "vm_call_cfunc_with_frame" {
+                    native_frames_iter.next();
+                    break;
+                }
+
+                // TODO: find a way to filter out internal ruby core functions, and make it configurable?
+                if found_start_of_cfunc  {
+                    frames.push(native_frame.clone());
+                }
+
+                if native_frame.name == "rb_vm_exec" {
+                    found_start_of_cfunc = true;
+                }
+            }
+        }
+        frames.push(ruby_frame.clone())
+    }
+    ruby_trace.trace = frames;
+    ruby_trace
 }
 
 #[cfg(all(windows, target_arch = "x86_64"))]
@@ -186,7 +325,7 @@ mod tests {
 
     #[test]
     fn test_initialize_with_nonexistent_process() {
-        match RubySpy::new(65535, None) {
+        match RubySpy::new(65535, None, false) {
             Ok(_) => assert!(
                 false,
                 "Expected error because process probably doesn't exist"
@@ -198,7 +337,7 @@ mod tests {
     #[test]
     #[cfg(target_os = "linux")]
     fn test_initialize_with_disallowed_process() {
-        match RubySpy::new(1, None) {
+        match RubySpy::new(1, None, false) {
             Ok(_) => assert!(
                 false,
                 "Expected error because we shouldn't be allowed to profile the init process"
@@ -214,7 +353,7 @@ mod tests {
         let mut process = Command::new("/usr/bin/ruby").spawn().unwrap();
         let pid = process.id() as Pid;
 
-        match RubySpy::new(pid, None) {
+        match RubySpy::new(pid, None, false) {
             Ok(_) => assert!(
                 false,
                 "Expected error because we shouldn't be allowed to profile system processes"
@@ -235,7 +374,7 @@ mod tests {
 
         let cmd = RubyScript::new("./ci/ruby-programs/infinite.rb");
         let pid = cmd.id() as Pid;
-        let mut spy = RubySpy::retry_new(pid, 100, None).expect("couldn't initialize spy");
+        let mut spy = RubySpy::retry_new(pid, 100, None, false).expect("couldn't initialize spy");
         spy.get_stack_trace(false)
             .expect("couldn't get stack trace");
     }
@@ -249,7 +388,7 @@ mod tests {
         }
 
         let mut cmd = RubyScript::new("./ci/ruby-programs/infinite.rb");
-        let mut getter = RubySpy::retry_new(cmd.id(), 100, None).unwrap();
+        let mut getter = RubySpy::retry_new(cmd.id(), 100, None, false).unwrap();
 
         cmd.kill().expect("couldn't clean up test process");
 

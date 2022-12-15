@@ -23,6 +23,7 @@ fn main() {
         flame_min_width: 10.0,
         lock_process: true,
         force_version: None,
+        native_profiling: false,
     };
     let recorder = Recorder::new(config);
     match recorder.record() {
