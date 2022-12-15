@@ -21,7 +21,7 @@ pub struct Sampler {
     total_traces: Arc<AtomicUsize>,
     with_subprocesses: bool,
     force_version: Option<String>,
-    native_tracing: bool
+    native_profiling: bool,
 }
 
 impl Sampler {
@@ -32,7 +32,7 @@ impl Sampler {
         time_limit: Option<Duration>,
         with_subprocesses: bool,
         force_version: Option<String>,
-        native_tracing: bool
+        native_profiling: bool,
     ) -> Self {
         Sampler {
             done: Arc::new(AtomicBool::new(false)),
@@ -44,7 +44,7 @@ impl Sampler {
             total_traces: Arc::new(AtomicUsize::new(0)),
             with_subprocesses,
             force_version,
-            native_tracing
+            native_profiling,
         }
     }
 
@@ -75,7 +75,7 @@ impl Sampler {
         let result_sender = result_sender.clone();
         let timing_error_traces = self.timing_error_traces.clone();
         let total_traces = self.total_traces.clone();
-        let native_tracing = self.native_tracing;
+        let native_profiling = self.native_profiling;
 
         if self.with_subprocesses {
             // Start a thread which watches for new descendents and starts new recorders when they
@@ -120,7 +120,7 @@ impl Sampler {
                                 trace_sender_clone,
                                 lock_process,
                                 force_version,
-                                native_tracing
+                                native_profiling,
                             );
                             result_sender.send(result).expect("couldn't send error");
                             drop(result_sender);
@@ -150,7 +150,7 @@ impl Sampler {
                     trace_sender,
                     lock_process,
                     force_version,
-                    native_tracing
+                    native_profiling,
                 );
                 result_sender.send(result).unwrap();
                 drop(result_sender);
@@ -176,10 +176,11 @@ fn sample(
     sender: SyncSender<StackTrace>,
     lock_process: bool,
     force_version: Option<String>,
-    native_tracing: bool,
+    native_profiling: bool,
 ) -> Result<(), Error> {
     let mut process =
-        crate::core::ruby_spy::RubySpy::retry_new(pid, 10, force_version, native_tracing).context("new spy")?;
+        crate::core::ruby_spy::RubySpy::retry_new(pid, 10, force_version, native_profiling)
+            .context("new spy")?;
 
     let mut total = 0;
     let mut errors = 0;
@@ -350,7 +351,7 @@ mod tests {
             Some(std::time::Duration::from_millis(500)),
             false,
             None,
-            false
+            false,
         );
         let (trace_sender, trace_receiver) = std::sync::mpsc::sync_channel(100);
         let (result_sender, result_receiver) = std::sync::mpsc::channel();

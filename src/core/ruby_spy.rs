@@ -3,10 +3,12 @@ use anyhow::format_err;
 use anyhow::{Context, Error, Result};
 use spytools::ProcessInfo;
 
-use crate::StackFrame;
-use std::time::{Duration, Instant};
 use crate::core::process::{Pid, Process, ProcessRetry};
 use crate::core::types::{MemoryCopyError, StackTrace};
+use crate::StackFrame;
+use std::collections::HashSet;
+use symbolic::common::Name;
+use symbolic::demangle::{Demangle, DemangleOptions};
 
 pub struct RubySpy {
     process: Process,
@@ -14,15 +16,16 @@ pub struct RubySpy {
     ruby_vm_addr_location: usize,
     global_symbols_addr_location: Option<usize>,
     stack_trace_function: crate::core::types::StackTraceFn,
-    native_tracing: bool,
-    #[cfg(all(feature = "native_profiling", target_os = "linux", target_arch = "x86_64"))]
+    native_profiling: bool,
+    visited_ips: HashSet<u64>,
+    #[cfg(any(windows, target_os = "linux"))]
     unwinder: remoteprocess::Unwinder,
-    #[cfg(all(feature = "native_profiling", target_os = "linux", target_arch = "x86_64"))]
-    symbolicator: remoteprocess::Symbolicator
+    #[cfg(any(windows, target_os = "linux"))]
+    symbolicator: remoteprocess::Symbolicator,
 }
 
 impl RubySpy {
-    pub fn new(pid: Pid, force_version: Option<String>, native_tracing: bool) -> Result<Self> {
+    pub fn new(pid: Pid, force_version: Option<String>, native_profiling: bool) -> Result<Self> {
         #[cfg(all(windows, target_arch = "x86_64"))]
         if is_wow64_process(pid).context("check wow64 process")? {
             return Err(format_err!(
@@ -46,10 +49,10 @@ impl RubySpy {
         )
         .context("get ruby VM state")?;
 
-        #[cfg(all(feature = "native_profiling", target_os = "linux", target_arch = "x86_64"))]
+        #[cfg(any(windows, target_os = "linux"))]
         let unwinder = process.unwinder()?;
-        #[cfg(all(feature = "native_profiling", target_os = "linux", target_arch = "x86_64"))]
-        let mut symbolicator = process.symbolicator()?;
+        #[cfg(any(windows, target_os = "linux"))]
+        let symbolicator = process.symbolicator()?;
 
         let stack_trace_function = crate::core::ruby_version::get_stack_trace_function(&version);
         Ok(Self {
@@ -58,10 +61,11 @@ impl RubySpy {
             ruby_vm_addr_location,
             global_symbols_addr_location,
             stack_trace_function,
-            native_tracing,
-            #[cfg(all(feature = "native_profiling", target_os = "linux", target_arch = "x86_64"))]
+            native_profiling,
+            visited_ips: HashSet::new(),
+            #[cfg(any(windows, target_os = "linux"))]
             unwinder,
-            #[cfg(all(feature = "native_profiling", target_os = "linux", target_arch = "x86_64"))]
+            #[cfg(any(windows, target_os = "linux"))]
             symbolicator,
         })
     }
@@ -78,11 +82,11 @@ impl RubySpy {
         pid: Pid,
         max_retries: u64,
         force_version: Option<String>,
-        native_tracing: bool
+        native_profiling: bool,
     ) -> Result<Self, Error> {
         let mut retries = 0;
         loop {
-            let err = match Self::new(pid, force_version.clone(), native_tracing) {
+            let err = match Self::new(pid, force_version.clone(), native_profiling) {
                 Ok(mut process) => {
                     // verify that we can load a stack trace before returning success
                     match process.get_stack_trace(false) {
@@ -123,74 +127,123 @@ impl RubySpy {
         }
     }
 
-    fn get_trace_from_current_thread(&self, lock_process: bool) -> Result<StackTrace> {
+    fn get_trace_from_current_thread(&mut self, lock_process: bool) -> Result<StackTrace> {
+        if self.native_profiling && cfg!(any(windows, target_os = "linux")) {
+            let thread = self
+                .process
+                .threads()
+                .unwrap_or_default()
+                .into_iter()
+                .find(|t| t.active().unwrap_or_default());
+            if let Some(thread) = thread {
+                let lock = self
+                    .process
+                    .lock()
+                    .context("locking process during stack trace retrieval")?;
+                let ruby_trace = self.get_ruby_trace()?;
+
+                let native_frames = self.get_native_frames(thread, lock)?;
+                return Ok(merge_ruby_and_native_frames(ruby_trace, native_frames));
+            }
+        }
         let _lock;
-        if lock_process || self.native_tracing {
+        if lock_process {
             _lock = self
                 .process
                 .lock()
                 .context("locking process during stack trace retrieval")?;
         }
+        self.get_ruby_trace()
+    }
 
-        let result = (&self.stack_trace_function)(
+    fn get_ruby_trace(&mut self) -> Result<StackTrace> {
+        (&self.stack_trace_function)(
             self.current_thread_addr_location,
             self.ruby_vm_addr_location,
             self.global_symbols_addr_location,
             &self.process,
             self.process.pid,
-        )?;
-
-        if !self.native_tracing {
-            Ok(result)
-        } else {
-            #[cfg(all(feature = "native_profiling", target_os = "linux", target_arch = "x86_64"))]
-            return self.merge_ruby_and_native_frames(result);
-
-            #[cfg(not(all(feature = "native_profiling", target_os = "linux", target_arch = "x86_64")))]
-            Ok(result)
-        }
+        )
     }
 
-    #[cfg(all(feature = "native_profiling", target_os = "linux", target_arch = "x86_64"))]
-    fn merge_ruby_and_native_frames(&self, mut ruby_trace: StackTrace) -> Result<StackTrace> {
-        if let Some(thread_id) = ruby_trace.thread_id {
-            let start = Instant::now();
-            let thread = self.process.threads().unwrap_or_default()[0];
+    #[cfg(any(windows, target_os = "linux"))]
+    fn get_native_frames(
+        &mut self,
+        thread: remoteprocess::Thread,
+        lock: remoteprocess::Lock,
+    ) -> Result<Vec<StackFrame>> {
+        let mut native_ips: Vec<u64> = Vec::new();
+        for ip in self.unwinder.cursor(&thread)? {
+            let ip = ip?;
+            native_ips.push(ip)
+        }
 
-            // if let Some(thread) = thread {
-                    // Iterate over the callstack for the current thread
-                let mut native_frames: Vec<StackFrame> = Vec::new();
-                for ip in self.unwinder.cursor(&thread)? {
-                    let ip = ip?;
+        drop(lock);
 
-                    // Lookup the current stack frame containing a filename/function/linenumber etc
-                    // for the current address
-                    self.symbolicator.symbolicate(ip, true, &mut |sf| {
-                        native_frames.push(StackFrame {
-                            name: sf.function.clone().unwrap_or_else(|| "cfunc (unnamed)".to_string()),
-                            relative_path: sf.filename.clone().unwrap_or_default(),
-                            absolute_path: None,
-                            lineno: sf.line.unwrap_or_default() as u32,
-                        });
-                    })?;
+        let mut native_frames: Vec<StackFrame> = Vec::new();
+        for ip in native_ips {
+            self.symbolicate(ip, &mut |sf| {
+                let name: &str = sf
+                    .function
+                    .as_ref()
+                    .map(|s| s as &str)
+                    .unwrap_or_else(|| "cfunc (unnamed)".into());
+                let name = Name::from(name);
+                let name = name.try_demangle(DemangleOptions::complete());
+                if sf
+                    .filename
+                    .as_ref()
+                    .map(|s| s as &str)
+                    .unwrap_or_default()
+                    .contains("ruby")
+                {
+                    return;
                 }
-                ruby_trace.trace = merge_ruby_and_native_frames(&ruby_trace.trace, &native_frames);
-                let duration = start.elapsed();
+                native_frames.push(StackFrame {
+                    name: name.into(),
+                    relative_path: sf.filename.clone().unwrap_or_default(),
+                    absolute_path: None,
+                    lineno: sf.line.unwrap_or_default() as u32,
+                });
+            })
+            .unwrap_or_else(|_| {
+                native_frames.push(StackFrame {
+                    name: format!("0x{:x}", ip),
+                    relative_path: "".to_string(),
+                    absolute_path: None,
+                    lineno: 0,
+                });
+            });
+        }
+        Ok(native_frames)
+    }
 
-                println!("Time elapsed in expensive_function() is: {:?}", duration);
-
-                Ok(ruby_trace)
-            // } else {
-                // Ok(ruby_trace)
-            // }
-        } else {
-            Ok(ruby_trace)
+    fn symbolicate(
+        &mut self,
+        ip: u64,
+        func: &mut dyn FnMut(&remoteprocess::StackFrame),
+    ) -> Result<(), remoteprocess::Error> {
+        match self.symbolicator.symbolicate(ip, true, func) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                // Do not reload more than once per IP which is not found
+                if self.visited_ips.contains(&ip) {
+                    return Err(e);
+                }
+                self.symbolicator.reload()?;
+                self.visited_ips.insert(ip);
+                self.symbolicator.symbolicate(ip, true, func)
+            }
         }
     }
 }
 
-#[cfg(all(feature = "native_profiling", target_os = "linux", target_arch = "x86_64"))]
-fn merge_ruby_and_native_frames(ruby_frames: &[StackFrame], native_frames: &[StackFrame]) -> Vec<StackFrame> {
+#[cfg(any(windows, target_os = "linux"))]
+fn merge_ruby_and_native_frames(
+    mut ruby_trace: StackTrace,
+    native_frames: Vec<StackFrame>,
+) -> StackTrace {
+    let ruby_frames = ruby_trace.trace;
     let mut native_frames_iter = native_frames.iter();
     let mut frames = vec![];
     for (i, ruby_frame) in ruby_frames.iter().enumerate() {
@@ -214,7 +267,8 @@ fn merge_ruby_and_native_frames(ruby_frames: &[StackFrame], native_frames: &[Sta
         }
         frames.push(ruby_frame.clone())
     }
-    frames
+    ruby_trace.trace = frames;
+    ruby_trace
 }
 
 #[cfg(all(windows, target_arch = "x86_64"))]
