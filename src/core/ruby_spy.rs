@@ -190,15 +190,7 @@ impl RubySpy {
                     .unwrap_or_else(|| "cfunc (unnamed)".into());
                 let name = Name::from(name);
                 let name = name.try_demangle(DemangleOptions::complete());
-                if sf
-                    .filename
-                    .as_ref()
-                    .map(|s| s as &str)
-                    .unwrap_or_default()
-                    .contains("ruby")
-                {
-                    return;
-                }
+
                 native_frames.push(StackFrame {
                     name: name.into(),
                     relative_path: sf.filename.clone().unwrap_or_default(),
@@ -256,7 +248,8 @@ fn merge_ruby_and_native_frames(
                     break;
                 }
 
-                if found_start_of_cfunc {
+                // TODO: find a way to filter out internal ruby core functions, and make it configurable?
+                if found_start_of_cfunc  {
                     frames.push(native_frame.clone());
                 }
 
