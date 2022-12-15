@@ -9,5 +9,5 @@ pub fn snapshot(
     lock_process: bool,
     force_version: Option<String>,
 ) -> Result<StackTrace, Error> {
-    RubySpy::retry_new(pid, 10, force_version, true)?.get_stack_trace(lock_process)
+    RubySpy::retry_new(pid, 10, force_version, false)?.get_stack_trace(lock_process)
 }
