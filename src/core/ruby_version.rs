@@ -607,7 +607,7 @@ macro_rules! get_ruby_string_1_9_1(
                 // See RSTRING_NOEMBED and RUBY_FL_USER1
                 let is_embedded_string = rstring.basic.flags & 1 << 13 == 0;
                 if is_embedded_string {
-                    unsafe { std::ffi::CStr::from_ptr(rstring_as_array(rstring).as_ref().as_ptr() as *const libc::c_char) }
+                    unsafe { std::ffi::CStr::from_ptr(rstring_as_array(rstring).as_ref().as_ptr()) }
                     .to_bytes()
                     .to_vec()
                 } else {
