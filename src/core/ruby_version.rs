@@ -21,7 +21,7 @@ macro_rules! ruby_version_v_1_9_1(
             get_stack_trace!(rb_thread_struct);
             get_execution_context_from_thread!(rb_thread_struct);
             rstring_as_array_1_9_1!();
-            get_ruby_string!();
+            get_ruby_string_1_9_1!();
             get_cfps!();
             get_pos!(rb_iseq_struct);
             get_lineno_1_9_0!();
@@ -45,7 +45,7 @@ macro_rules! ruby_version_v_1_9_2_to_3(
             get_stack_trace!(rb_thread_struct);
             get_execution_context_from_thread!(rb_thread_struct);
             rstring_as_array_1_9_1!();
-            get_ruby_string!();
+            get_ruby_string_1_9_1!();
             get_cfps!();
             get_pos!(rb_iseq_struct);
             get_lineno_1_9_0!();
@@ -80,7 +80,7 @@ macro_rules! ruby_version_v_2_0_to_2_2(
             get_stack_trace!(rb_thread_struct);
             get_execution_context_from_thread!(rb_thread_struct);
             rstring_as_array_1_9_1!();
-            get_ruby_string!();
+            get_ruby_string_1_9_1!();
             get_cfps!();
             get_pos!(rb_iseq_struct);
             get_lineno_2_0_0!();
@@ -103,7 +103,7 @@ macro_rules! ruby_version_v_2_3_to_2_4(
             get_stack_trace!(rb_thread_struct);
             get_execution_context_from_thread!(rb_thread_struct);
             rstring_as_array_1_9_1!();
-            get_ruby_string!();
+            get_ruby_string_1_9_1!();
             get_cfps!();
             get_pos!(rb_iseq_constant_body);
             get_lineno_2_3_0!();
@@ -126,7 +126,7 @@ macro_rules! ruby_version_v2_5_x(
             get_stack_trace!(rb_execution_context_struct);
             get_execution_context_from_thread!(rb_execution_context_struct);
             rstring_as_array_1_9_1!();
-            get_ruby_string!();
+            get_ruby_string_1_9_1!();
             get_cfps!();
             get_pos!(rb_iseq_constant_body);
             get_lineno_2_5_0!();
@@ -153,7 +153,7 @@ macro_rules! ruby_version_v2_6_x(
             get_stack_trace!(rb_execution_context_struct);
             get_execution_context_from_thread!(rb_execution_context_struct);
             rstring_as_array_1_9_1!();
-            get_ruby_string!();
+            get_ruby_string_1_9_1!();
             get_ruby_string_array_2_5_0!();
             get_cfps!();
             get_pos!(rb_iseq_constant_body);
@@ -180,7 +180,7 @@ macro_rules! ruby_version_v2_7_x(
             get_stack_trace!(rb_execution_context_struct);
             get_execution_context_from_thread!(rb_execution_context_struct);
             rstring_as_array_1_9_1!();
-            get_ruby_string!();
+            get_ruby_string_1_9_1!();
             get_ruby_string_array_2_5_0!();
             get_cfps!();
             get_pos!(rb_iseq_constant_body);
@@ -204,7 +204,7 @@ macro_rules! ruby_version_v3_0_x(
             get_stack_trace!(rb_execution_context_struct);
             get_execution_context_from_vm!();
             rstring_as_array_1_9_1!();
-            get_ruby_string!();
+            get_ruby_string_1_9_1!();
             get_ruby_string_array_2_5_0!();
             get_cfps!();
             get_pos!(rb_iseq_constant_body);
@@ -231,7 +231,7 @@ macro_rules! ruby_version_v3_1_x(
             get_stack_trace!(rb_execution_context_struct);
             get_execution_context_from_vm!();
             rstring_as_array_3_1_0!();
-            get_ruby_string!();
+            get_ruby_string_1_9_1!();
             get_ruby_string_array_2_5_0!();
             get_cfps!();
             get_pos!(rb_iseq_constant_body);
@@ -513,7 +513,7 @@ macro_rules! rstring_as_array_3_1_0(
     )
 );
 
-macro_rules! get_ruby_string(
+macro_rules! get_ruby_string_1_9_1(
     () => (
         use std::ffi::CStr;
 
