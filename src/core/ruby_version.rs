@@ -522,10 +522,10 @@ macro_rules! get_ruby_string_1_9_1(
             source: &T
         ) -> Result<String> where T: ProcessMemory {
             let vec = {
-                let rstring: RString = source.copy_struct(addr)
-                    .context("couldn't copy rstring")?;
-                let is_array = rstring.basic.flags & 1 << 13 == 0;
-                if is_array {
+                let rstring: RString = source.copy_struct(addr).context("couldn't copy rstring")?;
+                // See RSTRING_NOEMBED and RUBY_FL_USER1
+                let is_embedded_string = rstring.basic.flags & 1 << 13 == 0;
+                if is_embedded_string {
                     unsafe { CStr::from_ptr(rstring_as_array(rstring).as_ref().as_ptr() as *const libc::c_char) }
                     .to_bytes()
                     .to_vec()
