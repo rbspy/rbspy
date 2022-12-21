@@ -247,6 +247,32 @@ macro_rules! ruby_version_v3_1_x(
     )
 );
 
+macro_rules! ruby_version_v3_2_x(
+    ($ruby_version:ident) => (
+        pub mod $ruby_version {
+            use std;
+            use anyhow::{Context, format_err, Result};
+            use bindings::$ruby_version::*;
+            use crate::core::process::ProcessMemory;
+
+            get_stack_trace!(rb_execution_context_struct);
+            get_execution_context_from_vm!();
+            get_ruby_string_3_2_0!();
+            get_ruby_string_array_3_2_0!();
+            get_cfps!();
+            get_pos!(rb_iseq_constant_body);
+            get_lineno_2_6_0!();
+            get_stack_frame_2_5_0!();
+            stack_field_2_5_0!();
+            get_thread_id_3_2_0!();
+            get_cfunc_name!();
+
+            #[allow(non_upper_case_globals)]
+            const ruby_fl_type_RUBY_FL_USHIFT: ruby_fl_type = ruby_fl_ushift_RUBY_FL_USHIFT as i32;
+        }
+    )
+);
+
 macro_rules! get_execution_context_from_thread(
     ($thread_type:ident) => (
         pub fn get_execution_context<T: ProcessMemory>(
@@ -468,25 +494,82 @@ macro_rules! get_thread_id_2_5_0(
     )
 );
 
+macro_rules! get_thread_id_3_2_0(
+    () => (
+        fn get_thread_id<T>(thread_struct: &rb_execution_context_struct, source: &T)
+                            -> Result<usize> where T: ProcessMemory {
+            let thread: rb_thread_struct = source.copy_struct(thread_struct.thread_ptr as usize)
+                .context("couldn't copy thread struct")?;
+            if thread.nt.is_null() {
+                return Err(format_err!("native thread pointer is NULL"));
+            }
+            let native_thread: rb_native_thread = source.copy_struct(thread.nt as usize)
+                .context("couldn't copy native thread struct")?;
+            Ok(native_thread.thread_id as usize)
+        }
+    )
+);
+
 macro_rules! get_ruby_string_array_2_5_0(
     () => (
         // Returns (path, absolute_path)
         fn get_ruby_string_array<T>(addr: usize, string_class: usize, source: &T) -> Result<(String, String)> where T: ProcessMemory {
             // todo: we're doing an extra copy here for no reason
-            let rstring: RString = source.copy_struct(addr)
-                .context("couldn't copy RString")?;
+            let rstring: RString = source.copy_struct(addr).context("couldn't copy RString")?;
             if rstring.basic.klass as usize == string_class {
                 let s = get_ruby_string(addr, source)?;
                 return Ok((s.clone(), s))
             }
             // otherwise it's an RArray
-            let rarray: RArray = source.copy_struct(addr)
-                .context(addr)?;
+            let rarray: RArray = source.copy_struct(addr).context("couldn't copy RArray")?;
             // TODO: this assumes that the array contents are stored inline and not on the heap
             // I think this will always be true but we should check instead
             // the reason I am not checking is that I don't know how to check yet
-            let path_addr: usize = unsafe { rarray.as_.ary[0] as usize }; // 1 means get the absolute path, not the relative path
-            let abs_path_addr: usize = unsafe { rarray.as_.ary[1] as usize }; // 1 means get the absolute path, not the relative path
+            let path_addr: usize = unsafe { rarray.as_.ary[0] as usize }; // 0 => relative path
+            let abs_path_addr: usize = unsafe { rarray.as_.ary[1] as usize }; // 1 => absolute path
+            let rel_path = get_ruby_string(path_addr, source)?;
+            // In the case of internal ruby functions (and maybe others), we may not get a valid
+            // pointer here
+            let abs_path = get_ruby_string(abs_path_addr, source)
+                .unwrap_or(String::from("unknown"));
+            Ok((rel_path, abs_path))
+        }
+    )
+);
+
+macro_rules! get_ruby_string_array_3_2_0(
+    () => (
+        // Returns (path, absolute_path)
+        fn get_ruby_string_array<T>(addr: usize, string_class: usize, source: &T) -> Result<(String, String)> where T: ProcessMemory {
+            let rstring: RString = source.copy_struct(addr).context("couldn't copy RString")?;
+            if rstring.basic.klass as usize == string_class {
+                let s = get_ruby_string(addr, source)?;
+                return Ok((s.clone(), s))
+            }
+
+            // Due to VWA in ruby 3.2, we can't get the exact length of the RArray. So,
+            // we use these inline structs and assume that there are at least two array
+            // elements when we're reading a pathobj.
+            #[repr(C)]
+            #[derive(Copy, Clone)]
+            struct PaddedRArray {
+                pub basic: RBasic,
+                pub as_: PaddedRArray__bindgen_ty_1,
+            }
+            #[repr(C)]
+            #[derive(Copy, Clone)]
+            union PaddedRArray__bindgen_ty_1 {
+                pub heap: RArray__bindgen_ty_1__bindgen_ty_1,
+                pub ary: [VALUE; 2usize],
+            }
+
+            // otherwise it's an RArray
+            let rarray: PaddedRArray = source.copy_struct(addr).context("couldn't copy RArray")?;
+            // TODO: this assumes that the array contents are stored inline and not on the heap
+            // I think this will always be true but we should check instead
+            // the reason I am not checking is that I don't know how to check yet
+            let path_addr: usize = unsafe { rarray.as_.ary[0] as usize }; // 0 => relative path
+            let abs_path_addr: usize = unsafe { rarray.as_.ary[1] as usize }; // 1 => absolute path
             let rel_path = get_ruby_string(path_addr, source)?;
             // In the case of internal ruby functions (and maybe others), we may not get a valid
             // pointer here
@@ -515,8 +598,6 @@ macro_rules! rstring_as_array_3_1_0(
 
 macro_rules! get_ruby_string_1_9_1(
     () => (
-        use std::ffi::CStr;
-
         fn get_ruby_string<T>(
             addr: usize,
             source: &T
@@ -526,26 +607,51 @@ macro_rules! get_ruby_string_1_9_1(
                 // See RSTRING_NOEMBED and RUBY_FL_USER1
                 let is_embedded_string = rstring.basic.flags & 1 << 13 == 0;
                 if is_embedded_string {
-                    unsafe { CStr::from_ptr(rstring_as_array(rstring).as_ref().as_ptr() as *const libc::c_char) }
+                    unsafe { std::ffi::CStr::from_ptr(rstring_as_array(rstring).as_ref().as_ptr() as *const libc::c_char) }
                     .to_bytes()
                     .to_vec()
                 } else {
                     unsafe {
                         let addr = rstring.as_.heap.ptr as usize;
                         let len = rstring.as_.heap.len as usize;
-                        let result = source.copy(addr as usize, len);
-                        match result {
-                            Err(x) => {
-                                debug!("Error: Failed to copy ruby string from heap.\nrstring: {:?}, addr: {}, len: {}", rstring, addr, len);
-                                return Err(x).context("couldn't copy ruby string from heap")?;
-                            }
-                            Ok(x) => x
-                        }
+                        source.copy(addr as usize, len).context("couldn't copy ruby string from heap")?
                     }
                 }
             };
 
             String::from_utf8(vec).context("couldn't convert ruby string bytes to string")
+        }
+    )
+);
+
+macro_rules! get_ruby_string_3_2_0(
+    () => (
+        fn get_ruby_string<T>(
+            addr: usize,
+            source: &T
+        ) -> Result<String> where T: ProcessMemory {
+            let rstring: RString = source.copy_struct(addr).context("couldn't copy rstring")?;
+            // See RSTRING_NOEMBED and RUBY_FL_USER1
+            let is_embedded_string = rstring.basic.flags & 1 << 13 == 0;
+            if is_embedded_string {
+                // The introduction of Variable Width Allocation (VWA) for strings means that
+                // the length of embedded strings varies at runtime. Instead of assuming a
+                // constant length, we need to read the length from the struct.
+                //
+                // See https://bugs.ruby-lang.org/issues/18239
+                let embedded_str_bytes = source.copy(
+                    addr + std::mem::size_of::<RBasic>() + std::mem::size_of::<std::os::raw::c_long>(),
+                    unsafe { rstring.as_.embed.len } as usize
+                ).context("couldn't copy rstring")?;
+                return String::from_utf8(embedded_str_bytes).context("couldn't convert ruby string bytes to string")
+            } else {
+                unsafe {
+                    let addr = rstring.as_.heap.ptr as usize;
+                    let len = rstring.as_.heap.len as usize;
+                    let heap_str_bytes = source.copy(addr as usize, len).context("couldn't copy ruby string from heap")?;
+                    return String::from_utf8(heap_str_bytes).context("couldn't convert ruby string bytes to string");
+                }
+            }
         }
     )
 );
