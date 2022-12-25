@@ -209,207 +209,27 @@ impl ::std::fmt::Debug for pthread_cond_t {
         write!(f, "pthread_cond_t {{ union }}")
     }
 }
-pub type VALUE = usize;
-pub type ID = usize;
-pub const ruby_fl_type_RUBY_FL_WB_PROTECTED: ruby_fl_type = 32;
-pub const ruby_fl_type_RUBY_FL_PROMOTED0: ruby_fl_type = 32;
-pub const ruby_fl_type_RUBY_FL_PROMOTED1: ruby_fl_type = 64;
-pub const ruby_fl_type_RUBY_FL_PROMOTED: ruby_fl_type = 96;
-pub const ruby_fl_type_RUBY_FL_FINALIZE: ruby_fl_type = 128;
-pub const ruby_fl_type_RUBY_FL_TAINT: ruby_fl_type = 256;
-pub const ruby_fl_type_RUBY_FL_UNTRUSTED: ruby_fl_type = 256;
-pub const ruby_fl_type_RUBY_FL_SEEN_OBJ_ID: ruby_fl_type = 512;
-pub const ruby_fl_type_RUBY_FL_EXIVAR: ruby_fl_type = 1024;
-pub const ruby_fl_type_RUBY_FL_FREEZE: ruby_fl_type = 2048;
-pub const ruby_fl_type_RUBY_FL_USHIFT: ruby_fl_type = 12;
-pub const ruby_fl_type_RUBY_FL_USER0: ruby_fl_type = 4096;
-pub const ruby_fl_type_RUBY_FL_USER1: ruby_fl_type = 8192;
-pub const ruby_fl_type_RUBY_FL_USER2: ruby_fl_type = 16384;
-pub const ruby_fl_type_RUBY_FL_USER3: ruby_fl_type = 32768;
-pub const ruby_fl_type_RUBY_FL_USER4: ruby_fl_type = 65536;
-pub const ruby_fl_type_RUBY_FL_USER5: ruby_fl_type = 131072;
-pub const ruby_fl_type_RUBY_FL_USER6: ruby_fl_type = 262144;
-pub const ruby_fl_type_RUBY_FL_USER7: ruby_fl_type = 524288;
-pub const ruby_fl_type_RUBY_FL_USER8: ruby_fl_type = 1048576;
-pub const ruby_fl_type_RUBY_FL_USER9: ruby_fl_type = 2097152;
-pub const ruby_fl_type_RUBY_FL_USER10: ruby_fl_type = 4194304;
-pub const ruby_fl_type_RUBY_FL_USER11: ruby_fl_type = 8388608;
-pub const ruby_fl_type_RUBY_FL_USER12: ruby_fl_type = 16777216;
-pub const ruby_fl_type_RUBY_FL_USER13: ruby_fl_type = 33554432;
-pub const ruby_fl_type_RUBY_FL_USER14: ruby_fl_type = 67108864;
-pub const ruby_fl_type_RUBY_FL_USER15: ruby_fl_type = 134217728;
-pub const ruby_fl_type_RUBY_FL_USER16: ruby_fl_type = 268435456;
-pub const ruby_fl_type_RUBY_FL_USER17: ruby_fl_type = 536870912;
-pub const ruby_fl_type_RUBY_FL_USER18: ruby_fl_type = 1073741824;
-pub const ruby_fl_type_RUBY_FL_USER19: ruby_fl_type = -2147483648;
-pub const ruby_fl_type_RUBY_ELTS_SHARED: ruby_fl_type = 16384;
-pub const ruby_fl_type_RUBY_FL_DUPPED: ruby_fl_type = 1311;
-pub const ruby_fl_type_RUBY_FL_SINGLETON: ruby_fl_type = 4096;
-pub type ruby_fl_type = ::std::os::raw::c_int;
+pub type __jmp_buf = [::std::os::raw::c_long; 8usize];
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct RBasic {
-    pub flags: VALUE,
-    pub klass: VALUE,
+pub struct __jmp_buf_tag {
+    pub __jmpbuf: __jmp_buf,
+    pub __mask_was_saved: ::std::os::raw::c_int,
+    pub __saved_mask: __sigset_t,
 }
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct RString {
-    pub basic: RBasic,
-    pub as_: RString__bindgen_ty_1,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union RString__bindgen_ty_1 {
-    pub heap: RString__bindgen_ty_1__bindgen_ty_1,
-    pub ary: [::std::os::raw::c_char; 24usize],
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct RString__bindgen_ty_1__bindgen_ty_1 {
-    pub len: ::std::os::raw::c_long,
-    pub ptr: *mut ::std::os::raw::c_char,
-    pub aux: RString__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union RString__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
-    pub capa: ::std::os::raw::c_long,
-    pub shared: VALUE,
-}
-impl ::std::fmt::Debug for RString__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(
-            f,
-            "RString__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {{ union }}"
-        )
-    }
-}
-impl ::std::fmt::Debug for RString__bindgen_ty_1__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(
-            f,
-            "RString__bindgen_ty_1__bindgen_ty_1 {{ len: {:?}, ptr: {:?}, aux: {:?} }}",
-            self.len, self.ptr, self.aux
-        )
-    }
-}
-impl ::std::fmt::Debug for RString__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "RString__bindgen_ty_1 {{ union }}")
-    }
-}
-impl ::std::fmt::Debug for RString {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(
-            f,
-            "RString {{ basic: {:?}, as: {:?} }}",
-            self.basic, self.as_
-        )
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct RArray {
-    pub basic: RBasic,
-    pub as_: RArray__bindgen_ty_1,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union RArray__bindgen_ty_1 {
-    pub heap: RArray__bindgen_ty_1__bindgen_ty_1,
-    pub ary: [VALUE; 3usize],
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct RArray__bindgen_ty_1__bindgen_ty_1 {
-    pub len: ::std::os::raw::c_long,
-    pub aux: RArray__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1,
-    pub ptr: *const VALUE,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union RArray__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
-    pub capa: ::std::os::raw::c_long,
-    pub shared_root: VALUE,
-}
-impl ::std::fmt::Debug for RArray__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(
-            f,
-            "RArray__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {{ union }}"
-        )
-    }
-}
-impl ::std::fmt::Debug for RArray__bindgen_ty_1__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(
-            f,
-            "RArray__bindgen_ty_1__bindgen_ty_1 {{ len: {:?}, aux: {:?}, ptr: {:?} }}",
-            self.len, self.aux, self.ptr
-        )
-    }
-}
-impl ::std::fmt::Debug for RArray__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "RArray__bindgen_ty_1 {{ union }}")
-    }
-}
-impl ::std::fmt::Debug for RArray {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(
-            f,
-            "RArray {{ basic: {:?}, as: {:?} }}",
-            self.basic, self.as_
-        )
-    }
-}
-pub type st_data_t = usize;
-pub type st_index_t = st_data_t;
+pub type jmp_buf = [__jmp_buf_tag; 1usize];
+pub type sigjmp_buf = [__jmp_buf_tag; 1usize];
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct st_hash_type {
-    pub compare: ::std::option::Option<
-        unsafe extern "C" fn(arg1: st_data_t, arg2: st_data_t) -> ::std::os::raw::c_int,
-    >,
-    pub hash: ::std::option::Option<unsafe extern "C" fn(arg1: st_data_t) -> st_index_t>,
+pub struct ccan_list_node {
+    pub next: *mut ccan_list_node,
+    pub prev: *mut ccan_list_node,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct st_table_entry {
-    _unused: [u8; 0],
+pub struct ccan_list_head {
+    pub n: ccan_list_node,
 }
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct st_table {
-    pub entry_power: ::std::os::raw::c_uchar,
-    pub bin_power: ::std::os::raw::c_uchar,
-    pub size_ind: ::std::os::raw::c_uchar,
-    pub rebuilds_num: ::std::os::raw::c_uint,
-    pub type_: *const st_hash_type,
-    pub num_entries: st_index_t,
-    pub bins: *mut st_index_t,
-    pub entries_start: st_index_t,
-    pub entries_bound: st_index_t,
-    pub entries: *mut st_table_entry,
-}
-pub type rb_unblock_function_t =
-    ::std::option::Option<unsafe extern "C" fn(arg1: *mut ::std::os::raw::c_void)>;
-pub type rb_event_flag_t = u32;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct rb_code_position_struct {
-    pub lineno: ::std::os::raw::c_int,
-    pub column: ::std::os::raw::c_int,
-}
-pub type rb_code_position_t = rb_code_position_struct;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct rb_code_location_struct {
-    pub beg_pos: rb_code_position_t,
-    pub end_pos: rb_code_position_t,
-}
-pub type rb_code_location_t = rb_code_location_struct;
 pub const ruby_id_types_RUBY_ID_STATIC_SYM: ruby_id_types = 1;
 pub const ruby_id_types_RUBY_ID_LOCAL: ruby_id_types = 0;
 pub const ruby_id_types_RUBY_ID_INSTANCE: ruby_id_types = 2;
@@ -472,190 +292,367 @@ pub const ruby_method_ids_id_core_set_postexe: ruby_method_ids = 164;
 pub const ruby_method_ids_id_core_hash_merge_ptr: ruby_method_ids = 165;
 pub const ruby_method_ids_id_core_hash_merge_kwd: ruby_method_ids = 166;
 pub const ruby_method_ids_id_core_raise: ruby_method_ids = 167;
-pub const ruby_method_ids_id_debug_created_info: ruby_method_ids = 168;
-pub const ruby_method_ids_tPRESERVED_ID_END: ruby_method_ids = 169;
-pub const ruby_method_ids_tTOKEN_LOCAL_BEGIN: ruby_method_ids = 168;
-pub const ruby_method_ids_tMax: ruby_method_ids = 169;
-pub const ruby_method_ids_tMin: ruby_method_ids = 170;
-pub const ruby_method_ids_tFreeze: ruby_method_ids = 171;
-pub const ruby_method_ids_tInspect: ruby_method_ids = 172;
-pub const ruby_method_ids_tIntern: ruby_method_ids = 173;
-pub const ruby_method_ids_tObject_id: ruby_method_ids = 174;
-pub const ruby_method_ids_tConst_missing: ruby_method_ids = 175;
-pub const ruby_method_ids_tMethodMissing: ruby_method_ids = 176;
-pub const ruby_method_ids_tMethod_added: ruby_method_ids = 177;
-pub const ruby_method_ids_tSingleton_method_added: ruby_method_ids = 178;
-pub const ruby_method_ids_tMethod_removed: ruby_method_ids = 179;
-pub const ruby_method_ids_tSingleton_method_removed: ruby_method_ids = 180;
-pub const ruby_method_ids_tMethod_undefined: ruby_method_ids = 181;
-pub const ruby_method_ids_tSingleton_method_undefined: ruby_method_ids = 182;
-pub const ruby_method_ids_tLength: ruby_method_ids = 183;
-pub const ruby_method_ids_tSize: ruby_method_ids = 184;
-pub const ruby_method_ids_tGets: ruby_method_ids = 185;
-pub const ruby_method_ids_tSucc: ruby_method_ids = 186;
-pub const ruby_method_ids_tEach: ruby_method_ids = 187;
-pub const ruby_method_ids_tProc: ruby_method_ids = 188;
-pub const ruby_method_ids_tLambda: ruby_method_ids = 189;
-pub const ruby_method_ids_tSend: ruby_method_ids = 190;
-pub const ruby_method_ids_t__send__: ruby_method_ids = 191;
-pub const ruby_method_ids_t__attached__: ruby_method_ids = 192;
-pub const ruby_method_ids_tInitialize: ruby_method_ids = 193;
-pub const ruby_method_ids_tInitialize_copy: ruby_method_ids = 194;
-pub const ruby_method_ids_tInitialize_clone: ruby_method_ids = 195;
-pub const ruby_method_ids_tInitialize_dup: ruby_method_ids = 196;
-pub const ruby_method_ids_tTo_int: ruby_method_ids = 197;
-pub const ruby_method_ids_tTo_ary: ruby_method_ids = 198;
-pub const ruby_method_ids_tTo_str: ruby_method_ids = 199;
-pub const ruby_method_ids_tTo_sym: ruby_method_ids = 200;
-pub const ruby_method_ids_tTo_hash: ruby_method_ids = 201;
-pub const ruby_method_ids_tTo_proc: ruby_method_ids = 202;
-pub const ruby_method_ids_tTo_io: ruby_method_ids = 203;
-pub const ruby_method_ids_tTo_a: ruby_method_ids = 204;
-pub const ruby_method_ids_tTo_s: ruby_method_ids = 205;
-pub const ruby_method_ids_tTo_i: ruby_method_ids = 206;
-pub const ruby_method_ids_tTo_f: ruby_method_ids = 207;
-pub const ruby_method_ids_tTo_r: ruby_method_ids = 208;
-pub const ruby_method_ids_tBt: ruby_method_ids = 209;
-pub const ruby_method_ids_tBt_locations: ruby_method_ids = 210;
-pub const ruby_method_ids_tCall: ruby_method_ids = 211;
-pub const ruby_method_ids_tMesg: ruby_method_ids = 212;
-pub const ruby_method_ids_tException: ruby_method_ids = 213;
-pub const ruby_method_ids_tLocals: ruby_method_ids = 214;
-pub const ruby_method_ids_tNOT: ruby_method_ids = 215;
-pub const ruby_method_ids_tAND: ruby_method_ids = 216;
-pub const ruby_method_ids_tOR: ruby_method_ids = 217;
-pub const ruby_method_ids_tDiv: ruby_method_ids = 218;
-pub const ruby_method_ids_tDivmod: ruby_method_ids = 219;
-pub const ruby_method_ids_tFdiv: ruby_method_ids = 220;
-pub const ruby_method_ids_tQuo: ruby_method_ids = 221;
-pub const ruby_method_ids_tName: ruby_method_ids = 222;
-pub const ruby_method_ids_tNil: ruby_method_ids = 223;
-pub const ruby_method_ids_tUScore: ruby_method_ids = 224;
-pub const ruby_method_ids_tNUMPARAM_1: ruby_method_ids = 225;
-pub const ruby_method_ids_tNUMPARAM_2: ruby_method_ids = 226;
-pub const ruby_method_ids_tNUMPARAM_3: ruby_method_ids = 227;
-pub const ruby_method_ids_tNUMPARAM_4: ruby_method_ids = 228;
-pub const ruby_method_ids_tNUMPARAM_5: ruby_method_ids = 229;
-pub const ruby_method_ids_tNUMPARAM_6: ruby_method_ids = 230;
-pub const ruby_method_ids_tNUMPARAM_7: ruby_method_ids = 231;
-pub const ruby_method_ids_tNUMPARAM_8: ruby_method_ids = 232;
-pub const ruby_method_ids_tNUMPARAM_9: ruby_method_ids = 233;
-pub const ruby_method_ids_tTOKEN_LOCAL_END: ruby_method_ids = 234;
-pub const ruby_method_ids_tTOKEN_INSTANCE_BEGIN: ruby_method_ids = 233;
-pub const ruby_method_ids_tTOKEN_INSTANCE_END: ruby_method_ids = 234;
-pub const ruby_method_ids_tTOKEN_GLOBAL_BEGIN: ruby_method_ids = 233;
-pub const ruby_method_ids_tLASTLINE: ruby_method_ids = 234;
-pub const ruby_method_ids_tBACKREF: ruby_method_ids = 235;
-pub const ruby_method_ids_tERROR_INFO: ruby_method_ids = 236;
-pub const ruby_method_ids_tTOKEN_GLOBAL_END: ruby_method_ids = 237;
-pub const ruby_method_ids_tTOKEN_CONST_BEGIN: ruby_method_ids = 236;
-pub const ruby_method_ids_tTOKEN_CONST_END: ruby_method_ids = 237;
-pub const ruby_method_ids_tTOKEN_CLASS_BEGIN: ruby_method_ids = 236;
-pub const ruby_method_ids_tTOKEN_CLASS_END: ruby_method_ids = 237;
-pub const ruby_method_ids_tTOKEN_ATTRSET_BEGIN: ruby_method_ids = 236;
-pub const ruby_method_ids_tTOKEN_ATTRSET_END: ruby_method_ids = 237;
-pub const ruby_method_ids_tNEXT_ID: ruby_method_ids = 237;
-pub const ruby_method_ids_idMax: ruby_method_ids = 2705;
-pub const ruby_method_ids_idMin: ruby_method_ids = 2721;
-pub const ruby_method_ids_idFreeze: ruby_method_ids = 2737;
-pub const ruby_method_ids_idInspect: ruby_method_ids = 2753;
-pub const ruby_method_ids_idIntern: ruby_method_ids = 2769;
-pub const ruby_method_ids_idObject_id: ruby_method_ids = 2785;
-pub const ruby_method_ids_idConst_missing: ruby_method_ids = 2801;
-pub const ruby_method_ids_idMethodMissing: ruby_method_ids = 2817;
-pub const ruby_method_ids_idMethod_added: ruby_method_ids = 2833;
-pub const ruby_method_ids_idSingleton_method_added: ruby_method_ids = 2849;
-pub const ruby_method_ids_idMethod_removed: ruby_method_ids = 2865;
-pub const ruby_method_ids_idSingleton_method_removed: ruby_method_ids = 2881;
-pub const ruby_method_ids_idMethod_undefined: ruby_method_ids = 2897;
-pub const ruby_method_ids_idSingleton_method_undefined: ruby_method_ids = 2913;
-pub const ruby_method_ids_idLength: ruby_method_ids = 2929;
-pub const ruby_method_ids_idSize: ruby_method_ids = 2945;
-pub const ruby_method_ids_idGets: ruby_method_ids = 2961;
-pub const ruby_method_ids_idSucc: ruby_method_ids = 2977;
-pub const ruby_method_ids_idEach: ruby_method_ids = 2993;
-pub const ruby_method_ids_idProc: ruby_method_ids = 3009;
-pub const ruby_method_ids_idLambda: ruby_method_ids = 3025;
-pub const ruby_method_ids_idSend: ruby_method_ids = 3041;
-pub const ruby_method_ids_id__send__: ruby_method_ids = 3057;
-pub const ruby_method_ids_id__attached__: ruby_method_ids = 3073;
-pub const ruby_method_ids_idInitialize: ruby_method_ids = 3089;
-pub const ruby_method_ids_idInitialize_copy: ruby_method_ids = 3105;
-pub const ruby_method_ids_idInitialize_clone: ruby_method_ids = 3121;
-pub const ruby_method_ids_idInitialize_dup: ruby_method_ids = 3137;
-pub const ruby_method_ids_idTo_int: ruby_method_ids = 3153;
-pub const ruby_method_ids_idTo_ary: ruby_method_ids = 3169;
-pub const ruby_method_ids_idTo_str: ruby_method_ids = 3185;
-pub const ruby_method_ids_idTo_sym: ruby_method_ids = 3201;
-pub const ruby_method_ids_idTo_hash: ruby_method_ids = 3217;
-pub const ruby_method_ids_idTo_proc: ruby_method_ids = 3233;
-pub const ruby_method_ids_idTo_io: ruby_method_ids = 3249;
-pub const ruby_method_ids_idTo_a: ruby_method_ids = 3265;
-pub const ruby_method_ids_idTo_s: ruby_method_ids = 3281;
-pub const ruby_method_ids_idTo_i: ruby_method_ids = 3297;
-pub const ruby_method_ids_idTo_f: ruby_method_ids = 3313;
-pub const ruby_method_ids_idTo_r: ruby_method_ids = 3329;
-pub const ruby_method_ids_idBt: ruby_method_ids = 3345;
-pub const ruby_method_ids_idBt_locations: ruby_method_ids = 3361;
-pub const ruby_method_ids_idCall: ruby_method_ids = 3377;
-pub const ruby_method_ids_idMesg: ruby_method_ids = 3393;
-pub const ruby_method_ids_idException: ruby_method_ids = 3409;
-pub const ruby_method_ids_idLocals: ruby_method_ids = 3425;
-pub const ruby_method_ids_idNOT: ruby_method_ids = 3441;
-pub const ruby_method_ids_idAND: ruby_method_ids = 3457;
-pub const ruby_method_ids_idOR: ruby_method_ids = 3473;
-pub const ruby_method_ids_idDiv: ruby_method_ids = 3489;
-pub const ruby_method_ids_idDivmod: ruby_method_ids = 3505;
-pub const ruby_method_ids_idFdiv: ruby_method_ids = 3521;
-pub const ruby_method_ids_idQuo: ruby_method_ids = 3537;
-pub const ruby_method_ids_idName: ruby_method_ids = 3553;
-pub const ruby_method_ids_idNil: ruby_method_ids = 3569;
-pub const ruby_method_ids_idUScore: ruby_method_ids = 3585;
-pub const ruby_method_ids_idNUMPARAM_1: ruby_method_ids = 3601;
-pub const ruby_method_ids_idNUMPARAM_2: ruby_method_ids = 3617;
-pub const ruby_method_ids_idNUMPARAM_3: ruby_method_ids = 3633;
-pub const ruby_method_ids_idNUMPARAM_4: ruby_method_ids = 3649;
-pub const ruby_method_ids_idNUMPARAM_5: ruby_method_ids = 3665;
-pub const ruby_method_ids_idNUMPARAM_6: ruby_method_ids = 3681;
-pub const ruby_method_ids_idNUMPARAM_7: ruby_method_ids = 3697;
-pub const ruby_method_ids_idNUMPARAM_8: ruby_method_ids = 3713;
-pub const ruby_method_ids_idNUMPARAM_9: ruby_method_ids = 3729;
-pub const ruby_method_ids_idLASTLINE: ruby_method_ids = 3751;
-pub const ruby_method_ids_idBACKREF: ruby_method_ids = 3767;
-pub const ruby_method_ids_idERROR_INFO: ruby_method_ids = 3783;
-pub const ruby_method_ids_tLAST_OP_ID: ruby_method_ids = 168;
+pub const ruby_method_ids_id_core_sprintf: ruby_method_ids = 168;
+pub const ruby_method_ids_id_debug_created_info: ruby_method_ids = 169;
+pub const ruby_method_ids_tPRESERVED_ID_END: ruby_method_ids = 170;
+pub const ruby_method_ids_tTOKEN_LOCAL_BEGIN: ruby_method_ids = 169;
+pub const ruby_method_ids_tMax: ruby_method_ids = 170;
+pub const ruby_method_ids_tMin: ruby_method_ids = 171;
+pub const ruby_method_ids_tFreeze: ruby_method_ids = 172;
+pub const ruby_method_ids_tInspect: ruby_method_ids = 173;
+pub const ruby_method_ids_tIntern: ruby_method_ids = 174;
+pub const ruby_method_ids_tObject_id: ruby_method_ids = 175;
+pub const ruby_method_ids_tConst_added: ruby_method_ids = 176;
+pub const ruby_method_ids_tConst_missing: ruby_method_ids = 177;
+pub const ruby_method_ids_tMethodMissing: ruby_method_ids = 178;
+pub const ruby_method_ids_tMethod_added: ruby_method_ids = 179;
+pub const ruby_method_ids_tSingleton_method_added: ruby_method_ids = 180;
+pub const ruby_method_ids_tMethod_removed: ruby_method_ids = 181;
+pub const ruby_method_ids_tSingleton_method_removed: ruby_method_ids = 182;
+pub const ruby_method_ids_tMethod_undefined: ruby_method_ids = 183;
+pub const ruby_method_ids_tSingleton_method_undefined: ruby_method_ids = 184;
+pub const ruby_method_ids_tLength: ruby_method_ids = 185;
+pub const ruby_method_ids_tSize: ruby_method_ids = 186;
+pub const ruby_method_ids_tGets: ruby_method_ids = 187;
+pub const ruby_method_ids_tSucc: ruby_method_ids = 188;
+pub const ruby_method_ids_tEach: ruby_method_ids = 189;
+pub const ruby_method_ids_tProc: ruby_method_ids = 190;
+pub const ruby_method_ids_tLambda: ruby_method_ids = 191;
+pub const ruby_method_ids_tSend: ruby_method_ids = 192;
+pub const ruby_method_ids_t__send__: ruby_method_ids = 193;
+pub const ruby_method_ids_t__attached__: ruby_method_ids = 194;
+pub const ruby_method_ids_t__recursive_key__: ruby_method_ids = 195;
+pub const ruby_method_ids_tInitialize: ruby_method_ids = 196;
+pub const ruby_method_ids_tInitialize_copy: ruby_method_ids = 197;
+pub const ruby_method_ids_tInitialize_clone: ruby_method_ids = 198;
+pub const ruby_method_ids_tInitialize_dup: ruby_method_ids = 199;
+pub const ruby_method_ids_tTo_int: ruby_method_ids = 200;
+pub const ruby_method_ids_tTo_ary: ruby_method_ids = 201;
+pub const ruby_method_ids_tTo_str: ruby_method_ids = 202;
+pub const ruby_method_ids_tTo_sym: ruby_method_ids = 203;
+pub const ruby_method_ids_tTo_hash: ruby_method_ids = 204;
+pub const ruby_method_ids_tTo_proc: ruby_method_ids = 205;
+pub const ruby_method_ids_tTo_io: ruby_method_ids = 206;
+pub const ruby_method_ids_tTo_a: ruby_method_ids = 207;
+pub const ruby_method_ids_tTo_s: ruby_method_ids = 208;
+pub const ruby_method_ids_tTo_i: ruby_method_ids = 209;
+pub const ruby_method_ids_tTo_f: ruby_method_ids = 210;
+pub const ruby_method_ids_tTo_r: ruby_method_ids = 211;
+pub const ruby_method_ids_tBt: ruby_method_ids = 212;
+pub const ruby_method_ids_tBt_locations: ruby_method_ids = 213;
+pub const ruby_method_ids_tCall: ruby_method_ids = 214;
+pub const ruby_method_ids_tMesg: ruby_method_ids = 215;
+pub const ruby_method_ids_tException: ruby_method_ids = 216;
+pub const ruby_method_ids_tLocals: ruby_method_ids = 217;
+pub const ruby_method_ids_tNOT: ruby_method_ids = 218;
+pub const ruby_method_ids_tAND: ruby_method_ids = 219;
+pub const ruby_method_ids_tOR: ruby_method_ids = 220;
+pub const ruby_method_ids_tDiv: ruby_method_ids = 221;
+pub const ruby_method_ids_tDivmod: ruby_method_ids = 222;
+pub const ruby_method_ids_tFdiv: ruby_method_ids = 223;
+pub const ruby_method_ids_tQuo: ruby_method_ids = 224;
+pub const ruby_method_ids_tName: ruby_method_ids = 225;
+pub const ruby_method_ids_tNil: ruby_method_ids = 226;
+pub const ruby_method_ids_tPath: ruby_method_ids = 227;
+pub const ruby_method_ids_tUScore: ruby_method_ids = 228;
+pub const ruby_method_ids_tNUMPARAM_1: ruby_method_ids = 229;
+pub const ruby_method_ids_tNUMPARAM_2: ruby_method_ids = 230;
+pub const ruby_method_ids_tNUMPARAM_3: ruby_method_ids = 231;
+pub const ruby_method_ids_tNUMPARAM_4: ruby_method_ids = 232;
+pub const ruby_method_ids_tNUMPARAM_5: ruby_method_ids = 233;
+pub const ruby_method_ids_tNUMPARAM_6: ruby_method_ids = 234;
+pub const ruby_method_ids_tNUMPARAM_7: ruby_method_ids = 235;
+pub const ruby_method_ids_tNUMPARAM_8: ruby_method_ids = 236;
+pub const ruby_method_ids_tNUMPARAM_9: ruby_method_ids = 237;
+pub const ruby_method_ids_tDefault: ruby_method_ids = 238;
+pub const ruby_method_ids_tTOKEN_LOCAL_END: ruby_method_ids = 239;
+pub const ruby_method_ids_tTOKEN_INSTANCE_BEGIN: ruby_method_ids = 238;
+pub const ruby_method_ids_tTOKEN_INSTANCE_END: ruby_method_ids = 239;
+pub const ruby_method_ids_tTOKEN_GLOBAL_BEGIN: ruby_method_ids = 238;
+pub const ruby_method_ids_tLASTLINE: ruby_method_ids = 239;
+pub const ruby_method_ids_tBACKREF: ruby_method_ids = 240;
+pub const ruby_method_ids_tERROR_INFO: ruby_method_ids = 241;
+pub const ruby_method_ids_tTOKEN_GLOBAL_END: ruby_method_ids = 242;
+pub const ruby_method_ids_tTOKEN_CONST_BEGIN: ruby_method_ids = 241;
+pub const ruby_method_ids_tTOKEN_CONST_END: ruby_method_ids = 242;
+pub const ruby_method_ids_tTOKEN_CLASS_BEGIN: ruby_method_ids = 241;
+pub const ruby_method_ids_tTOKEN_CLASS_END: ruby_method_ids = 242;
+pub const ruby_method_ids_tTOKEN_ATTRSET_BEGIN: ruby_method_ids = 241;
+pub const ruby_method_ids_tTOKEN_ATTRSET_END: ruby_method_ids = 242;
+pub const ruby_method_ids_tNEXT_ID: ruby_method_ids = 242;
+pub const ruby_method_ids_idMax: ruby_method_ids = 2721;
+pub const ruby_method_ids_idMin: ruby_method_ids = 2737;
+pub const ruby_method_ids_idFreeze: ruby_method_ids = 2753;
+pub const ruby_method_ids_idInspect: ruby_method_ids = 2769;
+pub const ruby_method_ids_idIntern: ruby_method_ids = 2785;
+pub const ruby_method_ids_idObject_id: ruby_method_ids = 2801;
+pub const ruby_method_ids_idConst_added: ruby_method_ids = 2817;
+pub const ruby_method_ids_idConst_missing: ruby_method_ids = 2833;
+pub const ruby_method_ids_idMethodMissing: ruby_method_ids = 2849;
+pub const ruby_method_ids_idMethod_added: ruby_method_ids = 2865;
+pub const ruby_method_ids_idSingleton_method_added: ruby_method_ids = 2881;
+pub const ruby_method_ids_idMethod_removed: ruby_method_ids = 2897;
+pub const ruby_method_ids_idSingleton_method_removed: ruby_method_ids = 2913;
+pub const ruby_method_ids_idMethod_undefined: ruby_method_ids = 2929;
+pub const ruby_method_ids_idSingleton_method_undefined: ruby_method_ids = 2945;
+pub const ruby_method_ids_idLength: ruby_method_ids = 2961;
+pub const ruby_method_ids_idSize: ruby_method_ids = 2977;
+pub const ruby_method_ids_idGets: ruby_method_ids = 2993;
+pub const ruby_method_ids_idSucc: ruby_method_ids = 3009;
+pub const ruby_method_ids_idEach: ruby_method_ids = 3025;
+pub const ruby_method_ids_idProc: ruby_method_ids = 3041;
+pub const ruby_method_ids_idLambda: ruby_method_ids = 3057;
+pub const ruby_method_ids_idSend: ruby_method_ids = 3073;
+pub const ruby_method_ids_id__send__: ruby_method_ids = 3089;
+pub const ruby_method_ids_id__attached__: ruby_method_ids = 3105;
+pub const ruby_method_ids_id__recursive_key__: ruby_method_ids = 3121;
+pub const ruby_method_ids_idInitialize: ruby_method_ids = 3137;
+pub const ruby_method_ids_idInitialize_copy: ruby_method_ids = 3153;
+pub const ruby_method_ids_idInitialize_clone: ruby_method_ids = 3169;
+pub const ruby_method_ids_idInitialize_dup: ruby_method_ids = 3185;
+pub const ruby_method_ids_idTo_int: ruby_method_ids = 3201;
+pub const ruby_method_ids_idTo_ary: ruby_method_ids = 3217;
+pub const ruby_method_ids_idTo_str: ruby_method_ids = 3233;
+pub const ruby_method_ids_idTo_sym: ruby_method_ids = 3249;
+pub const ruby_method_ids_idTo_hash: ruby_method_ids = 3265;
+pub const ruby_method_ids_idTo_proc: ruby_method_ids = 3281;
+pub const ruby_method_ids_idTo_io: ruby_method_ids = 3297;
+pub const ruby_method_ids_idTo_a: ruby_method_ids = 3313;
+pub const ruby_method_ids_idTo_s: ruby_method_ids = 3329;
+pub const ruby_method_ids_idTo_i: ruby_method_ids = 3345;
+pub const ruby_method_ids_idTo_f: ruby_method_ids = 3361;
+pub const ruby_method_ids_idTo_r: ruby_method_ids = 3377;
+pub const ruby_method_ids_idBt: ruby_method_ids = 3393;
+pub const ruby_method_ids_idBt_locations: ruby_method_ids = 3409;
+pub const ruby_method_ids_idCall: ruby_method_ids = 3425;
+pub const ruby_method_ids_idMesg: ruby_method_ids = 3441;
+pub const ruby_method_ids_idException: ruby_method_ids = 3457;
+pub const ruby_method_ids_idLocals: ruby_method_ids = 3473;
+pub const ruby_method_ids_idNOT: ruby_method_ids = 3489;
+pub const ruby_method_ids_idAND: ruby_method_ids = 3505;
+pub const ruby_method_ids_idOR: ruby_method_ids = 3521;
+pub const ruby_method_ids_idDiv: ruby_method_ids = 3537;
+pub const ruby_method_ids_idDivmod: ruby_method_ids = 3553;
+pub const ruby_method_ids_idFdiv: ruby_method_ids = 3569;
+pub const ruby_method_ids_idQuo: ruby_method_ids = 3585;
+pub const ruby_method_ids_idName: ruby_method_ids = 3601;
+pub const ruby_method_ids_idNil: ruby_method_ids = 3617;
+pub const ruby_method_ids_idPath: ruby_method_ids = 3633;
+pub const ruby_method_ids_idUScore: ruby_method_ids = 3649;
+pub const ruby_method_ids_idNUMPARAM_1: ruby_method_ids = 3665;
+pub const ruby_method_ids_idNUMPARAM_2: ruby_method_ids = 3681;
+pub const ruby_method_ids_idNUMPARAM_3: ruby_method_ids = 3697;
+pub const ruby_method_ids_idNUMPARAM_4: ruby_method_ids = 3713;
+pub const ruby_method_ids_idNUMPARAM_5: ruby_method_ids = 3729;
+pub const ruby_method_ids_idNUMPARAM_6: ruby_method_ids = 3745;
+pub const ruby_method_ids_idNUMPARAM_7: ruby_method_ids = 3761;
+pub const ruby_method_ids_idNUMPARAM_8: ruby_method_ids = 3777;
+pub const ruby_method_ids_idNUMPARAM_9: ruby_method_ids = 3793;
+pub const ruby_method_ids_idDefault: ruby_method_ids = 3809;
+pub const ruby_method_ids_idLASTLINE: ruby_method_ids = 3831;
+pub const ruby_method_ids_idBACKREF: ruby_method_ids = 3847;
+pub const ruby_method_ids_idERROR_INFO: ruby_method_ids = 3863;
+pub const ruby_method_ids_tLAST_OP_ID: ruby_method_ids = 169;
 pub const ruby_method_ids_idLAST_OP_ID: ruby_method_ids = 10;
 pub type ruby_method_ids = ::std::os::raw::c_uint;
-pub type rb_serial_t = ::std::os::raw::c_ulonglong;
-pub const imemo_type_imemo_env: imemo_type = 0;
-pub const imemo_type_imemo_cref: imemo_type = 1;
-pub const imemo_type_imemo_svar: imemo_type = 2;
-pub const imemo_type_imemo_throw_data: imemo_type = 3;
-pub const imemo_type_imemo_ifunc: imemo_type = 4;
-pub const imemo_type_imemo_memo: imemo_type = 5;
-pub const imemo_type_imemo_ment: imemo_type = 6;
-pub const imemo_type_imemo_iseq: imemo_type = 7;
-pub const imemo_type_imemo_tmpbuf: imemo_type = 8;
-pub const imemo_type_imemo_ast: imemo_type = 9;
-pub const imemo_type_imemo_parser_strterm: imemo_type = 10;
-pub type imemo_type = ::std::os::raw::c_uint;
+pub type VALUE = usize;
+pub type ID = usize;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct vm_svar {
+pub struct RBasic {
     pub flags: VALUE,
-    pub cref_or_me: VALUE,
-    pub lastline: VALUE,
-    pub backref: VALUE,
-    pub others: VALUE,
+    pub klass: VALUE,
+}
+pub const ruby_fl_ushift_RUBY_FL_USHIFT: ruby_fl_ushift = 12;
+pub type ruby_fl_ushift = ::std::os::raw::c_uint;
+pub const ruby_fl_type_RUBY_FL_WB_PROTECTED: ruby_fl_type = 32;
+pub const ruby_fl_type_RUBY_FL_PROMOTED0: ruby_fl_type = 32;
+pub const ruby_fl_type_RUBY_FL_PROMOTED1: ruby_fl_type = 64;
+pub const ruby_fl_type_RUBY_FL_PROMOTED: ruby_fl_type = 96;
+pub const ruby_fl_type_RUBY_FL_FINALIZE: ruby_fl_type = 128;
+pub const ruby_fl_type_RUBY_FL_TAINT: ruby_fl_type = 256;
+pub const ruby_fl_type_RUBY_FL_SHAREABLE: ruby_fl_type = 256;
+pub const ruby_fl_type_RUBY_FL_UNTRUSTED: ruby_fl_type = 256;
+pub const ruby_fl_type_RUBY_FL_SEEN_OBJ_ID: ruby_fl_type = 512;
+pub const ruby_fl_type_RUBY_FL_EXIVAR: ruby_fl_type = 1024;
+pub const ruby_fl_type_RUBY_FL_FREEZE: ruby_fl_type = 2048;
+pub const ruby_fl_type_RUBY_FL_USER0: ruby_fl_type = 4096;
+pub const ruby_fl_type_RUBY_FL_USER1: ruby_fl_type = 8192;
+pub const ruby_fl_type_RUBY_FL_USER2: ruby_fl_type = 16384;
+pub const ruby_fl_type_RUBY_FL_USER3: ruby_fl_type = 32768;
+pub const ruby_fl_type_RUBY_FL_USER4: ruby_fl_type = 65536;
+pub const ruby_fl_type_RUBY_FL_USER5: ruby_fl_type = 131072;
+pub const ruby_fl_type_RUBY_FL_USER6: ruby_fl_type = 262144;
+pub const ruby_fl_type_RUBY_FL_USER7: ruby_fl_type = 524288;
+pub const ruby_fl_type_RUBY_FL_USER8: ruby_fl_type = 1048576;
+pub const ruby_fl_type_RUBY_FL_USER9: ruby_fl_type = 2097152;
+pub const ruby_fl_type_RUBY_FL_USER10: ruby_fl_type = 4194304;
+pub const ruby_fl_type_RUBY_FL_USER11: ruby_fl_type = 8388608;
+pub const ruby_fl_type_RUBY_FL_USER12: ruby_fl_type = 16777216;
+pub const ruby_fl_type_RUBY_FL_USER13: ruby_fl_type = 33554432;
+pub const ruby_fl_type_RUBY_FL_USER14: ruby_fl_type = 67108864;
+pub const ruby_fl_type_RUBY_FL_USER15: ruby_fl_type = 134217728;
+pub const ruby_fl_type_RUBY_FL_USER16: ruby_fl_type = 268435456;
+pub const ruby_fl_type_RUBY_FL_USER17: ruby_fl_type = 536870912;
+pub const ruby_fl_type_RUBY_FL_USER18: ruby_fl_type = 1073741824;
+pub const ruby_fl_type_RUBY_FL_USER19: ruby_fl_type = -2147483648;
+pub const ruby_fl_type_RUBY_ELTS_SHARED: ruby_fl_type = 16384;
+pub const ruby_fl_type_RUBY_FL_SINGLETON: ruby_fl_type = 4096;
+pub type ruby_fl_type = ::std::os::raw::c_int;
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct RString {
+    pub basic: RBasic,
+    pub as_: RString__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union RString__bindgen_ty_1 {
+    pub heap: RString__bindgen_ty_1__bindgen_ty_1,
+    pub embed: RString__bindgen_ty_1__bindgen_ty_2,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct RString__bindgen_ty_1__bindgen_ty_1 {
+    pub len: ::std::os::raw::c_long,
+    pub ptr: *mut ::std::os::raw::c_char,
+    pub aux: RString__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union RString__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
+    pub capa: ::std::os::raw::c_long,
+    pub shared: VALUE,
+}
+impl ::std::fmt::Debug for RString__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(
+            f,
+            "RString__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {{ union }}"
+        )
+    }
+}
+impl ::std::fmt::Debug for RString__bindgen_ty_1__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(
+            f,
+            "RString__bindgen_ty_1__bindgen_ty_1 {{ len: {:?}, ptr: {:?}, aux: {:?} }}",
+            self.len, self.ptr, self.aux
+        )
+    }
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct rb_fiber_struct {
+pub struct RString__bindgen_ty_1__bindgen_ty_2 {
+    pub len: ::std::os::raw::c_long,
+    pub ary: [::std::os::raw::c_char; 1usize],
+}
+impl ::std::fmt::Debug for RString__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "RString__bindgen_ty_1 {{ union }}")
+    }
+}
+impl ::std::fmt::Debug for RString {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(
+            f,
+            "RString {{ basic: {:?}, as: {:?} }}",
+            self.basic, self.as_
+        )
+    }
+}
+pub type st_data_t = usize;
+pub type st_index_t = st_data_t;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct st_hash_type {
+    pub compare: ::std::option::Option<
+        unsafe extern "C" fn(arg1: st_data_t, arg2: st_data_t) -> ::std::os::raw::c_int,
+    >,
+    pub hash: ::std::option::Option<unsafe extern "C" fn(arg1: st_data_t) -> st_index_t>,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct st_table_entry {
     _unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct rb_objspace {
+pub struct st_table {
+    pub entry_power: ::std::os::raw::c_uchar,
+    pub bin_power: ::std::os::raw::c_uchar,
+    pub size_ind: ::std::os::raw::c_uchar,
+    pub rebuilds_num: ::std::os::raw::c_uint,
+    pub type_: *const st_hash_type,
+    pub num_entries: st_index_t,
+    pub bins: *mut st_index_t,
+    pub entries_start: st_index_t,
+    pub entries_bound: st_index_t,
+    pub entries: *mut st_table_entry,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct RArray {
+    pub basic: RBasic,
+    pub as_: RArray__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union RArray__bindgen_ty_1 {
+    pub heap: RArray__bindgen_ty_1__bindgen_ty_1,
+    pub ary: [VALUE; 1usize],
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct RArray__bindgen_ty_1__bindgen_ty_1 {
+    pub len: ::std::os::raw::c_long,
+    pub aux: RArray__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1,
+    pub ptr: *const VALUE,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union RArray__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
+    pub capa: ::std::os::raw::c_long,
+    pub shared_root: VALUE,
+}
+impl ::std::fmt::Debug for RArray__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(
+            f,
+            "RArray__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {{ union }}"
+        )
+    }
+}
+impl ::std::fmt::Debug for RArray__bindgen_ty_1__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(
+            f,
+            "RArray__bindgen_ty_1__bindgen_ty_1 {{ len: {:?}, aux: {:?}, ptr: {:?} }}",
+            self.len, self.aux, self.ptr
+        )
+    }
+}
+impl ::std::fmt::Debug for RArray__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "RArray__bindgen_ty_1 {{ union }}")
+    }
+}
+impl ::std::fmt::Debug for RArray {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(
+            f,
+            "RArray {{ basic: {:?}, as: {:?} }}",
+            self.basic, self.as_
+        )
+    }
+}
+pub type rb_event_flag_t = u32;
+pub type rb_unblock_function_t =
+    ::std::option::Option<unsafe extern "C" fn(arg1: *mut ::std::os::raw::c_void)>;
+pub type rb_serial_t = ::std::os::raw::c_ulonglong;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_callinfo {
     _unused: [u8; 0],
 }
 pub const method_missing_reason_MISSING_NOENTRY: method_missing_reason = 0;
@@ -668,55 +665,38 @@ pub const method_missing_reason_MISSING_MISSING: method_missing_reason = 32;
 pub const method_missing_reason_MISSING_NONE: method_missing_reason = 64;
 pub type method_missing_reason = ::std::os::raw::c_uint;
 #[repr(C)]
-#[derive(Copy, Clone)]
-pub struct rb_call_cache {
-    pub method_state: rb_serial_t,
-    pub class_serial: [rb_serial_t; 3usize],
-    pub me: *const rb_callable_method_entry_struct,
-    pub method_serial: usize,
-    pub call: ::std::option::Option<
-        unsafe extern "C" fn(
-            ec: *mut rb_execution_context_struct,
-            cfp: *mut rb_control_frame_struct,
-            calling: *mut rb_calling_info,
-            cd: *mut rb_call_data,
-        ) -> VALUE,
-    >,
-    pub aux: rb_call_cache__bindgen_ty_1,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union rb_call_cache__bindgen_ty_1 {
-    pub index: ::std::os::raw::c_uint,
-    pub method_missing_reason: method_missing_reason,
-}
-impl ::std::fmt::Debug for rb_call_cache__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "rb_call_cache__bindgen_ty_1 {{ union }}")
-    }
-}
-impl ::std::fmt::Debug for rb_call_cache {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write ! (f , "rb_call_cache {{ method_state: {:?}, class_serial: {:?}, me: {:?}, call: {:?}, aux: {:?} }}" , self . method_state , self . class_serial , self . me , self . call , self . aux)
-    }
+#[derive(Debug, Copy, Clone)]
+pub struct rb_callcache {
+    _unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct rb_call_info {
-    pub mid: ID,
-    pub flag: ::std::os::raw::c_uint,
-    pub orig_argc: ::std::os::raw::c_int,
+pub struct rb_objspace {
+    _unused: [u8; 0],
 }
+pub const imemo_type_imemo_env: imemo_type = 0;
+pub const imemo_type_imemo_cref: imemo_type = 1;
+pub const imemo_type_imemo_svar: imemo_type = 2;
+pub const imemo_type_imemo_throw_data: imemo_type = 3;
+pub const imemo_type_imemo_ifunc: imemo_type = 4;
+pub const imemo_type_imemo_memo: imemo_type = 5;
+pub const imemo_type_imemo_ment: imemo_type = 6;
+pub const imemo_type_imemo_iseq: imemo_type = 7;
+pub const imemo_type_imemo_tmpbuf: imemo_type = 8;
+pub const imemo_type_imemo_ast: imemo_type = 9;
+pub const imemo_type_imemo_parser_strterm: imemo_type = 10;
+pub const imemo_type_imemo_callinfo: imemo_type = 11;
+pub const imemo_type_imemo_callcache: imemo_type = 12;
+pub const imemo_type_imemo_constcache: imemo_type = 13;
+pub type imemo_type = ::std::os::raw::c_uint;
 #[repr(C)]
-#[derive(Copy, Clone)]
-pub struct rb_call_data {
-    pub cc: rb_call_cache,
-    pub ci: rb_call_info,
-}
-impl ::std::fmt::Debug for rb_call_data {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "rb_call_data {{ cc: {:?}, ci: {:?} }}", self.cc, self.ci)
-    }
+#[derive(Debug, Copy, Clone)]
+pub struct vm_svar {
+    pub flags: VALUE,
+    pub cref_or_me: VALUE,
+    pub lastline: VALUE,
+    pub backref: VALUE,
+    pub others: VALUE,
 }
 pub const rb_method_visibility_t_METHOD_VISI_UNDEF: rb_method_visibility_t = 0;
 pub const rb_method_visibility_t_METHOD_VISI_PUBLIC: rb_method_visibility_t = 1;
@@ -778,7 +758,7 @@ pub type rb_scope_visibility_t = rb_scope_visi_struct;
 pub struct rb_cref_struct {
     pub flags: VALUE,
     pub refinements: VALUE,
-    pub klass: VALUE,
+    pub klass_or_self: VALUE,
     pub next: *mut rb_cref_struct,
     pub scope_visi: rb_scope_visibility_t,
 }
@@ -786,15 +766,6 @@ pub type rb_cref_t = rb_cref_struct;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct rb_method_entry_struct {
-    pub flags: VALUE,
-    pub defined_class: VALUE,
-    pub def: *mut rb_method_definition_struct,
-    pub called_id: ID,
-    pub owner: VALUE,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct rb_callable_method_entry_struct {
     pub flags: VALUE,
     pub defined_class: VALUE,
     pub def: *mut rb_method_definition_struct,
@@ -818,7 +789,7 @@ pub type rb_iseq_t = rb_iseq_struct;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct rb_method_iseq_struct {
-    pub iseqptr: *mut rb_iseq_t,
+    pub iseqptr: *const rb_iseq_t,
     pub cref: *mut rb_cref_t,
 }
 pub type rb_method_iseq_t = rb_method_iseq_struct;
@@ -862,13 +833,23 @@ pub type rb_method_refined_t = rb_method_refined_struct;
 pub struct rb_method_bmethod_struct {
     pub proc_: VALUE,
     pub hooks: *mut rb_hook_list_struct,
+    pub defined_ractor: VALUE,
 }
 pub type rb_method_bmethod_t = rb_method_bmethod_struct;
 pub const method_optimized_type_OPTIMIZED_METHOD_TYPE_SEND: method_optimized_type = 0;
 pub const method_optimized_type_OPTIMIZED_METHOD_TYPE_CALL: method_optimized_type = 1;
 pub const method_optimized_type_OPTIMIZED_METHOD_TYPE_BLOCK_CALL: method_optimized_type = 2;
-pub const method_optimized_type_OPTIMIZED_METHOD_TYPE__MAX: method_optimized_type = 3;
+pub const method_optimized_type_OPTIMIZED_METHOD_TYPE_STRUCT_AREF: method_optimized_type = 3;
+pub const method_optimized_type_OPTIMIZED_METHOD_TYPE_STRUCT_ASET: method_optimized_type = 4;
+pub const method_optimized_type_OPTIMIZED_METHOD_TYPE__MAX: method_optimized_type = 5;
 pub type method_optimized_type = ::std::os::raw::c_uint;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_method_optimized {
+    pub type_: method_optimized_type,
+    pub index: ::std::os::raw::c_uint,
+}
+pub type rb_method_optimized_t = rb_method_optimized;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct rb_method_definition_struct {
@@ -887,7 +868,7 @@ pub union rb_method_definition_struct__bindgen_ty_1 {
     pub alias: rb_method_alias_t,
     pub refined: rb_method_refined_t,
     pub bmethod: rb_method_bmethod_t,
-    pub optimize_type: method_optimized_type,
+    pub optimized: rb_method_optimized_t,
 }
 impl ::std::fmt::Debug for rb_method_definition_struct__bindgen_ty_1 {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -907,14 +888,25 @@ impl rb_method_definition_struct {
         }
     }
     #[inline]
+    pub fn iseq_overload(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(4usize, 1u8) as u32) }
+    }
+    #[inline]
+    pub fn set_iseq_overload(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(4usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
     pub fn alias_count(&self) -> ::std::os::raw::c_int {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(4usize, 28u8) as u32) }
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(5usize, 27u8) as u32) }
     }
     #[inline]
     pub fn set_alias_count(&mut self, val: ::std::os::raw::c_int) {
         unsafe {
             let val: u32 = ::std::mem::transmute(val);
-            self._bitfield_1.set(4usize, 28u8, val as u64)
+            self._bitfield_1.set(5usize, 27u8, val as u64)
         }
     }
     #[inline]
@@ -942,6 +934,7 @@ impl rb_method_definition_struct {
     #[inline]
     pub fn new_bitfield_1(
         type_: rb_method_type_t,
+        iseq_overload: ::std::os::raw::c_uint,
         alias_count: ::std::os::raw::c_int,
         complemented_count: ::std::os::raw::c_int,
         no_redef_warning: ::std::os::raw::c_uint,
@@ -951,7 +944,11 @@ impl rb_method_definition_struct {
             let type_: u32 = unsafe { ::std::mem::transmute(type_) };
             type_ as u64
         });
-        __bindgen_bitfield_unit.set(4usize, 28u8, {
+        __bindgen_bitfield_unit.set(4usize, 1u8, {
+            let iseq_overload: u32 = unsafe { ::std::mem::transmute(iseq_overload) };
+            iseq_overload as u64
+        });
+        __bindgen_bitfield_unit.set(5usize, 27u8, {
             let alias_count: u32 = unsafe { ::std::mem::transmute(alias_count) };
             alias_count as u64
         });
@@ -966,88 +963,246 @@ impl rb_method_definition_struct {
         __bindgen_bitfield_unit
     }
 }
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_id_table {
+    _unused: [u8; 0],
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_code_position_struct {
+    pub lineno: ::std::os::raw::c_int,
+    pub column: ::std::os::raw::c_int,
+}
+pub type rb_code_position_t = rb_code_position_struct;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_code_location_struct {
+    pub beg_pos: rb_code_position_t,
+    pub end_pos: rb_code_position_t,
+}
+pub type rb_code_location_t = rb_code_location_struct;
+#[repr(C)]
+#[derive(Debug)]
+pub struct rb_ast_id_table {
+    pub size: ::std::os::raw::c_int,
+    pub ids: __IncompleteArrayField<ID>,
+}
+pub type rb_ast_id_table_t = rb_ast_id_table;
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct RNode {
+    pub flags: VALUE,
+    pub u1: RNode__bindgen_ty_1,
+    pub u2: RNode__bindgen_ty_2,
+    pub u3: RNode__bindgen_ty_3,
+    pub nd_loc: rb_code_location_t,
+    pub node_id: ::std::os::raw::c_int,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union RNode__bindgen_ty_1 {
+    pub node: *mut RNode,
+    pub id: ID,
+    pub value: VALUE,
+    pub tbl: *mut rb_ast_id_table_t,
+}
+impl ::std::fmt::Debug for RNode__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "RNode__bindgen_ty_1 {{ union }}")
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union RNode__bindgen_ty_2 {
+    pub node: *mut RNode,
+    pub id: ID,
+    pub argc: ::std::os::raw::c_long,
+    pub value: VALUE,
+}
+impl ::std::fmt::Debug for RNode__bindgen_ty_2 {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "RNode__bindgen_ty_2 {{ union }}")
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union RNode__bindgen_ty_3 {
+    pub node: *mut RNode,
+    pub id: ID,
+    pub state: ::std::os::raw::c_long,
+    pub args: *mut rb_args_info,
+    pub apinfo: *mut rb_ary_pattern_info,
+    pub fpinfo: *mut rb_fnd_pattern_info,
+    pub value: VALUE,
+}
+impl ::std::fmt::Debug for RNode__bindgen_ty_3 {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "RNode__bindgen_ty_3 {{ union }}")
+    }
+}
+impl ::std::fmt::Debug for RNode {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(
+            f,
+            "RNode {{ flags: {:?}, u1: {:?}, u2: {:?}, u3: {:?}, nd_loc: {:?}, node_id: {:?} }}",
+            self.flags, self.u1, self.u2, self.u3, self.nd_loc, self.node_id
+        )
+    }
+}
+pub type NODE = RNode;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_args_info {
+    pub pre_init: *mut NODE,
+    pub post_init: *mut NODE,
+    pub pre_args_num: ::std::os::raw::c_int,
+    pub post_args_num: ::std::os::raw::c_int,
+    pub first_post_arg: ID,
+    pub rest_arg: ID,
+    pub block_arg: ID,
+    pub kw_args: *mut NODE,
+    pub kw_rest_arg: *mut NODE,
+    pub opt_args: *mut NODE,
+    pub _bitfield_align_1: [u8; 0],
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
+    pub imemo: VALUE,
+}
+impl rb_args_info {
+    #[inline]
+    pub fn no_kwarg(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 1u8) as u32) }
+    }
+    #[inline]
+    pub fn set_no_kwarg(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(0usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn ruby2_keywords(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(1usize, 1u8) as u32) }
+    }
+    #[inline]
+    pub fn set_ruby2_keywords(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(1usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn forwarding(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(2usize, 1u8) as u32) }
+    }
+    #[inline]
+    pub fn set_forwarding(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(2usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn new_bitfield_1(
+        no_kwarg: ::std::os::raw::c_uint,
+        ruby2_keywords: ::std::os::raw::c_uint,
+        forwarding: ::std::os::raw::c_uint,
+    ) -> __BindgenBitfieldUnit<[u8; 1usize]> {
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
+        __bindgen_bitfield_unit.set(0usize, 1u8, {
+            let no_kwarg: u32 = unsafe { ::std::mem::transmute(no_kwarg) };
+            no_kwarg as u64
+        });
+        __bindgen_bitfield_unit.set(1usize, 1u8, {
+            let ruby2_keywords: u32 = unsafe { ::std::mem::transmute(ruby2_keywords) };
+            ruby2_keywords as u64
+        });
+        __bindgen_bitfield_unit.set(2usize, 1u8, {
+            let forwarding: u32 = unsafe { ::std::mem::transmute(forwarding) };
+            forwarding as u64
+        });
+        __bindgen_bitfield_unit
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_ary_pattern_info {
+    pub pre_args: *mut NODE,
+    pub rest_arg: *mut NODE,
+    pub post_args: *mut NODE,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_fnd_pattern_info {
+    pub pre_rest_arg: *mut NODE,
+    pub args: *mut NODE,
+    pub post_rest_arg: *mut NODE,
+}
 pub type rb_atomic_t = ::std::os::raw::c_uint;
+pub type attr_index_t = u32;
+pub type shape_id_t = u32;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct list_node {
-    pub next: *mut list_node,
-    pub prev: *mut list_node,
+pub struct rb_shape {
+    pub edges: *mut rb_id_table,
+    pub edge_name: ID,
+    pub next_iv_index: attr_index_t,
+    pub capacity: u32,
+    pub type_: u8,
+    pub size_pool_index: u8,
+    pub parent_id: shape_id_t,
 }
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct list_head {
-    pub n: list_node,
-}
-pub type __jmp_buf = [::std::os::raw::c_long; 8usize];
+pub type rb_shape_t = rb_shape;
 pub type rb_nativethread_id_t = pthread_t;
 pub type rb_nativethread_lock_t = pthread_mutex_t;
 pub type rb_nativethread_cond_t = pthread_cond_t;
 #[repr(C)]
 #[derive(Copy, Clone)]
-pub struct native_thread_data_struct {
-    pub node: native_thread_data_struct__bindgen_ty_1,
-    pub cond: native_thread_data_struct__bindgen_ty_2,
+pub struct rb_thread_sched_item {
+    pub node: rb_thread_sched_item__bindgen_ty_1,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
-pub union native_thread_data_struct__bindgen_ty_1 {
-    pub ubf: list_node,
-    pub gvl: list_node,
+pub union rb_thread_sched_item__bindgen_ty_1 {
+    pub ubf: ccan_list_node,
+    pub readyq: ccan_list_node,
 }
-impl ::std::fmt::Debug for native_thread_data_struct__bindgen_ty_1 {
+impl ::std::fmt::Debug for rb_thread_sched_item__bindgen_ty_1 {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "native_thread_data_struct__bindgen_ty_1 {{ union }}")
+        write!(f, "rb_thread_sched_item__bindgen_ty_1 {{ union }}")
+    }
+}
+impl ::std::fmt::Debug for rb_thread_sched_item {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "rb_thread_sched_item {{ node: {:?} }}", self.node)
     }
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
-pub union native_thread_data_struct__bindgen_ty_2 {
+pub struct rb_native_thread {
+    pub id: ::std::os::raw::c_int,
+    pub thread_id: rb_nativethread_id_t,
+    pub tid: ::std::os::raw::c_int,
+    pub running_thread: *mut rb_thread_struct,
+    pub cond: rb_native_thread__bindgen_ty_1,
+    pub altstack: *mut ::std::os::raw::c_void,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union rb_native_thread__bindgen_ty_1 {
     pub intr: rb_nativethread_cond_t,
-    pub gvlq: rb_nativethread_cond_t,
+    pub readyq: rb_nativethread_cond_t,
 }
-impl ::std::fmt::Debug for native_thread_data_struct__bindgen_ty_2 {
+impl ::std::fmt::Debug for rb_native_thread__bindgen_ty_1 {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "native_thread_data_struct__bindgen_ty_2 {{ union }}")
+        write!(f, "rb_native_thread__bindgen_ty_1 {{ union }}")
     }
 }
-impl ::std::fmt::Debug for native_thread_data_struct {
+impl ::std::fmt::Debug for rb_native_thread {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(
-            f,
-            "native_thread_data_struct {{ node: {:?}, cond: {:?} }}",
-            self.node, self.cond
-        )
+        write ! (f , "rb_native_thread {{ id: {:?}, thread_id: {:?}, tid: {:?}, running_thread: {:?}, cond: {:?}, altstack: {:?} }}" , self . id , self . thread_id , self . tid , self . running_thread , self . cond , self . altstack)
     }
 }
-pub type native_thread_data_t = native_thread_data_struct;
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct rb_global_vm_lock_struct {
-    pub owner: *const rb_thread_struct,
-    pub lock: rb_nativethread_lock_t,
-    pub waitq: list_head,
-    pub timer: *const rb_thread_struct,
-    pub timer_err: ::std::os::raw::c_int,
-    pub switch_cond: rb_nativethread_cond_t,
-    pub switch_wait_cond: rb_nativethread_cond_t,
-    pub need_yield: ::std::os::raw::c_int,
-    pub wait_yield: ::std::os::raw::c_int,
-}
-impl ::std::fmt::Debug for rb_global_vm_lock_struct {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write ! (f , "rb_global_vm_lock_struct {{ owner: {:?}, lock: {:?}, waitq: {:?}, timer: {:?}, timer_err: {:?}, switch_cond: {:?}, switch_wait_cond: {:?}, need_yield: {:?}, wait_yield: {:?} }}" , self . owner , self . lock , self . waitq , self . timer , self . timer_err , self . switch_cond , self . switch_wait_cond , self . need_yield , self . wait_yield)
-    }
-}
-pub type rb_global_vm_lock_t = rb_global_vm_lock_struct;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct __jmp_buf_tag {
-    pub __jmpbuf: __jmp_buf,
-    pub __mask_was_saved: ::std::os::raw::c_int,
-    pub __saved_mask: __sigset_t,
-}
-pub type jmp_buf = [__jmp_buf_tag; 1usize];
-pub type sigjmp_buf = [__jmp_buf_tag; 1usize];
 pub type rb_snum_t = ::std::os::raw::c_long;
 pub const ruby_tag_type_RUBY_TAG_NONE: ruby_tag_type = 0;
 pub const ruby_tag_type_RUBY_TAG_RETURN: ruby_tag_type = 1;
@@ -1063,22 +1218,30 @@ pub type ruby_tag_type = ::std::os::raw::c_uint;
 pub type rb_compile_option_t = rb_compile_option_struct;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct iseq_inline_cache_entry {
-    pub ic_serial: rb_serial_t,
-    pub ic_cref: *const rb_cref_t,
+pub struct iseq_inline_constant_cache_entry {
+    pub flags: VALUE,
     pub value: VALUE,
+    pub _unused1: VALUE,
+    pub _unused2: VALUE,
+    pub ic_cref: *const rb_cref_t,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct iseq_inline_constant_cache {
+    pub entry: *mut iseq_inline_constant_cache_entry,
+    pub segments: *const ID,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct iseq_inline_iv_cache_entry {
-    pub ic_serial: rb_serial_t,
-    pub index: usize,
+    pub value: usize,
+    pub iv_set_name: ID,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union iseq_inline_storage_entry {
     pub once: iseq_inline_storage_entry__bindgen_ty_1,
-    pub cache: iseq_inline_cache_entry,
+    pub ic_cache: iseq_inline_constant_cache,
     pub iv_cache: iseq_inline_iv_cache_entry,
 }
 #[repr(C)]
@@ -1095,6 +1258,8 @@ impl ::std::fmt::Debug for iseq_inline_storage_entry {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct rb_calling_info {
+    pub ci: *const rb_callinfo,
+    pub cc: *const rb_callcache,
     pub block_handler: VALUE,
     pub recv: VALUE,
     pub argc: ::std::os::raw::c_int,
@@ -1106,7 +1271,7 @@ pub struct rb_iseq_location_struct {
     pub pathobj: VALUE,
     pub base_label: VALUE,
     pub label: VALUE,
-    pub first_lineno: VALUE,
+    pub first_lineno: ::std::os::raw::c_int,
     pub node_id: ::std::os::raw::c_int,
     pub code_location: rb_code_location_t,
 }
@@ -1116,10 +1281,21 @@ pub type rb_iseq_location_t = rb_iseq_location_struct;
 pub struct rb_mjit_unit {
     _unused: [u8; 0],
 }
+pub type iseq_bits_t = usize;
+pub const rb_iseq_type_ISEQ_TYPE_TOP: rb_iseq_type = 0;
+pub const rb_iseq_type_ISEQ_TYPE_METHOD: rb_iseq_type = 1;
+pub const rb_iseq_type_ISEQ_TYPE_BLOCK: rb_iseq_type = 2;
+pub const rb_iseq_type_ISEQ_TYPE_CLASS: rb_iseq_type = 3;
+pub const rb_iseq_type_ISEQ_TYPE_RESCUE: rb_iseq_type = 4;
+pub const rb_iseq_type_ISEQ_TYPE_ENSURE: rb_iseq_type = 5;
+pub const rb_iseq_type_ISEQ_TYPE_EVAL: rb_iseq_type = 6;
+pub const rb_iseq_type_ISEQ_TYPE_MAIN: rb_iseq_type = 7;
+pub const rb_iseq_type_ISEQ_TYPE_PLAIN: rb_iseq_type = 8;
+pub type rb_iseq_type = ::std::os::raw::c_uint;
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 pub struct rb_iseq_constant_body {
-    pub type_: rb_iseq_constant_body_iseq_type,
+    pub type_: rb_iseq_type,
     pub iseq_size: ::std::os::raw::c_uint,
     pub iseq_encoded: *mut VALUE,
     pub param: rb_iseq_constant_body__bindgen_ty_1,
@@ -1133,11 +1309,17 @@ pub struct rb_iseq_constant_body {
     pub call_data: *mut rb_call_data,
     pub variable: rb_iseq_constant_body__bindgen_ty_2,
     pub local_table_size: ::std::os::raw::c_uint,
-    pub is_size: ::std::os::raw::c_uint,
+    pub ic_size: ::std::os::raw::c_uint,
+    pub ise_size: ::std::os::raw::c_uint,
+    pub ivc_size: ::std::os::raw::c_uint,
+    pub icvarc_size: ::std::os::raw::c_uint,
     pub ci_size: ::std::os::raw::c_uint,
-    pub ci_kw_size: ::std::os::raw::c_uint,
     pub stack_max: ::std::os::raw::c_uint,
-    pub catch_except_p: ::std::os::raw::c_char,
+    pub catch_except_p: bool,
+    pub builtin_inline_p: bool,
+    pub mark_bits: rb_iseq_constant_body__bindgen_ty_3,
+    pub outer_variables: *mut rb_id_table,
+    pub mandatory_only_iseq: *const rb_iseq_t,
     pub jit_func: ::std::option::Option<
         unsafe extern "C" fn(
             arg1: *mut rb_execution_context_struct,
@@ -1145,19 +1327,9 @@ pub struct rb_iseq_constant_body {
         ) -> VALUE,
     >,
     pub total_calls: ::std::os::raw::c_ulong,
-    pub jit_unit: *mut rb_mjit_unit,
-    pub iseq_unique_id: usize,
+    pub mjit_unit: *mut rb_mjit_unit,
+    pub yjit_payload: *mut ::std::os::raw::c_void,
 }
-pub const rb_iseq_constant_body_iseq_type_ISEQ_TYPE_TOP: rb_iseq_constant_body_iseq_type = 0;
-pub const rb_iseq_constant_body_iseq_type_ISEQ_TYPE_METHOD: rb_iseq_constant_body_iseq_type = 1;
-pub const rb_iseq_constant_body_iseq_type_ISEQ_TYPE_BLOCK: rb_iseq_constant_body_iseq_type = 2;
-pub const rb_iseq_constant_body_iseq_type_ISEQ_TYPE_CLASS: rb_iseq_constant_body_iseq_type = 3;
-pub const rb_iseq_constant_body_iseq_type_ISEQ_TYPE_RESCUE: rb_iseq_constant_body_iseq_type = 4;
-pub const rb_iseq_constant_body_iseq_type_ISEQ_TYPE_ENSURE: rb_iseq_constant_body_iseq_type = 5;
-pub const rb_iseq_constant_body_iseq_type_ISEQ_TYPE_EVAL: rb_iseq_constant_body_iseq_type = 6;
-pub const rb_iseq_constant_body_iseq_type_ISEQ_TYPE_MAIN: rb_iseq_constant_body_iseq_type = 7;
-pub const rb_iseq_constant_body_iseq_type_ISEQ_TYPE_PLAIN: rb_iseq_constant_body_iseq_type = 8;
-pub type rb_iseq_constant_body_iseq_type = ::std::os::raw::c_uint;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct rb_iseq_constant_body__bindgen_ty_1 {
@@ -1370,9 +1542,26 @@ pub struct rb_iseq_constant_body_iseq_insn_info {
 #[derive(Debug, Copy, Clone)]
 pub struct rb_iseq_constant_body__bindgen_ty_2 {
     pub flip_count: rb_snum_t,
+    pub script_lines: VALUE,
     pub coverage: VALUE,
     pub pc2branchindex: VALUE,
     pub original_iseq: *mut VALUE,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union rb_iseq_constant_body__bindgen_ty_3 {
+    pub list: *mut iseq_bits_t,
+    pub single: iseq_bits_t,
+}
+impl ::std::fmt::Debug for rb_iseq_constant_body__bindgen_ty_3 {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "rb_iseq_constant_body__bindgen_ty_3 {{ union }}")
+    }
+}
+impl ::std::fmt::Debug for rb_iseq_constant_body {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write ! (f , "rb_iseq_constant_body {{ type: {:?}, iseq_size: {:?}, iseq_encoded: {:?}, param: {:?}, location: {:?}, insns_info: {:?}, local_table: {:?}, catch_table: {:?}, parent_iseq: {:?}, local_iseq: {:?}, is_entries: {:?}, call_data: {:?}, variable: {:?}, local_table_size: {:?}, ic_size: {:?}, ise_size: {:?}, ivc_size: {:?}, icvarc_size: {:?}, ci_size: {:?}, stack_max: {:?}, catch_except_p: {:?}, builtin_inline_p: {:?}, mark_bits: {:?}, outer_variables: {:?}, mandatory_only_iseq: {:?}, jit_func: {:?}, total_calls: {:?}, mjit_unit: {:?}, yjit_payload: {:?} }}" , self . type_ , self . iseq_size , self . iseq_encoded , self . param , self . location , self . insns_info , self . local_table , self . catch_table , self . parent_iseq , self . local_iseq , self . is_entries , self . call_data , self . variable , self . local_table_size , self . ic_size , self . ise_size , self . ivc_size , self . icvarc_size , self . ci_size , self . stack_max , self . catch_except_p , self . builtin_inline_p , self . mark_bits , self . outer_variables , self . mandatory_only_iseq , self . jit_func , self . total_calls , self . mjit_unit , self . yjit_payload)
+    }
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -1427,10 +1616,10 @@ pub struct rb_at_exit_list {
 pub struct rb_hook_list_struct {
     pub hooks: *mut rb_event_hook_struct,
     pub events: rb_event_flag_t,
-    pub need_clean: ::std::os::raw::c_uint,
     pub running: ::std::os::raw::c_uint,
+    pub need_clean: bool,
+    pub is_local: bool,
 }
-pub type rb_hook_list_t = rb_hook_list_struct;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct rb_builtin_function {
@@ -1440,24 +1629,21 @@ pub struct rb_builtin_function {
 #[derive(Copy, Clone)]
 pub struct rb_vm_struct {
     pub self_: VALUE,
-    pub gvl: rb_global_vm_lock_t,
-    pub main_thread: *mut rb_thread_struct,
-    pub running_thread: *const rb_thread_struct,
+    pub ractor: rb_vm_struct__bindgen_ty_1,
     pub main_altstack: *mut ::std::os::raw::c_void,
     pub fork_gen: rb_serial_t,
     pub waitpid_lock: rb_nativethread_lock_t,
-    pub waiting_pids: list_head,
-    pub waiting_grps: list_head,
-    pub waiting_fds: list_head,
-    pub living_threads: list_head,
-    pub thgroup_default: VALUE,
-    pub living_thread_num: ::std::os::raw::c_int,
+    pub waiting_pids: ccan_list_head,
+    pub waiting_grps: ccan_list_head,
+    pub waiting_fds: ccan_list_head,
     pub ubf_async_safe: ::std::os::raw::c_int,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
-    pub sleeper: ::std::os::raw::c_int,
     pub mark_object_ary: VALUE,
     pub special_exceptions: [VALUE; 5usize],
+    pub shape_list: *mut rb_shape_t,
+    pub root_shape: *mut rb_shape_t,
+    pub next_shape_id: shape_id_t,
     pub top_self: VALUE,
     pub load_path: VALUE,
     pub load_path_snapshot: VALUE,
@@ -1465,40 +1651,73 @@ pub struct rb_vm_struct {
     pub expanded_load_path: VALUE,
     pub loaded_features: VALUE,
     pub loaded_features_snapshot: VALUE,
+    pub loaded_features_realpaths: VALUE,
     pub loaded_features_index: *mut st_table,
     pub loading_table: *mut st_table,
-    pub trap_list: rb_vm_struct__bindgen_ty_1,
-    pub global_hooks: rb_hook_list_t,
+    pub trap_list: rb_vm_struct__bindgen_ty_2,
     pub ensure_rollback_table: *mut st_table,
     pub postponed_job_buffer: *mut rb_postponed_job_struct,
-    pub postponed_job_index: ::std::os::raw::c_int,
+    pub postponed_job_index: rb_atomic_t,
     pub src_encoding_index: ::std::os::raw::c_int,
-    pub workqueue: list_head,
+    pub workqueue: ccan_list_head,
     pub workqueue_lock: rb_nativethread_lock_t,
-    pub verbose: VALUE,
-    pub debug: VALUE,
     pub orig_progname: VALUE,
     pub progname: VALUE,
     pub coverages: VALUE,
+    pub me2counter: VALUE,
     pub coverage_mode: ::std::os::raw::c_int,
     pub defined_module_hash: *mut st_table,
     pub objspace: *mut rb_objspace,
     pub at_exit: *mut rb_at_exit_list,
-    pub defined_strings: *mut VALUE,
     pub frozen_strings: *mut st_table,
     pub builtin_function_table: *const rb_builtin_function,
     pub builtin_inline_index: ::std::os::raw::c_int,
-    pub default_params: rb_vm_struct__bindgen_ty_2,
-    pub redefined_flag: [::std::os::raw::c_short; 29usize],
+    pub negative_cme_table: *mut rb_id_table,
+    pub overloaded_cme_table: *mut st_table,
+    pub constant_cache: *mut rb_id_table,
+    pub global_cc_cache_table: [*const rb_callcache; 1023usize],
+    pub default_params: rb_vm_struct__bindgen_ty_3,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 pub struct rb_vm_struct__bindgen_ty_1 {
-    pub cmd: [VALUE; 65usize],
+    pub set: ccan_list_head,
+    pub cnt: ::std::os::raw::c_uint,
+    pub blocking_cnt: ::std::os::raw::c_uint,
+    pub main_ractor: *mut rb_ractor_struct,
+    pub main_thread: *mut rb_thread_struct,
+    pub sync: rb_vm_struct__bindgen_ty_1__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct rb_vm_struct__bindgen_ty_1__bindgen_ty_1 {
+    pub lock: rb_nativethread_lock_t,
+    pub lock_owner: *mut rb_ractor_struct,
+    pub lock_rec: ::std::os::raw::c_uint,
+    pub barrier_waiting: bool,
+    pub barrier_cnt: ::std::os::raw::c_uint,
+    pub barrier_cond: rb_nativethread_cond_t,
+    pub terminate_cond: rb_nativethread_cond_t,
+    pub terminate_waiting: bool,
+}
+impl ::std::fmt::Debug for rb_vm_struct__bindgen_ty_1__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write ! (f , "rb_vm_struct__bindgen_ty_1__bindgen_ty_1 {{ lock: {:?}, lock_owner: {:?}, lock_rec: {:?}, barrier_waiting: {:?}, barrier_cnt: {:?}, barrier_cond: {:?}, terminate_cond: {:?}, terminate_waiting: {:?} }}" , self . lock , self . lock_owner , self . lock_rec , self . barrier_waiting , self . barrier_cnt , self . barrier_cond , self . terminate_cond , self . terminate_waiting)
+    }
+}
+impl ::std::fmt::Debug for rb_vm_struct__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write ! (f , "rb_vm_struct__bindgen_ty_1 {{ set: {:?}, cnt: {:?}, blocking_cnt: {:?}, main_ractor: {:?}, main_thread: {:?}, sync: {:?} }}" , self . set , self . cnt , self . blocking_cnt , self . main_ractor , self . main_thread , self . sync)
+    }
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct rb_vm_struct__bindgen_ty_2 {
+    pub cmd: [VALUE; 65usize],
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_vm_struct__bindgen_ty_3 {
     pub thread_vm_stack_size: usize,
     pub thread_machine_stack_size: usize,
     pub fiber_vm_stack_size: usize,
@@ -1506,7 +1725,7 @@ pub struct rb_vm_struct__bindgen_ty_2 {
 }
 impl ::std::fmt::Debug for rb_vm_struct {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write ! (f , "rb_vm_struct {{ self: {:?}, gvl: {:?}, main_thread: {:?}, running_thread: {:?}, main_altstack: {:?}, fork_gen: {:?}, waitpid_lock: {:?}, waiting_pids: {:?}, waiting_grps: {:?}, waiting_fds: {:?}, living_threads: {:?}, thgroup_default: {:?}, living_thread_num: {:?}, ubf_async_safe: {:?}, running : {:?}, thread_abort_on_exception : {:?}, thread_report_on_exception : {:?}, safe_level_ : {:?}, sleeper: {:?}, mark_object_ary: {:?}, special_exceptions: {:?}, top_self: {:?}, load_path: {:?}, load_path_snapshot: {:?}, load_path_check_cache: {:?}, expanded_load_path: {:?}, loaded_features: {:?}, loaded_features_snapshot: {:?}, loaded_features_index: {:?}, loading_table: {:?}, trap_list: {:?}, global_hooks: {:?}, ensure_rollback_table: {:?}, postponed_job_buffer: {:?}, postponed_job_index: {:?}, src_encoding_index: {:?}, workqueue: {:?}, workqueue_lock: {:?}, verbose: {:?}, debug: {:?}, orig_progname: {:?}, progname: {:?}, coverages: {:?}, coverage_mode: {:?}, defined_module_hash: {:?}, objspace: {:?}, at_exit: {:?}, defined_strings: {:?}, frozen_strings: {:?}, builtin_function_table: {:?}, builtin_inline_index: {:?}, default_params: {:?}, redefined_flag: {:?} }}" , self . self_ , self . gvl , self . main_thread , self . running_thread , self . main_altstack , self . fork_gen , self . waitpid_lock , self . waiting_pids , self . waiting_grps , self . waiting_fds , self . living_threads , self . thgroup_default , self . living_thread_num , self . ubf_async_safe , self . running () , self . thread_abort_on_exception () , self . thread_report_on_exception () , self . safe_level_ () , self . sleeper , self . mark_object_ary , self . special_exceptions , self . top_self , self . load_path , self . load_path_snapshot , self . load_path_check_cache , self . expanded_load_path , self . loaded_features , self . loaded_features_snapshot , self . loaded_features_index , self . loading_table , self . trap_list , self . global_hooks , self . ensure_rollback_table , self . postponed_job_buffer , self . postponed_job_index , self . src_encoding_index , self . workqueue , self . workqueue_lock , self . verbose , self . debug , self . orig_progname , self . progname , self . coverages , self . coverage_mode , self . defined_module_hash , self . objspace , self . at_exit , self . defined_strings , self . frozen_strings , self . builtin_function_table , self . builtin_inline_index , self . default_params , self . redefined_flag)
+        write ! (f , "rb_vm_struct {{ self: {:?}, ractor: {:?}, main_altstack: {:?}, fork_gen: {:?}, waitpid_lock: {:?}, waiting_pids: {:?}, waiting_grps: {:?}, waiting_fds: {:?}, ubf_async_safe: {:?}, running : {:?}, thread_abort_on_exception : {:?}, thread_report_on_exception : {:?}, thread_ignore_deadlock : {:?}, mark_object_ary: {:?}, special_exceptions: {:?}, shape_list: {:?}, root_shape: {:?}, top_self: {:?}, load_path: {:?}, load_path_snapshot: {:?}, load_path_check_cache: {:?}, expanded_load_path: {:?}, loaded_features: {:?}, loaded_features_snapshot: {:?}, loaded_features_realpaths: {:?}, loaded_features_index: {:?}, loading_table: {:?}, trap_list: {:?}, ensure_rollback_table: {:?}, postponed_job_buffer: {:?}, postponed_job_index: {:?}, src_encoding_index: {:?}, workqueue: {:?}, workqueue_lock: {:?}, orig_progname: {:?}, progname: {:?}, coverages: {:?}, me2counter: {:?}, coverage_mode: {:?}, defined_module_hash: {:?}, objspace: {:?}, at_exit: {:?}, frozen_strings: {:?}, builtin_function_table: {:?}, builtin_inline_index: {:?}, negative_cme_table: {:?}, overloaded_cme_table: {:?}, constant_cache: {:?}, global_cc_cache_table: {:?}, default_params: {:?} }}" , self . self_ , self . ractor , self . main_altstack , self . fork_gen , self . waitpid_lock , self . waiting_pids , self . waiting_grps , self . waiting_fds , self . ubf_async_safe , self . running () , self . thread_abort_on_exception () , self . thread_report_on_exception () , self . thread_ignore_deadlock () , self . mark_object_ary , self . special_exceptions , self . shape_list , self . root_shape , self . top_self , self . load_path , self . load_path_snapshot , self . load_path_check_cache , self . expanded_load_path , self . loaded_features , self . loaded_features_snapshot , self . loaded_features_realpaths , self . loaded_features_index , self . loading_table , self . trap_list , self . ensure_rollback_table , self . postponed_job_buffer , self . postponed_job_index , self . src_encoding_index , self . workqueue , self . workqueue_lock , self . orig_progname , self . progname , self . coverages , self . me2counter , self . coverage_mode , self . defined_module_hash , self . objspace , self . at_exit , self . frozen_strings , self . builtin_function_table , self . builtin_inline_index , self . negative_cme_table , self . overloaded_cme_table , self . constant_cache , self . global_cc_cache_table , self . default_params)
     }
 }
 impl rb_vm_struct {
@@ -1544,11 +1763,11 @@ impl rb_vm_struct {
         }
     }
     #[inline]
-    pub fn safe_level_(&self) -> ::std::os::raw::c_uint {
+    pub fn thread_ignore_deadlock(&self) -> ::std::os::raw::c_uint {
         unsafe { ::std::mem::transmute(self._bitfield_1.get(3usize, 1u8) as u32) }
     }
     #[inline]
-    pub fn set_safe_level_(&mut self, val: ::std::os::raw::c_uint) {
+    pub fn set_thread_ignore_deadlock(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
             let val: u32 = ::std::mem::transmute(val);
             self._bitfield_1.set(3usize, 1u8, val as u64)
@@ -1559,7 +1778,7 @@ impl rb_vm_struct {
         running: ::std::os::raw::c_uint,
         thread_abort_on_exception: ::std::os::raw::c_uint,
         thread_report_on_exception: ::std::os::raw::c_uint,
-        safe_level_: ::std::os::raw::c_uint,
+        thread_ignore_deadlock: ::std::os::raw::c_uint,
     ) -> __BindgenBitfieldUnit<[u8; 1usize]> {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 1u8, {
@@ -1577,8 +1796,9 @@ impl rb_vm_struct {
             thread_report_on_exception as u64
         });
         __bindgen_bitfield_unit.set(3usize, 1u8, {
-            let safe_level_: u32 = unsafe { ::std::mem::transmute(safe_level_) };
-            safe_level_ as u64
+            let thread_ignore_deadlock: u32 =
+                unsafe { ::std::mem::transmute(thread_ignore_deadlock) };
+            thread_ignore_deadlock as u64
         });
         __bindgen_bitfield_unit
     }
@@ -1594,6 +1814,7 @@ pub struct rb_control_frame_struct {
     pub ep: *const VALUE,
     pub block_code: *const ::std::os::raw::c_void,
     pub __bp__: *mut VALUE,
+    pub jit_return: *mut ::std::os::raw::c_void,
 }
 pub type rb_control_frame_t = rb_control_frame_struct;
 pub const rb_thread_status_THREAD_RUNNABLE: rb_thread_status = 0;
@@ -1610,11 +1831,7 @@ pub struct rb_vm_tag {
     pub buf: rb_jmpbuf_t,
     pub prev: *mut rb_vm_tag,
     pub state: ruby_tag_type,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct rb_vm_protect_tag {
-    pub prev: *mut rb_vm_protect_tag,
+    pub lock_rec: ::std::os::raw::c_uint,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -1629,13 +1846,6 @@ pub struct rb_mutex_struct {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct rb_thread_list_struct {
-    pub next: *mut rb_thread_list_struct,
-    pub th: *mut rb_thread_struct,
-}
-pub type rb_thread_list_t = rb_thread_list_struct;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
 pub struct rb_ensure_entry {
     pub marker: VALUE,
     pub e_proc: ::std::option::Option<unsafe extern "C" fn(arg1: VALUE) -> VALUE>,
@@ -1648,7 +1858,19 @@ pub struct rb_ensure_list {
     pub entry: rb_ensure_entry,
 }
 pub type rb_ensure_list_t = rb_ensure_list;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_fiber_struct {
+    _unused: [u8; 0],
+}
 pub type rb_fiber_t = rb_fiber_struct;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_waiting_list {
+    pub next: *mut rb_waiting_list,
+    pub thread: *mut rb_thread_struct,
+    pub fiber: *mut rb_fiber_struct,
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct rb_execution_context_struct {
@@ -1656,14 +1878,14 @@ pub struct rb_execution_context_struct {
     pub vm_stack_size: usize,
     pub cfp: *mut rb_control_frame_t,
     pub tag: *mut rb_vm_tag,
-    pub protect_tag: *mut rb_vm_protect_tag,
     pub interrupt_flag: rb_atomic_t,
     pub interrupt_mask: rb_atomic_t,
     pub fiber_ptr: *mut rb_fiber_t,
     pub thread_ptr: *mut rb_thread_struct,
-    pub local_storage: *mut st_table,
+    pub local_storage: *mut rb_id_table,
     pub local_storage_recursive_hash: VALUE,
     pub local_storage_recursive_hash_for_trace: VALUE,
+    pub storage: VALUE,
     pub root_lep: *const VALUE,
     pub root_svar: VALUE,
     pub ensure_list: *mut rb_ensure_list_t,
@@ -1711,22 +1933,30 @@ impl rb_execution_context_struct {
 }
 pub type rb_execution_context_t = rb_execution_context_struct;
 #[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_ext_config {
+    pub ractor_safe: bool,
+}
+pub type rb_ractor_t = rb_ractor_struct;
+#[repr(C)]
 #[derive(Copy, Clone)]
 pub struct rb_thread_struct {
-    pub vmlt_node: list_node,
+    pub lt_node: ccan_list_node,
     pub self_: VALUE,
+    pub ractor: *mut rb_ractor_t,
     pub vm: *mut rb_vm_t,
+    pub nt: *mut rb_native_thread,
     pub ec: *mut rb_execution_context_t,
+    pub sched: rb_thread_sched_item,
+    pub serial: rb_atomic_t,
     pub last_status: VALUE,
     pub calling: *mut rb_calling_info,
     pub top_self: VALUE,
     pub top_wrapper: VALUE,
-    pub thread_id: rb_nativethread_id_t,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
     pub priority: i8,
     pub running_time_us: u32,
-    pub native_thread_data: native_thread_data_t,
     pub blocking_region_buffer: *mut ::std::os::raw::c_void,
     pub thgroup: VALUE,
     pub value: VALUE,
@@ -1736,13 +1966,15 @@ pub struct rb_thread_struct {
     pub unblock: rb_unblock_callback,
     pub locking_mutex: VALUE,
     pub keeping_mutexes: *mut rb_mutex_struct,
-    pub join_list: *mut rb_thread_list_t,
+    pub join_list: *mut rb_waiting_list,
     pub invoke_arg: rb_thread_struct__bindgen_ty_1,
-    pub invoke_type: rb_thread_struct__bindgen_ty_2,
+    pub invoke_type: rb_thread_struct_thread_invoke_type,
     pub stat_insn_usage: VALUE,
     pub root_fiber: *mut rb_fiber_t,
-    pub root_jmpbuf: rb_jmpbuf_t,
+    pub scheduler: VALUE,
+    pub blocking: ::std::os::raw::c_uint,
     pub name: VALUE,
+    pub ext_config: rb_ext_config,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -1769,13 +2001,18 @@ impl ::std::fmt::Debug for rb_thread_struct__bindgen_ty_1 {
         write!(f, "rb_thread_struct__bindgen_ty_1 {{ union }}")
     }
 }
-pub const rb_thread_struct_thread_invoke_type_none: rb_thread_struct__bindgen_ty_2 = 0;
-pub const rb_thread_struct_thread_invoke_type_proc: rb_thread_struct__bindgen_ty_2 = 1;
-pub const rb_thread_struct_thread_invoke_type_func: rb_thread_struct__bindgen_ty_2 = 2;
-pub type rb_thread_struct__bindgen_ty_2 = ::std::os::raw::c_uint;
+pub const rb_thread_struct_thread_invoke_type_thread_invoke_type_none:
+    rb_thread_struct_thread_invoke_type = 0;
+pub const rb_thread_struct_thread_invoke_type_thread_invoke_type_proc:
+    rb_thread_struct_thread_invoke_type = 1;
+pub const rb_thread_struct_thread_invoke_type_thread_invoke_type_ractor_proc:
+    rb_thread_struct_thread_invoke_type = 2;
+pub const rb_thread_struct_thread_invoke_type_thread_invoke_type_func:
+    rb_thread_struct_thread_invoke_type = 3;
+pub type rb_thread_struct_thread_invoke_type = ::std::os::raw::c_uint;
 impl ::std::fmt::Debug for rb_thread_struct {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write ! (f , "rb_thread_struct {{ vmlt_node: {:?}, self: {:?}, vm: {:?}, ec: {:?}, last_status: {:?}, calling: {:?}, top_self: {:?}, top_wrapper: {:?}, thread_id: {:?}, status : {:?}, to_kill : {:?}, abort_on_exception : {:?}, report_on_exception : {:?}, pending_interrupt_queue_checked : {:?}, native_thread_data: {:?}, blocking_region_buffer: {:?}, thgroup: {:?}, value: {:?}, pending_interrupt_queue: {:?}, pending_interrupt_mask_stack: {:?}, interrupt_lock: {:?}, unblock: {:?}, locking_mutex: {:?}, keeping_mutexes: {:?}, join_list: {:?}, invoke_arg: {:?}, invoke_type: {:?}, stat_insn_usage: {:?}, root_fiber: {:?}, root_jmpbuf: {:?}, name: {:?} }}" , self . vmlt_node , self . self_ , self . vm , self . ec , self . last_status , self . calling , self . top_self , self . top_wrapper , self . thread_id , self . status () , self . to_kill () , self . abort_on_exception () , self . report_on_exception () , self . pending_interrupt_queue_checked () , self . native_thread_data , self . blocking_region_buffer , self . thgroup , self . value , self . pending_interrupt_queue , self . pending_interrupt_mask_stack , self . interrupt_lock , self . unblock , self . locking_mutex , self . keeping_mutexes , self . join_list , self . invoke_arg , self . invoke_type , self . stat_insn_usage , self . root_fiber , self . root_jmpbuf , self . name)
+        write ! (f , "rb_thread_struct {{ lt_node: {:?}, self: {:?}, ractor: {:?}, vm: {:?}, nt: {:?}, ec: {:?}, sched: {:?}, serial: {:?}, last_status: {:?}, calling: {:?}, top_self: {:?}, top_wrapper: {:?}, status : {:?}, locking_native_thread : {:?}, to_kill : {:?}, abort_on_exception : {:?}, report_on_exception : {:?}, pending_interrupt_queue_checked : {:?}, blocking_region_buffer: {:?}, thgroup: {:?}, value: {:?}, pending_interrupt_queue: {:?}, pending_interrupt_mask_stack: {:?}, interrupt_lock: {:?}, unblock: {:?}, locking_mutex: {:?}, keeping_mutexes: {:?}, join_list: {:?}, invoke_arg: {:?}, invoke_type: {:?}, stat_insn_usage: {:?}, root_fiber: {:?}, scheduler: {:?}, blocking: {:?}, name: {:?}, ext_config: {:?} }}" , self . lt_node , self . self_ , self . ractor , self . vm , self . nt , self . ec , self . sched , self . serial , self . last_status , self . calling , self . top_self , self . top_wrapper , self . status () , self . locking_native_thread () , self . to_kill () , self . abort_on_exception () , self . report_on_exception () , self . pending_interrupt_queue_checked () , self . blocking_region_buffer , self . thgroup , self . value , self . pending_interrupt_queue , self . pending_interrupt_mask_stack , self . interrupt_lock , self . unblock , self . locking_mutex , self . keeping_mutexes , self . join_list , self . invoke_arg , self . invoke_type , self . stat_insn_usage , self . root_fiber , self . scheduler , self . blocking , self . name , self . ext_config)
     }
 }
 impl rb_thread_struct {
@@ -1791,52 +2028,64 @@ impl rb_thread_struct {
         }
     }
     #[inline]
-    pub fn to_kill(&self) -> ::std::os::raw::c_uint {
+    pub fn locking_native_thread(&self) -> ::std::os::raw::c_uint {
         unsafe { ::std::mem::transmute(self._bitfield_1.get(2usize, 1u8) as u32) }
     }
     #[inline]
-    pub fn set_to_kill(&mut self, val: ::std::os::raw::c_uint) {
+    pub fn set_locking_native_thread(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
             let val: u32 = ::std::mem::transmute(val);
             self._bitfield_1.set(2usize, 1u8, val as u64)
         }
     }
     #[inline]
-    pub fn abort_on_exception(&self) -> ::std::os::raw::c_uint {
+    pub fn to_kill(&self) -> ::std::os::raw::c_uint {
         unsafe { ::std::mem::transmute(self._bitfield_1.get(3usize, 1u8) as u32) }
     }
     #[inline]
-    pub fn set_abort_on_exception(&mut self, val: ::std::os::raw::c_uint) {
+    pub fn set_to_kill(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
             let val: u32 = ::std::mem::transmute(val);
             self._bitfield_1.set(3usize, 1u8, val as u64)
         }
     }
     #[inline]
-    pub fn report_on_exception(&self) -> ::std::os::raw::c_uint {
+    pub fn abort_on_exception(&self) -> ::std::os::raw::c_uint {
         unsafe { ::std::mem::transmute(self._bitfield_1.get(4usize, 1u8) as u32) }
     }
     #[inline]
-    pub fn set_report_on_exception(&mut self, val: ::std::os::raw::c_uint) {
+    pub fn set_abort_on_exception(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
             let val: u32 = ::std::mem::transmute(val);
             self._bitfield_1.set(4usize, 1u8, val as u64)
         }
     }
     #[inline]
-    pub fn pending_interrupt_queue_checked(&self) -> ::std::os::raw::c_uint {
+    pub fn report_on_exception(&self) -> ::std::os::raw::c_uint {
         unsafe { ::std::mem::transmute(self._bitfield_1.get(5usize, 1u8) as u32) }
     }
     #[inline]
-    pub fn set_pending_interrupt_queue_checked(&mut self, val: ::std::os::raw::c_uint) {
+    pub fn set_report_on_exception(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
             let val: u32 = ::std::mem::transmute(val);
             self._bitfield_1.set(5usize, 1u8, val as u64)
         }
     }
     #[inline]
+    pub fn pending_interrupt_queue_checked(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(6usize, 1u8) as u32) }
+    }
+    #[inline]
+    pub fn set_pending_interrupt_queue_checked(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(6usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
     pub fn new_bitfield_1(
         status: rb_thread_status,
+        locking_native_thread: ::std::os::raw::c_uint,
         to_kill: ::std::os::raw::c_uint,
         abort_on_exception: ::std::os::raw::c_uint,
         report_on_exception: ::std::os::raw::c_uint,
@@ -1848,18 +2097,23 @@ impl rb_thread_struct {
             status as u64
         });
         __bindgen_bitfield_unit.set(2usize, 1u8, {
+            let locking_native_thread: u32 =
+                unsafe { ::std::mem::transmute(locking_native_thread) };
+            locking_native_thread as u64
+        });
+        __bindgen_bitfield_unit.set(3usize, 1u8, {
             let to_kill: u32 = unsafe { ::std::mem::transmute(to_kill) };
             to_kill as u64
         });
-        __bindgen_bitfield_unit.set(3usize, 1u8, {
+        __bindgen_bitfield_unit.set(4usize, 1u8, {
             let abort_on_exception: u32 = unsafe { ::std::mem::transmute(abort_on_exception) };
             abort_on_exception as u64
         });
-        __bindgen_bitfield_unit.set(4usize, 1u8, {
+        __bindgen_bitfield_unit.set(5usize, 1u8, {
             let report_on_exception: u32 = unsafe { ::std::mem::transmute(report_on_exception) };
             report_on_exception as u64
         });
-        __bindgen_bitfield_unit.set(5usize, 1u8, {
+        __bindgen_bitfield_unit.set(6usize, 1u8, {
             let pending_interrupt_queue_checked: u32 =
                 unsafe { ::std::mem::transmute(pending_interrupt_queue_checked) };
             pending_interrupt_queue_checked as u64
@@ -1895,15 +2149,18 @@ pub struct iseq_compile_data {
     pub ensure_node_stack: *mut iseq_compile_data_ensure_node_stack,
     pub node: iseq_compile_data__bindgen_ty_1,
     pub insn: iseq_compile_data__bindgen_ty_2,
+    pub in_rescue: bool,
     pub loopval_popped: ::std::os::raw::c_int,
     pub last_line: ::std::os::raw::c_int,
     pub label_no: ::std::os::raw::c_int,
     pub node_level: ::std::os::raw::c_int,
+    pub isolated_depth: ::std::os::raw::c_int,
     pub ci_index: ::std::os::raw::c_uint,
-    pub ci_kw_index: ::std::os::raw::c_uint,
+    pub ic_index: ::std::os::raw::c_uint,
     pub option: *const rb_compile_option_t,
     pub ivar_cache_table: *mut rb_id_table,
     pub builtin_function_table: *const rb_builtin_function,
+    pub root_node: *const NODE,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -2102,27 +2359,26 @@ impl rb_compile_option_struct {
 #[derive(Debug, Copy, Clone)]
 pub struct iseq_insn_info_entry {
     pub line_no: ::std::os::raw::c_int,
+    pub node_id: ::std::os::raw::c_int,
     pub events: rb_event_flag_t,
 }
+pub const rb_catch_type_CATCH_TYPE_RESCUE: rb_catch_type = 3;
+pub const rb_catch_type_CATCH_TYPE_ENSURE: rb_catch_type = 5;
+pub const rb_catch_type_CATCH_TYPE_RETRY: rb_catch_type = 7;
+pub const rb_catch_type_CATCH_TYPE_BREAK: rb_catch_type = 9;
+pub const rb_catch_type_CATCH_TYPE_REDO: rb_catch_type = 11;
+pub const rb_catch_type_CATCH_TYPE_NEXT: rb_catch_type = 13;
+pub type rb_catch_type = ::std::os::raw::c_uint;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct iseq_catch_table_entry {
-    pub type_: iseq_catch_table_entry_catch_type,
+    pub type_: rb_catch_type,
     pub iseq: *mut rb_iseq_t,
     pub start: ::std::os::raw::c_uint,
     pub end: ::std::os::raw::c_uint,
     pub cont: ::std::os::raw::c_uint,
     pub sp: ::std::os::raw::c_uint,
 }
-pub const iseq_catch_table_entry_catch_type_CATCH_TYPE_RESCUE: iseq_catch_table_entry_catch_type =
-    3;
-pub const iseq_catch_table_entry_catch_type_CATCH_TYPE_ENSURE: iseq_catch_table_entry_catch_type =
-    5;
-pub const iseq_catch_table_entry_catch_type_CATCH_TYPE_RETRY: iseq_catch_table_entry_catch_type = 7;
-pub const iseq_catch_table_entry_catch_type_CATCH_TYPE_BREAK: iseq_catch_table_entry_catch_type = 9;
-pub const iseq_catch_table_entry_catch_type_CATCH_TYPE_REDO: iseq_catch_table_entry_catch_type = 11;
-pub const iseq_catch_table_entry_catch_type_CATCH_TYPE_NEXT: iseq_catch_table_entry_catch_type = 13;
-pub type iseq_catch_table_entry_catch_type = ::std::os::raw::c_uint;
 #[repr(C, packed)]
 pub struct iseq_catch_table {
     pub size: ::std::os::raw::c_uint,
@@ -2138,17 +2394,22 @@ pub struct iseq_compile_data_storage {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct rb_id_table {
-    pub _address: u8,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
 pub struct succ_index_table {
     pub _address: u8,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
+pub struct rb_call_data {
+    pub _address: u8,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct rb_event_hook_struct {
+    pub _address: u8,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_ractor_struct {
     pub _address: u8,
 }
 #[repr(C)]
