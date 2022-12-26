@@ -779,6 +779,22 @@ macro_rules! get_stack_frame_2_5_0(
     )
 );
 
+macro_rules! get_pos(
+    ($iseq_type:ident) => (
+        #[allow(unused)] // this doesn't get used in every ruby version
+        fn get_pos(iseq_struct: &$iseq_type, cfp: &rb_control_frame_t) -> Result<usize> {
+            if (cfp.pc as usize) < (iseq_struct.iseq_encoded as usize) {
+                return Err(crate::core::types::MemoryCopyError::Message(format!("program counter and iseq are out of sync")).into());
+            }
+            let mut pos = cfp.pc as usize - iseq_struct.iseq_encoded as usize;
+            if pos != 0 {
+                pos -= 1;
+            }
+            Ok(pos)
+        }
+    )
+);
+
 macro_rules! get_lineno_1_9_0(
     () => (
         fn get_lineno<T>(
@@ -868,22 +884,6 @@ macro_rules! get_lineno_2_3_0(
                 }
                 Ok(table[t_size-1].line_no as usize)
             }
-        }
-    )
-);
-
-macro_rules! get_pos(
-    ($iseq_type:ident) => (
-        #[allow(unused)] // this doesn't get used in every ruby version
-        fn get_pos(iseq_struct: &$iseq_type, cfp: &rb_control_frame_t) -> Result<usize> {
-            if (cfp.pc as usize) < (iseq_struct.iseq_encoded as usize) {
-                return Err(crate::core::types::MemoryCopyError::Message(format!("program counter and iseq are out of sync")).into());
-            }
-            let mut pos = cfp.pc as usize - iseq_struct.iseq_encoded as usize;
-            if pos != 0 {
-                pos -= 1;
-            }
-            Ok(pos)
         }
     )
 );
