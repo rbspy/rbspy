@@ -20,8 +20,30 @@ With new bindings in hand, we can update rbspy itself to work with the new Ruby 
 
 1. Open `ruby-structs/src/lib.rs` and add a `mod` line for each new version.
 1. Open `src/core/initialize.rs` and add a line for each new version in the `is_maybe_thread_function` and `get_stack_trace_function` functions.
-1. Open `src/core/ruby_version.rs` and add a line for each new version. Please also add a test for each one.
+1. Open `src/core/ruby_version.rs` and add a line for each new version. Please also add a test for each one (see next section).
 1. Commit your changes and push your branch
 1. Open a PR
 
 To understand where the lines need to be added and how to write the tests, you can use [this commit](https://github.com/rbspy/rbspy/commit/9d8fee1665c1b4fcdb007533307696d524964e84) as a template.
+
+## Update tests
+
+1. Run `infinite.rb` with the new Ruby version
+
+    ```sh
+    rbenv local X.Y.Z
+    ruby ci/ruby-programs/infinite.rb
+    ```
+1. In another terminal, run rbspy with RUST_LOG=debug to get VM and symbols addresses:
+
+    ```sh
+    cargo build && RUST_LOG=info ./target/debug/rbspy snapshot -p $(pgrep -fn infinite.rb)
+    ```
+1. Run `gcore -o ruby-coredump-X.Y.Z -p $(pgrep ruby)` to get a core dump
+1. Compress the core dump with `gzip -9 ruby-coredump-X.Y.Z`
+1. Add the core dump to the rbspy-testdata repo
+1. Optional but recommended: edit rbspy's Cargo.toml to refer to your local copy of rbspy-testdata
+1. Add a test in `ruby_version.rs` (and a `real_stack_trace_X_Y_Z` func) that uses the new core dump
+1. Verify that the test passes
+1. Publish a new version of rbspy-testdata
+1. Update the version of rbspy-testdata referenced in rbspy's Cargo.toml
