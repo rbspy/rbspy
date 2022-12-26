@@ -67,8 +67,8 @@ struct Shared {
 struct Frame {
     name: String,
     file: Option<String>,
-    line: Option<u32>,
-    col: Option<u32>,
+    line: Option<usize>,
+    col: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -785,7 +785,7 @@ macro_rules! get_lineno_1_9_0(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-        ) -> Result<u32> where T: ProcessMemory {
+        ) -> Result<usize> where T: ProcessMemory {
             let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.insn_info_size as usize;
             if t_size == 0 {
@@ -793,18 +793,18 @@ macro_rules! get_lineno_1_9_0(
             } else if t_size == 1 {
                 let table: [iseq_insn_info_entry; 1] = source.copy_struct(iseq_struct.insn_info_table as usize)
                     .context(iseq_struct.insn_info_table as usize)?;
-                Ok(table[0].line_no as u32)
+                Ok(table[0].line_no as usize)
             } else {
                 let table: Vec<iseq_insn_info_entry> = source.copy_vec(iseq_struct.insn_info_table as usize, t_size as usize)
                     .context(iseq_struct.insn_info_table as usize)?;
                 for i in 0..t_size {
                     if pos == table[i].position as usize {
-                        return Ok(table[i].line_no as u32)
+                        return Ok(table[i].line_no as usize)
                     } else if table[i].position as usize > pos {
-                        return Ok(table[i-1].line_no as u32)
+                        return Ok(table[i-1].line_no as usize)
                     }
                 }
-                Ok(table[t_size-1].line_no as u32)
+                Ok(table[t_size-1].line_no as usize)
             }
         }
     )
@@ -816,7 +816,7 @@ macro_rules! get_lineno_2_0_0(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
-        ) -> Result<u32> where T: ProcessMemory {
+        ) -> Result<usize> where T: ProcessMemory {
             let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.line_info_size as usize;
             if t_size == 0 {
@@ -824,18 +824,18 @@ macro_rules! get_lineno_2_0_0(
             } else if t_size == 1 {
                 let table: [iseq_line_info_entry; 1] = source.copy_struct(iseq_struct.line_info_table as usize)
                     .context(iseq_struct.line_info_table as usize)?;
-                Ok(table[0].line_no)
+                Ok(table[0].line_no as usize)
             } else {
                 let table: Vec<iseq_line_info_entry> = source.copy_vec(iseq_struct.line_info_table as usize, t_size as usize)
                     .context(iseq_struct.line_info_table as usize)?;
                 for i in 0..t_size {
                     if pos == table[i].position as usize {
-                        return Ok(table[i].line_no)
+                        return Ok(table[i].line_no as usize)
                     } else if table[i].position as usize > pos {
-                        return Ok(table[i-1].line_no)
+                        return Ok(table[i-1].line_no as usize)
                     }
                 }
-                Ok(table[t_size-1].line_no)
+                Ok(table[t_size-1].line_no as usize)
             }
         }
     )
@@ -847,7 +847,7 @@ macro_rules! get_lineno_2_3_0(
             iseq_struct: &rb_iseq_constant_body,
             cfp: &rb_control_frame_t,
             source: &T,
-        ) -> Result<u32> where T: ProcessMemory {
+        ) -> Result<usize> where T: ProcessMemory {
             let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.line_info_size as usize;
             if t_size == 0 {
@@ -855,18 +855,18 @@ macro_rules! get_lineno_2_3_0(
             } else if t_size == 1 {
                 let table: [iseq_line_info_entry; 1] = source.copy_struct(iseq_struct.line_info_table as usize)
                     .context(iseq_struct.line_info_table as usize)?;
-                Ok(table[0].line_no)
+                Ok(table[0].line_no as usize)
             } else {
                 let table: Vec<iseq_line_info_entry> = source.copy_vec(iseq_struct.line_info_table as usize, t_size as usize)
                     .context(iseq_struct.line_info_table as usize)?;
                 for i in 0..t_size {
                     if pos == table[i].position as usize {
-                        return Ok(table[i].line_no)
+                        return Ok(table[i].line_no as usize)
                     } else if table[i].position as usize > pos {
-                        return Ok(table[i-1].line_no)
+                        return Ok(table[i-1].line_no as usize)
                     }
                 }
-                Ok(table[t_size-1].line_no)
+                Ok(table[t_size-1].line_no as usize)
             }
         }
     )
@@ -894,7 +894,7 @@ macro_rules! get_lineno_2_5_0(
             iseq_struct: &rb_iseq_constant_body,
             cfp: &rb_control_frame_t,
             source: &T,
-        ) -> Result<u32> where T: ProcessMemory {
+        ) -> Result<usize> where T: ProcessMemory {
             let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.insns_info_size as usize;
             if t_size == 0 {
@@ -902,18 +902,18 @@ macro_rules! get_lineno_2_5_0(
             } else if t_size == 1 {
                 let table: [iseq_insn_info_entry; 1] = source.copy_struct(iseq_struct.insns_info as usize)
                     .context(iseq_struct.insns_info as usize)?;
-                Ok(table[0].line_no as u32)
+                Ok(table[0].line_no as usize)
             } else {
                 let table: Vec<iseq_insn_info_entry> = source.copy_vec(iseq_struct.insns_info as usize, t_size as usize)
                     .context(iseq_struct.insns_info as usize)?;
                 for i in 0..t_size {
                     if pos == table[i].position as usize {
-                        return Ok(table[i].line_no as u32)
+                        return Ok(table[i].line_no as usize)
                     } else if table[i].position as usize > pos {
-                        return Ok(table[i-1].line_no as u32)
+                        return Ok(table[i-1].line_no as usize)
                     }
                 }
-                Ok(table[t_size-1].line_no as u32)
+                Ok(table[t_size-1].line_no as usize)
             }
         }
     )
@@ -925,20 +925,20 @@ macro_rules! get_lineno_2_6_0(
             iseq_struct: &rb_iseq_constant_body,
             _cfp: &rb_control_frame_t,
             source: &T,
-        ) -> Result<u32> where T: ProcessMemory {
+        ) -> Result<usize> where T: ProcessMemory {
             let t_size = iseq_struct.insns_info.size as usize;
             if t_size == 0 {
                 Err(format_err!("line number is not available"))
             } else if t_size == 1 {
                 let table: [iseq_insn_info_entry; 1] = source.copy_struct(iseq_struct.insns_info.body as usize)
                     .context(iseq_struct.insns_info.body as usize)?;
-                Ok(table[0].line_no as u32)
+                Ok(table[0].line_no as usize)
             } else {
                 // TODO: To handle this properly, we need to imitate ruby's succinct bit vector lookup.
                 // See https://github.com/rbspy/rbspy/issues/213#issuecomment-826363857
                 let table: Vec<iseq_insn_info_entry> = source.copy_vec(iseq_struct.insns_info.body as usize, t_size as usize)
                     .context(iseq_struct.insns_info.body as usize)?;
-                Ok(table[t_size-1].line_no as u32)
+                Ok(table[t_size-1].line_no as usize)
             }
         }
     )

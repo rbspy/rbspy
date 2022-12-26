@@ -24,7 +24,7 @@ pub struct StackFrame {
     pub name: String,
     pub relative_path: String,
     pub absolute_path: Option<String>,
-    pub lineno: Option<u32>,
+    pub lineno: Option<usize>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
