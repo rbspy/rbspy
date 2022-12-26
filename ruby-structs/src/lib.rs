@@ -85,3 +85,4 @@ pub mod ruby_3_1_0;
 pub mod ruby_3_1_1;
 pub mod ruby_3_1_2;
 pub mod ruby_3_1_3;
+pub mod ruby_3_2_0;

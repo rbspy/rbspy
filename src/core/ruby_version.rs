@@ -1171,6 +1171,7 @@ ruby_version_v3_1_x!(ruby_3_1_0);
 ruby_version_v3_1_x!(ruby_3_1_1);
 ruby_version_v3_1_x!(ruby_3_1_2);
 ruby_version_v3_1_x!(ruby_3_1_3);
+ruby_version_v3_2_x!(ruby_3_2_0);
 
 pub fn get_execution_context(version: &Version) -> crate::core::types::GetExecutionContextFn {
     let function = match version {
@@ -1684,6 +1685,12 @@ pub fn get_execution_context(version: &Version) -> crate::core::types::GetExecut
             patch: 3,
             ..
         } => ruby_3_1_3::get_execution_context,
+        Version {
+            major: 3,
+            minor: 2,
+            patch: 0,
+            ..
+        } => ruby_3_2_0::get_execution_context,
         _ => panic!(
             "Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!",
             version
@@ -2205,6 +2212,12 @@ pub fn is_maybe_thread_function(version: &Version) -> crate::core::types::IsMayb
             patch: 3,
             ..
         } => ruby_3_1_3::is_maybe_thread,
+        Version {
+            major: 3,
+            minor: 2,
+            patch: 0,
+            ..
+        } => ruby_3_2_0::is_maybe_thread,
         _ => panic!(
             "Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!",
             version
@@ -2725,6 +2738,12 @@ pub fn get_stack_trace_function(version: &Version) -> crate::core::types::StackT
             patch: 3,
             ..
         } => ruby_3_1_3::get_stack_trace,
+        Version {
+            major: 3,
+            minor: 2,
+            patch: 0,
+            ..
+        } => ruby_3_2_0::get_stack_trace,
         _ => panic!(
             "Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!",
             version
@@ -2876,6 +2895,63 @@ mod tests {
                 relative_path: "(unknown)".to_string(),
                 absolute_path: None,
                 lineno: 0,
+            },
+        ]
+    }
+
+    fn real_stack_trace_3_2_0() -> Vec<StackFrame> {
+        vec![
+            StackFrame {
+                name: "sleep [c function]".to_string(),
+                relative_path: "(unknown)".to_string(),
+                absolute_path: None,
+                lineno: 0,
+            },
+            StackFrame {
+                name: "aaa".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some(
+                    "/home/parallels/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
+                lineno: 3,
+            },
+            StackFrame {
+                name: "bbb".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some(
+                    "/home/parallels/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
+                lineno: 7,
+            },
+            StackFrame {
+                name: "ccc".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some(
+                    "/home/parallels/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
+                lineno: 11,
+            },
+            StackFrame {
+                name: "block in <main>".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some(
+                    "/home/parallels/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
+                lineno: 15,
+            },
+            StackFrame {
+                name: "loop [c function]".to_string(),
+                relative_path: "(unknown)".to_string(),
+                absolute_path: None,
+                lineno: 0,
+            },
+            StackFrame {
+                name: "<main>".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some(
+                    "/home/parallels/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
+                lineno: 13,
             },
         ]
     }
@@ -3309,5 +3385,23 @@ mod tests {
         )
         .unwrap();
         assert_eq!(real_stack_trace_3_1_0(), stack_trace.trace);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn test_get_ruby_stack_trace_3_2_0() {
+        let source = coredump_3_2_0();
+        let vm_addr = 0xffffb8034578;
+        let global_symbols_addr = Some(0xffffb8025340);
+        let stack_trace = ruby_version::ruby_3_2_0::get_stack_trace::<CoreDump>(
+            0,
+            vm_addr,
+            global_symbols_addr,
+            &source,
+            0,
+        )
+        .unwrap();
+        assert_eq!(real_stack_trace_3_2_0(), stack_trace.trace);
     }
 }

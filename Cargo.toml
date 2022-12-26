@@ -58,5 +58,5 @@ winapi = { version = "0.3.9", features = ["timeapi", "wow64apiset"] }
 
 [dev-dependencies]
 byteorder = "1.4.3"
-rbspy-testdata = "0.1.5"
+rbspy-testdata = "0.1.9"
 tempdir = "0.3.4"
