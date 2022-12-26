@@ -789,7 +789,7 @@ macro_rules! get_lineno_1_9_0(
             let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.insn_info_size as usize;
             if t_size == 0 {
-                Ok(0) //TODO: really?
+                Err(format_err!("line number is not available"))
             } else if t_size == 1 {
                 let table: [iseq_insn_info_entry; 1] = source.copy_struct(iseq_struct.insn_info_table as usize)
                     .context(iseq_struct.insn_info_table as usize)?;
@@ -820,7 +820,7 @@ macro_rules! get_lineno_2_0_0(
             let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.line_info_size as usize;
             if t_size == 0 {
-                Ok(0) //TODO: really?
+                Err(format_err!("line number is not available"))
             } else if t_size == 1 {
                 let table: [iseq_line_info_entry; 1] = source.copy_struct(iseq_struct.line_info_table as usize)
                     .context(iseq_struct.line_info_table as usize)?;
@@ -851,7 +851,7 @@ macro_rules! get_lineno_2_3_0(
             let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.line_info_size as usize;
             if t_size == 0 {
-                Ok(0) //TODO: really?
+                Err(format_err!("line number is not available"))
             } else if t_size == 1 {
                 let table: [iseq_line_info_entry; 1] = source.copy_struct(iseq_struct.line_info_table as usize)
                     .context(iseq_struct.line_info_table as usize)?;
@@ -898,7 +898,7 @@ macro_rules! get_lineno_2_5_0(
             let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.insns_info_size as usize;
             if t_size == 0 {
-                Ok(0) //TODO: really?
+                Err(format_err!("line number is not available"))
             } else if t_size == 1 {
                 let table: [iseq_insn_info_entry; 1] = source.copy_struct(iseq_struct.insns_info as usize)
                     .context(iseq_struct.insns_info as usize)?;
@@ -929,7 +929,7 @@ macro_rules! get_lineno_2_6_0(
             //let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.insns_info.size as usize;
             if t_size == 0 {
-                Ok(0) //TODO: really?
+                Err(format_err!("line number is not available"))
             } else if t_size == 1 {
                 let table: [iseq_insn_info_entry; 1] = source.copy_struct(iseq_struct.insns_info.body as usize)
                     .context(iseq_struct.insns_info.body as usize)?;
