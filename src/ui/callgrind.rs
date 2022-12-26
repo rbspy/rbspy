@@ -266,15 +266,15 @@ impl Stats {
             // Exclusive info, along with filename and function name.
             writeln!(w, "fl={}", frame.path())?;
             writeln!(w, "fn={}", &frame.name)?;
-            writeln!(w, "{} {}", frame.lineno, loc.exclusive)?;
+            writeln!(w, "{} {}", frame.lineno.unwrap_or(0), loc.exclusive)?;
 
             // Inclusive info for each function called by this one.
             let csorted: BTreeMap<_, _> = loc.calls.iter().collect();
             for (cframe, call) in csorted.iter() {
                 writeln!(w, "cfl={}", cframe.path())?;
                 writeln!(w, "cfn={}", &cframe.name)?;
-                writeln!(w, "calls={} {}", call.count, cframe.lineno)?;
-                writeln!(w, "{} {}", frame.lineno, call.inclusive)?;
+                writeln!(w, "calls={} {}", call.count, cframe.lineno.unwrap_or(0))?;
+                writeln!(w, "{} {}", frame.lineno.unwrap_or(0), call.inclusive)?;
             }
         }
 
@@ -292,7 +292,7 @@ mod tests {
             name: format!("func{}", i),
             relative_path: format!("file{}.rb", i),
             absolute_path: None,
-            lineno: i,
+            lineno: Some(i),
         }
     }
 
@@ -302,7 +302,7 @@ mod tests {
             name: "funcX".to_owned(),
             relative_path: "file1.rb".to_owned(),
             absolute_path: None,
-            lineno: 42,
+            lineno: Some(42),
         }
     }
 

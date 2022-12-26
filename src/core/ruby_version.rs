@@ -366,7 +366,7 @@ macro_rules! get_stack_trace(
                                     name: format!("{} [c function]", name),
                                     relative_path: "(unknown)".to_string(),
                                     absolute_path: None,
-                                    lineno: 0
+                                    lineno: None,
                                 };
                             },
                             Err(e) => {
@@ -667,7 +667,13 @@ macro_rules! get_stack_frame_1_9_1(
                 name: get_ruby_string(iseq_struct.name as usize, source)?,
                 relative_path: get_ruby_string(iseq_struct.filename as usize, source)?,
                 absolute_path: None,
-                lineno: get_lineno(iseq_struct, cfp, source)?,
+                lineno: match get_lineno(iseq_struct, cfp, source) {
+                    Ok(lineno) => Some(lineno),
+                    Err(e) => {
+                        warn!("couldn't get lineno: {}", e);
+                        None
+                    },
+                }
             })
         }
     )
@@ -684,7 +690,13 @@ macro_rules! get_stack_frame_1_9_2(
                 name: get_ruby_string(iseq_struct.name as usize, source)?,
                 relative_path: get_ruby_string(iseq_struct.filename as usize, source)?,
                 absolute_path: Some(get_ruby_string(iseq_struct.filepath as usize, source)?),
-                lineno: get_lineno(iseq_struct, cfp, source)?,
+                lineno: match get_lineno(iseq_struct, cfp, source) {
+                    Ok(lineno) => Some(lineno),
+                    Err(e) => {
+                        warn!("couldn't get lineno: {}", e);
+                        None
+                    },
+                }
             })
         }
     )
@@ -701,7 +713,13 @@ macro_rules! get_stack_frame_2_0_0(
                 name: get_ruby_string(iseq_struct.location.label as usize, source)?,
                 relative_path: get_ruby_string(iseq_struct.location.path as usize, source)?,
                 absolute_path: Some(get_ruby_string(iseq_struct.location.absolute_path as usize, source)?),
-                lineno: get_lineno(iseq_struct, cfp, source)?,
+                lineno: match get_lineno(iseq_struct, cfp, source) {
+                    Ok(lineno) => Some(lineno),
+                    Err(e) => {
+                        warn!("couldn't get lineno: {}", e);
+                        None
+                    },
+                }
             })
         }
     )
@@ -720,7 +738,13 @@ macro_rules! get_stack_frame_2_3_0(
                 name: get_ruby_string(body.location.label as usize, source)?,
                 relative_path: get_ruby_string(body.location.path as usize, source)?,
                 absolute_path: Some(get_ruby_string(body.location.absolute_path as usize, source)?),
-                lineno: get_lineno(&body, cfp, source)?,
+                lineno: match get_lineno(&body, cfp, source) {
+                    Ok(lineno) => Some(lineno),
+                    Err(e) => {
+                        warn!("couldn't get lineno: {}", e);
+                        None
+                    },
+                }
             })
         }
     )
@@ -743,7 +767,13 @@ macro_rules! get_stack_frame_2_5_0(
                 name: get_ruby_string(body.location.label as usize, source)?,
                 relative_path: path,
                 absolute_path: Some(absolute_path),
-                lineno: get_lineno(&body, cfp, source)?,
+                lineno: match get_lineno(&body, cfp, source) {
+                    Ok(lineno) => Some(lineno),
+                    Err(e) => {
+                        warn!("couldn't get lineno: {}", e);
+                        None
+                    },
+                }
             })
         }
     )
@@ -2769,7 +2799,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 2,
+                lineno: Some(2),
             },
             StackFrame {
                 name: "bbb".to_string(),
@@ -2777,7 +2807,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 6,
+                lineno: Some(6),
             },
             StackFrame {
                 name: "ccc".to_string(),
@@ -2785,7 +2815,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 10,
+                lineno: Some(10),
             },
             StackFrame {
                 name: "block in <main>".to_string(),
@@ -2793,7 +2823,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 14,
+                lineno: Some(14),
             },
             StackFrame::unknown_c_function(),
             StackFrame::unknown_c_function(),
@@ -2803,7 +2833,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 13,
+                lineno: Some(13),
             },
             StackFrame::unknown_c_function(),
         ]
@@ -2815,37 +2845,37 @@ mod tests {
                 name: "sleep [c function]".to_string(),
                 relative_path: "(unknown)".to_string(),
                 absolute_path: None,
-                lineno: 0,
+                lineno: None,
             },
             StackFrame {
                 name: "aaa".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
                 absolute_path: Some("/vagrant/ci/ruby-programs/infinite.rb".to_string()),
-                lineno: 3,
+                lineno: Some(3),
             },
             StackFrame {
                 name: "bbb".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
                 absolute_path: Some("/vagrant/ci/ruby-programs/infinite.rb".to_string()),
-                lineno: 7,
+                lineno: Some(7),
             },
             StackFrame {
                 name: "ccc".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
                 absolute_path: Some("/vagrant/ci/ruby-programs/infinite.rb".to_string()),
-                lineno: 11,
+                lineno: Some(11),
             },
             StackFrame {
                 name: "block in <main>".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
                 absolute_path: Some("/vagrant/ci/ruby-programs/infinite.rb".to_string()),
-                lineno: 15,
+                lineno: Some(15),
             },
             StackFrame {
                 name: "loop [c function]".to_string(),
                 relative_path: "(unknown)".to_string(),
                 absolute_path: None,
-                lineno: 0,
+                lineno: None,
             },
         ]
     }
@@ -2856,7 +2886,7 @@ mod tests {
                 name: "sleep [c function]".to_string(),
                 relative_path: "(unknown)".to_string(),
                 absolute_path: None,
-                lineno: 0,
+                lineno: None,
             },
             StackFrame {
                 name: "aaa".to_string(),
@@ -2864,7 +2894,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/acj/workspace/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 3,
+                lineno: Some(3),
             },
             StackFrame {
                 name: "bbb".to_string(),
@@ -2872,7 +2902,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/acj/workspace/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 7,
+                lineno: Some(7),
             },
             StackFrame {
                 name: "ccc".to_string(),
@@ -2880,7 +2910,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/acj/workspace/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 11,
+                lineno: Some(11),
             },
             StackFrame {
                 name: "block in <main>".to_string(),
@@ -2888,13 +2918,13 @@ mod tests {
                 absolute_path: Some(
                     "/home/acj/workspace/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 15,
+                lineno: Some(15),
             },
             StackFrame {
                 name: "loop [c function]".to_string(),
                 relative_path: "(unknown)".to_string(),
                 absolute_path: None,
-                lineno: 0,
+                lineno: None,
             },
         ]
     }
@@ -2905,7 +2935,7 @@ mod tests {
                 name: "sleep [c function]".to_string(),
                 relative_path: "(unknown)".to_string(),
                 absolute_path: None,
-                lineno: 0,
+                lineno: None,
             },
             StackFrame {
                 name: "aaa".to_string(),
@@ -2913,7 +2943,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/parallels/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 3,
+                lineno: Some(3),
             },
             StackFrame {
                 name: "bbb".to_string(),
@@ -2921,7 +2951,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/parallels/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 7,
+                lineno: Some(7),
             },
             StackFrame {
                 name: "ccc".to_string(),
@@ -2929,7 +2959,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/parallels/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 11,
+                lineno: Some(11),
             },
             StackFrame {
                 name: "block in <main>".to_string(),
@@ -2937,13 +2967,13 @@ mod tests {
                 absolute_path: Some(
                     "/home/parallels/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 15,
+                lineno: Some(15),
             },
             StackFrame {
                 name: "loop [c function]".to_string(),
                 relative_path: "(unknown)".to_string(),
                 absolute_path: None,
-                lineno: 0,
+                lineno: None,
             },
             StackFrame {
                 name: "<main>".to_string(),
@@ -2951,7 +2981,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/parallels/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 13,
+                lineno: Some(13),
             },
         ]
     }
@@ -2965,7 +2995,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 2,
+                lineno: Some(2),
             },
             StackFrame {
                 name: "bbb".to_string(),
@@ -2973,7 +3003,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 6,
+                lineno: Some(6),
             },
             StackFrame {
                 name: "ccc".to_string(),
@@ -2981,7 +3011,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 10,
+                lineno: Some(10),
             },
             StackFrame {
                 name: "block in <main>".to_string(),
@@ -2989,7 +3019,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 14,
+                lineno: Some(14),
             },
             StackFrame::unknown_c_function(),
             StackFrame {
@@ -2998,7 +3028,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 13,
+                lineno: Some(13),
             },
         ]
     }
@@ -3012,7 +3042,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 2,
+                lineno: Some(2),
             },
             StackFrame {
                 name: "bbb".to_string(),
@@ -3020,7 +3050,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 6,
+                lineno: Some(6),
             },
             StackFrame {
                 name: "ccc".to_string(),
@@ -3028,7 +3058,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 10,
+                lineno: Some(10),
             },
             StackFrame {
                 name: "block in <main>".to_string(),
@@ -3036,7 +3066,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/bork/work/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: 14,
+                lineno: Some(14),
             },
             StackFrame::unknown_c_function(),
         ]

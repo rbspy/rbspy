@@ -24,7 +24,7 @@ pub struct StackFrame {
     pub name: String,
     pub relative_path: String,
     pub absolute_path: Option<String>,
-    pub lineno: u32,
+    pub lineno: Option<u32>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
@@ -73,7 +73,7 @@ impl StackFrame {
             name: "(unknown) [c function]".to_string(),
             relative_path: "(unknown)".to_string(),
             absolute_path: None,
-            lineno: 0,
+            lineno: None,
         }
     }
 }

@@ -139,7 +139,7 @@ mod tests {
             name: format!("func{}", i),
             relative_path: format!("file{}.rb", i),
             absolute_path: None,
-            lineno: i,
+            lineno: Some(i),
         }
     }
 
