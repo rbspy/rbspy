@@ -926,7 +926,6 @@ macro_rules! get_lineno_2_6_0(
             _cfp: &rb_control_frame_t,
             source: &T,
         ) -> Result<u32> where T: ProcessMemory {
-            //let pos = get_pos(iseq_struct, cfp)?;
             let t_size = iseq_struct.insns_info.size as usize;
             if t_size == 0 {
                 Err(format_err!("line number is not available"))
@@ -935,17 +934,10 @@ macro_rules! get_lineno_2_6_0(
                     .context(iseq_struct.insns_info.body as usize)?;
                 Ok(table[0].line_no as u32)
             } else {
+                // TODO: To handle this properly, we need to imitate ruby's succinct bit vector lookup.
+                // See https://github.com/rbspy/rbspy/issues/213#issuecomment-826363857
                 let table: Vec<iseq_insn_info_entry> = source.copy_vec(iseq_struct.insns_info.body as usize, t_size as usize)
                     .context(iseq_struct.insns_info.body as usize)?;
-                // TODO: fix this. I'm not sure why it doesn't extract the table properly.
-                /*let positions: Vec<usize> = source.copy_vec(iseq_struct.insns_info.positions as usize, t_size as usize)?;
-                for i in 0..t_size {
-                    if pos == positions[i] as usize {
-                        return Ok(table[i].line_no as u32)
-                    } else if positions[i] as usize > pos {
-                        return Ok(table[i-1].line_no as u32)
-                    }
-                }*/
                 Ok(table[t_size-1].line_no as u32)
             }
         }
