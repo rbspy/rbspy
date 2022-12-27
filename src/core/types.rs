@@ -80,7 +80,11 @@ impl StackFrame {
 
 impl fmt::Display for StackFrame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} - {}:{}", self.name, self.path(), self.lineno)
+        let lineno = match self.lineno {
+            Some(lineno) => format!(":{}", lineno.to_string()),
+            None => "".to_string(),
+        };
+        write!(f, "{} - {}{}", self.name, self.path(), lineno)
     }
 }
 
