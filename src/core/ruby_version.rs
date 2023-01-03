@@ -808,11 +808,11 @@ macro_rules! get_lineno_1_9_0(
                 Err(format_err!("line number is not available"))
             } else if t_size == 1 {
                 let table: [iseq_insn_info_entry; 1] = source.copy_struct(iseq_struct.insn_info_table as usize)
-                    .context(iseq_struct.insn_info_table as usize)?;
+                    .context("couldn't copy instruction table")?;
                 Ok(table[0].line_no as usize)
             } else {
                 let table: Vec<iseq_insn_info_entry> = source.copy_vec(iseq_struct.insn_info_table as usize, t_size as usize)
-                    .context(iseq_struct.insn_info_table as usize)?;
+                    .context("couldn't copy instruction table")?;
                 for i in 0..t_size {
                     if pos == table[i].position as usize {
                         return Ok(table[i].line_no as usize)
@@ -839,11 +839,11 @@ macro_rules! get_lineno_2_0_0(
                 Err(format_err!("line number is not available"))
             } else if t_size == 1 {
                 let table: [iseq_line_info_entry; 1] = source.copy_struct(iseq_struct.line_info_table as usize)
-                    .context(iseq_struct.line_info_table as usize)?;
+                    .context("couldn't copy instruction table")?;
                 Ok(table[0].line_no as usize)
             } else {
                 let table: Vec<iseq_line_info_entry> = source.copy_vec(iseq_struct.line_info_table as usize, t_size as usize)
-                    .context(iseq_struct.line_info_table as usize)?;
+                    .context("couldn't copy instruction table")?;
                 for i in 0..t_size {
                     if pos == table[i].position as usize {
                         return Ok(table[i].line_no as usize)
@@ -870,11 +870,11 @@ macro_rules! get_lineno_2_3_0(
                 Err(format_err!("line number is not available"))
             } else if t_size == 1 {
                 let table: [iseq_line_info_entry; 1] = source.copy_struct(iseq_struct.line_info_table as usize)
-                    .context(iseq_struct.line_info_table as usize)?;
+                    .context("couldn't copy instruction table")?;
                 Ok(table[0].line_no as usize)
             } else {
                 let table: Vec<iseq_line_info_entry> = source.copy_vec(iseq_struct.line_info_table as usize, t_size as usize)
-                    .context(iseq_struct.line_info_table as usize)?;
+                    .context("couldn't copy instruction table")?;
                 for i in 0..t_size {
                     if pos == table[i].position as usize {
                         return Ok(table[i].line_no as usize)
@@ -901,11 +901,11 @@ macro_rules! get_lineno_2_5_0(
                 Err(format_err!("line number is not available"))
             } else if t_size == 1 {
                 let table: [iseq_insn_info_entry; 1] = source.copy_struct(iseq_struct.insns_info as usize)
-                    .context(iseq_struct.insns_info as usize)?;
+                    .context("couldn't copy instruction table")?;
                 Ok(table[0].line_no as usize)
             } else {
                 let table: Vec<iseq_insn_info_entry> = source.copy_vec(iseq_struct.insns_info as usize, t_size as usize)
-                    .context(iseq_struct.insns_info as usize)?;
+                    .context("couldn't copy instruction table")?;
                 for i in 0..t_size {
                     if pos == table[i].position as usize {
                         return Ok(table[i].line_no as usize)
@@ -931,7 +931,7 @@ macro_rules! get_lineno_2_6_0(
                 Err(format_err!("line number is not available"))
             } else if t_size == 1 {
                 let table: [iseq_insn_info_entry; 1] = source.copy_struct(iseq_struct.insns_info.body as usize)
-                    .context(iseq_struct.insns_info.body as usize)?;
+                    .context("couldn't copy instruction table")?;
                 Ok(table[0].line_no as usize)
             } else {
                 // TODO: To handle this properly, we need to imitate ruby's succinct bit vector lookup.
