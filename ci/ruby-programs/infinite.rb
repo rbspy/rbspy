@@ -1,12 +1,12 @@
-def aaa() 
+def aaa()
     sleep(0.5)
 end
 
-def bbb() 
+def bbb()
     aaa()
 end
 
-def ccc() 
+def ccc()
     bbb()
 end
 
