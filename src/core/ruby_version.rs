@@ -350,7 +350,13 @@ macro_rules! get_stack_trace(
                 return Ok(StackTrace {
                     pid: Some(pid),
                     trace: vec!(StackFrame::unknown_c_function()),
-                    thread_id: Some(get_thread_id(&thread, source)?),
+                    thread_id: match get_thread_id(&thread, source) {
+                        Ok(tid) => Some(tid),
+                        Err(e) => {
+                            debug!("Couldn't get thread ID: {}", e);
+                            None
+                        },
+                    },
                     time: Some(SystemTime::now())
                 });
             }
@@ -401,7 +407,14 @@ macro_rules! get_stack_trace(
                     }
                 }
             }
-            Ok(StackTrace{trace, pid: Some(pid), thread_id: Some(get_thread_id(&thread, source)?), time: Some(SystemTime::now())})
+            let thread_id = match get_thread_id(&thread, source) {
+                Ok(tid) => Some(tid),
+                Err(e) => {
+                    debug!("Couldn't get thread ID: {}", e);
+                    None
+                },
+            };
+            Ok(StackTrace{trace, pid: Some(pid), thread_id, time: Some(SystemTime::now())})
         }
 
         use proc_maps::{maps_contain_addr, MapRange};
