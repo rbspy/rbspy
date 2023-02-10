@@ -1727,7 +1727,7 @@ pub fn get_execution_context(version: &Version) -> crate::core::types::GetExecut
             ..
         } => ruby_3_2_0::get_execution_context,
         _ => panic!(
-            "Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!",
+            "Ruby version not supported yet: {}. In the meantime, we suggest trying `--force-version <prior version>`.",
             version
         ),
     };
@@ -2254,7 +2254,7 @@ pub fn is_maybe_thread_function(version: &Version) -> crate::core::types::IsMayb
             ..
         } => ruby_3_2_0::is_maybe_thread,
         _ => panic!(
-            "Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!",
+            "Ruby version not supported yet: {}. In the meantime, we suggest trying `--force-version <prior version>`.",
             version
         ),
     };
@@ -2780,7 +2780,7 @@ pub fn get_stack_trace_function(version: &Version) -> crate::core::types::StackT
             ..
         } => ruby_3_2_0::get_stack_trace,
         _ => panic!(
-            "Ruby version not supported yet: {}. Please create a GitHub issue and we'll fix it!",
+            "Ruby version not supported yet: {}. In the meantime, we suggest trying `--force-version <prior version>`.",
             version
         ),
     };
