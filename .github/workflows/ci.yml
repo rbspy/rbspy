@@ -24,7 +24,7 @@ jobs:
           cargo fmt --all -- --check
 
   build:
-    name: Build, test, and upload binaries
+    name: Build
     env:
       CARGO: cargo
       TARGET_FLAGS: --target ${{ matrix.target }}
@@ -136,6 +136,7 @@ jobs:
           target/${{ matrix.target }}/release/rbspy record env LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4 ruby ci/ruby-programs/short_program.rb
 
   build-linux-cross:
+    name: Build
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
@@ -170,7 +171,7 @@ jobs:
           path: rbspy-${{ matrix.target }}
 
   build-freebsd:
-    name: Build, test, and upload binaries (freebsd-x86_64)
+    name: Build
     runs-on: macos-12
     timeout-minutes: 45
     strategy:
