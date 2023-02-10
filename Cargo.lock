@@ -1094,7 +1094,7 @@ dependencies = [
 
 [[package]]
 name = "rbspy"
-version = "0.15.1"
+version = "0.16.0"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -1131,7 +1131,7 @@ dependencies = [
 
 [[package]]
 name = "rbspy-ruby-structs"
-version = "0.15.1"
+version = "0.16.0"
 
 [[package]]
 name = "rbspy-testdata"
@@ -1667,7 +1667,7 @@ checksum = "447660ad36a13288b1db4d4248e857b510e8c3a225c822ba4fb748c0aafecffd"
 
 [[package]]
 name = "xtask"
-version = "0.15.1"
+version = "0.16.0"
 dependencies = [
  "anyhow",
  "bindgen 0.63.0",
