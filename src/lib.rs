@@ -24,7 +24,6 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
-extern crate tempdir;
 extern crate term_size;
 #[cfg(windows)]
 extern crate winapi;

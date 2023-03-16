@@ -11,7 +11,7 @@ pub fn generate_ruby_bindings(
     prepare_ruby_source(&ruby_source_path, version_tag)
         .context("prepare ruby source repository")?;
 
-    let work_path = tempdir::TempDir::new("rbspy-ruby-bindgen").context("create work directory")?;
+    let work_path = tempfile::tempdir().context("create work directory")?;
     log::info!(
         "Working directory path is {}",
         work_path.path().to_string_lossy()

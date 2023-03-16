@@ -389,7 +389,7 @@ mod tests {
             .next()
             .expect("failed to execute ruby process");
 
-        let coordination_dir = tempdir::TempDir::new("").unwrap();
+        let coordination_dir = tempfile::tempdir().unwrap();
         let coordination_dir_name = coordination_dir.path().to_str().unwrap();
 
         let mut process = Command::new(ruby_binary_path_str)
