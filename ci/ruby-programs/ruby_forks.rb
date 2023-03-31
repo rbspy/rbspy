@@ -3,7 +3,7 @@ coordination_path = ARGV[0].gsub('\\', '/')
 # rbspy's test will indicate that it's gotten a stack trace from this PID by
 # creating a file on disk. Sleep until we see our file.
 wait_for_ack_func = %Q(
-  while !File.exists?(File.join("#{coordination_path}", "rbspy_ack." + Process.pid.to_s))
+  while !File.exist?(File.join("#{coordination_path}", "rbspy_ack." + Process.pid.to_s))
     sleep(0.25)
   end
 )
