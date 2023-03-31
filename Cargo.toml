@@ -24,7 +24,7 @@ anyhow = "1.0.58"
 chrono = "0.4.19"
 clap = "3.1.6"
 ctrlc = "3.1.0"
-directories = "4.0.1"
+directories = "5.0.0"
 env_logger = "0.10.0"
 inferno = "0.11.1"
 flate2 = "1.0.20"
@@ -51,7 +51,7 @@ thiserror = "1.0.24"
 nix = "0.26.0"
 
 [target.'cfg(target_os="macos")'.dependencies]
-libproc = "0.12.0"
+libproc = "0.13.0"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.9", features = ["timeapi", "wow64apiset"] }
