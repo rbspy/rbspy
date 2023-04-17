@@ -21,7 +21,7 @@ members = [
 
 [dependencies]
 anyhow = "1.0.58"
-chrono = "0.4.19"
+chrono = { version = "0.4.24", default-features = false, features = ["clock", "std"] }
 clap = "3.1.6"
 ctrlc = "3.1.0"
 directories = "5.0.0"
