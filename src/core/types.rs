@@ -5,7 +5,7 @@ use std::time::SystemTime;
 use std::{self, convert::From};
 
 use anyhow::{Error, Result};
-use clap::ArgEnum;
+use clap::ValueEnum;
 use remoteprocess::Pid;
 use thiserror::Error;
 
@@ -139,7 +139,7 @@ impl From<Error> for MemoryCopyError {
 
 // The values of this enum get translated directly to command line arguments. Make them
 // lowercase so that we don't have camelcase command line arguments
-#[derive(ArgEnum, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(ValueEnum, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[allow(non_camel_case_types)]
 pub enum OutputFormat {
     flamegraph,
@@ -177,10 +177,10 @@ impl OutputFormat {
         .to_string()
     }
 
-    pub fn possible_values() -> impl Iterator<Item = clap::PossibleValue<'static>> {
+    pub fn possible_values() -> impl Iterator<Item = clap::builder::PossibleValue> {
         Self::value_variants()
             .iter()
-            .filter_map(ArgEnum::to_possible_value)
+            .filter_map(ValueEnum::to_possible_value)
     }
 }
 

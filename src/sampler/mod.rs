@@ -78,7 +78,8 @@ impl Sampler {
             // appear
             let done_clone = self.done.clone();
             std::thread::spawn(move || {
-                let process = Process::new_with_retry(root_pid).unwrap();
+                let process = Process::new_with_retry(root_pid)
+                    .expect("couldn't attach to process (is it running?)");
                 let mut pids: HashSet<Pid> = HashSet::new();
                 // we need to exit this loop when the process we're monitoring exits, otherwise the
                 // sender channels won't get closed and rbspy will hang. So we check the done

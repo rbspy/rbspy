@@ -266,7 +266,7 @@ fn do_main() -> Result<(), Error> {
     }
 }
 
-fn arg_parser() -> clap::Command<'static> {
+fn arg_parser() -> clap::Command {
     clap::Command::new("rbspy")
         .version(env!("CARGO_PKG_VERSION"))
         .about("Sampling profiler for Ruby programs")
@@ -276,7 +276,7 @@ fn arg_parser() -> clap::Command<'static> {
                 .about("Capture a single stack trace from a running Ruby program")
                 .arg(
                     arg!(-p --pid <PID> "PID of the Ruby process you want to profile")
-                        .validator(validate_pid)
+                        .value_parser(validate_pid)
                         .required(true)
                 )
                 .arg(
@@ -289,7 +289,6 @@ fn arg_parser() -> clap::Command<'static> {
                         .help("Assume that the Ruby version is <VERSION>. This is useful when the Ruby \
                             version is not yet supported by rbspy, e.g. a release candidate")
                         .long("force-version")
-                        .takes_value(true)
                         .required(false)
                 )
         )
@@ -298,7 +297,7 @@ fn arg_parser() -> clap::Command<'static> {
                 .about("Continuously capture traces from a Ruby process")
                 .arg(
                     arg!(-p --pid <PID> "PID of the Ruby process you want to profile")
-                    .validator(validate_pid)
+                    .value_parser(validate_pid)
                     // It's a bit confusing but this is how to get exactly-one-of behaviour
                     // for `--pid` and `cmd`.
                     .required_unless_present("cmd")
@@ -308,7 +307,6 @@ fn arg_parser() -> clap::Command<'static> {
                     clap::Arg::new("raw-file")
                         .help("File to write raw data to (will be gzipped)")
                         .long("raw-file")
-                        .takes_value(true)
                         .required(false),
                 )
                 .arg(
@@ -317,11 +315,13 @@ fn arg_parser() -> clap::Command<'static> {
                 )
                 .arg(
                     arg!(-r --rate <RATE> "Samples per second collected")
+                        .value_parser(clap::value_parser!(u32))
                         .required(false)
                         .default_value("100"),
                 )
                 .arg(
                     clap::Arg::new("no-drop-root")
+                        .action(clap::ArgAction::SetTrue)
                         .help("Don't drop root privileges when running a Ruby program as a subprocess")
                         .short('n')
                         .long("no-drop-root")
@@ -329,35 +329,39 @@ fn arg_parser() -> clap::Command<'static> {
                 )
                 .arg(
                     arg!(-o --format <FORMAT> "Output format to write")
-                        .possible_values(OutputFormat::possible_values())
+                        .value_parser(clap::value_parser!(OutputFormat))
                         .ignore_case(true)
                         .required(false)
                         .default_value("flamegraph"),
                 )
                 .arg(
                     arg!(-d --duration <DURATION> "Number of seconds to record for")
+                        .value_parser(clap::value_parser!(u64))
                         .conflicts_with("cmd")
                         .required(false),
                 )
                 .arg(
                     arg!(-s --subprocesses "Record all subprocesses of the given PID or command")
+                        .action(clap::ArgAction::SetTrue)
                         .required(false)
                 )
                 .arg(
                     arg!(--silent "Don't print the summary profiling data every second")
+                        .action(clap::ArgAction::SetTrue)
                         .required(false)
                 )
                 .arg(
                     clap::Arg::new("flame-min-width")
+                        .value_parser(clap::value_parser!(f64))
                         .help("Minimum flame width in %")
                         .long("flame-min-width")
-                        .takes_value(true)
                         .required(false)
                         .default_value("0.1"),
                 )
                 .arg(
                     arg!(--nonblocking "Don't pause the ruby process when collecting stack samples. Setting this option will reduce \
                                                    the performance impact of sampling but may produce inaccurate results")
+                        .action(clap::ArgAction::SetTrue)
                         .required(false),
                 )
                 .arg(
@@ -365,7 +369,6 @@ fn arg_parser() -> clap::Command<'static> {
                         .help("Assume that the Ruby version is <VERSION>. This is useful when the Ruby \
                             version is not yet supported by rbspy, e.g. a release candidate")
                         .long("force-version")
-                        .takes_value(true)
                         .required(false)
                 )
                 .arg(arg!(<cmd> ... "command to run").required(false)),
@@ -373,11 +376,20 @@ fn arg_parser() -> clap::Command<'static> {
         .subcommand(
             clap::Command::new("report")
                 .about("Generate visualization from raw data recorded by `rbspy record`")
-                .arg(arg!(-i --input <FILE> "Input raw data to use").required(true))
-                .arg(arg!(-o --output <FILE> "Output file").required(false).default_value("-"))
+                .arg(
+                    arg!(-i --input <FILE> "Input raw data to use")
+                        .required(true)
+                        .value_parser(clap::value_parser!(PathBuf))
+                    )
+                .arg(
+                    arg!(-o --output <FILE> "Output file")
+                        .required(false)
+                        .default_value("-")
+                        .value_parser(clap::value_parser!(PathBuf))
+                )
                 .arg(
                     arg!(-f --format <FORMAT> "Output format to write")
-                        .possible_values(OutputFormat::possible_values())
+                        .value_parser(clap::value_parser!(OutputFormat))
                         .ignore_case(true)
                         .required(false)
                         .default_value("flamegraph"),
@@ -387,14 +399,14 @@ fn arg_parser() -> clap::Command<'static> {
 
 /// Check `s` is a positive integer.
 // This assumes a process group isn't a sensible thing to snapshot; could be wrong!
-fn validate_pid(s: &str) -> Result<(), String> {
+fn validate_pid(s: &str) -> Result<Pid, String> {
     let pid: Pid = s
         .parse()
         .map_err(|_| "PID must be an integer".to_string())?;
     if pid <= 0 {
         return Err("PID must be positive".to_string());
     }
-    Ok(())
+    Ok(pid)
 }
 
 impl Args {
@@ -403,55 +415,54 @@ impl Args {
     // TODO(maybe): Consider replacing with one of the derive-based arg thingies.
     fn from<'a, I: IntoIterator<Item = String> + 'a>(args: I) -> Result<Args, Error> {
         let matches: ArgMatches = arg_parser().get_matches_from(args);
-
-        fn get_pid(matches: &ArgMatches) -> Option<Pid> {
-            if let Some(pid_str) = matches.value_of("pid") {
-                Some(
-                    pid_str
-                        .parse()
-                        .expect("this shouldn't happen because clap validated the arg"),
-                )
-            } else {
-                None
-            }
-        }
-
         let cmd = match matches.subcommand() {
             Some(("snapshot", submatches)) => SubCmd::Snapshot {
-                pid: get_pid(submatches)
+                pid: *submatches
+                    .get_one::<Pid>("pid")
                     .expect("this shouldn't happen because clap requires a pid"),
-                lock_process: submatches.is_present("nonblocking"),
-                force_version: match submatches.value_of("force-version") {
+                lock_process: *submatches.get_one::<bool>("nonblocking").unwrap(),
+                force_version: match submatches.get_one::<String>("force-version") {
                     Some(version) => Some(version.to_string()),
                     None => None,
                 },
             },
             Some(("record", submatches)) => {
-                let format: OutputFormat = ArgMatches::value_of_t(submatches, "format").unwrap();
+                let format: OutputFormat =
+                    ArgMatches::get_one::<OutputFormat>(submatches, "format")
+                        .unwrap()
+                        .clone();
 
-                let raw_path = output_filename(submatches.value_of("raw-file"), "raw.gz")?;
-                let out_path = output_filename(submatches.value_of("file"), &format.extension())?;
-                let maybe_duration = match ArgMatches::value_of_t(submatches, "duration") {
-                    Err(_) => None,
-                    Ok(integer_duration) => Some(std::time::Duration::from_secs(integer_duration)),
+                let raw_path = output_filename(
+                    submatches.get_one::<String>("raw-file").map(|x| x.as_str()),
+                    "raw.gz",
+                )?;
+                let out_path = output_filename(
+                    submatches.get_one::<String>("file").map(|x| x.as_str()),
+                    &format.extension(),
+                )?;
+                let maybe_duration = match ArgMatches::get_one::<u64>(submatches, "duration") {
+                    Some(integer_duration) => {
+                        Some(std::time::Duration::from_secs(*integer_duration))
+                    }
+                    None => None,
                 };
 
-                let no_drop_root = submatches.occurrences_of("no-drop-root") == 1;
-                let silent = submatches.is_present("silent");
-                let with_subprocesses = submatches.is_present("subprocesses");
-                let nonblocking = submatches.is_present("nonblocking");
+                let no_drop_root = *submatches.get_one::<bool>("no-drop-root").unwrap();
+                let silent = *submatches.get_one::<bool>("silent").unwrap();
+                let with_subprocesses = *submatches.get_one::<bool>("subprocesses").unwrap();
+                let nonblocking = *submatches.get_one::<bool>("nonblocking").unwrap();
 
-                let sample_rate = ArgMatches::value_of_t(submatches, "rate").unwrap();
+                let sample_rate = *ArgMatches::get_one::<u32>(submatches, "rate").unwrap();
                 let flame_min_width =
-                    ArgMatches::value_of_t(submatches, "flame-min-width").unwrap();
-                let force_version = match ArgMatches::value_of_t(submatches, "force-version") {
-                    Err(_) => None,
-                    Ok(v) => Some(v),
-                };
-                let target = if let Some(pid) = get_pid(submatches) {
-                    Target::Pid { pid }
+                    *ArgMatches::get_one::<f64>(submatches, "flame-min-width").unwrap();
+                let force_version =
+                    ArgMatches::get_one::<String>(submatches, "force-version").cloned();
+                let target = if let Some(pid) = submatches.get_one::<Pid>("pid") {
+                    Target::Pid { pid: *pid }
                 } else {
-                    let mut cmd = submatches.values_of("cmd").expect("shouldn't happen");
+                    let mut cmd = submatches
+                        .get_many::<String>("cmd")
+                        .expect("shouldn't happen");
                     let prog = cmd.next().expect("nope");
                     let args = cmd;
                     Target::Subprocess {
@@ -475,9 +486,9 @@ impl Args {
                 }
             }
             Some(("report", submatches)) => {
-                let format = ArgMatches::value_of_t(submatches, "format");
-                let input = ArgMatches::value_of_t(submatches, "input");
-                let output = ArgMatches::value_of_t(submatches, "output");
+                let format = ArgMatches::get_one::<OutputFormat>(submatches, "format").cloned();
+                let input = ArgMatches::get_one::<PathBuf>(submatches, "input").cloned();
+                let output = ArgMatches::get_one::<PathBuf>(submatches, "output").cloned();
                 SubCmd::Report {
                     format: format.unwrap(),
                     input: input.unwrap(),
