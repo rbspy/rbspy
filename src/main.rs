@@ -541,7 +541,7 @@ mod tests {
     }
 
     #[test]
-    fn test_arg_parsing() {
+    fn test_record_arg_parsing() {
         // Workaround to avoid modifying read-only directories, e.g. on Nix
         let d = tempfile::tempdir().unwrap();
         let dirname = d.path().to_str().unwrap();
@@ -557,19 +557,6 @@ mod tests {
             } => (),
             x => panic!("Unexpected: {:?}", x),
         };
-
-        // test snapshot
-        let args = Args::from(make_args("rbspy snapshot --pid 1234")).unwrap();
-        assert_eq!(
-            args,
-            Args {
-                cmd: SubCmd::Snapshot {
-                    pid: 1234,
-                    lock_process: false,
-                    force_version: None,
-                },
-            }
-        );
 
         // test record with subcommand
         match Args::from(make_args("rbspy record ruby blah.rb")).unwrap() {
@@ -771,6 +758,21 @@ mod tests {
                     with_subprocesses: false,
                     silent: false,
                     flame_min_width: 0.1,
+                    lock_process: false,
+                    force_version: None,
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn test_snapshot_arg_parsing() {
+        let args = Args::from(make_args("rbspy snapshot --pid 1234")).unwrap();
+        assert_eq!(
+            args,
+            Args {
+                cmd: SubCmd::Snapshot {
+                    pid: 1234,
                     lock_process: false,
                     force_version: None,
                 },
