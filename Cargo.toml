@@ -28,13 +28,13 @@ directories = "5.0.0"
 env_logger = "0.10.0"
 inferno = "0.11.1"
 flate2 = "1.0.20"
-goblin = "0.6.0"
+goblin = "0.7.1"
 lazy_static = "1.4"
 libc = "0.2.34"
 log = "0.4.6"
-memmap2 = "0.5"
+memmap2 = "0.8.0"
 proc-maps = "0.3.0"
-prost = "0.11.0"
+prost = "0.12.1"
 rand = "0.8.3"
 rbspy-ruby-structs = { path = "ruby-structs", version="0.17.0" }
 remoteprocess = "0.4.5"
@@ -48,10 +48,10 @@ tempfile = "3.4.0"
 thiserror = "1.0.24"
 
 [target.'cfg(unix)'.dependencies]
-nix = "0.26.0"
+nix = { version = "0.27.1", features = ["user"] }
 
 [target.'cfg(target_os="macos")'.dependencies]
-libproc = "0.13.0"
+libproc = "0.14.2"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.9", features = ["timeapi", "wow64apiset"] }
