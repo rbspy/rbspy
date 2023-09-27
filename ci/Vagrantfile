@@ -1,10 +1,10 @@
 Vagrant.configure("2") do |config|
-  config.vm.define "fbsd_12_3" do |c|
-    c.vm.box = "rbspy/FreeBSD-12.3-STABLE"
+  config.vm.define "fbsd_12_4" do |c|
+    c.vm.box = "rbspy/FreeBSD-12.4-STABLE"
   end
 
-  config.vm.define "fbsd_13_1" do |c|
-    c.vm.box = "rbspy/FreeBSD-13.1-STABLE"
+  config.vm.define "fbsd_13_2" do |c|
+    c.vm.box = "rbspy/FreeBSD-13.2-STABLE"
   end
 
   config.vm.synced_folder ".", "/vagrant", type: "rsync",
