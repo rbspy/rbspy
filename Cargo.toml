@@ -10,7 +10,7 @@ readme = "README.md"
 documentation = "https://github.com/rbspy/rbspy"
 homepage = "https://rbspy.github.io/"
 edition = "2021"
-exclude = ["/.github/", "/scripts/", "/ci/", "/xtask/"]
+exclude = ["/.github/", "/ci/", "/xtask/"]
 rust-version = "1.56"
 
 [workspace]
