@@ -8,11 +8,17 @@ on:
         description: 'Ruby commit to test'
         required: true
         default: 'master'
+      bisect_good:
+        description: 'Healthy Ruby commit to end bisecting at'
+        required: false
+      bisect_bad:
+        description: 'Broken Ruby commit to start bisecting from'
+        required: false
 jobs:
   ruby-latest:
     name: Test rbspy with upstream Ruby's main branch
     runs-on: ubuntu-22.04
-    timeout-minutes: 15
+    timeout-minutes: 60
     env:
       MAKEFLAGS: -j4
       RUBY_LATEST_STABLE_VERSION: 3.2.2
@@ -26,20 +32,7 @@ jobs:
           path: ruby
           repository: ruby/ruby
           ref: ${{ inputs.ruby_commit }}
-          fetch-depth: 1
-      - name: Build and install latest Ruby
-        run: |
-          # Workaround for missing digest gem. https://github.com/ruby/psych/issues/552
-          sudo apt-get update && sudo apt-get install -qq libyaml-dev libffi-dev
-
-          cd ruby
-          ./autogen.sh
-          ./configure --disable-install-doc
-          make
-          sudo make install
-
-          echo "Ruby path: $(which ruby)"
-          echo "Ruby version: $(ruby -v)"
+          fetch-depth: 0
       - name: Check out rbspy source
         uses: actions/checkout@v3
         with:
@@ -50,15 +43,47 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-${{ matrix.target }}-cargo0-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo0-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.target }}-cargo0-
+            ${{ runner.os }}-cargo0-
       - name: Build rbspy
         run: |
           cd rbspy
           cargo build --release
-      - name: Test rbspy with latest Ruby
+      - name: Install dependencies
         run: |
-          cd rbspy
-          ruby ci/ruby-programs/infinite.rb &
-          sudo ./target/release/rbspy record --pid $! --duration 2 --force-version $RUBY_LATEST_STABLE_VERSION --silent
+          # Workaround for missing digest gem. https://github.com/ruby/psych/issues/552
+          sudo apt-get update && sudo apt-get install -qq libyaml-dev libffi-dev moreutils
+      - name: Build Ruby and run rbspy tests
+        run: |
+          cat <<EOF > build-and-test-ruby-version.sh
+          #!/bin/bash
+          set -euxo pipefail
+
+          sudo rm -rf ~/.bundle
+          chronic sudo git clean -fdx
+
+          chronic ./autogen.sh
+          chronic ./configure --disable-install-doc
+          chronic make || exit 125
+          chronic sudo make install || exit 125
+
+          echo "Ruby version: \$(/usr/local/bin/ruby -v)"
+
+          cd $GITHUB_WORKSPACE/rbspy
+          /usr/local/bin/ruby ci/ruby-programs/infinite.rb &
+          sudo ./target/release/rbspy record --pid \$! --duration 2 --force-version $RUBY_LATEST_STABLE_VERSION --silent
+
+          EOF
+          chmod u+x build-and-test-ruby-version.sh
+          
+          cd ruby
+          if [ -n "${{ inputs.bisect_bad }}" ]; then
+            git bisect start
+            git bisect bad ${{ inputs.bisect_bad }}
+            git bisect good ${{ inputs.bisect_good }}
+            git bisect run ../build-and-test-ruby-version.sh
+            git bisect reset
+          else
+            ../build-and-test-ruby-version.sh
+          fi
