@@ -16,7 +16,7 @@ pub fn generate_ruby_bindings(
         "Working directory path is {}",
         work_path.path().to_string_lossy()
     );
-    let wrapper_path = prepare_ruby_headers(work_path.path(), &ruby_source_path)
+    let wrapper_path = prepare_ruby_headers(work_path.path(), &ruby_source_path, version_tag)
         .context("prepare ruby headers")?;
 
     let bindings = bindgen::builder()
@@ -30,6 +30,7 @@ pub fn generate_ruby_bindings(
         .allowlist_type("rb_iseq_location_struct")
         .allowlist_type("rb_iseq_struct")
         .allowlist_type("rb_method_entry_struct")
+        .allowlist_type("rb_ractor_struct")
         .allowlist_type("rb_thread_struct")
         .allowlist_type("rb_thread_t")
         .allowlist_type("rb_thread_struct")
@@ -151,7 +152,7 @@ fn prepare_ruby_source(path: &Path, version_tag: &str) -> Result<()> {
 }
 
 /// Copies any ruby headers we need to the given path
-fn prepare_ruby_headers(path: &Path, ruby_source_path: &Path) -> Result<PathBuf> {
+fn prepare_ruby_headers(path: &Path, ruby_source_path: &Path, version_tag: &str) -> Result<PathBuf> {
     copy_dir_recursive(ruby_source_path.join("include"), path.join("include"))?;
     let _ = copy_dir_recursive(ruby_source_path.join("internal"), path.join("internal"));
     let _ = copy_dir_recursive(ruby_source_path.join("ccan"), path.join("ccan"));
@@ -173,6 +174,9 @@ fn prepare_ruby_headers(path: &Path, ruby_source_path: &Path) -> Result<PathBuf>
     let mut wrapper = std::fs::File::create(&wrapper_path)?;
     writeln!(wrapper, "#define RUBY_JMP_BUF sigjmp_buf")?;
     writeln!(wrapper, "#include \"{}/vm_core.h\"", path.to_string_lossy())?;
+    if version_tag.starts_with("v3") {
+        writeln!(wrapper, "#include \"{}/ractor_core.h\"", path.to_string_lossy())?;
+    }
     writeln!(wrapper, "#include \"{}/iseq.h\"", path.to_string_lossy())?;
 
     return Ok(wrapper_path);
