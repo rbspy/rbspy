@@ -674,6 +674,20 @@ pub struct rb_callcache {
 pub struct rb_objspace {
     _unused: [u8; 0],
 }
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ractor_newobj_size_pool_cache {
+    pub freelist: *mut RVALUE,
+    pub using_page: *mut heap_page,
+}
+pub type rb_ractor_newobj_size_pool_cache_t = ractor_newobj_size_pool_cache;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ractor_newobj_cache {
+    pub incremental_mark_step_allocated_slots: usize,
+    pub size_pool_caches: [rb_ractor_newobj_size_pool_cache_t; 5usize],
+}
+pub type rb_ractor_newobj_cache_t = ractor_newobj_cache;
 pub const imemo_type_imemo_env: imemo_type = 0;
 pub const imemo_type_imemo_cref: imemo_type = 1;
 pub const imemo_type_imemo_svar: imemo_type = 2;
@@ -1203,6 +1217,24 @@ impl ::std::fmt::Debug for rb_native_thread {
         write ! (f , "rb_native_thread {{ id: {:?}, thread_id: {:?}, tid: {:?}, running_thread: {:?}, cond: {:?}, altstack: {:?} }}" , self . id , self . thread_id , self . tid , self . running_thread , self . cond , self . altstack)
     }
 }
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct rb_thread_sched {
+    pub running: *const rb_thread_struct,
+    pub lock: rb_nativethread_lock_t,
+    pub readyq: ccan_list_head,
+    pub timer: *const rb_thread_struct,
+    pub timer_err: ::std::os::raw::c_int,
+    pub switch_cond: rb_nativethread_cond_t,
+    pub switch_wait_cond: rb_nativethread_cond_t,
+    pub need_yield: ::std::os::raw::c_int,
+    pub wait_yield: ::std::os::raw::c_int,
+}
+impl ::std::fmt::Debug for rb_thread_sched {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write ! (f , "rb_thread_sched {{ running: {:?}, lock: {:?}, readyq: {:?}, timer: {:?}, timer_err: {:?}, switch_cond: {:?}, switch_wait_cond: {:?}, need_yield: {:?}, wait_yield: {:?} }}" , self . running , self . lock , self . readyq , self . timer , self . timer_err , self . switch_cond , self . switch_wait_cond , self . need_yield , self . wait_yield)
+    }
+}
 pub type rb_snum_t = ::std::os::raw::c_long;
 pub const ruby_tag_type_RUBY_TAG_NONE: ruby_tag_type = 0;
 pub const ruby_tag_type_RUBY_TAG_RETURN: ruby_tag_type = 1;
@@ -1620,6 +1652,7 @@ pub struct rb_hook_list_struct {
     pub need_clean: bool,
     pub is_local: bool,
 }
+pub type rb_hook_list_t = rb_hook_list_struct;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct rb_builtin_function {
@@ -2139,6 +2172,141 @@ pub struct rb_trace_arg_struct {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
+pub struct rb_ractor_pub {
+    pub self_: VALUE,
+    pub id: u32,
+    pub hooks: rb_hook_list_t,
+}
+pub const rb_ractor_basket_type_basket_type_none: rb_ractor_basket_type = 0;
+pub const rb_ractor_basket_type_basket_type_ref: rb_ractor_basket_type = 1;
+pub const rb_ractor_basket_type_basket_type_copy: rb_ractor_basket_type = 2;
+pub const rb_ractor_basket_type_basket_type_move: rb_ractor_basket_type = 3;
+pub const rb_ractor_basket_type_basket_type_will: rb_ractor_basket_type = 4;
+pub const rb_ractor_basket_type_basket_type_deleted: rb_ractor_basket_type = 5;
+pub const rb_ractor_basket_type_basket_type_reserved: rb_ractor_basket_type = 6;
+pub type rb_ractor_basket_type = ::std::os::raw::c_uint;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_ractor_basket {
+    pub exception: bool,
+    pub type_: rb_ractor_basket_type,
+    pub v: VALUE,
+    pub sender: VALUE,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_ractor_queue {
+    pub baskets: *mut rb_ractor_basket,
+    pub start: ::std::os::raw::c_int,
+    pub cnt: ::std::os::raw::c_int,
+    pub size: ::std::os::raw::c_int,
+    pub serial: ::std::os::raw::c_uint,
+    pub reserved_cnt: ::std::os::raw::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_ractor_waiting_list {
+    pub cnt: ::std::os::raw::c_int,
+    pub size: ::std::os::raw::c_int,
+    pub ractors: *mut *mut rb_ractor_t,
+}
+pub const rb_ractor_wait_status_wait_none: rb_ractor_wait_status = 0;
+pub const rb_ractor_wait_status_wait_receiving: rb_ractor_wait_status = 1;
+pub const rb_ractor_wait_status_wait_taking: rb_ractor_wait_status = 2;
+pub const rb_ractor_wait_status_wait_yielding: rb_ractor_wait_status = 4;
+pub const rb_ractor_wait_status_wait_moving: rb_ractor_wait_status = 8;
+pub type rb_ractor_wait_status = ::std::os::raw::c_uint;
+pub const rb_ractor_wakeup_status_wakeup_none: rb_ractor_wakeup_status = 0;
+pub const rb_ractor_wakeup_status_wakeup_by_send: rb_ractor_wakeup_status = 1;
+pub const rb_ractor_wakeup_status_wakeup_by_yield: rb_ractor_wakeup_status = 2;
+pub const rb_ractor_wakeup_status_wakeup_by_take: rb_ractor_wakeup_status = 3;
+pub const rb_ractor_wakeup_status_wakeup_by_close: rb_ractor_wakeup_status = 4;
+pub const rb_ractor_wakeup_status_wakeup_by_interrupt: rb_ractor_wakeup_status = 5;
+pub const rb_ractor_wakeup_status_wakeup_by_retry: rb_ractor_wakeup_status = 6;
+pub type rb_ractor_wakeup_status = ::std::os::raw::c_uint;
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct rb_ractor_sync {
+    pub lock: rb_nativethread_lock_t,
+    pub cond: rb_nativethread_cond_t,
+    pub incoming_queue: rb_ractor_queue,
+    pub taking_ractors: rb_ractor_waiting_list,
+    pub incoming_port_closed: bool,
+    pub outgoing_port_closed: bool,
+    pub wait: rb_ractor_sync_ractor_wait,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_ractor_sync_ractor_wait {
+    pub status: rb_ractor_wait_status,
+    pub wakeup_status: rb_ractor_wakeup_status,
+    pub yielded_basket: rb_ractor_basket,
+    pub taken_basket: rb_ractor_basket,
+}
+impl ::std::fmt::Debug for rb_ractor_sync {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write ! (f , "rb_ractor_sync {{ lock: {:?}, cond: {:?}, incoming_queue: {:?}, taking_ractors: {:?}, incoming_port_closed: {:?}, outgoing_port_closed: {:?}, wait: {:?} }}" , self . lock , self . cond , self . incoming_queue , self . taking_ractors , self . incoming_port_closed , self . outgoing_port_closed , self . wait)
+    }
+}
+pub const ractor_status_ractor_created: ractor_status = 0;
+pub const ractor_status_ractor_running: ractor_status = 1;
+pub const ractor_status_ractor_blocking: ractor_status = 2;
+pub const ractor_status_ractor_terminated: ractor_status = 3;
+pub type ractor_status = ::std::os::raw::c_uint;
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct rb_ractor_struct {
+    pub pub_: rb_ractor_pub,
+    pub sync: rb_ractor_sync,
+    pub receiving_mutex: VALUE,
+    pub yield_atexit: bool,
+    pub barrier_wait_cond: rb_nativethread_cond_t,
+    pub threads: rb_ractor_struct__bindgen_ty_1,
+    pub thgroup_default: VALUE,
+    pub name: VALUE,
+    pub loc: VALUE,
+    pub status_: ractor_status,
+    pub vmlr_node: ccan_list_node,
+    pub local_storage: *mut st_table,
+    pub idkey_local_storage: *mut rb_id_table,
+    pub r_stdin: VALUE,
+    pub r_stdout: VALUE,
+    pub r_stderr: VALUE,
+    pub verbose: VALUE,
+    pub debug: VALUE,
+    pub newobj_cache: rb_ractor_newobj_cache_t,
+    pub mfd: *mut rb_ractor_struct_gc_mark_func_data_struct,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct rb_ractor_struct__bindgen_ty_1 {
+    pub set: ccan_list_head,
+    pub cnt: ::std::os::raw::c_uint,
+    pub blocking_cnt: ::std::os::raw::c_uint,
+    pub sleeper: ::std::os::raw::c_uint,
+    pub sched: rb_thread_sched,
+    pub running_ec: *mut rb_execution_context_t,
+    pub main: *mut rb_thread_t,
+}
+impl ::std::fmt::Debug for rb_ractor_struct__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write ! (f , "rb_ractor_struct__bindgen_ty_1 {{ set: {:?}, cnt: {:?}, blocking_cnt: {:?}, sleeper: {:?}, sched: {:?}, running_ec: {:?}, main: {:?} }}" , self . set , self . cnt , self . blocking_cnt , self . sleeper , self . sched , self . running_ec , self . main)
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_ractor_struct_gc_mark_func_data_struct {
+    pub data: *mut ::std::os::raw::c_void,
+    pub mark_func:
+        ::std::option::Option<unsafe extern "C" fn(v: VALUE, data: *mut ::std::os::raw::c_void)>,
+}
+impl ::std::fmt::Debug for rb_ractor_struct {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write ! (f , "rb_ractor_struct {{ pub: {:?}, sync: {:?}, receiving_mutex: {:?}, yield_atexit: {:?}, barrier_wait_cond: {:?}, threads: {:?}, thgroup_default: {:?}, name: {:?}, loc: {:?}, status_: {:?}, vmlr_node: {:?}, local_storage: {:?}, idkey_local_storage: {:?}, r_stdin: {:?}, r_stdout: {:?}, r_stderr: {:?}, verbose: {:?}, debug: {:?}, newobj_cache: {:?}, mfd: {:?} }}" , self . pub_ , self . sync , self . receiving_mutex , self . yield_atexit , self . barrier_wait_cond , self . threads , self . thgroup_default , self . name , self . loc , self . status_ , self . vmlr_node , self . local_storage , self . idkey_local_storage , self . r_stdin , self . r_stdout , self . r_stderr , self . verbose , self . debug , self . newobj_cache , self . mfd)
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct iseq_compile_data {
     pub err_info: VALUE,
     pub catch_table_ary: VALUE,
@@ -2394,6 +2562,16 @@ pub struct iseq_compile_data_storage {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
+pub struct RVALUE {
+    pub _address: u8,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct heap_page {
+    pub _address: u8,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct succ_index_table {
     pub _address: u8,
 }
@@ -2405,11 +2583,6 @@ pub struct rb_call_data {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct rb_event_hook_struct {
-    pub _address: u8,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct rb_ractor_struct {
     pub _address: u8,
 }
 #[repr(C)]
