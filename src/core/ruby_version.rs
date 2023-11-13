@@ -360,7 +360,7 @@ macro_rules! get_stack_trace(
                     continue;
                 }
                 let iseq_struct: rb_iseq_struct = source.copy_struct(cfp.iseq as usize)
-                    .context(cfp.iseq as usize)?;
+                    .context("couldn't copy iseq struct")?;
 
                 let label_path  = get_stack_frame(&iseq_struct, &cfp, source);
                 match label_path {
@@ -746,8 +746,11 @@ macro_rules! get_stack_frame_2_5_0(
                 .context("couldn't copy rb_iseq_constant_body")?;
             let rstring: RString = source.copy_struct(body.location.label as usize)
                 .context("couldn't copy RString")?;
-
-            let (path, absolute_path) = get_ruby_string_array(body.location.pathobj as usize, rstring.basic.klass as usize, source)?;
+            let (path, absolute_path) = get_ruby_string_array(
+                body.location.pathobj as usize,
+                rstring.basic.klass as usize,
+                source
+            ).context("couldn't get ruby string from iseq body")?;
             Ok(StackFrame{
                 name: get_ruby_string(body.location.label as usize, source)?,
                 relative_path: path,
