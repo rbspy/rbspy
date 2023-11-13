@@ -152,7 +152,11 @@ fn prepare_ruby_source(path: &Path, version_tag: &str) -> Result<()> {
 }
 
 /// Copies any ruby headers we need to the given path
-fn prepare_ruby_headers(path: &Path, ruby_source_path: &Path, version_tag: &str) -> Result<PathBuf> {
+fn prepare_ruby_headers(
+    path: &Path,
+    ruby_source_path: &Path,
+    version_tag: &str,
+) -> Result<PathBuf> {
     copy_dir_recursive(ruby_source_path.join("include"), path.join("include"))?;
     let _ = copy_dir_recursive(ruby_source_path.join("internal"), path.join("internal"));
     let _ = copy_dir_recursive(ruby_source_path.join("ccan"), path.join("ccan"));
@@ -175,7 +179,11 @@ fn prepare_ruby_headers(path: &Path, ruby_source_path: &Path, version_tag: &str)
     writeln!(wrapper, "#define RUBY_JMP_BUF sigjmp_buf")?;
     writeln!(wrapper, "#include \"{}/vm_core.h\"", path.to_string_lossy())?;
     if version_tag.starts_with("v3") {
-        writeln!(wrapper, "#include \"{}/ractor_core.h\"", path.to_string_lossy())?;
+        writeln!(
+            wrapper,
+            "#include \"{}/ractor_core.h\"",
+            path.to_string_lossy()
+        )?;
     }
     writeln!(wrapper, "#include \"{}/iseq.h\"", path.to_string_lossy())?;
 
