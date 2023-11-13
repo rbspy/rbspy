@@ -273,6 +273,32 @@ macro_rules! ruby_version_v3_2_x(
     )
 );
 
+macro_rules! ruby_version_v3_3_x(
+    ($ruby_version:ident) => (
+        pub mod $ruby_version {
+            use std;
+            use anyhow::{Context, format_err, Result};
+            use bindings::$ruby_version::*;
+            use crate::core::process::ProcessMemory;
+
+            get_stack_trace!(rb_execution_context_struct);
+            get_execution_context_from_vm!();
+            get_ruby_string_3_3_0!();
+            get_ruby_string_array_3_2_0!();
+            get_cfps!();
+            get_pos!(rb_iseq_constant_body);
+            get_lineno_2_6_0!();
+            get_stack_frame_2_5_0!();
+            stack_field_2_5_0!();
+            get_thread_id_3_2_0!();
+            get_cfunc_name!();
+
+            #[allow(non_upper_case_globals)]
+            const ruby_fl_type_RUBY_FL_USHIFT: ruby_fl_type = ruby_fl_ushift_RUBY_FL_USHIFT as i32;
+        }
+    )
+);
+
 macro_rules! get_execution_context_from_thread(
     ($thread_type:ident) => (
         pub fn get_execution_context<T: ProcessMemory>(
@@ -633,6 +659,38 @@ macro_rules! get_ruby_string_3_2_0(
                 unsafe {
                     let addr = rstring.as_.heap.ptr as usize;
                     let len = rstring.as_.heap.len as usize;
+                    let heap_str_bytes = source.copy(addr as usize, len).context("couldn't copy ruby string from heap")?;
+                    return String::from_utf8(heap_str_bytes).context("couldn't convert ruby string bytes to string");
+                }
+            }
+        }
+    )
+);
+
+macro_rules! get_ruby_string_3_3_0(
+    () => (
+        fn get_ruby_string<T>(
+            addr: usize,
+            source: &T
+        ) -> Result<String> where T: ProcessMemory {
+            let rstring: RString = source.copy_struct(addr).context("couldn't copy rstring")?;
+            // See RSTRING_NOEMBED and RUBY_FL_USER1
+            let is_embedded_string = rstring.basic.flags & 1 << 13 == 0;
+            if is_embedded_string {
+                // The introduction of Variable Width Allocation (VWA) for strings means that
+                // the length of embedded strings varies at runtime. Instead of assuming a
+                // constant length, we need to read the length from the struct.
+                //
+                // See https://bugs.ruby-lang.org/issues/18239
+                let embedded_str_bytes = source.copy(
+                    addr + std::mem::size_of::<RBasic>() + std::mem::size_of::<std::os::raw::c_long>(),
+                    rstring.len as usize
+                ).context("couldn't copy rstring")?;
+                return String::from_utf8(embedded_str_bytes).context("couldn't convert ruby string bytes to string")
+            } else {
+                unsafe {
+                    let addr = rstring.as_.heap.ptr as usize;
+                    let len = rstring.len as usize;
                     let heap_str_bytes = source.copy(addr as usize, len).context("couldn't copy ruby string from heap")?;
                     return String::from_utf8(heap_str_bytes).context("couldn't convert ruby string bytes to string");
                 }
@@ -1190,6 +1248,7 @@ ruby_version_v3_1_x!(ruby_3_1_4);
 ruby_version_v3_2_x!(ruby_3_2_0);
 ruby_version_v3_2_x!(ruby_3_2_1);
 ruby_version_v3_2_x!(ruby_3_2_2);
+ruby_version_v3_3_x!(ruby_3_3_0);
 
 pub fn get_execution_context(version: &Version) -> crate::core::types::GetExecutionContextFn {
     let function = match version {
@@ -1739,6 +1798,12 @@ pub fn get_execution_context(version: &Version) -> crate::core::types::GetExecut
             patch: 2,
             ..
         } => ruby_3_2_2::get_execution_context,
+        Version {
+            major: 3,
+            minor: 3,
+            patch: 0,
+            ..
+        } => ruby_3_3_0::get_execution_context,
         _ => panic!(
             "Ruby version not supported yet: {}. In the meantime, we suggest trying `--force-version <prior version>`.",
             version
@@ -2296,6 +2361,12 @@ pub fn is_maybe_thread_function(version: &Version) -> crate::core::types::IsMayb
             patch: 2,
             ..
         } => ruby_3_2_2::is_maybe_thread,
+        Version {
+            major: 3,
+            minor: 3,
+            patch: 0,
+            ..
+        } => ruby_3_3_0::is_maybe_thread,
         _ => panic!(
             "Ruby version not supported yet: {}. In the meantime, we suggest trying `--force-version <prior version>`.",
             version
@@ -2852,6 +2923,12 @@ pub fn get_stack_trace_function(version: &Version) -> crate::core::types::StackT
             patch: 2,
             ..
         } => ruby_3_2_2::get_stack_trace,
+        Version {
+            major: 3,
+            minor: 3,
+            patch: 0,
+            ..
+        } => ruby_3_3_0::get_stack_trace,
         _ => panic!(
             "Ruby version not supported yet: {}. In the meantime, we suggest trying `--force-version <prior version>`.",
             version
