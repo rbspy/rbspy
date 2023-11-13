@@ -742,6 +742,9 @@ macro_rules! get_stack_frame_2_5_0(
             cfp: &rb_control_frame_t,
             source: &T,
         ) -> Result<StackFrame> where T: ProcessMemory {
+            if iseq_struct.body == std::ptr::null_mut() {
+                return Err(format_err!("iseq body is null"));
+            }
             let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
                 .context("couldn't copy rb_iseq_constant_body")?;
             let rstring: RString = source.copy_struct(body.location.label as usize)
