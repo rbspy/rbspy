@@ -1,17 +1,30 @@
 Vagrant.configure("2") do |config|
-  config.vm.define "fbsd_12_4" do |c|
-    c.vm.box = "rbspy/FreeBSD-12.4-STABLE"
+  config.vm.define "freebsd-14" do |c|
+    c.vm.box = "roboxes/freebsd14"
   end
 
-  config.vm.define "fbsd_13_2" do |c|
-    c.vm.box = "rbspy/FreeBSD-13.2-STABLE"
+  config.vm.boot_timeout = 600
+
+  config.vm.provider "libvirt" do |qe|
+    # https://vagrant-libvirt.github.io/vagrant-libvirt/configuration.html
+    qe.driver = "kvm"
+    qe.cpus = 3
+    qe.memory = 8192
   end
 
   config.vm.synced_folder ".", "/vagrant", type: "rsync",
     rsync__exclude: [".git", ".vagrant.d"]
 
-  config.vm.provider "virtualbox" do |v|
-    v.memory = 8192
-    v.cpus = 3
-  end
+  config.vm.provision "shell", inline: <<~SHELL
+    set -e
+
+    pkg install -y curl bash ruby llvm
+
+    chsh -s /usr/local/bin/bash vagrant
+    pw groupmod wheel -m vagrant
+
+    su -l vagrant <<'EOF'
+    curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain 1.73.0
+    EOF
+  SHELL
 end
