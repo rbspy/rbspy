@@ -1,0 +1,63 @@
+name: Create Core Dump
+
+on:
+  workflow_dispatch:
+    inputs:
+      ruby-version:
+        description: 'Ruby version'
+        required: true
+
+jobs:
+  create-core-dump:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ inputs.ruby-version }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@984d158d699777abbaa79de23de3134e60c187fa # stable branch
+
+      - name: Install gdb
+        run: sudo apt-get install -y gdb
+
+      - name: Check out rbspy source
+        uses: actions/checkout@v3
+
+      - name: Cargo Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      
+      - name: Build rbspy
+        run: cargo build --release
+      
+      - name: Run Ruby script
+        id: ruby-script
+        run: |
+          ruby ci/ruby-programs/infinite.rb &
+          pid=$!
+          echo "pid=$pid" >> $GITHUB_OUTPUT
+
+      - name: Inspect process
+        run: sudo ./target/release/rbspy inspect --pid ${{ steps.ruby-script.outputs.pid }}
+
+      - name: Create core dump
+        shell: sudo bash {0}
+        run: |
+          gcore ${{ steps.ruby-script.outputs.pid }}
+          mv core.${{ steps.ruby-script.outputs.pid }} ruby-coredump-${{ inputs.ruby-version }}
+          gzip -9 ruby-coredump-${{ inputs.ruby-version }}
+
+      - name: Upload core dump
+        uses: actions/upload-artifact@v3
+        with:
+          name: ruby-coredump-${{ inputs.ruby-version }}.gz
+          path: ruby-coredump-${{ inputs.ruby-version }}.gz
