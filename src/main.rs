@@ -580,11 +580,11 @@ fn spawn_subprocess(prog: String, args: Vec<String>, no_drop_root: bool) -> Resu
     #[cfg(windows)]
     {
         let _ = no_drop_root;
-        std::process::Command::new(prog)
+        Ok(std::process::Command::new(prog)
             .args(args)
             .spawn()
             .context(context)?
-            .id() as Pid
+            .id() as Pid)
     }
 }
 
