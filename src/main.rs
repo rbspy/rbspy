@@ -52,6 +52,10 @@ enum SubCmd {
         input: PathBuf,
         output: PathBuf,
     },
+    Inspect {
+        target: Target,
+        force_version: Option<String>,
+    },
 }
 
 /// Top level args type.
@@ -125,54 +129,7 @@ fn do_main() -> Result<(), Error> {
         } => {
             let pid = match target {
                 Target::Pid { pid } => pid,
-                Target::Subprocess { prog, args } => {
-                    if cfg!(target_os = "macos") {
-                        // sleep to prevent freezes (because of High Sierra kernel bug)
-                        // TODO: figure out how to work around this race in a cleaner way
-                        std::thread::sleep(std::time::Duration::from_millis(10));
-                    }
-
-                    let context = format!("spawn subprocess '{}'", prog.clone());
-
-                    #[cfg(unix)]
-                    {
-                        let uid_str = std::env::var("SUDO_UID");
-                        if nix::unistd::Uid::effective().is_root()
-                            && !no_drop_root
-                            && uid_str.is_ok()
-                        {
-                            let uid: u32 = uid_str
-                                .unwrap()
-                                .parse::<u32>()
-                                .context("Failed to parse UID")?;
-                            eprintln!(
-                                "Dropping permissions: running Ruby command as user {}",
-                                std::env::var("SUDO_USER").context("SUDO_USER")?
-                            );
-                            std::process::Command::new(prog)
-                                .uid(uid)
-                                .args(args)
-                                .spawn()
-                                .context(context)?
-                                .id() as Pid
-                        } else {
-                            std::process::Command::new(prog)
-                                .args(args)
-                                .spawn()
-                                .context(context)?
-                                .id() as Pid
-                        }
-                    }
-                    #[cfg(windows)]
-                    {
-                        let _ = no_drop_root;
-                        std::process::Command::new(prog)
-                            .args(args)
-                            .spawn()
-                            .context(context)?
-                            .id() as Pid
-                    }
-                }
+                Target::Subprocess { prog, args } => spawn_subprocess(prog, args, no_drop_root)?,
             };
 
             let config = recorder::RecordConfig {
@@ -262,6 +219,16 @@ fn do_main() -> Result<(), Error> {
             } else {
                 report(format, &mut input, &mut std::fs::File::create(output)?)
             }
+        }
+        SubCmd::Inspect {
+            target,
+            force_version,
+        } => {
+            let pid = match target {
+                Target::Pid { pid } => pid,
+                Target::Subprocess { prog, args } => spawn_subprocess(prog, args, true)?,
+            };
+            rbspy::inspect(pid, force_version)
         }
     }
 }
@@ -395,6 +362,28 @@ fn arg_parser() -> clap::Command {
                         .default_value("flamegraph"),
                 )
         )
+        .subcommand(
+            clap::Command::new("inspect")
+                .about("Inspect a Ruby process, finding key memory addresses that are needed for profiling")
+                .hide(true)
+                .arg(
+                    arg!(-p --pid <PID> "PID of the Ruby process you want to inspect")
+                    .value_parser(validate_pid)
+                    // It's a bit confusing but this is how to get exactly-one-of behaviour
+                    // for `--pid` and `cmd`.
+                    .required_unless_present("cmd")
+                    .conflicts_with("cmd")
+                    .required(false),
+                )
+                .arg(
+                    clap::Arg::new("force-version")
+                        .help("Assume that the Ruby version is <VERSION>. This is useful when the Ruby \
+                            version is not yet supported by rbspy, e.g. a release candidate")
+                        .long("force-version")
+                        .required(false)
+                )
+                .arg(arg!(<cmd> ... "command to run").required(false)),
+        )
 }
 
 /// Check `s` is a positive integer.
@@ -495,6 +484,27 @@ impl Args {
                     output: output.unwrap(),
                 }
             }
+            Some(("inspect", submatches)) => {
+                let force_version =
+                    ArgMatches::get_one::<String>(submatches, "force-version").cloned();
+                let target = if let Some(pid) = submatches.get_one::<Pid>("pid") {
+                    Target::Pid { pid: *pid }
+                } else {
+                    let mut cmd = submatches
+                        .get_many::<String>("cmd")
+                        .expect("shouldn't happen");
+                    let prog = cmd.next().expect("nope");
+                    let args = cmd;
+                    Target::Subprocess {
+                        prog: prog.to_string(),
+                        args: args.map(String::from).collect(),
+                    }
+                };
+                SubCmd::Inspect {
+                    target,
+                    force_version,
+                }
+            }
             _ => panic!("this shouldn't happen, please report the command you ran!"),
         };
 
@@ -529,6 +539,52 @@ fn output_filename(maybe_filename: Option<&str>, extension: &str) -> Result<Path
                 .create(&dirs.cache_dir())?;
             Ok(dirs.cache_dir().join(&filename))
         }
+    }
+}
+
+fn spawn_subprocess(prog: String, args: Vec<String>, no_drop_root: bool) -> Result<Pid> {
+    if cfg!(target_os = "macos") {
+        // sleep to prevent freezes (because of High Sierra kernel bug)
+        // TODO: figure out how to work around this race in a cleaner way
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+
+    let context = format!("spawn subprocess '{}'", prog.clone());
+
+    #[cfg(unix)]
+    {
+        let uid_str = std::env::var("SUDO_UID");
+        if nix::unistd::Uid::effective().is_root() && !no_drop_root && uid_str.is_ok() {
+            let uid: u32 = uid_str
+                .unwrap()
+                .parse::<u32>()
+                .context("Failed to parse UID")?;
+            eprintln!(
+                "Dropping permissions: running Ruby command as user {}",
+                std::env::var("SUDO_USER").context("SUDO_USER")?
+            );
+            Ok(std::process::Command::new(prog)
+                .uid(uid)
+                .args(args)
+                .spawn()
+                .context(context)?
+                .id() as Pid)
+        } else {
+            Ok(std::process::Command::new(prog)
+                .args(args)
+                .spawn()
+                .context(context)?
+                .id() as Pid)
+        }
+    }
+    #[cfg(windows)]
+    {
+        let _ = no_drop_root;
+        std::process::Command::new(prog)
+            .args(args)
+            .spawn()
+            .context(context)?
+            .id() as Pid
     }
 }
 

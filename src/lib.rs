@@ -28,7 +28,9 @@ extern crate term_size;
 #[cfg(windows)]
 extern crate winapi;
 
-use anyhow::{Error, Result};
+use core::ruby_spy::RubySpy;
+
+use anyhow::Result;
 
 mod core;
 pub mod recorder;
@@ -46,12 +48,29 @@ pub fn report(
     format: OutputFormat,
     input: &mut dyn std::io::Read,
     output: &mut dyn std::io::Write,
-) -> Result<(), Error> {
+) -> Result<()> {
     let traces = storage::from_reader(input)?.traces;
     let mut outputter = format.outputter(0.1);
     for trace in traces {
         outputter.record(&trace)?;
     }
     outputter.complete(output)?;
+    Ok(())
+}
+
+pub fn inspect(pid: Pid, force_version: Option<String>) -> Result<()> {
+    let ruby_spy = RubySpy::new(pid, force_version)?;
+    let vm = ruby_spy.inspect();
+    println!("Ruby version: {}", vm.version);
+    println!("Ruby VM address: {:#x}", vm.ruby_vm_addr_location);
+    println!(
+        "Current thread address: {:#x}",
+        vm.current_thread_addr_location
+    );
+    println!(
+        "Global symbols address: {:#x}",
+        vm.global_symbols_addr_location.unwrap_or(0)
+    );
+
     Ok(())
 }

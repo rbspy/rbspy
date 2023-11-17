@@ -6,11 +6,11 @@ use spytools::ProcessInfo;
 use crate::core::process::{Pid, Process, ProcessRetry};
 use crate::core::types::{MemoryCopyError, StackTrace};
 
+use super::address_finder::RubyVM;
+
 pub struct RubySpy {
     process: Process,
-    current_thread_addr_location: usize,
-    ruby_vm_addr_location: usize,
-    global_symbols_addr_location: Option<usize>,
+    vm: super::address_finder::RubyVM,
     stack_trace_function: crate::core::types::StackTraceFn,
 }
 
@@ -27,25 +27,18 @@ impl RubySpy {
 
         let process_info = ProcessInfo::new::<spytools::process::RubyProcessType>(&process)?;
 
-        let (
-            version,
-            current_thread_addr_location,
-            ruby_vm_addr_location,
-            global_symbols_addr_location,
-        ) = crate::core::address_finder::inspect_ruby_process(
+        let vm = crate::core::address_finder::inspect_ruby_process(
             &process,
             &process_info,
             force_version,
         )
         .context("get ruby VM state")?;
 
-        let stack_trace_function = crate::core::ruby_version::get_stack_trace_function(&version);
+        let stack_trace_function = crate::core::ruby_version::get_stack_trace_function(&vm.version);
 
         Ok(Self {
             process,
-            current_thread_addr_location,
-            ruby_vm_addr_location,
-            global_symbols_addr_location,
+            vm,
             stack_trace_function,
         })
     }
@@ -116,12 +109,16 @@ impl RubySpy {
         }
 
         (&self.stack_trace_function)(
-            self.current_thread_addr_location,
-            self.ruby_vm_addr_location,
-            self.global_symbols_addr_location,
+            self.vm.current_thread_addr_location,
+            self.vm.ruby_vm_addr_location,
+            self.vm.global_symbols_addr_location,
             &self.process,
             self.process.pid,
         )
+    }
+
+    pub fn inspect(&self) -> RubyVM {
+        self.vm.clone()
     }
 }
 

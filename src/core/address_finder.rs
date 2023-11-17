@@ -3,12 +3,20 @@ use remoteprocess::{Process, ProcessMemory};
 use semver::Version;
 use spytools::ProcessInfo;
 
+#[derive(Clone)]
+pub struct RubyVM {
+    pub version: Version,
+    pub current_thread_addr_location: usize,
+    pub ruby_vm_addr_location: usize,
+    pub global_symbols_addr_location: Option<usize>,
+}
+
 /// Inspect a running Ruby process, finding key memory addresses that are needed for profiling
 pub fn inspect_ruby_process(
     process: &Process,
     process_info: &ProcessInfo,
     force_version: Option<String>,
-) -> Result<(Version, usize, usize, Option<usize>)> {
+) -> Result<RubyVM> {
     let version = match force_version {
         Some(ref v) => {
             info!("Assuming Ruby version is {}", v);
@@ -51,12 +59,12 @@ pub fn inspect_ruby_process(
         }
     };
 
-    let vm_address = match process_info.get_symbol(&ruby_current_vm_symbol(&version)) {
+    let ruby_vm_address = match process_info.get_symbol(&ruby_current_vm_symbol(&version)) {
         Some(addr) => *addr as usize,
         None => return Err(anyhow::format_err!("Couldn't find Ruby VM address")),
     };
     let current_thread_address =
-        get_current_thread_address(process_info, process, &version, vm_address)?;
+        get_current_thread_address(process_info, process, &version, ruby_vm_address)?;
     let global_symbols_address = match process_info.get_symbol(&ruby_globals_symbol(&version)) {
         Some(addr) => Some(*addr as usize),
         // The global symbols address lookup is allowed to fail (e.g. on older rubies)
@@ -68,16 +76,16 @@ pub fn inspect_ruby_process(
         current thread address: {:#x?}\n\
         VM address: {:#x?}\n\
         global symbols address: {:#x?}\n",
-        version, &current_thread_address, &vm_address, global_symbols_address
+        version, &current_thread_address, &ruby_vm_address, global_symbols_address
     );
 
     info!("Ruby VM addresses: {}", addresses_status);
-    return Ok((
+    return Ok(RubyVM {
         version,
-        current_thread_address,
-        vm_address,
-        global_symbols_address,
-    ));
+        current_thread_addr_location: current_thread_address,
+        ruby_vm_addr_location: ruby_vm_address,
+        global_symbols_addr_location: global_symbols_address,
+    });
 }
 
 fn get_current_thread_address(
