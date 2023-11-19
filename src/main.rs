@@ -409,7 +409,7 @@ impl Args {
                 pid: *submatches
                     .get_one::<Pid>("pid")
                     .expect("this shouldn't happen because clap requires a pid"),
-                lock_process: *submatches.get_one::<bool>("nonblocking").unwrap(),
+                lock_process: !*submatches.get_one::<bool>("nonblocking").unwrap(),
                 force_version: match submatches.get_one::<String>("force-version") {
                     Some(version) => Some(version.to_string()),
                     None => None,
@@ -829,7 +829,7 @@ mod tests {
             Args {
                 cmd: SubCmd::Snapshot {
                     pid: 1234,
-                    lock_process: false,
+                    lock_process: true,
                     force_version: None,
                 },
             }
