@@ -284,7 +284,7 @@ fn arg_parser() -> clap::Command {
                     arg!(-r --rate <RATE> "Samples per second collected")
                         .value_parser(clap::value_parser!(u32))
                         .required(false)
-                        .default_value("100"),
+                        .default_value("99"),
                 )
                 .arg(
                     clap::Arg::new("no-drop-root")
@@ -640,7 +640,7 @@ mod tests {
                     target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
                     raw_path: "raw.gz".into(),
-                    sample_rate: 100,
+                    sample_rate: 99,
                     maybe_duration: None,
                     format: OutputFormat::flamegraph,
                     no_drop_root: false,
@@ -688,7 +688,7 @@ mod tests {
                     target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
                     raw_path: "raw.gz".into(),
-                    sample_rate: 100,
+                    sample_rate: 99,
                     maybe_duration: Some(std::time::Duration::from_secs(60)),
                     format: OutputFormat::flamegraph,
                     no_drop_root: false,
@@ -711,7 +711,7 @@ mod tests {
                     target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
                     raw_path: "raw.gz".into(),
-                    sample_rate: 100,
+                    sample_rate: 99,
                     maybe_duration: Some(std::time::Duration::from_secs(60)),
                     format: OutputFormat::callgrind,
                     no_drop_root: false,
@@ -735,7 +735,7 @@ mod tests {
                     target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
                     raw_path: "raw.gz".into(),
-                    sample_rate: 100,
+                    sample_rate: 99,
                     maybe_duration: None,
                     format: OutputFormat::flamegraph,
                     no_drop_root: true,
@@ -759,7 +759,7 @@ mod tests {
                     target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
                     raw_path: "raw.gz".into(),
-                    sample_rate: 100,
+                    sample_rate: 99,
                     maybe_duration: None,
                     format: OutputFormat::flamegraph,
                     no_drop_root: false,
@@ -783,7 +783,7 @@ mod tests {
                     target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
                     raw_path: "raw.gz".into(),
-                    sample_rate: 100,
+                    sample_rate: 99,
                     maybe_duration: None,
                     format: OutputFormat::flamegraph,
                     no_drop_root: false,
@@ -807,7 +807,7 @@ mod tests {
                     target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
                     raw_path: "raw.gz".into(),
-                    sample_rate: 100,
+                    sample_rate: 99,
                     maybe_duration: None,
                     format: OutputFormat::flamegraph,
                     no_drop_root: false,
