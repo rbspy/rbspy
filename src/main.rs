@@ -256,6 +256,7 @@ fn arg_parser() -> clap::Command {
                         .help("Assume that the Ruby version is <VERSION>. This is useful when the Ruby \
                             version is not yet supported by rbspy, e.g. a release candidate")
                         .long("force-version")
+                        .value_name("VERSION")
                         .required(false)
                 )
         )
@@ -336,6 +337,7 @@ fn arg_parser() -> clap::Command {
                         .help("Assume that the Ruby version is <VERSION>. This is useful when the Ruby \
                             version is not yet supported by rbspy, e.g. a release candidate")
                         .long("force-version")
+                        .value_name("VERSION")
                         .required(false)
                 )
                 .arg(arg!(<cmd> ... "command to run").required(false)),
@@ -380,6 +382,7 @@ fn arg_parser() -> clap::Command {
                         .help("Assume that the Ruby version is <VERSION>. This is useful when the Ruby \
                             version is not yet supported by rbspy, e.g. a release candidate")
                         .long("force-version")
+                        .value_name("VERSION")
                         .required(false)
                 )
                 .arg(arg!(<cmd> ... "command to run").required(false)),
