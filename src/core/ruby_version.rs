@@ -1095,6 +1095,7 @@ macro_rules! get_cfunc_name(
             type rb_id_serial_t = u32;
 
             // Declared in symbol.c prior to ruby 2.7.0, so not accessible by bindgen
+            #[allow(non_camel_case_types)]
             #[repr(C)]
             #[derive(Debug, Copy, Clone)]
             struct rb_symbols_t {
