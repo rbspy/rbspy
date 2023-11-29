@@ -35,12 +35,11 @@ pub struct StackTrace {
     pub time: Option<SystemTime>,
 }
 
-pub type StackTraceFn =
-    Box<dyn Fn(usize, usize, Option<usize>, &Process, Pid) -> Result<StackTrace>>;
+pub type StackTraceFn = fn(usize, usize, Option<usize>, &Process, Pid) -> Result<StackTrace>;
 
-pub type IsMaybeThreadFn = Box<dyn Fn(usize, usize, &Process, &[proc_maps::MapRange]) -> bool>;
+pub type IsMaybeThreadFn = fn(usize, usize, &Process, &[proc_maps::MapRange]) -> bool;
 
-pub type GetExecutionContextFn = Box<dyn Fn(usize, usize, &Process) -> Result<usize>>;
+pub type GetExecutionContextFn = fn(usize, usize, &Process) -> Result<usize>;
 
 #[derive(Error, Debug)]
 pub enum MemoryCopyError {

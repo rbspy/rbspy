@@ -1,11 +1,14 @@
 use anyhow::{anyhow, format_err, Context, Error, Result};
+use proc_maps::MapRange;
 use remoteprocess::{Process, ProcessMemory};
 use semver::Version;
+use spytools::binary_parser::BinaryInfo;
 use spytools::ProcessInfo;
 
-#[derive(Clone)]
+use super::supported_ruby_versions::RubyVersion;
+
 pub struct RubyVM {
-    pub version: Version,
+    pub ruby_version: RubyVersion,
     pub current_thread_addr_location: usize,
     pub ruby_vm_addr_location: usize,
     pub global_symbols_addr_location: Option<usize>,
@@ -59,12 +62,13 @@ pub fn inspect_ruby_process(
         }
     };
 
+    let ruby_version = crate::core::supported_ruby_versions::get(&version.to_string())?;
     let ruby_vm_address = match process_info.get_symbol(&ruby_current_vm_symbol(&version)) {
         Some(addr) => *addr as usize,
         None => return Err(anyhow::format_err!("Couldn't find Ruby VM address")),
     };
     let current_thread_address =
-        get_current_thread_address(process_info, process, &version, ruby_vm_address)?;
+        get_current_thread_address(process_info, process, &ruby_version, ruby_vm_address)?;
     let global_symbols_address = match process_info.get_symbol(&ruby_globals_symbol(&version)) {
         Some(addr) => Some(*addr as usize),
         // The global symbols address lookup is allowed to fail (e.g. on older rubies)
@@ -81,7 +85,7 @@ pub fn inspect_ruby_process(
 
     info!("Ruby VM addresses: {}", addresses_status);
     return Ok(RubyVM {
-        version,
+        ruby_version,
         current_thread_addr_location: current_thread_address,
         ruby_vm_addr_location: ruby_vm_address,
         global_symbols_addr_location: global_symbols_address,
@@ -91,16 +95,15 @@ pub fn inspect_ruby_process(
 fn get_current_thread_address(
     process_info: &ProcessInfo,
     process: &remoteprocess::Process,
-    version: &Version,
+    ruby_version: &RubyVersion,
     vm_address: usize,
 ) -> Result<usize> {
-    if *version >= Version::new(3, 0, 0) {
+    if ruby_version.semver_version >= Version::new(3, 0, 0) {
         // Current thread is not directly accessible on Ruby 3+, so get it from the VM
-        let get_execution_context = crate::core::ruby_version::get_execution_context(&version);
-        return get_execution_context(0, vm_address, process);
+        return (ruby_version.get_execution_context_fn)(0, vm_address, process);
     }
 
-    let symbol = ruby_execution_context_symbol(&version);
+    let symbol = ruby_execution_context_symbol(&ruby_version.semver_version);
 
     // get the address of the current ruby thread from loaded symbols if we can
     // (this tends to be faster than scanning through the bss section)
@@ -113,7 +116,7 @@ fn get_current_thread_address(
             &[addr as usize],
             &process_info.maps,
             process,
-            crate::core::ruby_version::is_maybe_thread_function(&version),
+            ruby_version.is_maybe_thread_fn,
         ) {
             Ok(addr) => return Ok(addr),
             Err(e) => {
@@ -132,7 +135,7 @@ fn get_current_thread_address(
             binary,
             &process_info.maps,
             process,
-            crate::core::ruby_version::is_maybe_thread_function(&version),
+            ruby_version.is_maybe_thread_fn,
         ) {
             Ok(addr) => return Ok(addr),
             Err(err) => Some(Err(err)),
@@ -147,7 +150,7 @@ fn get_current_thread_address(
             library,
             &process_info.maps,
             process,
-            crate::core::ruby_version::is_maybe_thread_function(&version),
+            ruby_version.is_maybe_thread_fn,
         ) {
             Ok(addr) => return Ok(addr),
             Err(lib_err) => Err(err).unwrap_or(Err(lib_err)),
@@ -156,9 +159,6 @@ fn get_current_thread_address(
         err.expect("Both ruby and libruby are invalid.")
     }
 }
-
-use proc_maps::MapRange;
-use spytools::binary_parser::BinaryInfo;
 
 fn get_thread_address_from_binary(
     binary: &BinaryInfo,

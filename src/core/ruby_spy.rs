@@ -11,7 +11,6 @@ use super::address_finder::RubyVM;
 pub struct RubySpy {
     process: Process,
     vm: super::address_finder::RubyVM,
-    stack_trace_function: crate::core::types::StackTraceFn,
 }
 
 impl RubySpy {
@@ -34,13 +33,7 @@ impl RubySpy {
         )
         .context("get ruby VM state")?;
 
-        let stack_trace_function = crate::core::ruby_version::get_stack_trace_function(&vm.version);
-
-        Ok(Self {
-            process,
-            vm,
-            stack_trace_function,
-        })
+        Ok(Self { process, vm })
     }
 
     /// Creates a RubySpy object, retrying up to max_retries times.
@@ -108,7 +101,7 @@ impl RubySpy {
                 .context("locking process during stack trace retrieval")?;
         }
 
-        (&self.stack_trace_function)(
+        (&self.vm.ruby_version.get_stack_trace_fn)(
             self.vm.current_thread_addr_location,
             self.vm.ruby_vm_addr_location,
             self.vm.global_symbols_addr_location,
@@ -117,8 +110,8 @@ impl RubySpy {
         )
     }
 
-    pub fn inspect(&self) -> RubyVM {
-        self.vm.clone()
+    pub fn inspect(&self) -> &RubyVM {
+        &self.vm
     }
 }
 
