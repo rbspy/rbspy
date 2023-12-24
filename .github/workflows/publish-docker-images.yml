@@ -2,35 +2,54 @@ name: Publish Docker images
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build and push"
+        required: true
 
 jobs:
   musl:
     runs-on: ubuntu-22.04
     steps:
+      - name: Determine release version
+        run: |
+          set -euo pipefail
+
+          release_tag="${{ github.event.inputs.tag || github.event.release.tag_name }}"
+          release_version=$(tr -d 'v' <<< $release_tag)
+          echo "Tag: $release_tag"
+          echo "Version: $release_version"
+          echo "release_tag=$release_tag" >> $GITHUB_ENV
+          echo "release_version=$release_version" >> $GITHUB_ENV
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ env.release_tag }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@27d0a4f181a40b142cce983c5393082c365d1480 # v1.2.0
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@94ab11c41e45d028884a99163086648e898eed25 # v1.6.0
       - name: Log into DockerHub
-        uses: docker/login-action@42d299face0c5c43a0487c477f595ac9cf22f1a7 # v1.12.0
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Login to Quay.io
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_PASSWORD }}
       - name: Generate image tags
         id: generate-image-tags
         run: |
           set -euo pipefail
 
-          release_version=$(tr -d 'v' <<< ${{ github.event.release.tag_name }})
-          echo "release_version=$release_version" >> $GITHUB_ENV
-          image_tags="rbspy/rbspy:${release_version}-musl,rbspy/rbspy:${release_version}-musl"
+          image_tags="rbspy/rbspy:${{ env.release_version }}-musl,quay.io/rbspy/rbspy:${{ env.release_version }}-musl"
           echo "image_tags=$image_tags" >> $GITHUB_ENV
       - name: Build and push
-        uses: docker/build-push-action@7f9d37fa544684fb73bfe4835ed7214c255ce02b # v2.9.0
+        uses: docker/build-push-action@4a13e500e55cf31b7a5d59a38ab2040ab0f42f56 # v5.1.0
         with:
           build-args: VERSION=${{ env.release_version }}
           context: .
@@ -43,30 +62,44 @@ jobs:
   gnu:
     runs-on: ubuntu-22.04
     steps:
+      - name: Determine release version
+        run: |
+          set -euo pipefail
+
+          release_tag="${{ github.event.inputs.tag || github.event.release.tag_name }}"
+          release_version=$(tr -d 'v' <<< $release_tag)
+          echo "Tag: $release_tag"
+          echo "Version: $release_version"
+          echo "release_tag=$release_tag" >> $GITHUB_ENV
+          echo "release_version=$release_version" >> $GITHUB_ENV
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ env.release_tag }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@27d0a4f181a40b142cce983c5393082c365d1480 # v1.2.0
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@94ab11c41e45d028884a99163086648e898eed25 # v1.6.0
       - name: Log into DockerHub
-        uses: docker/login-action@42d299face0c5c43a0487c477f595ac9cf22f1a7 # v1.12.0
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Login to Quay.io
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_PASSWORD }}
       - name: Generate image tags
         id: generate-image-tags
         run: |
           set -euo pipefail
 
-          release_version=$(tr -d 'v' <<< ${{ github.event.release.tag_name }})
-          echo "release_version=$release_version" >> $GITHUB_ENV
-          image_tags="rbspy/rbspy:${release_version}-gnu"
+          image_tags="rbspy/rbspy:${{ env.release_version }}-gnu,quay.io/rbspy/rbspy:${{ env.release_version }}-gnu"
           echo "image_tags=$image_tags" >> $GITHUB_ENV
       - name: Build and push
-        uses: docker/build-push-action@7f9d37fa544684fb73bfe4835ed7214c255ce02b # v2.9.0
+        uses: docker/build-push-action@4a13e500e55cf31b7a5d59a38ab2040ab0f42f56 # v5.1.0
         with:
           build-args: VERSION=${{ env.release_version }}
           context: .
@@ -82,7 +115,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event.inputs.tag || github.event.release.tag_name }}
       - name: Sync README to Docker Hub
         uses: ms-jpq/sync-dockerhub-readme@0c8d5cd2a45de29ab6d890d78ee19a332be3503e # v1
         with:
