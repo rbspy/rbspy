@@ -169,6 +169,13 @@ fn prepare_ruby_headers(
     ruby_source_path: &Path,
     version_tag: &str,
 ) -> Result<PathBuf> {
+    let clean_version = version_tag
+        .trim_start_matches("v")
+        .replace("_551", "") // ruby 1.9
+        .replace("_648", "") // ruby 2.0
+        .replace("_", ".");
+    let version = semver::Version::parse(&clean_version)?;
+
     copy_dir_recursive(ruby_source_path.join("include"), path.join("include"))?;
     let _ = copy_dir_recursive(ruby_source_path.join("internal"), path.join("internal"));
     let _ = copy_dir_recursive(ruby_source_path.join("ccan"), path.join("ccan"));
@@ -190,7 +197,7 @@ fn prepare_ruby_headers(
     let mut wrapper = std::fs::File::create(&wrapper_path)?;
     writeln!(wrapper, "#define RUBY_JMP_BUF sigjmp_buf")?;
     writeln!(wrapper, "#include \"{}/vm_core.h\"", path.to_string_lossy())?;
-    if version_tag.starts_with("v3") {
+    if version >= semver::Version::new(3, 0, 0) {
         writeln!(
             wrapper,
             "#include \"{}/ractor_core.h\"",
