@@ -100,6 +100,18 @@ fn prepare_ruby_source(path: &Path, version_tag: &str) -> Result<()> {
     }
 
     let status = Command::new("git")
+        .args(vec!["fetch"])
+        .current_dir(path)
+        .status()
+        .context("fetch latest tags from ruby repository")?;
+    if !status.success() {
+        return Err(anyhow!(
+            "failed to fetch latest tags from ruby repository ({})",
+            status
+        ));
+    }
+
+    let status = Command::new("git")
         .args(vec!["checkout", "-f", version_tag])
         .current_dir(path)
         .status()
