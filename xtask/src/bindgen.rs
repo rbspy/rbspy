@@ -180,15 +180,24 @@ fn prepare_ruby_headers(
     let _ = copy_dir_recursive(ruby_source_path.join("internal"), path.join("internal"));
     let _ = copy_dir_recursive(ruby_source_path.join("ccan"), path.join("ccan"));
 
+    if version >= semver::Version::new(3, 3, 0) {
+        copy_dir_recursive(ruby_source_path.join("prism"), path.join("prism"))?;
+        std::fs::File::create(&path.join("prism_compile.h"))?;
+    }
+
     let config_path = find_file(ruby_source_path.join(".ext"), &PathBuf::from("config.h"))?;
     log::info!("Found config.h at {}", config_path.to_string_lossy());
     std::fs::create_dir(path.join("ruby"))?;
     std::fs::copy(config_path, path.join("ruby").join("config.h"))?;
 
+    let exclude_headers = vec!["prism_compile.h"];
     for entry in std::fs::read_dir(ruby_source_path)? {
         let entry = entry?;
         let ty = entry.file_type()?;
-        if ty.is_file() && entry.file_name().to_string_lossy().ends_with(".h") {
+        if ty.is_file()
+            && entry.file_name().to_string_lossy().ends_with(".h")
+            && !exclude_headers.contains(&entry.file_name().to_str().unwrap())
+        {
             std::fs::copy(entry.path(), path.join(entry.file_name()))?;
         }
     }
@@ -201,6 +210,13 @@ fn prepare_ruby_headers(
         writeln!(
             wrapper,
             "#include \"{}/ractor_core.h\"",
+            path.to_string_lossy()
+        )?;
+    }
+    if version >= semver::Version::new(3, 3, 0) {
+        writeln!(
+            wrapper,
+            "#include \"{}/prism/options.h\"",
             path.to_string_lossy()
         )?;
     }
