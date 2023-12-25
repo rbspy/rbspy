@@ -1453,6 +1453,55 @@ mod tests {
         ]
     }
 
+    fn real_stack_trace_3_3_0() -> Vec<StackFrame> {
+        vec![
+            StackFrame {
+                name: "sleep [c function]".to_string(),
+                relative_path: "(unknown)".to_string(),
+                absolute_path: None,
+                lineno: None,
+            },
+            StackFrame {
+                name: "aaa".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some(
+                    "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
+                lineno: Some(3),
+            },
+            StackFrame {
+                name: "bbb".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some(
+                    "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
+                lineno: Some(7),
+            },
+            StackFrame {
+                name: "ccc".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some(
+                    "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
+                lineno: Some(11),
+            },
+            StackFrame {
+                name: "block in <main>".to_string(),
+                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                absolute_path: Some(
+                    "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                ),
+                lineno: Some(15),
+            },
+            StackFrame {
+                name: "loop".to_string(),
+                relative_path: "<internal:kernel>".to_string(),
+                absolute_path: Some("unknown".to_string()),
+                lineno: Some(192),
+            },
+        ]
+    }
+
     fn real_stack_trace_main() -> Vec<StackFrame> {
         vec![
             StackFrame::unknown_c_function(),
@@ -1986,5 +2035,23 @@ mod tests {
         )
         .unwrap();
         assert_eq!(real_stack_trace_3_2_0(), stack_trace.trace);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn test_get_ruby_stack_trace_3_3_0() {
+        let source = coredump_3_3_0();
+        let vm_addr = 0x7f7ff21f1868;
+        let global_symbols_addr = Some(0x7f7ff21e0c60);
+        let stack_trace = ruby_version::ruby_3_3_0::get_stack_trace::<CoreDump>(
+            0,
+            vm_addr,
+            global_symbols_addr,
+            &source,
+            0,
+        )
+        .unwrap();
+        assert_eq!(real_stack_trace_3_3_0(), stack_trace.trace);
     }
 }

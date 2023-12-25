@@ -1032,9 +1032,9 @@ version = "0.17.1"
 
 [[package]]
 name = "rbspy-testdata"
-version = "0.1.9"
+version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d78443a0db94c52076d1b939af6d1461106b418acd6a3eecc0fca49fba93b060"
+checksum = "32ddc05314a1a5a95bf0a2b2f52436ab1eb05a5911846933da844348dd4fa189"
 dependencies = [
  "anyhow",
  "elf",
