@@ -2,6 +2,13 @@ name: Bump Homebrew Formula
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Git tag"
+        required: true
+      revision:
+        description: "Git revision"
+        required: true
   release:
     types: [published]
 
@@ -16,5 +23,5 @@ jobs:
         with:
           token: ${{ secrets.HOMEBREW_GITHUB_TOKEN }}
           formula: rbspy
-          tag: ${{ github.ref }}
-          revision: ${{ github.sha }}
+          tag: ${{ inputs.tag || github.ref }}
+          revision: ${{ inputs.revision || github.sha }}
