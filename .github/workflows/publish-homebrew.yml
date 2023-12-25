@@ -10,9 +10,9 @@ jobs:
     name: Bump Homebrew formula
     runs-on: macos-12
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Update Homebrew formula
-        uses: dawidd6/action-homebrew-bump-formula@dd221ff435f42fa8102b5871bb1929af9d76476c # 3.8.0
+        uses: dawidd6/action-homebrew-bump-formula@75ed025ff3ad1d617862838b342b06d613a0ddf3 # 3.10.1
         with:
           token: ${{ secrets.HOMEBREW_GITHUB_TOKEN }}
           formula: rbspy
