@@ -406,12 +406,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a26ae43d7bcc3b814de94796a5e736d4029efb0ee900c12e2d54c993ad1a1e07"
 
 [[package]]
-name = "elf"
-version = "0.0.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b9c86cae88373e32c872967c296dcdd3b25771dcc7da1c4ba060b4a68fd8db7"
-
-[[package]]
 name = "env_logger"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1032,13 +1026,13 @@ version = "0.18.0"
 
 [[package]]
 name = "rbspy-testdata"
-version = "0.1.10"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32ddc05314a1a5a95bf0a2b2f52436ab1eb05a5911846933da844348dd4fa189"
+checksum = "32e625679e7fef140cc02e3406e7297623e1d9de5795f9abf1d278b8a182133e"
 dependencies = [
  "anyhow",
- "elf",
  "flate2",
+ "goblin 0.7.1",
  "libc",
  "remoteprocess",
 ]
