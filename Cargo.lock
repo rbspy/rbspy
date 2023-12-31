@@ -485,17 +485,6 @@ checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
 
 [[package]]
 name = "goblin"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d6b4de4a8eb6c46a8c77e1d3be942cb9a8bf073c22374578e5ba4b08ed0ff68"
-dependencies = [
- "log",
- "plain",
- "scroll",
-]
-
-[[package]]
-name = "goblin"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f27c1b4369c2cd341b5de549380158b105a04c331be5db9110eef7b6d2742134"
@@ -995,7 +984,7 @@ dependencies = [
  "directories",
  "env_logger",
  "flate2",
- "goblin 0.7.1",
+ "goblin",
  "inferno",
  "lazy_static",
  "libc",
@@ -1032,7 +1021,7 @@ checksum = "32e625679e7fef140cc02e3406e7297623e1d9de5795f9abf1d278b8a182133e"
 dependencies = [
  "anyhow",
  "flate2",
- "goblin 0.7.1",
+ "goblin",
  "libc",
  "remoteprocess",
 ]
@@ -1105,7 +1094,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8928e7901c7fc6f1f8d697d77a9da0f749f96454714a8d097662531640647409"
 dependencies = [
  "addr2line",
- "goblin 0.7.1",
+ "goblin",
  "lazy_static",
  "libc",
  "libproc",
@@ -1249,16 +1238,16 @@ checksum = "4dccd0940a2dcdf68d092b8cbab7dc0ad8fa938bf95787e1b916b0e3d0e8e970"
 
 [[package]]
 name = "spytools"
-version = "0.1.4"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c04c26ba0b990e198276595f99839a3233a95190d04beb23f9adc9b188dff695"
+checksum = "30006940befa2d61a17bcb05da80d9f9be1a8a93cd9f4864e3d8ec349591495b"
 dependencies = [
  "anyhow",
- "goblin 0.6.1",
+ "goblin",
  "lazy_static",
  "libc",
  "log",
- "memmap2 0.5.10",
+ "memmap2 0.9.3",
  "proc-maps",
  "regex",
  "remoteprocess",
