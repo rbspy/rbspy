@@ -56,7 +56,7 @@ jobs:
             run-tests: 'true'
             target: x86_64-apple-darwin
           - build: windows
-            os: windows-2019
+            os: windows-2022
             ruby-version: 2.7.2
             run-tests: 'true'
             target: x86_64-pc-windows-msvc
