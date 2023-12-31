@@ -1991,7 +1991,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_1_0(), stack_trace.trace);
     }
 
-    #[cfg(not(target_os = "windows"))]
     #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_2_0() {
@@ -2009,7 +2008,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_2_0(), stack_trace.trace);
     }
 
-    #[cfg(not(target_os = "windows"))]
     #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_2_1() {
@@ -2027,7 +2025,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_2_0(), stack_trace.trace);
     }
 
-    #[cfg(not(target_os = "windows"))]
     #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_2_2() {
@@ -2045,7 +2042,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_2_0(), stack_trace.trace);
     }
 
-    #[cfg(not(target_os = "windows"))]
     #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_3_0() {

@@ -57,7 +57,7 @@ jobs:
             target: x86_64-apple-darwin
           - build: windows
             os: windows-2022
-            ruby-version: 2.7.2
+            ruby-version: 3.2.1
             run-tests: 'true'
             target: x86_64-pc-windows-msvc
     steps:
