@@ -643,6 +643,10 @@ macro_rules! get_ruby_string_3_2_0(
             // See RSTRING_NOEMBED and RUBY_FL_USER1
             let is_embedded_string = rstring.basic.flags & 1 << 13 == 0;
             if is_embedded_string {
+                // Workaround for Windows strings until we have OS-specific bindings
+                #[cfg(target_os = "windows")]
+                let addr = addr + 4;
+
                 // The introduction of Variable Width Allocation (VWA) for strings means that
                 // the length of embedded strings varies at runtime. Instead of assuming a
                 // constant length, we need to read the length from the struct.
@@ -675,6 +679,10 @@ macro_rules! get_ruby_string_3_3_0(
             // See RSTRING_NOEMBED and RUBY_FL_USER1
             let is_embedded_string = rstring.basic.flags & 1 << 13 == 0;
             if is_embedded_string {
+                // Workaround for Windows strings until we have OS-specific bindings
+                #[cfg(target_os = "windows")]
+                let addr = addr + 4;
+
                 // The introduction of Variable Width Allocation (VWA) for strings means that
                 // the length of embedded strings varies at runtime. Instead of assuming a
                 // constant length, we need to read the length from the struct.
