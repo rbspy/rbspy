@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 60
     env:
       MAKEFLAGS: -j4
-      RUBY_LATEST_STABLE_VERSION: 3.2.2
+      RUBY_LATEST_STABLE_VERSION: 3.3.0
       RUST_BACKTRACE: 1
     steps:
       - name: Install Rust
