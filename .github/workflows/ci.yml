@@ -141,7 +141,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [i686-musl, armv7-musleabihf, aarch64-musl, x86_64-musl]
+        target:
+          - i686-musl
+          - armv7-musleabihf
+          - aarch64-musl
+          - x86_64-musl
+        include:
+          - target: i686-musl
+            triple: i686-unknown-linux-musl
+          - target: armv7-musleabihf
+            triple: armv7-unknown-linux-musleabihf
+          - target: aarch64-musl
+            triple: aarch64-unknown-linux-musl
+          - target: x86_64-musl
+            triple: x86_64-unknown-linux-musl
     container:
       image: docker://messense/rust-musl-cross:${{ matrix.target }}
       env:
@@ -163,12 +176,12 @@ jobs:
         run: cargo build --release --locked
       - name: Prepare binary for upload
         run: |
-          cp target/*/release/rbspy rbspy-${{ matrix.target }}
+          cp target/*/release/rbspy rbspy-${{ matrix.triple }}
       - name: Upload Binaries
         uses: actions/upload-artifact@v3
         with:
-          name: rbspy-${{ matrix.target }}
-          path: rbspy-${{ matrix.target }}
+          name: rbspy-${{ matrix.triple }}
+          path: rbspy-${{ matrix.triple }}
 
   build-freebsd:
     name: Build
