@@ -77,14 +77,9 @@ jobs:
         run: |
           sudo apt update -qq && sudo apt install -qq -y gcc-aarch64-linux-gnu
       - name: Cargo Cache
-        uses: actions/cache@v3.0.4
+        uses: Swatinem/rust-cache@v2.7.0
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-${{ matrix.target }}-cargo-20221101-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.target }}-cargo-20221101
+          prefix-key: "20230109"
       - name: Show command used for Cargo
         run: |
           echo "cargo command is: ${{ env.CARGO }}"
@@ -163,15 +158,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Cargo Cache
-        uses: actions/cache@v3.0.4
+        uses: Swatinem/rust-cache@v2.7.0
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-${{ matrix.target }}-cargo0-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.target }}-cargo0-
+          prefix-key: "20230109"
       - name: Build
         run: cargo build --release --locked
       - name: Prepare binary for upload
