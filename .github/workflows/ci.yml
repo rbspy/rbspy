@@ -10,6 +10,10 @@ on:
   schedule:
     - cron: '0 0 * * 0'
   workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
   format:
     name: Check code formatting

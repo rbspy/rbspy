@@ -1,7 +1,12 @@
 # Convenience workflow for running the test suite against every supported ruby version
 name: ruby-version-tests
+
 on:
   workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
   build-ruby-version-tests:
     name: Build and upload test binaries

@@ -14,6 +14,10 @@ on:
       bisect_bad:
         description: 'Broken Ruby commit to start bisecting from'
         required: false
+
+permissions:
+  contents: read
+
 jobs:
   ruby-latest:
     name: Test rbspy with upstream Ruby's main branch

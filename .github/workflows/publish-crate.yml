@@ -5,12 +5,15 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: read
+
 jobs:
   publish-ruby-structs:
     name: Publish rbspy-ruby-structs crate
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@984d158d699777abbaa79de23de3134e60c187fa # stable branch
       - name: publish ruby-structs crate
@@ -24,7 +27,7 @@ jobs:
     needs: [publish-ruby-structs]
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@984d158d699777abbaa79de23de3134e60c187fa # stable branch
       - name: publish rbspy crate
         run: |

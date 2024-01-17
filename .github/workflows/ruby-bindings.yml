@@ -1,6 +1,10 @@
 name: ruby-bindings
 on:
   workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
   xtask:
     name: Build xtask
@@ -25,6 +29,7 @@ jobs:
         with:
           name: xtask
           path: target/release/xtask
+
   generate:
     name: Generate Ruby bindings
     runs-on: ${{ matrix.os }}
