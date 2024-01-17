@@ -1,5 +1,6 @@
-// TODO: there are a bunch of warnings in here, maybe address them later
-#![allow(warnings)]
+#![allow(deref_nullptr)]
+#![allow(non_camel_case_types)]
+#![allow(non_upper_case_globals)]
 pub mod ruby_1_9_1_0;
 pub mod ruby_1_9_2_0;
 pub mod ruby_1_9_3_0;
