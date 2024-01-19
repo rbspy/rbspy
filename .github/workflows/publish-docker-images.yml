@@ -27,8 +27,6 @@ jobs:
           echo "release_version=$release_version" >> $GITHUB_ENV
       - name: Checkout repository
         uses: actions/checkout@v3
-        with:
-          ref: ${{ env.release_tag }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3.0.0
       - name: Set up Docker Buildx
@@ -77,8 +75,6 @@ jobs:
           echo "release_version=$release_version" >> $GITHUB_ENV
       - name: Checkout repository
         uses: actions/checkout@v3
-        with:
-          ref: ${{ env.release_tag }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3.0.0
       - name: Set up Docker Buildx
