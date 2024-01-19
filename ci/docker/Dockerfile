@@ -16,8 +16,8 @@ RUN case $TARGETPLATFORM in \
     ;; \
   esac && \
   wget -q -O - https://github.com/rbspy/rbspy/releases/download/v$VERSION/rbspy-$arch-unknown-linux-musl.tar.gz | tar -xzf - && \
-  install -m755 rbspy-$arch-musl /usr/bin/rbspy && \
-  rm -f rbspy-$arch-musl
+  install -m755 rbspy-$arch-unknown-linux-musl /usr/bin/rbspy && \
+  rm -f rbspy-$arch-unknown-linux-musl
 
 RUN rbspy --version
 
