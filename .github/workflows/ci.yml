@@ -184,20 +184,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Checkout rbspy
-        uses: actions/checkout@v4
-        with:
-          repository: rbspy/rbspy
-          path: rbspy
-          ref: main
-
       - name: Install Rust
         uses: dtolnay/rust-toolchain@984d158d699777abbaa79de23de3134e60c187fa # stable branch
 
       - uses: Swatinem/rust-cache@v2.7.0
-        with:
-          workspaces: |
-            rbspy -> target
 
       - name: Cross-compile rbspy
         run: |
@@ -205,7 +195,6 @@ jobs:
           chmod +x cross
           mv cross /usr/local/bin/cross
 
-          cd rbspy
           cross build --release --target x86_64-unknown-freebsd
           cp target/x86_64-unknown-freebsd/release/rbspy rbspy
           rm -rf target/x86_64-unknown-freebsd/release/deps/rbspy-*
@@ -222,17 +211,16 @@ jobs:
             include_path="$(mktemp)"
             cat <<EOF > $include_path
             rbspy
-            rbspy/rbspy
-            rbspy/target
-            rbspy/target/x86_64-unknown-freebsd
-            rbspy/target/x86_64-unknown-freebsd/release
-            rbspy/target/x86_64-unknown-freebsd/release/rbspy
-            rbspy/target/x86_64-unknown-freebsd/release/deps
-            rbspy/target/x86_64-unknown-freebsd/release/deps/rbspy-*
-            rbspy/ci
-            rbspy/ci/ruby-programs
-            rbspy/ci/ruby-programs/infinite.rb
-            rbspy/ci/ruby-programs/ruby_forks.rb
+            target
+            target/x86_64-unknown-freebsd
+            target/x86_64-unknown-freebsd/release
+            target/x86_64-unknown-freebsd/release/rbspy
+            target/x86_64-unknown-freebsd/release/deps
+            target/x86_64-unknown-freebsd/release/deps/rbspy-*
+            ci
+            ci/ruby-programs
+            ci/ruby-programs/infinite.rb
+            ci/ruby-programs/ruby_forks.rb
             .cargo
             .cargo/registry
             .cargo/registry/src
@@ -255,7 +243,6 @@ jobs:
 
             pkg install -y ruby
 
-            cd rbspy
             ./rbspy --version
 
             skip_tests="--skip core::ruby_spy::tests --skip sampler::tests"
@@ -273,7 +260,7 @@ jobs:
 
       - name: Prepare binary for upload
         run: |
-          mv rbspy/rbspy rbspy-x86_64-unknown-freebsd
+          mv rbspy rbspy-x86_64-unknown-freebsd
       - name: Upload Binaries
         uses: actions/upload-artifact@v3
         with:
