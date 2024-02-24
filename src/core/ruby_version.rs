@@ -317,10 +317,38 @@ macro_rules! get_execution_context_from_vm(
             ruby_vm_address_ptr: usize,
             source: &T
         ) -> Result<usize> {
-            let vm_addr: usize = source.copy_struct(ruby_vm_address_ptr).context("couldn't read Ruby VM pointer")?;
-            let vm: rb_vm_struct = source.copy_struct(vm_addr as usize).context("couldn't read Ruby VM struct")?;
-            let main_thread: rb_thread_t = source.copy_struct(vm.ractor.main_thread as usize).context("couldn't read main thread struct")?;
-            return Ok(main_thread.ec as usize);
+            // This is a roundabout way to get the execution context address, but it helps us
+            // avoid platform-specific structures in memory (e.g. pthread types) that would
+            // require us to maintain separate ruby-structs bindings for each platform due to
+            // their varying sizes and alignments.
+            let vm_addr: usize = source.copy_struct(ruby_vm_address_ptr)
+                .context("couldn't read Ruby VM pointer")?;
+            let vm: rb_vm_struct = source.copy_struct(vm_addr as usize)
+                .context("couldn't read Ruby VM struct")?;
+
+            // Seek forward in the ractor struct, looking for the main thread's address. There
+            // may be other copies of the main thread address in the ractor struct, so it's
+            // important to jump as close as possible to the main_thread struct field before we
+            // search, which is the purpose of the initial offset. The execution context pointer
+            // is in the memory word just before main_thread (see rb_ractor_struct).
+            const ADDRESSES_TO_CHECK: usize = 64;
+            let initial_offset = 520; // Found through experiment
+            let main_ractor_address = vm.ractor.main_ractor as usize;
+            let candidate_addresses: [usize; ADDRESSES_TO_CHECK] =
+                source.copy_struct(main_ractor_address + initial_offset)
+                    .context("couldn't read main ractor struct")?;
+
+            candidate_addresses
+            .iter()
+            .enumerate()
+            .filter(|(_, &addr)| addr == vm.ractor.main_thread as usize)
+            .map(|(idx, _)| candidate_addresses[idx - 1])
+            .filter(|&addr| addr != 0)
+            .filter(|&addr| source.copy_struct::<rb_execution_context_struct>(addr as usize).is_ok())
+            .collect::<Vec<usize>>()
+            .first()
+            .map(|&addr| addr as usize)
+            .ok_or_else(|| format_err!("couldn't find execution context"))
         }
     )
 );
