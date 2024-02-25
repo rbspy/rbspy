@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Cargo Cache
-        uses: Swatinem/rust-cache@v2.7.0
+        uses: Swatinem/rust-cache@v2.7.3
         with:
           prefix-key: "20230109"
       
