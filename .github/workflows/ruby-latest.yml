@@ -31,14 +31,14 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@984d158d699777abbaa79de23de3134e60c187fa # stable branch
       - name: Check out latest Ruby source
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: ruby
           repository: ruby/ruby
           ref: ${{ inputs.ruby_commit }}
           fetch-depth: 0
       - name: Check out rbspy source
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: rbspy
       - name: Cargo Cache
