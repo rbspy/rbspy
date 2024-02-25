@@ -83,6 +83,8 @@ jobs:
       - name: Cargo Cache
         uses: Swatinem/rust-cache@v2.7.0
         with:
+          cache-on-failure: "true"
+          key: "${{ matrix.os }}-${{ matrix.target }}"
           prefix-key: "20230109"
       - name: Show command used for Cargo
         run: |
