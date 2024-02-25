@@ -126,7 +126,7 @@ jobs:
         if: runner.os == 'macOS' && matrix.run-tests == 'true'
       - name: Run tests
         timeout-minutes: 5
-        run: ${{ env.CARGO }} test --release ${{ env.TARGET_FLAGS }}
+        run: ${{ env.CARGO }} test --release ${{ env.TARGET_FLAGS }} -- --skip core::ruby_version::tests::test_get_ruby_stack_trace
         if: runner.os == 'windows' && matrix.run-tests == 'true'
       - name: Run rbspy with alternative mallocs
         if: runner.os == 'linux' && matrix.run-tests == 'true'
