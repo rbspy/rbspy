@@ -37,7 +37,7 @@ jobs:
           echo "Test binary path is $test_binary_path"
           cp $test_binary_path rbspy-test
       - name: Upload binaries
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: rbspy-test
           path: rbspy-test
@@ -70,7 +70,7 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby_version }}
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
       - name: Run tests
         timeout-minutes: 5
         run: |

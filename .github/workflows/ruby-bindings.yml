@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Cargo Cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -25,7 +25,7 @@ jobs:
       - name: Build xtask
         run: cargo xtask
       - name: Upload xtask binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: xtask
           path: target/release/xtask
@@ -71,7 +71,7 @@ jobs:
         run: |
           rustup target add ${{ matrix.target }}
       - name: Download xtask binary
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: xtask
       - name: Generate bindings for ruby ${{ matrix.ruby-version }}
@@ -87,7 +87,7 @@ jobs:
           git add ruby-structs/src
           cp $(git diff --name-only --staged | xargs) ../bindings-staging || echo "No new or modified files - bindings are up to date"
       - name: Upload Bindings
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           if-no-files-found: ignore
           name: bindings-${{ matrix.ruby-version }}
@@ -103,7 +103,7 @@ jobs:
         with:
             path: "rbspy"
             fetch-depth: 0
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
       - name: Copy bindings into place
         run: |
           cp bindings-*/ruby*.rs rbspy/ruby-structs/src/
