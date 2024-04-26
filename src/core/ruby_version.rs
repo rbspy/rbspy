@@ -1283,16 +1283,20 @@ ruby_version_v3_0_x!(ruby_3_0_3);
 ruby_version_v3_0_x!(ruby_3_0_4);
 ruby_version_v3_0_x!(ruby_3_0_5);
 ruby_version_v3_0_x!(ruby_3_0_6);
+ruby_version_v3_0_x!(ruby_3_0_7);
 ruby_version_v3_1_x!(ruby_3_1_0);
 ruby_version_v3_1_x!(ruby_3_1_1);
 ruby_version_v3_1_x!(ruby_3_1_2);
 ruby_version_v3_1_x!(ruby_3_1_3);
 ruby_version_v3_1_x!(ruby_3_1_4);
+ruby_version_v3_1_x!(ruby_3_1_5);
 ruby_version_v3_2_x!(ruby_3_2_0);
 ruby_version_v3_2_x!(ruby_3_2_1);
 ruby_version_v3_2_x!(ruby_3_2_2);
 ruby_version_v3_2_x!(ruby_3_2_3);
+ruby_version_v3_2_x!(ruby_3_2_4);
 ruby_version_v3_3_x!(ruby_3_3_0);
+ruby_version_v3_3_x!(ruby_3_3_1);
 
 #[cfg(not(debug_assertions))]
 #[cfg(test)]
