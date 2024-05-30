@@ -108,6 +108,7 @@ pub(crate) enum StorageError {
 /// to the current internal form.
 pub(crate) trait Storage: Into<v2::Data> {
     fn from_reader<R: Read>(r: R) -> Result<Self>;
+    #[allow(dead_code)]
     fn version() -> Version;
 }
 
