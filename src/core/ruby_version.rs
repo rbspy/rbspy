@@ -2091,7 +2091,7 @@ mod tests {
         let source = coredump_3_2_0();
         let vm_addr = 0xffffb8034578;
         let global_symbols_addr = Some(0xffffb8025340);
-        let stack_trace = ruby_version::ruby_3_2_2::get_stack_trace::<CoreDump>(
+        let stack_trace = ruby_version::ruby_3_2_3::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
             global_symbols_addr,
