@@ -42,6 +42,10 @@ pub mod tests {
 
     impl RubyScript {
         pub fn new(ruby_script_path: &str) -> Self {
+            Self::new_with_args(ruby_script_path, &[])
+        }
+
+        pub fn new_with_args(ruby_script_path: &str, args: &[String]) -> Self {
             let which = if cfg!(target_os = "windows") {
                 "C:\\Windows\\System32\\WHERE.exe"
             } else {
@@ -62,6 +66,7 @@ pub mod tests {
 
             let child = Command::new(ruby_binary_path_str)
                 .arg(ruby_script_path)
+                .args(args)
                 .stdin(std::process::Stdio::piped())
                 .spawn()
                 .unwrap();

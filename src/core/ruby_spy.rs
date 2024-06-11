@@ -265,8 +265,25 @@ mod tests {
             return;
         }
 
-        let cmd = RubyScript::new("./ci/ruby-programs/infinite_off_cpu.rb");
+        let coordination_dir = tempfile::tempdir().unwrap();
+        let coordination_dir_name = coordination_dir.path().to_str().unwrap();
+        let coordination_file_path = format!("{}/ready", coordination_dir_name);
+        let cp = std::path::Path::new(&coordination_file_path);
+        assert!(!cp.exists());
+
+        let cmd = RubyScript::new_with_args(
+            "./ci/ruby-programs/infinite_off_cpu.rb",
+            &[coordination_file_path.clone()],
+        );
         let pid = cmd.id() as Pid;
+
+        loop {
+            if cp.exists() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+
         let mut spy = RubySpy::retry_new(pid, 100, None, true).expect("couldn't initialize spy");
         let trace = spy
             .get_stack_trace(false)
