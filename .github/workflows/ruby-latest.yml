@@ -29,7 +29,7 @@ jobs:
       RUST_BACKTRACE: 1
     steps:
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@984d158d699777abbaa79de23de3134e60c187fa # stable branch
+        uses: dtolnay/rust-toolchain@d388a4836fcdbde0e50e395dc79a2670ccdef13f # stable branch
       - name: Check out latest Ruby source
         uses: actions/checkout@v4
         with:

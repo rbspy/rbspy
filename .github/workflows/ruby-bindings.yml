@@ -21,7 +21,7 @@ jobs:
             target
           key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@984d158d699777abbaa79de23de3134e60c187fa # stable branch
+        uses: dtolnay/rust-toolchain@d388a4836fcdbde0e50e395dc79a2670ccdef13f # stable branch
       - name: Build xtask
         run: cargo xtask
       - name: Upload xtask binary
@@ -66,7 +66,7 @@ jobs:
         with:
             path: "rbspy"
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@984d158d699777abbaa79de23de3134e60c187fa # stable branch
+        uses: dtolnay/rust-toolchain@d388a4836fcdbde0e50e395dc79a2670ccdef13f # stable branch
       - name: Install Rust toolchain target
         run: |
           rustup target add ${{ matrix.target }}
