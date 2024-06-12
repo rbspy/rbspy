@@ -604,6 +604,12 @@ pub fn get(v: &str) -> Result<RubyVersion> {
             get_stack_trace_fn: super::ruby_version::ruby_3_3_2::get_stack_trace,
             is_maybe_thread_fn: super::ruby_version::ruby_3_3_2::is_maybe_thread,
         }),
+        "3.3.3" => Ok(RubyVersion {
+            semver_version: Version::new(3, 3, 3),
+            get_execution_context_fn: super::ruby_version::ruby_3_3_3::get_execution_context,
+            get_stack_trace_fn: super::ruby_version::ruby_3_3_3::get_stack_trace,
+            is_maybe_thread_fn: super::ruby_version::ruby_3_3_3::is_maybe_thread,
+        }),
         _ => Err(format_err!("rbspy doesn't support Ruby {} yet. If this is a new patch-level version of Ruby, you can try using `--force-version` with the previous version number.", v)),
     }
 }
