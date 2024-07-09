@@ -34,7 +34,7 @@ libc = "0.2.34"
 log = "0.4.6"
 memmap2 = "0.9.3"
 proc-maps = "0.3.0"
-prost = "0.12.1"
+prost = "0.13.0"
 rand = "0.8.3"
 rbspy-ruby-structs = { path = "ruby-structs", version="0.22.0" }
 remoteprocess = "0.4.5"
