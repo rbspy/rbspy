@@ -522,18 +522,7 @@ checksum = "f27c1b4369c2cd341b5de549380158b105a04c331be5db9110eef7b6d2742134"
 dependencies = [
  "log",
  "plain",
- "scroll 0.11.0",
-]
-
-[[package]]
-name = "goblin"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b363a30c165f666402fe6a3024d3bec7ebc898f96a4a23bd1c99f8dbf3f4f47"
-dependencies = [
- "log",
- "plain",
- "scroll 0.12.0",
+ "scroll",
 ]
 
 [[package]]
@@ -1044,7 +1033,6 @@ dependencies = [
  "directories",
  "env_logger",
  "flate2",
- "goblin 0.8.2",
  "inferno",
  "lazy_static",
  "libc",
@@ -1081,7 +1069,7 @@ checksum = "ade73dca20d2926fe621350ee237a434a500db5d330b75524708efee21ad7670"
 dependencies = [
  "anyhow",
  "flate2",
- "goblin 0.7.1",
+ "goblin",
  "libc",
  "remoteprocess",
 ]
@@ -1154,7 +1142,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8928e7901c7fc6f1f8d697d77a9da0f749f96454714a8d097662531640647409"
 dependencies = [
  "addr2line",
- "goblin 0.7.1",
+ "goblin",
  "lazy_static",
  "libc",
  "libproc",
@@ -1233,16 +1221,7 @@ version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04c565b551bafbef4157586fa379538366e4385d42082f255bfd96e4fe8519da"
 dependencies = [
- "scroll_derive 0.11.1",
-]
-
-[[package]]
-name = "scroll"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ab8598aa408498679922eff7fa985c25d58a90771bd6be794434c5277eab1a6"
-dependencies = [
- "scroll_derive 0.12.0",
+ "scroll_derive",
 ]
 
 [[package]]
@@ -1250,17 +1229,6 @@ name = "scroll_derive"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1db149f81d46d2deba7cd3c50772474707729550221e69588478ebf9ada425ae"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "scroll_derive"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f81c2fde025af7e69b1d1420531c8a8811ca898919db177141a85313b1cb932"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1324,7 +1292,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "30006940befa2d61a17bcb05da80d9f9be1a8a93cd9f4864e3d8ec349591495b"
 dependencies = [
  "anyhow",
- "goblin 0.7.1",
+ "goblin",
  "lazy_static",
  "libc",
  "log",
