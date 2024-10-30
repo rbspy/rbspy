@@ -931,7 +931,6 @@ dependencies = [
  "directories",
  "env_logger",
  "flate2",
- "goblin",
  "inferno",
  "lazy_static",
  "libc",
