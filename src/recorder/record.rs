@@ -150,8 +150,8 @@ impl Recorder {
 
     /// Writes a summary of collected traces
     pub fn write_summary(&self, w: &mut dyn std::io::Write) -> Result<(), Error> {
-        let width = match term_size::dimensions() {
-            Some((w, _)) => Some(w as usize),
+        let width = match terminal_size::terminal_size() {
+            Some((w, _)) => Some(w.0 as usize),
             None => None,
         };
         let timing_error_traces = self.sampler.timing_error_traces();
