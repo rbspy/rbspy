@@ -1,5 +1,6 @@
 #![allow(deref_nullptr)]
 #![allow(non_camel_case_types)]
+#![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 pub mod ruby_1_9_1_0;
 pub mod ruby_1_9_2_0;
@@ -106,3 +107,5 @@ pub mod ruby_3_3_3;
 pub mod ruby_3_3_4;
 pub mod ruby_3_3_5;
 pub mod ruby_3_3_6;
+pub mod ruby_3_4_0;
+pub mod ruby_3_4_1;

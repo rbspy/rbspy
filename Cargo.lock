@@ -143,7 +143,27 @@ dependencies = [
  "proc-macro2",
  "quote",
  "regex",
- "rustc-hash",
+ "rustc-hash 1.1.0",
+ "shlex",
+ "syn",
+]
+
+[[package]]
+name = "bindgen"
+version = "0.71.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f58bf3d7db68cfbac37cfc485a8d711e87e064c3d0fe0435b92f7a407f9d6b3"
+dependencies = [
+ "bitflags 2.6.0",
+ "cexpr",
+ "clang-sys",
+ "itertools",
+ "log",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "rustc-hash 2.1.0",
  "shlex",
  "syn",
 ]
@@ -621,7 +641,7 @@ version = "0.14.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e78a09b56be5adbcad5aa1197371688dc6bb249a26da3bca2011ee2fb987ebfb"
 dependencies = [
- "bindgen",
+ "bindgen 0.70.1",
  "errno",
  "libc",
 ]
@@ -841,7 +861,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3db44c5aa60e193a25fcd93bb9ed27423827e8f118897866f946e2cf936c44fb"
 dependencies = [
  "anyhow",
- "bindgen",
+ "bindgen 0.70.1",
  "libc",
  "libproc",
  "mach2",
@@ -1077,6 +1097,12 @@ name = "rustc-hash"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
+
+[[package]]
+name = "rustc-hash"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7fb8039b3032c191086b10f11f319a6e99e1e82889c5cc6046f515c9db1d497"
 
 [[package]]
 name = "rustix"
@@ -1556,7 +1582,7 @@ name = "xtask"
 version = "0.27.0"
 dependencies = [
  "anyhow",
- "bindgen",
+ "bindgen 0.71.1",
  "log",
  "semver",
  "tempfile",

@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.40"
-bindgen = "0.70.1"
+bindgen = "0.71.1"
 log = "0.4.6"
 semver = "1.0.10"
 tempfile = "3.4.0"
