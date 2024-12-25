@@ -333,183 +333,192 @@ pub const ruby_method_ids_idOROP: ruby_method_ids = 149;
 pub const ruby_method_ids_idANDDOT: ruby_method_ids = 150;
 pub const ruby_method_ids_tPRESERVED_ID_BEGIN: ruby_method_ids = 150;
 pub const ruby_method_ids_idNilP: ruby_method_ids = 151;
-pub const ruby_method_ids_idNULL: ruby_method_ids = 152;
-pub const ruby_method_ids_idEmptyP: ruby_method_ids = 153;
-pub const ruby_method_ids_idEqlP: ruby_method_ids = 154;
-pub const ruby_method_ids_idRespond_to: ruby_method_ids = 155;
-pub const ruby_method_ids_idRespond_to_missing: ruby_method_ids = 156;
-pub const ruby_method_ids_idIFUNC: ruby_method_ids = 157;
-pub const ruby_method_ids_idCFUNC: ruby_method_ids = 158;
-pub const ruby_method_ids_id_core_set_method_alias: ruby_method_ids = 159;
-pub const ruby_method_ids_id_core_set_variable_alias: ruby_method_ids = 160;
-pub const ruby_method_ids_id_core_undef_method: ruby_method_ids = 161;
-pub const ruby_method_ids_id_core_define_method: ruby_method_ids = 162;
-pub const ruby_method_ids_id_core_define_singleton_method: ruby_method_ids = 163;
-pub const ruby_method_ids_id_core_set_postexe: ruby_method_ids = 164;
-pub const ruby_method_ids_id_core_hash_merge_ptr: ruby_method_ids = 165;
-pub const ruby_method_ids_id_core_hash_merge_kwd: ruby_method_ids = 166;
-pub const ruby_method_ids_id_core_raise: ruby_method_ids = 167;
-pub const ruby_method_ids_id_core_sprintf: ruby_method_ids = 168;
-pub const ruby_method_ids_id_debug_created_info: ruby_method_ids = 169;
-pub const ruby_method_ids_tPRESERVED_ID_END: ruby_method_ids = 170;
-pub const ruby_method_ids_tTOKEN_LOCAL_BEGIN: ruby_method_ids = 169;
-pub const ruby_method_ids_tMax: ruby_method_ids = 170;
-pub const ruby_method_ids_tMin: ruby_method_ids = 171;
-pub const ruby_method_ids_tHash: ruby_method_ids = 172;
-pub const ruby_method_ids_tFreeze: ruby_method_ids = 173;
-pub const ruby_method_ids_tInspect: ruby_method_ids = 174;
-pub const ruby_method_ids_tIntern: ruby_method_ids = 175;
-pub const ruby_method_ids_tObject_id: ruby_method_ids = 176;
-pub const ruby_method_ids_tConst_added: ruby_method_ids = 177;
-pub const ruby_method_ids_tConst_missing: ruby_method_ids = 178;
-pub const ruby_method_ids_tMethodMissing: ruby_method_ids = 179;
-pub const ruby_method_ids_tMethod_added: ruby_method_ids = 180;
-pub const ruby_method_ids_tSingleton_method_added: ruby_method_ids = 181;
-pub const ruby_method_ids_tMethod_removed: ruby_method_ids = 182;
-pub const ruby_method_ids_tSingleton_method_removed: ruby_method_ids = 183;
-pub const ruby_method_ids_tMethod_undefined: ruby_method_ids = 184;
-pub const ruby_method_ids_tSingleton_method_undefined: ruby_method_ids = 185;
-pub const ruby_method_ids_tLength: ruby_method_ids = 186;
-pub const ruby_method_ids_tSize: ruby_method_ids = 187;
-pub const ruby_method_ids_tGets: ruby_method_ids = 188;
-pub const ruby_method_ids_tSucc: ruby_method_ids = 189;
-pub const ruby_method_ids_tEach: ruby_method_ids = 190;
-pub const ruby_method_ids_tProc: ruby_method_ids = 191;
-pub const ruby_method_ids_tLambda: ruby_method_ids = 192;
-pub const ruby_method_ids_tSend: ruby_method_ids = 193;
-pub const ruby_method_ids_t__send__: ruby_method_ids = 194;
-pub const ruby_method_ids_t__recursive_key__: ruby_method_ids = 195;
-pub const ruby_method_ids_tInitialize: ruby_method_ids = 196;
-pub const ruby_method_ids_tInitialize_copy: ruby_method_ids = 197;
-pub const ruby_method_ids_tInitialize_clone: ruby_method_ids = 198;
-pub const ruby_method_ids_tInitialize_dup: ruby_method_ids = 199;
-pub const ruby_method_ids_tTo_int: ruby_method_ids = 200;
-pub const ruby_method_ids_tTo_ary: ruby_method_ids = 201;
-pub const ruby_method_ids_tTo_str: ruby_method_ids = 202;
-pub const ruby_method_ids_tTo_sym: ruby_method_ids = 203;
-pub const ruby_method_ids_tTo_hash: ruby_method_ids = 204;
-pub const ruby_method_ids_tTo_proc: ruby_method_ids = 205;
-pub const ruby_method_ids_tTo_io: ruby_method_ids = 206;
-pub const ruby_method_ids_tTo_a: ruby_method_ids = 207;
-pub const ruby_method_ids_tTo_s: ruby_method_ids = 208;
-pub const ruby_method_ids_tTo_i: ruby_method_ids = 209;
-pub const ruby_method_ids_tTo_f: ruby_method_ids = 210;
-pub const ruby_method_ids_tTo_r: ruby_method_ids = 211;
-pub const ruby_method_ids_tBt: ruby_method_ids = 212;
-pub const ruby_method_ids_tBt_locations: ruby_method_ids = 213;
-pub const ruby_method_ids_tCall: ruby_method_ids = 214;
-pub const ruby_method_ids_tMesg: ruby_method_ids = 215;
-pub const ruby_method_ids_tException: ruby_method_ids = 216;
-pub const ruby_method_ids_tLocals: ruby_method_ids = 217;
-pub const ruby_method_ids_tNOT: ruby_method_ids = 218;
-pub const ruby_method_ids_tAND: ruby_method_ids = 219;
-pub const ruby_method_ids_tOR: ruby_method_ids = 220;
-pub const ruby_method_ids_tDiv: ruby_method_ids = 221;
-pub const ruby_method_ids_tDivmod: ruby_method_ids = 222;
-pub const ruby_method_ids_tFdiv: ruby_method_ids = 223;
-pub const ruby_method_ids_tQuo: ruby_method_ids = 224;
-pub const ruby_method_ids_tName: ruby_method_ids = 225;
-pub const ruby_method_ids_tNil: ruby_method_ids = 226;
-pub const ruby_method_ids_tPath: ruby_method_ids = 227;
-pub const ruby_method_ids_tUScore: ruby_method_ids = 228;
-pub const ruby_method_ids_tNUMPARAM_1: ruby_method_ids = 229;
-pub const ruby_method_ids_tNUMPARAM_2: ruby_method_ids = 230;
-pub const ruby_method_ids_tNUMPARAM_3: ruby_method_ids = 231;
-pub const ruby_method_ids_tNUMPARAM_4: ruby_method_ids = 232;
-pub const ruby_method_ids_tNUMPARAM_5: ruby_method_ids = 233;
-pub const ruby_method_ids_tNUMPARAM_6: ruby_method_ids = 234;
-pub const ruby_method_ids_tNUMPARAM_7: ruby_method_ids = 235;
-pub const ruby_method_ids_tNUMPARAM_8: ruby_method_ids = 236;
-pub const ruby_method_ids_tNUMPARAM_9: ruby_method_ids = 237;
-pub const ruby_method_ids_tDefault: ruby_method_ids = 238;
-pub const ruby_method_ids_tTOKEN_LOCAL_END: ruby_method_ids = 239;
-pub const ruby_method_ids_tTOKEN_INSTANCE_BEGIN: ruby_method_ids = 238;
-pub const ruby_method_ids_tTOKEN_INSTANCE_END: ruby_method_ids = 239;
-pub const ruby_method_ids_tTOKEN_GLOBAL_BEGIN: ruby_method_ids = 238;
-pub const ruby_method_ids_tLASTLINE: ruby_method_ids = 239;
-pub const ruby_method_ids_tBACKREF: ruby_method_ids = 240;
-pub const ruby_method_ids_tERROR_INFO: ruby_method_ids = 241;
-pub const ruby_method_ids_tTOKEN_GLOBAL_END: ruby_method_ids = 242;
-pub const ruby_method_ids_tTOKEN_CONST_BEGIN: ruby_method_ids = 241;
-pub const ruby_method_ids_tTOKEN_CONST_END: ruby_method_ids = 242;
-pub const ruby_method_ids_tTOKEN_CLASS_BEGIN: ruby_method_ids = 241;
-pub const ruby_method_ids_tTOKEN_CLASS_END: ruby_method_ids = 242;
-pub const ruby_method_ids_tTOKEN_ATTRSET_BEGIN: ruby_method_ids = 241;
-pub const ruby_method_ids_tTOKEN_ATTRSET_END: ruby_method_ids = 242;
-pub const ruby_method_ids_tNEXT_ID: ruby_method_ids = 242;
-pub const ruby_method_ids_idMax: ruby_method_ids = 2721;
-pub const ruby_method_ids_idMin: ruby_method_ids = 2737;
-pub const ruby_method_ids_idHash: ruby_method_ids = 2753;
-pub const ruby_method_ids_idFreeze: ruby_method_ids = 2769;
-pub const ruby_method_ids_idInspect: ruby_method_ids = 2785;
-pub const ruby_method_ids_idIntern: ruby_method_ids = 2801;
-pub const ruby_method_ids_idObject_id: ruby_method_ids = 2817;
-pub const ruby_method_ids_idConst_added: ruby_method_ids = 2833;
-pub const ruby_method_ids_idConst_missing: ruby_method_ids = 2849;
-pub const ruby_method_ids_idMethodMissing: ruby_method_ids = 2865;
-pub const ruby_method_ids_idMethod_added: ruby_method_ids = 2881;
-pub const ruby_method_ids_idSingleton_method_added: ruby_method_ids = 2897;
-pub const ruby_method_ids_idMethod_removed: ruby_method_ids = 2913;
-pub const ruby_method_ids_idSingleton_method_removed: ruby_method_ids = 2929;
-pub const ruby_method_ids_idMethod_undefined: ruby_method_ids = 2945;
-pub const ruby_method_ids_idSingleton_method_undefined: ruby_method_ids = 2961;
-pub const ruby_method_ids_idLength: ruby_method_ids = 2977;
-pub const ruby_method_ids_idSize: ruby_method_ids = 2993;
-pub const ruby_method_ids_idGets: ruby_method_ids = 3009;
-pub const ruby_method_ids_idSucc: ruby_method_ids = 3025;
-pub const ruby_method_ids_idEach: ruby_method_ids = 3041;
-pub const ruby_method_ids_idProc: ruby_method_ids = 3057;
-pub const ruby_method_ids_idLambda: ruby_method_ids = 3073;
-pub const ruby_method_ids_idSend: ruby_method_ids = 3089;
-pub const ruby_method_ids_id__send__: ruby_method_ids = 3105;
-pub const ruby_method_ids_id__recursive_key__: ruby_method_ids = 3121;
-pub const ruby_method_ids_idInitialize: ruby_method_ids = 3137;
-pub const ruby_method_ids_idInitialize_copy: ruby_method_ids = 3153;
-pub const ruby_method_ids_idInitialize_clone: ruby_method_ids = 3169;
-pub const ruby_method_ids_idInitialize_dup: ruby_method_ids = 3185;
-pub const ruby_method_ids_idTo_int: ruby_method_ids = 3201;
-pub const ruby_method_ids_idTo_ary: ruby_method_ids = 3217;
-pub const ruby_method_ids_idTo_str: ruby_method_ids = 3233;
-pub const ruby_method_ids_idTo_sym: ruby_method_ids = 3249;
-pub const ruby_method_ids_idTo_hash: ruby_method_ids = 3265;
-pub const ruby_method_ids_idTo_proc: ruby_method_ids = 3281;
-pub const ruby_method_ids_idTo_io: ruby_method_ids = 3297;
-pub const ruby_method_ids_idTo_a: ruby_method_ids = 3313;
-pub const ruby_method_ids_idTo_s: ruby_method_ids = 3329;
-pub const ruby_method_ids_idTo_i: ruby_method_ids = 3345;
-pub const ruby_method_ids_idTo_f: ruby_method_ids = 3361;
-pub const ruby_method_ids_idTo_r: ruby_method_ids = 3377;
-pub const ruby_method_ids_idBt: ruby_method_ids = 3393;
-pub const ruby_method_ids_idBt_locations: ruby_method_ids = 3409;
-pub const ruby_method_ids_idCall: ruby_method_ids = 3425;
-pub const ruby_method_ids_idMesg: ruby_method_ids = 3441;
-pub const ruby_method_ids_idException: ruby_method_ids = 3457;
-pub const ruby_method_ids_idLocals: ruby_method_ids = 3473;
-pub const ruby_method_ids_idNOT: ruby_method_ids = 3489;
-pub const ruby_method_ids_idAND: ruby_method_ids = 3505;
-pub const ruby_method_ids_idOR: ruby_method_ids = 3521;
-pub const ruby_method_ids_idDiv: ruby_method_ids = 3537;
-pub const ruby_method_ids_idDivmod: ruby_method_ids = 3553;
-pub const ruby_method_ids_idFdiv: ruby_method_ids = 3569;
-pub const ruby_method_ids_idQuo: ruby_method_ids = 3585;
-pub const ruby_method_ids_idName: ruby_method_ids = 3601;
-pub const ruby_method_ids_idNil: ruby_method_ids = 3617;
-pub const ruby_method_ids_idPath: ruby_method_ids = 3633;
-pub const ruby_method_ids_idUScore: ruby_method_ids = 3649;
-pub const ruby_method_ids_idNUMPARAM_1: ruby_method_ids = 3665;
-pub const ruby_method_ids_idNUMPARAM_2: ruby_method_ids = 3681;
-pub const ruby_method_ids_idNUMPARAM_3: ruby_method_ids = 3697;
-pub const ruby_method_ids_idNUMPARAM_4: ruby_method_ids = 3713;
-pub const ruby_method_ids_idNUMPARAM_5: ruby_method_ids = 3729;
-pub const ruby_method_ids_idNUMPARAM_6: ruby_method_ids = 3745;
-pub const ruby_method_ids_idNUMPARAM_7: ruby_method_ids = 3761;
-pub const ruby_method_ids_idNUMPARAM_8: ruby_method_ids = 3777;
-pub const ruby_method_ids_idNUMPARAM_9: ruby_method_ids = 3793;
-pub const ruby_method_ids_idDefault: ruby_method_ids = 3809;
-pub const ruby_method_ids_idLASTLINE: ruby_method_ids = 3831;
-pub const ruby_method_ids_idBACKREF: ruby_method_ids = 3847;
-pub const ruby_method_ids_idERROR_INFO: ruby_method_ids = 3863;
-pub const ruby_method_ids_tLAST_OP_ID: ruby_method_ids = 169;
+pub const ruby_method_ids_idIncludeP: ruby_method_ids = 152;
+pub const ruby_method_ids_idNULL: ruby_method_ids = 153;
+pub const ruby_method_ids_idEmptyP: ruby_method_ids = 154;
+pub const ruby_method_ids_idEqlP: ruby_method_ids = 155;
+pub const ruby_method_ids_idRespond_to: ruby_method_ids = 156;
+pub const ruby_method_ids_idRespond_to_missing: ruby_method_ids = 157;
+pub const ruby_method_ids_idIFUNC: ruby_method_ids = 158;
+pub const ruby_method_ids_idCFUNC: ruby_method_ids = 159;
+pub const ruby_method_ids_id_core_set_method_alias: ruby_method_ids = 160;
+pub const ruby_method_ids_id_core_set_variable_alias: ruby_method_ids = 161;
+pub const ruby_method_ids_id_core_undef_method: ruby_method_ids = 162;
+pub const ruby_method_ids_id_core_define_method: ruby_method_ids = 163;
+pub const ruby_method_ids_id_core_define_singleton_method: ruby_method_ids = 164;
+pub const ruby_method_ids_id_core_set_postexe: ruby_method_ids = 165;
+pub const ruby_method_ids_id_core_hash_merge_ptr: ruby_method_ids = 166;
+pub const ruby_method_ids_id_core_hash_merge_kwd: ruby_method_ids = 167;
+pub const ruby_method_ids_id_core_raise: ruby_method_ids = 168;
+pub const ruby_method_ids_id_core_sprintf: ruby_method_ids = 169;
+pub const ruby_method_ids_id_debug_created_info: ruby_method_ids = 170;
+pub const ruby_method_ids_tPRESERVED_ID_END: ruby_method_ids = 171;
+pub const ruby_method_ids_tTOKEN_LOCAL_BEGIN: ruby_method_ids = 170;
+pub const ruby_method_ids_tMax: ruby_method_ids = 171;
+pub const ruby_method_ids_tMin: ruby_method_ids = 172;
+pub const ruby_method_ids_tHash: ruby_method_ids = 173;
+pub const ruby_method_ids_tFreeze: ruby_method_ids = 174;
+pub const ruby_method_ids_tInspect: ruby_method_ids = 175;
+pub const ruby_method_ids_tIntern: ruby_method_ids = 176;
+pub const ruby_method_ids_tObject_id: ruby_method_ids = 177;
+pub const ruby_method_ids_t__id__: ruby_method_ids = 178;
+pub const ruby_method_ids_tConst_added: ruby_method_ids = 179;
+pub const ruby_method_ids_tConst_missing: ruby_method_ids = 180;
+pub const ruby_method_ids_tMethodMissing: ruby_method_ids = 181;
+pub const ruby_method_ids_tMethod_added: ruby_method_ids = 182;
+pub const ruby_method_ids_tSingleton_method_added: ruby_method_ids = 183;
+pub const ruby_method_ids_tMethod_removed: ruby_method_ids = 184;
+pub const ruby_method_ids_tSingleton_method_removed: ruby_method_ids = 185;
+pub const ruby_method_ids_tMethod_undefined: ruby_method_ids = 186;
+pub const ruby_method_ids_tSingleton_method_undefined: ruby_method_ids = 187;
+pub const ruby_method_ids_tLength: ruby_method_ids = 188;
+pub const ruby_method_ids_tSize: ruby_method_ids = 189;
+pub const ruby_method_ids_tGets: ruby_method_ids = 190;
+pub const ruby_method_ids_tSucc: ruby_method_ids = 191;
+pub const ruby_method_ids_tEach: ruby_method_ids = 192;
+pub const ruby_method_ids_tProc: ruby_method_ids = 193;
+pub const ruby_method_ids_tLambda: ruby_method_ids = 194;
+pub const ruby_method_ids_tSend: ruby_method_ids = 195;
+pub const ruby_method_ids_t__send__: ruby_method_ids = 196;
+pub const ruby_method_ids_t__recursive_key__: ruby_method_ids = 197;
+pub const ruby_method_ids_tInitialize: ruby_method_ids = 198;
+pub const ruby_method_ids_tInitialize_copy: ruby_method_ids = 199;
+pub const ruby_method_ids_tInitialize_clone: ruby_method_ids = 200;
+pub const ruby_method_ids_tInitialize_dup: ruby_method_ids = 201;
+pub const ruby_method_ids_tTo_int: ruby_method_ids = 202;
+pub const ruby_method_ids_tTo_ary: ruby_method_ids = 203;
+pub const ruby_method_ids_tTo_str: ruby_method_ids = 204;
+pub const ruby_method_ids_tTo_sym: ruby_method_ids = 205;
+pub const ruby_method_ids_tTo_hash: ruby_method_ids = 206;
+pub const ruby_method_ids_tTo_proc: ruby_method_ids = 207;
+pub const ruby_method_ids_tTo_io: ruby_method_ids = 208;
+pub const ruby_method_ids_tTo_a: ruby_method_ids = 209;
+pub const ruby_method_ids_tTo_s: ruby_method_ids = 210;
+pub const ruby_method_ids_tTo_i: ruby_method_ids = 211;
+pub const ruby_method_ids_tTo_f: ruby_method_ids = 212;
+pub const ruby_method_ids_tTo_r: ruby_method_ids = 213;
+pub const ruby_method_ids_tBt: ruby_method_ids = 214;
+pub const ruby_method_ids_tBt_locations: ruby_method_ids = 215;
+pub const ruby_method_ids_tCall: ruby_method_ids = 216;
+pub const ruby_method_ids_tMesg: ruby_method_ids = 217;
+pub const ruby_method_ids_tException: ruby_method_ids = 218;
+pub const ruby_method_ids_tLocals: ruby_method_ids = 219;
+pub const ruby_method_ids_tNOT: ruby_method_ids = 220;
+pub const ruby_method_ids_tAND: ruby_method_ids = 221;
+pub const ruby_method_ids_tOR: ruby_method_ids = 222;
+pub const ruby_method_ids_tDiv: ruby_method_ids = 223;
+pub const ruby_method_ids_tDivmod: ruby_method_ids = 224;
+pub const ruby_method_ids_tFdiv: ruby_method_ids = 225;
+pub const ruby_method_ids_tQuo: ruby_method_ids = 226;
+pub const ruby_method_ids_tName: ruby_method_ids = 227;
+pub const ruby_method_ids_tNil: ruby_method_ids = 228;
+pub const ruby_method_ids_tPath: ruby_method_ids = 229;
+pub const ruby_method_ids_tPack: ruby_method_ids = 230;
+pub const ruby_method_ids_tBuffer: ruby_method_ids = 231;
+pub const ruby_method_ids_tUScore: ruby_method_ids = 232;
+pub const ruby_method_ids_tNUMPARAM_1: ruby_method_ids = 233;
+pub const ruby_method_ids_tNUMPARAM_2: ruby_method_ids = 234;
+pub const ruby_method_ids_tNUMPARAM_3: ruby_method_ids = 235;
+pub const ruby_method_ids_tNUMPARAM_4: ruby_method_ids = 236;
+pub const ruby_method_ids_tNUMPARAM_5: ruby_method_ids = 237;
+pub const ruby_method_ids_tNUMPARAM_6: ruby_method_ids = 238;
+pub const ruby_method_ids_tNUMPARAM_7: ruby_method_ids = 239;
+pub const ruby_method_ids_tNUMPARAM_8: ruby_method_ids = 240;
+pub const ruby_method_ids_tNUMPARAM_9: ruby_method_ids = 241;
+pub const ruby_method_ids_tDefault: ruby_method_ids = 242;
+pub const ruby_method_ids_tTOKEN_LOCAL_END: ruby_method_ids = 243;
+pub const ruby_method_ids_tTOKEN_INSTANCE_BEGIN: ruby_method_ids = 242;
+pub const ruby_method_ids_tTOKEN_INSTANCE_END: ruby_method_ids = 243;
+pub const ruby_method_ids_tTOKEN_GLOBAL_BEGIN: ruby_method_ids = 242;
+pub const ruby_method_ids_tLASTLINE: ruby_method_ids = 243;
+pub const ruby_method_ids_tBACKREF: ruby_method_ids = 244;
+pub const ruby_method_ids_tERROR_INFO: ruby_method_ids = 245;
+pub const ruby_method_ids_tTOKEN_GLOBAL_END: ruby_method_ids = 246;
+pub const ruby_method_ids_tTOKEN_CONST_BEGIN: ruby_method_ids = 245;
+pub const ruby_method_ids_tRuby: ruby_method_ids = 246;
+pub const ruby_method_ids_tTOKEN_CONST_END: ruby_method_ids = 247;
+pub const ruby_method_ids_tTOKEN_CLASS_BEGIN: ruby_method_ids = 246;
+pub const ruby_method_ids_tTOKEN_CLASS_END: ruby_method_ids = 247;
+pub const ruby_method_ids_tTOKEN_ATTRSET_BEGIN: ruby_method_ids = 246;
+pub const ruby_method_ids_tTOKEN_ATTRSET_END: ruby_method_ids = 247;
+pub const ruby_method_ids_tNEXT_ID: ruby_method_ids = 247;
+pub const ruby_method_ids_idMax: ruby_method_ids = 2737;
+pub const ruby_method_ids_idMin: ruby_method_ids = 2753;
+pub const ruby_method_ids_idHash: ruby_method_ids = 2769;
+pub const ruby_method_ids_idFreeze: ruby_method_ids = 2785;
+pub const ruby_method_ids_idInspect: ruby_method_ids = 2801;
+pub const ruby_method_ids_idIntern: ruby_method_ids = 2817;
+pub const ruby_method_ids_idObject_id: ruby_method_ids = 2833;
+pub const ruby_method_ids_id__id__: ruby_method_ids = 2849;
+pub const ruby_method_ids_idConst_added: ruby_method_ids = 2865;
+pub const ruby_method_ids_idConst_missing: ruby_method_ids = 2881;
+pub const ruby_method_ids_idMethodMissing: ruby_method_ids = 2897;
+pub const ruby_method_ids_idMethod_added: ruby_method_ids = 2913;
+pub const ruby_method_ids_idSingleton_method_added: ruby_method_ids = 2929;
+pub const ruby_method_ids_idMethod_removed: ruby_method_ids = 2945;
+pub const ruby_method_ids_idSingleton_method_removed: ruby_method_ids = 2961;
+pub const ruby_method_ids_idMethod_undefined: ruby_method_ids = 2977;
+pub const ruby_method_ids_idSingleton_method_undefined: ruby_method_ids = 2993;
+pub const ruby_method_ids_idLength: ruby_method_ids = 3009;
+pub const ruby_method_ids_idSize: ruby_method_ids = 3025;
+pub const ruby_method_ids_idGets: ruby_method_ids = 3041;
+pub const ruby_method_ids_idSucc: ruby_method_ids = 3057;
+pub const ruby_method_ids_idEach: ruby_method_ids = 3073;
+pub const ruby_method_ids_idProc: ruby_method_ids = 3089;
+pub const ruby_method_ids_idLambda: ruby_method_ids = 3105;
+pub const ruby_method_ids_idSend: ruby_method_ids = 3121;
+pub const ruby_method_ids_id__send__: ruby_method_ids = 3137;
+pub const ruby_method_ids_id__recursive_key__: ruby_method_ids = 3153;
+pub const ruby_method_ids_idInitialize: ruby_method_ids = 3169;
+pub const ruby_method_ids_idInitialize_copy: ruby_method_ids = 3185;
+pub const ruby_method_ids_idInitialize_clone: ruby_method_ids = 3201;
+pub const ruby_method_ids_idInitialize_dup: ruby_method_ids = 3217;
+pub const ruby_method_ids_idTo_int: ruby_method_ids = 3233;
+pub const ruby_method_ids_idTo_ary: ruby_method_ids = 3249;
+pub const ruby_method_ids_idTo_str: ruby_method_ids = 3265;
+pub const ruby_method_ids_idTo_sym: ruby_method_ids = 3281;
+pub const ruby_method_ids_idTo_hash: ruby_method_ids = 3297;
+pub const ruby_method_ids_idTo_proc: ruby_method_ids = 3313;
+pub const ruby_method_ids_idTo_io: ruby_method_ids = 3329;
+pub const ruby_method_ids_idTo_a: ruby_method_ids = 3345;
+pub const ruby_method_ids_idTo_s: ruby_method_ids = 3361;
+pub const ruby_method_ids_idTo_i: ruby_method_ids = 3377;
+pub const ruby_method_ids_idTo_f: ruby_method_ids = 3393;
+pub const ruby_method_ids_idTo_r: ruby_method_ids = 3409;
+pub const ruby_method_ids_idBt: ruby_method_ids = 3425;
+pub const ruby_method_ids_idBt_locations: ruby_method_ids = 3441;
+pub const ruby_method_ids_idCall: ruby_method_ids = 3457;
+pub const ruby_method_ids_idMesg: ruby_method_ids = 3473;
+pub const ruby_method_ids_idException: ruby_method_ids = 3489;
+pub const ruby_method_ids_idLocals: ruby_method_ids = 3505;
+pub const ruby_method_ids_idNOT: ruby_method_ids = 3521;
+pub const ruby_method_ids_idAND: ruby_method_ids = 3537;
+pub const ruby_method_ids_idOR: ruby_method_ids = 3553;
+pub const ruby_method_ids_idDiv: ruby_method_ids = 3569;
+pub const ruby_method_ids_idDivmod: ruby_method_ids = 3585;
+pub const ruby_method_ids_idFdiv: ruby_method_ids = 3601;
+pub const ruby_method_ids_idQuo: ruby_method_ids = 3617;
+pub const ruby_method_ids_idName: ruby_method_ids = 3633;
+pub const ruby_method_ids_idNil: ruby_method_ids = 3649;
+pub const ruby_method_ids_idPath: ruby_method_ids = 3665;
+pub const ruby_method_ids_idPack: ruby_method_ids = 3681;
+pub const ruby_method_ids_idBuffer: ruby_method_ids = 3697;
+pub const ruby_method_ids_idUScore: ruby_method_ids = 3713;
+pub const ruby_method_ids_idNUMPARAM_1: ruby_method_ids = 3729;
+pub const ruby_method_ids_idNUMPARAM_2: ruby_method_ids = 3745;
+pub const ruby_method_ids_idNUMPARAM_3: ruby_method_ids = 3761;
+pub const ruby_method_ids_idNUMPARAM_4: ruby_method_ids = 3777;
+pub const ruby_method_ids_idNUMPARAM_5: ruby_method_ids = 3793;
+pub const ruby_method_ids_idNUMPARAM_6: ruby_method_ids = 3809;
+pub const ruby_method_ids_idNUMPARAM_7: ruby_method_ids = 3825;
+pub const ruby_method_ids_idNUMPARAM_8: ruby_method_ids = 3841;
+pub const ruby_method_ids_idNUMPARAM_9: ruby_method_ids = 3857;
+pub const ruby_method_ids_idDefault: ruby_method_ids = 3873;
+pub const ruby_method_ids_idLASTLINE: ruby_method_ids = 3895;
+pub const ruby_method_ids_idBACKREF: ruby_method_ids = 3911;
+pub const ruby_method_ids_idERROR_INFO: ruby_method_ids = 3927;
+pub const ruby_method_ids_idRuby: ruby_method_ids = 3947;
+pub const ruby_method_ids_tLAST_OP_ID: ruby_method_ids = 170;
 pub const ruby_method_ids_idLAST_OP_ID: ruby_method_ids = 10;
 pub type ruby_method_ids = ::std::os::raw::c_uint;
 pub type VALUE = usize;
@@ -552,8 +561,8 @@ pub const ruby_fl_type_RUBY_FL_USER16: ruby_fl_type = 268435456;
 pub const ruby_fl_type_RUBY_FL_USER17: ruby_fl_type = 536870912;
 pub const ruby_fl_type_RUBY_FL_USER18: ruby_fl_type = 1073741824;
 pub const ruby_fl_type_RUBY_FL_USER19: ruby_fl_type = -2147483648;
-pub const ruby_fl_type_RUBY_ELTS_SHARED: ruby_fl_type = 16384;
-pub const ruby_fl_type_RUBY_FL_SINGLETON: ruby_fl_type = 4096;
+pub const ruby_fl_type_RUBY_ELTS_SHARED: ruby_fl_type = 4096;
+pub const ruby_fl_type_RUBY_FL_SINGLETON: ruby_fl_type = 8192;
 pub type ruby_fl_type = ::std::os::raw::c_int;
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -882,10 +891,11 @@ pub struct rb_method_iseq_struct {
     pub cref: *mut rb_cref_t,
 }
 pub type rb_method_iseq_t = rb_method_iseq_struct;
+pub type rb_cfunc_t = ::std::option::Option<unsafe extern "C" fn() -> VALUE>;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct rb_method_cfunc_struct {
-    pub func: ::std::option::Option<unsafe extern "C" fn() -> VALUE>,
+    pub func: rb_cfunc_t,
     pub invoker: ::std::option::Option<
         unsafe extern "C" fn(
             recv: VALUE,
@@ -1194,9 +1204,34 @@ pub type rb_nativethread_lock_t = pthread_mutex_t;
 pub type rb_nativethread_cond_t = pthread_cond_t;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
+pub struct rb_thread_sched_waiting {
+    pub flags: rb_thread_sched_waiting_thread_sched_waiting_flag,
+    pub data: rb_thread_sched_waiting__bindgen_ty_1,
+    pub node: ccan_list_node,
+}
+pub const rb_thread_sched_waiting_thread_sched_waiting_flag_thread_sched_waiting_none:
+    rb_thread_sched_waiting_thread_sched_waiting_flag = 0;
+pub const rb_thread_sched_waiting_thread_sched_waiting_flag_thread_sched_waiting_timeout:
+    rb_thread_sched_waiting_thread_sched_waiting_flag = 1;
+pub const rb_thread_sched_waiting_thread_sched_waiting_flag_thread_sched_waiting_io_read:
+    rb_thread_sched_waiting_thread_sched_waiting_flag = 2;
+pub const rb_thread_sched_waiting_thread_sched_waiting_flag_thread_sched_waiting_io_write:
+    rb_thread_sched_waiting_thread_sched_waiting_flag = 8;
+pub const rb_thread_sched_waiting_thread_sched_waiting_flag_thread_sched_waiting_io_force:
+    rb_thread_sched_waiting_thread_sched_waiting_flag = 64;
+pub type rb_thread_sched_waiting_thread_sched_waiting_flag = ::std::os::raw::c_uint;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_thread_sched_waiting__bindgen_ty_1 {
+    pub timeout: u64,
+    pub fd: ::std::os::raw::c_int,
+    pub result: ::std::os::raw::c_int,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct rb_thread_sched_item {
     pub node: rb_thread_sched_item__bindgen_ty_1,
-    pub waiting_reason: rb_thread_sched_item__bindgen_ty_2,
+    pub waiting_reason: rb_thread_sched_waiting,
     pub finished: bool,
     pub malloc_stack: bool,
     pub context_stack: *mut ::std::os::raw::c_void,
@@ -1210,27 +1245,6 @@ pub struct rb_thread_sched_item__bindgen_ty_1 {
     pub timeslice_threads: ccan_list_node,
     pub running_threads: ccan_list_node,
     pub zombie_threads: ccan_list_node,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct rb_thread_sched_item__bindgen_ty_2 {
-    pub flags: rb_thread_sched_item__bindgen_ty_2_thread_sched_waiting_flag,
-    pub data: rb_thread_sched_item__bindgen_ty_2__bindgen_ty_1,
-    pub node: ccan_list_node,
-}
-pub const rb_thread_sched_item__bindgen_ty_2_thread_sched_waiting_flag_thread_sched_waiting_none:
-    rb_thread_sched_item__bindgen_ty_2_thread_sched_waiting_flag = 0;
-pub const rb_thread_sched_item__bindgen_ty_2_thread_sched_waiting_flag_thread_sched_waiting_timeout : rb_thread_sched_item__bindgen_ty_2_thread_sched_waiting_flag = 1 ;
-pub const rb_thread_sched_item__bindgen_ty_2_thread_sched_waiting_flag_thread_sched_waiting_io_read : rb_thread_sched_item__bindgen_ty_2_thread_sched_waiting_flag = 2 ;
-pub const rb_thread_sched_item__bindgen_ty_2_thread_sched_waiting_flag_thread_sched_waiting_io_write : rb_thread_sched_item__bindgen_ty_2_thread_sched_waiting_flag = 8 ;
-pub const rb_thread_sched_item__bindgen_ty_2_thread_sched_waiting_flag_thread_sched_waiting_io_force : rb_thread_sched_item__bindgen_ty_2_thread_sched_waiting_flag = 64 ;
-pub type rb_thread_sched_item__bindgen_ty_2_thread_sched_waiting_flag = ::std::os::raw::c_uint;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct rb_thread_sched_item__bindgen_ty_2__bindgen_ty_1 {
-    pub timeout: u64,
-    pub fd: ::std::os::raw::c_int,
-    pub result: ::std::os::raw::c_int,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -1394,6 +1408,7 @@ pub struct rb_iseq_constant_body {
     pub ci_size: ::std::os::raw::c_uint,
     pub stack_max: ::std::os::raw::c_uint,
     pub builtin_attrs: ::std::os::raw::c_uint,
+    pub prism: bool,
     pub mark_bits: rb_iseq_constant_body__bindgen_ty_3,
     pub outer_variables: *mut rb_id_table,
     pub mandatory_only_iseq: *const rb_iseq_t,
@@ -1759,6 +1774,138 @@ impl rb_iseq_constant_body__bindgen_ty_1__bindgen_ty_1 {
         }
     }
     #[inline]
+    pub fn anon_rest(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(10usize, 1u8) as u32) }
+    }
+    #[inline]
+    pub fn set_anon_rest(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(10usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub unsafe fn anon_rest_raw(this: *const Self) -> ::std::os::raw::c_uint {
+        unsafe {
+            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 2usize]>>::raw_get(
+                ::std::ptr::addr_of!((*this)._bitfield_1),
+                10usize,
+                1u8,
+            ) as u32)
+        }
+    }
+    #[inline]
+    pub unsafe fn set_anon_rest_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            <__BindgenBitfieldUnit<[u8; 2usize]>>::raw_set(
+                ::std::ptr::addr_of_mut!((*this)._bitfield_1),
+                10usize,
+                1u8,
+                val as u64,
+            )
+        }
+    }
+    #[inline]
+    pub fn anon_kwrest(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(11usize, 1u8) as u32) }
+    }
+    #[inline]
+    pub fn set_anon_kwrest(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(11usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub unsafe fn anon_kwrest_raw(this: *const Self) -> ::std::os::raw::c_uint {
+        unsafe {
+            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 2usize]>>::raw_get(
+                ::std::ptr::addr_of!((*this)._bitfield_1),
+                11usize,
+                1u8,
+            ) as u32)
+        }
+    }
+    #[inline]
+    pub unsafe fn set_anon_kwrest_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            <__BindgenBitfieldUnit<[u8; 2usize]>>::raw_set(
+                ::std::ptr::addr_of_mut!((*this)._bitfield_1),
+                11usize,
+                1u8,
+                val as u64,
+            )
+        }
+    }
+    #[inline]
+    pub fn use_block(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(12usize, 1u8) as u32) }
+    }
+    #[inline]
+    pub fn set_use_block(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(12usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub unsafe fn use_block_raw(this: *const Self) -> ::std::os::raw::c_uint {
+        unsafe {
+            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 2usize]>>::raw_get(
+                ::std::ptr::addr_of!((*this)._bitfield_1),
+                12usize,
+                1u8,
+            ) as u32)
+        }
+    }
+    #[inline]
+    pub unsafe fn set_use_block_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            <__BindgenBitfieldUnit<[u8; 2usize]>>::raw_set(
+                ::std::ptr::addr_of_mut!((*this)._bitfield_1),
+                12usize,
+                1u8,
+                val as u64,
+            )
+        }
+    }
+    #[inline]
+    pub fn forwardable(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(13usize, 1u8) as u32) }
+    }
+    #[inline]
+    pub fn set_forwardable(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(13usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub unsafe fn forwardable_raw(this: *const Self) -> ::std::os::raw::c_uint {
+        unsafe {
+            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 2usize]>>::raw_get(
+                ::std::ptr::addr_of!((*this)._bitfield_1),
+                13usize,
+                1u8,
+            ) as u32)
+        }
+    }
+    #[inline]
+    pub unsafe fn set_forwardable_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            <__BindgenBitfieldUnit<[u8; 2usize]>>::raw_set(
+                ::std::ptr::addr_of_mut!((*this)._bitfield_1),
+                13usize,
+                1u8,
+                val as u64,
+            )
+        }
+    }
+    #[inline]
     pub fn new_bitfield_1(
         has_lead: ::std::os::raw::c_uint,
         has_opt: ::std::os::raw::c_uint,
@@ -1770,6 +1917,10 @@ impl rb_iseq_constant_body__bindgen_ty_1__bindgen_ty_1 {
         ambiguous_param0: ::std::os::raw::c_uint,
         accepts_no_kwarg: ::std::os::raw::c_uint,
         ruby2_keywords: ::std::os::raw::c_uint,
+        anon_rest: ::std::os::raw::c_uint,
+        anon_kwrest: ::std::os::raw::c_uint,
+        use_block: ::std::os::raw::c_uint,
+        forwardable: ::std::os::raw::c_uint,
     ) -> __BindgenBitfieldUnit<[u8; 2usize]> {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 2usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 1u8, {
@@ -1811,6 +1962,22 @@ impl rb_iseq_constant_body__bindgen_ty_1__bindgen_ty_1 {
         __bindgen_bitfield_unit.set(9usize, 1u8, {
             let ruby2_keywords: u32 = unsafe { ::std::mem::transmute(ruby2_keywords) };
             ruby2_keywords as u64
+        });
+        __bindgen_bitfield_unit.set(10usize, 1u8, {
+            let anon_rest: u32 = unsafe { ::std::mem::transmute(anon_rest) };
+            anon_rest as u64
+        });
+        __bindgen_bitfield_unit.set(11usize, 1u8, {
+            let anon_kwrest: u32 = unsafe { ::std::mem::transmute(anon_kwrest) };
+            anon_kwrest as u64
+        });
+        __bindgen_bitfield_unit.set(12usize, 1u8, {
+            let use_block: u32 = unsafe { ::std::mem::transmute(use_block) };
+            use_block as u64
+        });
+        __bindgen_bitfield_unit.set(13usize, 1u8, {
+            let forwardable: u32 = unsafe { ::std::mem::transmute(forwardable) };
+            forwardable as u64
         });
         __bindgen_bitfield_unit
     }
@@ -1855,7 +2022,7 @@ impl ::std::fmt::Debug for rb_iseq_constant_body__bindgen_ty_3 {
 }
 impl ::std::fmt::Debug for rb_iseq_constant_body {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write ! (f , "rb_iseq_constant_body {{ type: {:?}, iseq_size: {:?}, iseq_encoded: {:?}, param: {:?}, location: {:?}, insns_info: {:?}, local_table: {:?}, catch_table: {:?}, parent_iseq: {:?}, local_iseq: {:?}, is_entries: {:?}, call_data: {:?}, variable: {:?}, local_table_size: {:?}, ic_size: {:?}, ise_size: {:?}, ivc_size: {:?}, icvarc_size: {:?}, ci_size: {:?}, stack_max: {:?}, builtin_attrs: {:?}, mark_bits: {:?}, outer_variables: {:?}, mandatory_only_iseq: {:?}, jit_entry: {:?}, jit_entry_calls: {:?}, jit_exception: {:?}, jit_exception_calls: {:?}, rjit_blocks: {:?}, yjit_payload: {:?} }}" , self . type_ , self . iseq_size , self . iseq_encoded , self . param , self . location , self . insns_info , self . local_table , self . catch_table , self . parent_iseq , self . local_iseq , self . is_entries , self . call_data , self . variable , self . local_table_size , self . ic_size , self . ise_size , self . ivc_size , self . icvarc_size , self . ci_size , self . stack_max , self . builtin_attrs , self . mark_bits , self . outer_variables , self . mandatory_only_iseq , self . jit_entry , self . jit_entry_calls , self . jit_exception , self . jit_exception_calls , self . rjit_blocks , self . yjit_payload)
+        write ! (f , "rb_iseq_constant_body {{ type: {:?}, iseq_size: {:?}, iseq_encoded: {:?}, param: {:?}, location: {:?}, insns_info: {:?}, local_table: {:?}, catch_table: {:?}, parent_iseq: {:?}, local_iseq: {:?}, is_entries: {:?}, call_data: {:?}, variable: {:?}, local_table_size: {:?}, ic_size: {:?}, ise_size: {:?}, ivc_size: {:?}, icvarc_size: {:?}, ci_size: {:?}, stack_max: {:?}, builtin_attrs: {:?}, prism: {:?}, mark_bits: {:?}, outer_variables: {:?}, mandatory_only_iseq: {:?}, jit_entry: {:?}, jit_entry_calls: {:?}, jit_exception: {:?}, jit_exception_calls: {:?}, rjit_blocks: {:?}, yjit_payload: {:?} }}" , self . type_ , self . iseq_size , self . iseq_encoded , self . param , self . location , self . insns_info , self . local_table , self . catch_table , self . parent_iseq , self . local_iseq , self . is_entries , self . call_data , self . variable , self . local_table_size , self . ic_size , self . ise_size , self . ivc_size , self . icvarc_size , self . ci_size , self . stack_max , self . builtin_attrs , self . prism , self . mark_bits , self . outer_variables , self . mandatory_only_iseq , self . jit_entry , self . jit_entry_calls , self . jit_exception , self . jit_exception_calls , self . rjit_blocks , self . yjit_payload)
     }
 }
 #[repr(C)]
@@ -1908,11 +2075,6 @@ pub struct rb_at_exit_list {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct rb_objspace {
-    _unused: [u8; 0],
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
 pub struct rb_hook_list_struct {
     pub hooks: *mut rb_event_hook_struct,
     pub events: rb_event_flag_t,
@@ -1927,6 +2089,12 @@ pub struct rb_builtin_function {
     _unused: [u8; 0],
 }
 #[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct global_object_list {
+    pub varptr: *mut VALUE,
+    pub next: *mut global_object_list,
+}
+#[repr(C)]
 #[derive(Copy, Clone)]
 pub struct rb_vm_struct {
     pub self_: VALUE,
@@ -1938,6 +2106,7 @@ pub struct rb_vm_struct {
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
     pub mark_object_ary: VALUE,
+    pub global_object_list: *mut global_object_list,
     pub special_exceptions: [VALUE; 5usize],
     pub top_self: VALUE,
     pub load_path: VALUE,
@@ -1952,7 +2121,6 @@ pub struct rb_vm_struct {
     pub loading_table: *mut st_table,
     pub static_ext_inits: *mut st_table,
     pub trap_list: rb_vm_struct__bindgen_ty_2,
-    pub ensure_rollback_table: *mut st_table,
     pub postponed_job_queue: *mut rb_postponed_job_queue,
     pub src_encoding_index: ::std::os::raw::c_int,
     pub workqueue: ccan_list_head,
@@ -1962,17 +2130,18 @@ pub struct rb_vm_struct {
     pub coverages: VALUE,
     pub me2counter: VALUE,
     pub coverage_mode: ::std::os::raw::c_int,
-    pub defined_module_hash: *mut st_table,
-    pub objspace: *mut rb_objspace,
+    pub gc: rb_vm_struct__bindgen_ty_3,
     pub at_exit: *mut rb_at_exit_list,
     pub frozen_strings: *mut st_table,
     pub builtin_function_table: *const rb_builtin_function,
-    pub builtin_inline_index: ::std::os::raw::c_int,
+    pub ci_table: *mut st_table,
     pub negative_cme_table: *mut rb_id_table,
     pub overloaded_cme_table: *mut st_table,
+    pub unused_block_warning_table: *mut st_table,
     pub constant_cache: *mut rb_id_table,
+    pub inserting_constant_cache_id: ID,
     pub global_cc_cache_table: [*const rb_callcache; 1023usize],
-    pub default_params: rb_vm_struct__bindgen_ty_3,
+    pub default_params: rb_vm_struct__bindgen_ty_4,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -2040,6 +2209,19 @@ pub struct rb_vm_struct__bindgen_ty_2 {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct rb_vm_struct__bindgen_ty_3 {
+    pub objspace: *mut rb_objspace,
+    pub mark_func_data: *mut rb_vm_struct__bindgen_ty_3_gc_mark_func_data_struct,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_vm_struct__bindgen_ty_3_gc_mark_func_data_struct {
+    pub data: *mut ::std::os::raw::c_void,
+    pub mark_func:
+        ::std::option::Option<unsafe extern "C" fn(v: VALUE, data: *mut ::std::os::raw::c_void)>,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rb_vm_struct__bindgen_ty_4 {
     pub thread_vm_stack_size: usize,
     pub thread_machine_stack_size: usize,
     pub fiber_vm_stack_size: usize,
@@ -2047,7 +2229,7 @@ pub struct rb_vm_struct__bindgen_ty_3 {
 }
 impl ::std::fmt::Debug for rb_vm_struct {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write ! (f , "rb_vm_struct {{ self: {:?}, ractor: {:?}, main_altstack: {:?}, fork_gen: {:?}, waiting_fds: {:?}, ubf_async_safe: {:?}, running : {:?}, thread_abort_on_exception : {:?}, thread_report_on_exception : {:?}, thread_ignore_deadlock : {:?}, mark_object_ary: {:?}, special_exceptions: {:?}, top_self: {:?}, load_path: {:?}, load_path_snapshot: {:?}, load_path_check_cache: {:?}, expanded_load_path: {:?}, loaded_features: {:?}, loaded_features_snapshot: {:?}, loaded_features_realpaths: {:?}, loaded_features_realpath_map: {:?}, loaded_features_index: {:?}, loading_table: {:?}, static_ext_inits: {:?}, trap_list: {:?}, ensure_rollback_table: {:?}, postponed_job_queue: {:?}, src_encoding_index: {:?}, workqueue: {:?}, workqueue_lock: {:?}, orig_progname: {:?}, progname: {:?}, coverages: {:?}, me2counter: {:?}, coverage_mode: {:?}, defined_module_hash: {:?}, objspace: {:?}, at_exit: {:?}, frozen_strings: {:?}, builtin_function_table: {:?}, builtin_inline_index: {:?}, negative_cme_table: {:?}, overloaded_cme_table: {:?}, constant_cache: {:?}, global_cc_cache_table: {:?}, default_params: {:?} }}" , self . self_ , self . ractor , self . main_altstack , self . fork_gen , self . waiting_fds , self . ubf_async_safe , self . running () , self . thread_abort_on_exception () , self . thread_report_on_exception () , self . thread_ignore_deadlock () , self . mark_object_ary , self . special_exceptions , self . top_self , self . load_path , self . load_path_snapshot , self . load_path_check_cache , self . expanded_load_path , self . loaded_features , self . loaded_features_snapshot , self . loaded_features_realpaths , self . loaded_features_realpath_map , self . loaded_features_index , self . loading_table , self . static_ext_inits , self . trap_list , self . ensure_rollback_table , self . postponed_job_queue , self . src_encoding_index , self . workqueue , self . workqueue_lock , self . orig_progname , self . progname , self . coverages , self . me2counter , self . coverage_mode , self . defined_module_hash , self . objspace , self . at_exit , self . frozen_strings , self . builtin_function_table , self . builtin_inline_index , self . negative_cme_table , self . overloaded_cme_table , self . constant_cache , self . global_cc_cache_table , self . default_params)
+        write ! (f , "rb_vm_struct {{ self: {:?}, ractor: {:?}, main_altstack: {:?}, fork_gen: {:?}, waiting_fds: {:?}, ubf_async_safe: {:?}, running : {:?}, thread_abort_on_exception : {:?}, thread_report_on_exception : {:?}, thread_ignore_deadlock : {:?}, mark_object_ary: {:?}, global_object_list: {:?}, special_exceptions: {:?}, top_self: {:?}, load_path: {:?}, load_path_snapshot: {:?}, load_path_check_cache: {:?}, expanded_load_path: {:?}, loaded_features: {:?}, loaded_features_snapshot: {:?}, loaded_features_realpaths: {:?}, loaded_features_realpath_map: {:?}, loaded_features_index: {:?}, loading_table: {:?}, static_ext_inits: {:?}, trap_list: {:?}, postponed_job_queue: {:?}, src_encoding_index: {:?}, workqueue: {:?}, workqueue_lock: {:?}, orig_progname: {:?}, progname: {:?}, coverages: {:?}, me2counter: {:?}, coverage_mode: {:?}, gc: {:?}, at_exit: {:?}, frozen_strings: {:?}, builtin_function_table: {:?}, ci_table: {:?}, negative_cme_table: {:?}, overloaded_cme_table: {:?}, unused_block_warning_table: {:?}, constant_cache: {:?}, inserting_constant_cache_id: {:?}, global_cc_cache_table: {:?}, default_params: {:?} }}" , self . self_ , self . ractor , self . main_altstack , self . fork_gen , self . waiting_fds , self . ubf_async_safe , self . running () , self . thread_abort_on_exception () , self . thread_report_on_exception () , self . thread_ignore_deadlock () , self . mark_object_ary , self . global_object_list , self . special_exceptions , self . top_self , self . load_path , self . load_path_snapshot , self . load_path_check_cache , self . expanded_load_path , self . loaded_features , self . loaded_features_snapshot , self . loaded_features_realpaths , self . loaded_features_realpath_map , self . loaded_features_index , self . loading_table , self . static_ext_inits , self . trap_list , self . postponed_job_queue , self . src_encoding_index , self . workqueue , self . workqueue_lock , self . orig_progname , self . progname , self . coverages , self . me2counter , self . coverage_mode , self . gc , self . at_exit , self . frozen_strings , self . builtin_function_table , self . ci_table , self . negative_cme_table , self . overloaded_cme_table , self . unused_block_warning_table , self . constant_cache , self . inserting_constant_cache_id , self . global_cc_cache_table , self . default_params)
     }
 }
 impl rb_vm_struct {
@@ -2256,20 +2438,6 @@ pub struct rb_mutex_struct {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct rb_ensure_entry {
-    pub marker: VALUE,
-    pub e_proc: ::std::option::Option<unsafe extern "C" fn(arg1: VALUE) -> VALUE>,
-    pub data2: VALUE,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct rb_ensure_list {
-    pub next: *mut rb_ensure_list,
-    pub entry: rb_ensure_entry,
-}
-pub type rb_ensure_list_t = rb_ensure_list;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
 pub struct rb_fiber_struct {
     _unused: [u8; 0],
 }
@@ -2298,7 +2466,6 @@ pub struct rb_execution_context_struct {
     pub storage: VALUE,
     pub root_lep: *const VALUE,
     pub root_svar: VALUE,
-    pub ensure_list: *mut rb_ensure_list_t,
     pub trace_arg: *mut rb_trace_arg_struct,
     pub errinfo: VALUE,
     pub passed_block_handler: VALUE,
@@ -2380,6 +2547,7 @@ pub struct rb_thread_struct {
     pub nt: *mut rb_native_thread,
     pub ec: *mut rb_execution_context_t,
     pub sched: rb_thread_sched_item,
+    pub mn_schedulable: bool,
     pub serial: rb_atomic_t,
     pub last_status: VALUE,
     pub calling: *mut rb_calling_info,
@@ -2398,6 +2566,7 @@ pub struct rb_thread_struct {
     pub unblock: rb_unblock_callback,
     pub locking_mutex: VALUE,
     pub keeping_mutexes: *mut rb_mutex_struct,
+    pub interrupt_exec_tasks: ccan_list_head,
     pub join_list: *mut rb_waiting_list,
     pub invoke_arg: rb_thread_struct__bindgen_ty_1,
     pub invoke_type: rb_thread_struct_thread_invoke_type,
@@ -2445,7 +2614,7 @@ pub const rb_thread_struct_thread_invoke_type_thread_invoke_type_func:
 pub type rb_thread_struct_thread_invoke_type = ::std::os::raw::c_uint;
 impl ::std::fmt::Debug for rb_thread_struct {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write ! (f , "rb_thread_struct {{ lt_node: {:?}, self: {:?}, ractor: {:?}, vm: {:?}, nt: {:?}, ec: {:?}, sched: {:?}, serial: {:?}, last_status: {:?}, calling: {:?}, top_self: {:?}, top_wrapper: {:?}, status : {:?}, has_dedicated_nt : {:?}, to_kill : {:?}, abort_on_exception : {:?}, report_on_exception : {:?}, pending_interrupt_queue_checked : {:?}, blocking_region_buffer: {:?}, thgroup: {:?}, value: {:?}, pending_interrupt_queue: {:?}, pending_interrupt_mask_stack: {:?}, interrupt_lock: {:?}, unblock: {:?}, locking_mutex: {:?}, keeping_mutexes: {:?}, join_list: {:?}, invoke_arg: {:?}, invoke_type: {:?}, stat_insn_usage: {:?}, root_fiber: {:?}, scheduler: {:?}, blocking: {:?}, name: {:?}, specific_storage: {:?}, ext_config: {:?} }}" , self . lt_node , self . self_ , self . ractor , self . vm , self . nt , self . ec , self . sched , self . serial , self . last_status , self . calling , self . top_self , self . top_wrapper , self . status () , self . has_dedicated_nt () , self . to_kill () , self . abort_on_exception () , self . report_on_exception () , self . pending_interrupt_queue_checked () , self . blocking_region_buffer , self . thgroup , self . value , self . pending_interrupt_queue , self . pending_interrupt_mask_stack , self . interrupt_lock , self . unblock , self . locking_mutex , self . keeping_mutexes , self . join_list , self . invoke_arg , self . invoke_type , self . stat_insn_usage , self . root_fiber , self . scheduler , self . blocking , self . name , self . specific_storage , self . ext_config)
+        write ! (f , "rb_thread_struct {{ lt_node: {:?}, self: {:?}, ractor: {:?}, vm: {:?}, nt: {:?}, ec: {:?}, sched: {:?}, mn_schedulable: {:?}, serial: {:?}, last_status: {:?}, calling: {:?}, top_self: {:?}, top_wrapper: {:?}, status : {:?}, has_dedicated_nt : {:?}, to_kill : {:?}, abort_on_exception : {:?}, report_on_exception : {:?}, pending_interrupt_queue_checked : {:?}, blocking_region_buffer: {:?}, thgroup: {:?}, value: {:?}, pending_interrupt_queue: {:?}, pending_interrupt_mask_stack: {:?}, interrupt_lock: {:?}, unblock: {:?}, locking_mutex: {:?}, keeping_mutexes: {:?}, interrupt_exec_tasks: {:?}, join_list: {:?}, invoke_arg: {:?}, invoke_type: {:?}, stat_insn_usage: {:?}, root_fiber: {:?}, scheduler: {:?}, blocking: {:?}, name: {:?}, specific_storage: {:?}, ext_config: {:?} }}" , self . lt_node , self . self_ , self . ractor , self . vm , self . nt , self . ec , self . sched , self . mn_schedulable , self . serial , self . last_status , self . calling , self . top_self , self . top_wrapper , self . status () , self . has_dedicated_nt () , self . to_kill () , self . abort_on_exception () , self . report_on_exception () , self . pending_interrupt_queue_checked () , self . blocking_region_buffer , self . thgroup , self . value , self . pending_interrupt_queue , self . pending_interrupt_mask_stack , self . interrupt_lock , self . unblock , self . locking_mutex , self . keeping_mutexes , self . interrupt_exec_tasks , self . join_list , self . invoke_arg , self . invoke_type , self . stat_insn_usage , self . root_fiber , self . scheduler , self . blocking , self . name , self . specific_storage , self . ext_config)
     }
 }
 impl rb_thread_struct {
@@ -2713,18 +2882,9 @@ pub struct rb_ractor_pub {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct ractor_newobj_size_pool_cache {
-    pub freelist: *mut RVALUE,
-    pub using_page: *mut heap_page,
+pub struct rb_objspace {
+    _unused: [u8; 0],
 }
-pub type rb_ractor_newobj_size_pool_cache_t = ractor_newobj_size_pool_cache;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct ractor_newobj_cache {
-    pub incremental_mark_step_allocated_slots: usize,
-    pub size_pool_caches: [rb_ractor_newobj_size_pool_cache_t; 5usize],
-}
-pub type rb_ractor_newobj_cache_t = ractor_newobj_cache;
 pub const rb_ractor_basket_type_basket_type_none: rb_ractor_basket_type = 0;
 pub const rb_ractor_basket_type_basket_type_ref: rb_ractor_basket_type = 1;
 pub const rb_ractor_basket_type_basket_type_copy: rb_ractor_basket_type = 2;
@@ -2858,13 +3018,13 @@ pub struct rb_ractor_struct {
     pub vmlr_node: ccan_list_node,
     pub local_storage: *mut st_table,
     pub idkey_local_storage: *mut rb_id_table,
+    pub local_storage_store_lock: VALUE,
     pub r_stdin: VALUE,
     pub r_stdout: VALUE,
     pub r_stderr: VALUE,
     pub verbose: VALUE,
     pub debug: VALUE,
-    pub newobj_cache: rb_ractor_newobj_cache_t,
-    pub mfd: *mut rb_ractor_struct_gc_mark_func_data_struct,
+    pub newobj_cache: *mut ::std::os::raw::c_void,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -2882,16 +3042,9 @@ impl ::std::fmt::Debug for rb_ractor_struct__bindgen_ty_1 {
         write ! (f , "rb_ractor_struct__bindgen_ty_1 {{ set: {:?}, cnt: {:?}, blocking_cnt: {:?}, sleeper: {:?}, sched: {:?}, running_ec: {:?}, main: {:?} }}" , self . set , self . cnt , self . blocking_cnt , self . sleeper , self . sched , self . running_ec , self . main)
     }
 }
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct rb_ractor_struct_gc_mark_func_data_struct {
-    pub data: *mut ::std::os::raw::c_void,
-    pub mark_func:
-        ::std::option::Option<unsafe extern "C" fn(v: VALUE, data: *mut ::std::os::raw::c_void)>,
-}
 impl ::std::fmt::Debug for rb_ractor_struct {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write ! (f , "rb_ractor_struct {{ pub: {:?}, sync: {:?}, receiving_mutex: {:?}, barrier_wait_cond: {:?}, threads: {:?}, thgroup_default: {:?}, name: {:?}, loc: {:?}, status_: {:?}, vmlr_node: {:?}, local_storage: {:?}, idkey_local_storage: {:?}, r_stdin: {:?}, r_stdout: {:?}, r_stderr: {:?}, verbose: {:?}, debug: {:?}, newobj_cache: {:?}, mfd: {:?} }}" , self . pub_ , self . sync , self . receiving_mutex , self . barrier_wait_cond , self . threads , self . thgroup_default , self . name , self . loc , self . status_ , self . vmlr_node , self . local_storage , self . idkey_local_storage , self . r_stdin , self . r_stdout , self . r_stderr , self . verbose , self . debug , self . newobj_cache , self . mfd)
+        write ! (f , "rb_ractor_struct {{ pub: {:?}, sync: {:?}, receiving_mutex: {:?}, barrier_wait_cond: {:?}, threads: {:?}, thgroup_default: {:?}, name: {:?}, loc: {:?}, status_: {:?}, vmlr_node: {:?}, local_storage: {:?}, idkey_local_storage: {:?}, local_storage_store_lock: {:?}, r_stdin: {:?}, r_stdout: {:?}, r_stderr: {:?}, verbose: {:?}, debug: {:?}, newobj_cache: {:?} }}" , self . pub_ , self . sync , self . receiving_mutex , self . barrier_wait_cond , self . threads , self . thgroup_default , self . name , self . loc , self . status_ , self . vmlr_node , self . local_storage , self . idkey_local_storage , self . local_storage_store_lock , self . r_stdin , self . r_stdout , self . r_stderr , self . verbose , self . debug , self . newobj_cache)
     }
 }
 #[repr(C)]
@@ -3139,47 +3292,47 @@ impl rb_compile_option_struct {
         }
     }
     #[inline]
-    pub fn frozen_string_literal(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(6usize, 1u8) as u32) }
+    pub fn frozen_string_literal(&self) -> ::std::os::raw::c_int {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(6usize, 2u8) as u32) }
     }
     #[inline]
-    pub fn set_frozen_string_literal(&mut self, val: ::std::os::raw::c_uint) {
+    pub fn set_frozen_string_literal(&mut self, val: ::std::os::raw::c_int) {
         unsafe {
             let val: u32 = ::std::mem::transmute(val);
-            self._bitfield_1.set(6usize, 1u8, val as u64)
+            self._bitfield_1.set(6usize, 2u8, val as u64)
         }
     }
     #[inline]
-    pub unsafe fn frozen_string_literal_raw(this: *const Self) -> ::std::os::raw::c_uint {
+    pub unsafe fn frozen_string_literal_raw(this: *const Self) -> ::std::os::raw::c_int {
         unsafe {
             ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 2usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 6usize,
-                1u8,
+                2u8,
             ) as u32)
         }
     }
     #[inline]
-    pub unsafe fn set_frozen_string_literal_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
+    pub unsafe fn set_frozen_string_literal_raw(this: *mut Self, val: ::std::os::raw::c_int) {
         unsafe {
             let val: u32 = ::std::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 2usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 6usize,
-                1u8,
+                2u8,
                 val as u64,
             )
         }
     }
     #[inline]
     pub fn debug_frozen_string_literal(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(7usize, 1u8) as u32) }
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(8usize, 1u8) as u32) }
     }
     #[inline]
     pub fn set_debug_frozen_string_literal(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
             let val: u32 = ::std::mem::transmute(val);
-            self._bitfield_1.set(7usize, 1u8, val as u64)
+            self._bitfield_1.set(8usize, 1u8, val as u64)
         }
     }
     #[inline]
@@ -3187,7 +3340,7 @@ impl rb_compile_option_struct {
         unsafe {
             ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 2usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
-                7usize,
+                8usize,
                 1u8,
             ) as u32)
         }
@@ -3201,7 +3354,7 @@ impl rb_compile_option_struct {
             let val: u32 = ::std::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 2usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
-                7usize,
+                8usize,
                 1u8,
                 val as u64,
             )
@@ -3209,13 +3362,13 @@ impl rb_compile_option_struct {
     }
     #[inline]
     pub fn coverage_enabled(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(8usize, 1u8) as u32) }
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(9usize, 1u8) as u32) }
     }
     #[inline]
     pub fn set_coverage_enabled(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
             let val: u32 = ::std::mem::transmute(val);
-            self._bitfield_1.set(8usize, 1u8, val as u64)
+            self._bitfield_1.set(9usize, 1u8, val as u64)
         }
     }
     #[inline]
@@ -3223,7 +3376,7 @@ impl rb_compile_option_struct {
         unsafe {
             ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 2usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
-                8usize,
+                9usize,
                 1u8,
             ) as u32)
         }
@@ -3234,7 +3387,7 @@ impl rb_compile_option_struct {
             let val: u32 = ::std::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 2usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
-                8usize,
+                9usize,
                 1u8,
                 val as u64,
             )
@@ -3248,7 +3401,7 @@ impl rb_compile_option_struct {
         specialized_instruction: ::std::os::raw::c_uint,
         operands_unification: ::std::os::raw::c_uint,
         instructions_unification: ::std::os::raw::c_uint,
-        frozen_string_literal: ::std::os::raw::c_uint,
+        frozen_string_literal: ::std::os::raw::c_int,
         debug_frozen_string_literal: ::std::os::raw::c_uint,
         coverage_enabled: ::std::os::raw::c_uint,
     ) -> __BindgenBitfieldUnit<[u8; 2usize]> {
@@ -3281,17 +3434,17 @@ impl rb_compile_option_struct {
                 unsafe { ::std::mem::transmute(instructions_unification) };
             instructions_unification as u64
         });
-        __bindgen_bitfield_unit.set(6usize, 1u8, {
+        __bindgen_bitfield_unit.set(6usize, 2u8, {
             let frozen_string_literal: u32 =
                 unsafe { ::std::mem::transmute(frozen_string_literal) };
             frozen_string_literal as u64
         });
-        __bindgen_bitfield_unit.set(7usize, 1u8, {
+        __bindgen_bitfield_unit.set(8usize, 1u8, {
             let debug_frozen_string_literal: u32 =
                 unsafe { ::std::mem::transmute(debug_frozen_string_literal) };
             debug_frozen_string_literal as u64
         });
-        __bindgen_bitfield_unit.set(8usize, 1u8, {
+        __bindgen_bitfield_unit.set(9usize, 1u8, {
             let coverage_enabled: u32 = unsafe { ::std::mem::transmute(coverage_enabled) };
             coverage_enabled as u64
         });
@@ -3358,16 +3511,6 @@ pub struct rb_event_hook_struct {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct rb_postponed_job_queue {
-    pub _address: u8,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct RVALUE {
-    pub _address: u8,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct heap_page {
     pub _address: u8,
 }
 #[repr(C)]
