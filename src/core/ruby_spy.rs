@@ -306,7 +306,7 @@ mod tests {
 
         let mut i = 0;
         loop {
-            match getter.get_stack_trace(true) {
+            match getter.get_stack_trace(false) {
                 Err(e) => {
                     if let Some(crate::core::types::MemoryCopyError::ProcessEnded) =
                         e.downcast_ref()
