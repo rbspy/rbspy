@@ -143,15 +143,9 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - i686-musl
-          - armv7-musleabihf
           - aarch64-musl
           - x86_64-musl
         include:
-          - target: i686-musl
-            triple: i686-unknown-linux-musl
-          - target: armv7-musleabihf
-            triple: armv7-unknown-linux-musleabihf
           - target: aarch64-musl
             triple: aarch64-unknown-linux-musl
           - target: x86_64-musl
