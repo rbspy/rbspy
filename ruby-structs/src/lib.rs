@@ -100,6 +100,7 @@ pub mod ruby_3_2_3;
 pub mod ruby_3_2_4;
 pub mod ruby_3_2_5;
 pub mod ruby_3_2_6;
+pub mod ruby_3_2_7;
 pub mod ruby_3_3_0;
 pub mod ruby_3_3_1;
 pub mod ruby_3_3_2;
