@@ -2,8 +2,7 @@ use anyhow::format_err;
 use anyhow::{Context, Error, Result};
 use chrono::prelude::*;
 use clap::{arg, ArgMatches};
-use rand::distributions::Alphanumeric;
-use rand::Rng;
+use rand::{distr::Alphanumeric, Rng};
 use rbspy::recorder;
 use rbspy::report;
 use rbspy::{OutputFormat, Pid};
@@ -549,7 +548,7 @@ fn output_filename(maybe_filename: Option<&str>, extension: &str) -> Result<Path
     match maybe_filename {
         Some(filename) => Ok(filename.into()),
         None => {
-            let s: String = rand::thread_rng()
+            let s: String = rand::rng()
                 .sample_iter(&Alphanumeric)
                 .take(10)
                 .map(char::from)
