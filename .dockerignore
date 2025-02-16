@@ -1,0 +1,5 @@
+target
+**/Dockerfile*
+.git
+.gitignore
+ci

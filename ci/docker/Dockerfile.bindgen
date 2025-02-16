@@ -1,0 +1,37 @@
+FROM ubuntu:20.04 AS builder-22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV tz=UTC
+
+RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    cargo \
+    git \
+    rustc
+  
+COPY Cargo.toml config.toml ./
+COPY src src
+COPY ruby-structs ruby-structs
+COPY xtask xtask
+
+RUN cargo run --release --package xtask
+
+FROM ubuntu:20.04 AS generate-22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV tz=UTC
+
+RUN apt-get update -qq && apt-get install -y -qq \
+    autoconf autogen build-essential clang llvm \
+    ca-certificates \
+    git \
+    ruby ruby-dev \
+    rubygems \
+    rustfmt
+
+COPY --from=builder-22.04 target/release/xtask /usr/local/bin/xtask
+
+RUN mkdir -p ruby-structs/src
+
+ENTRYPOINT ["xtask", "bindgen"]
