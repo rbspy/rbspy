@@ -23,19 +23,19 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@d388a4836fcdbde0e50e395dc79a2670ccdef13f # stable branch
       - name: Build xtask
-        run: cargo xtask
+        run: |
+          docker build -t xtask -f ci/docker/Dockerfile.bindgen --target=builder .
+          docker run --rm -v $PWD:/workdir xtask cp target/release/xtask /workdir/xtask.bin
       - name: Upload xtask binary
         uses: actions/upload-artifact@v4
         with:
           name: xtask
-          path: target/release/xtask
+          path: xtask.bin
 
   generate:
     name: Generate Ruby bindings
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-24.04
     needs: [xtask]
     timeout-minutes: 20
     env:
@@ -62,39 +62,353 @@ jobs:
           3_3_0, 3_3_1, 3_3_2, 3_3_3, 3_3_4, 3_3_5, 3_3_6, 3_3_7,
           3_4_0, 3_4_1, 3_4_2
         ]
-        os: ["ubuntu-20.04"]
+        docker-ubuntu-version: ["20.04"]
         target: ["x86_64-unknown-linux-gnu"]
+        include:
+          - ruby-version: 1_9_3_551
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_0_0_648
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_1_0
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_1_1
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_1_2
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_1_3
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_1_4
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_1_5
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_1_6
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_1_7
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_1_8
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_1_9
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_1_10
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_2_0
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_2_1
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_2_2
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_2_3
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_2_4
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_2_5
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_2_6
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_2_7
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_2_8
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_2_9
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_2_10
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_3_0
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_3_1
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_3_2
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_3_3
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_3_4
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_3_5
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_3_6
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_3_7
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_3_8
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_4_0
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_4_1
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_4_2
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_4_3
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_4_4
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_4_5
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_4_6
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_4_7
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_4_8
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_4_9
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_4_10
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_5_0
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_5_1
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_5_2
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_5_3
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_5_4
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_5_5
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_5_6
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_5_7
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_5_8
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_5_9
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_6_0
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_6_1
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_6_2
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_6_3
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_6_4
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_6_5
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_6_6
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_6_7
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_6_8
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_6_9
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_6_10
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_7_0
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_7_1
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_7_2
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_7_3
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_7_4
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_7_5
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_7_6
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_7_7
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 2_7_8
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_0_0
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_0_1
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_0_2
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_0_3
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_0_4
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_0_5
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_0_6
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_0_7
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_1_0
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_1_1
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_1_2
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_1_3
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_1_4
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_1_5
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_1_6
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_2_0
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_2_1
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_2_2
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_2_3
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_2_4
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_2_5
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_2_6
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_2_7
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_3_0
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_3_1
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_3_2
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_3_3
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_3_4
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_3_5
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_3_6
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_3_7
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_4_0
+            ubuntu-version: 24.04
+            ruby-system-version: 3.3.6
+          - ruby-version: 3_4_1
+            ubuntu-version: 24.04
+            ruby-system-version: 3.3.6
+          - ruby-version: 3_4_2
+            ubuntu-version: 24.04
+            ruby-system-version: 3.3.6
     steps:
       - name: Checkout rbspy repository
         uses: actions/checkout@v4
         with:
             path: "rbspy"
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@d388a4836fcdbde0e50e395dc79a2670ccdef13f # stable branch
-      - name: Install Rust toolchain target
-        run: |
-          rustup target add ${{ matrix.target }}
-      - name: Install Ruby
-        if: startsWith(matrix.ruby-version, '2_4')
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: 2.7.0
-      - name: Install Ruby
-        if: startsWith(matrix.ruby-version, '2_4') == false
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: 3.3.6
       - name: Download xtask binary
         uses: actions/download-artifact@v4
         with:
           name: xtask
+          path: xtask
       - name: Generate bindings for ruby ${{ matrix.ruby-version }}
         run: |
           set -euo pipefail
 
-          cd $GITHUB_WORKSPACE/rbspy
-          chmod u+x ../xtask
-          ../xtask bindgen v${{ matrix.ruby-version }}
+          chmod +x xtask/xtask.bin
+
+          cd rbspy
+
+          docker build -t xtask -f ci/docker/Dockerfile.bindgen --target=generate --build-arg UBUNTU_VERSION=${{ matrix.docker-ubuntu-version }} --build-arg RUBY_VERSION=${{ matrix.ruby-system-version }} .
+          docker run --rm -v $(pwd)/../xtask/xtask.bin:/xtask -v $PWD/ruby-structs:/ruby-structs xtask v${{ matrix.ruby-version }}
 
           mkdir ../bindings-staging
           # Add new files to the index so that they get picked up

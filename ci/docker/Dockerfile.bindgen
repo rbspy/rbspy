@@ -1,4 +1,5 @@
-FROM ubuntu:20.04 AS builder-22.04
+ARG UBUNTU_VERSION=20.04
+FROM ubuntu:${UBUNTU_VERSION} AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV tz=UTC
@@ -17,21 +18,30 @@ COPY xtask xtask
 
 RUN cargo run --release --package xtask
 
-FROM ubuntu:20.04 AS generate-22.04
+FROM ubuntu:${UBUNTU_VERSION} AS generate
+
+ARG RUBY_VERSION=3.4.2
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV tz=UTC
 
 RUN apt-get update -qq && apt-get install -y -qq \
-    autoconf autogen build-essential clang llvm \
+    autoconf autogen bash bison build-essential clang curl flex llvm \
+    libssl-dev libreadline-dev zlib1g-dev libyaml-dev libreadline-dev libncurses5-dev libffi-dev libgdbm-dev \
     ca-certificates \
     git \
     ruby ruby-dev \
     rubygems \
     rustfmt
 
-COPY --from=builder-22.04 target/release/xtask /usr/local/bin/xtask
+SHELL ["/bin/bash", "-c"]
+ENV PATH="/root/.rbenv/bin:/root/.rbenv/shims:${PATH}"
+
+RUN curl -fsSL https://github.com/rbenv/rbenv-installer/raw/HEAD/bin/rbenv-installer | bash && \
+    ~/.rbenv/bin/rbenv init && \
+    rbenv install ${RUBY_VERSION} && \
+    rbenv global ${RUBY_VERSION}
 
 RUN mkdir -p ruby-structs/src
 
-ENTRYPOINT ["xtask", "bindgen"]
+ENTRYPOINT ["/xtask", "bindgen"]
