@@ -65,6 +65,7 @@ pub fn generate_ruby_bindings(
     let default_filename = format!("ruby_{}.rs", version_number);
     let output_filename = output_filename.unwrap_or(default_filename.as_str());
     let bindings_path = format!("ruby-structs/src/{}", output_filename);
+    std::fs::create_dir_all("ruby-structs/src")?;
     bindings.write_to_file(&bindings_path)?;
 
     postprocess_bindings_for_windows(&PathBuf::from(bindings_path.clone()))?;
