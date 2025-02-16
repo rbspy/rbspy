@@ -22,7 +22,7 @@ members = [
 [dependencies]
 anyhow = "1.0.94"
 chrono = { version = "0.4.39", default-features = false, features = ["clock", "std"] }
-clap = { version = "4.5.28", features = ["derive"] }
+clap = { version = "4.5.29", features = ["derive"] }
 ctrlc = "3.1.0"
 directories = "6.0.0"
 env_logger = "0.11.2"
@@ -35,7 +35,7 @@ memmap2 = "0.9.5"
 proc-maps = "0.4.0"
 prost = "0.13.4"
 rand = "0.9.0"
-rbspy-ruby-structs = { path = "ruby-structs", version="0.30.0" }
+rbspy-ruby-structs = { path = "ruby-structs", version="0.31.0" }
 remoteprocess = "0.5.0"
 semver = "1.0.25"
 serde = "1.0.216"
