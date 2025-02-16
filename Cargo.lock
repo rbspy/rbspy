@@ -953,7 +953,7 @@ dependencies = [
 
 [[package]]
 name = "rbspy"
-version = "0.30.0"
+version = "0.31.0"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -1544,7 +1544,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.30.0"
+version = "0.31.0"
 dependencies = [
  "anyhow",
  "bindgen 0.71.1",
