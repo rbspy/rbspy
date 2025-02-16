@@ -1,5 +1,8 @@
 name: ruby-bindings
 on:
+  push:
+    paths:
+      - '.github/workflows/ruby-bindings.yml'
   workflow_dispatch:
 
 permissions:
