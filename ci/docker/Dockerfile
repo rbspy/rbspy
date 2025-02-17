@@ -1,4 +1,4 @@
-FROM alpine:3.17 as musl
+FROM alpine:3.21 AS musl
 
 ARG TARGETPLATFORM
 ARG VERSION
@@ -21,7 +21,7 @@ RUN case $TARGETPLATFORM in \
 
 RUN rbspy --version
 
-FROM ubuntu:jammy-20221101 as gnu
+FROM ubuntu:noble-20250127 AS gnu
 
 ARG TARGETPLATFORM
 ARG VERSION
