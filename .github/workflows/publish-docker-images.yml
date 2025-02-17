@@ -54,7 +54,7 @@ jobs:
         with:
           build-args: VERSION=${{ env.release_version }}
           context: .
-          file: ci/docker/Dockerfile
+          file: ci/docker/Dockerfile.containers
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ env.image_tags }}
@@ -102,7 +102,7 @@ jobs:
         with:
           build-args: VERSION=${{ env.release_version }}
           context: .
-          file: ci/docker/Dockerfile
+          file: ci/docker/Dockerfile.containers
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ env.image_tags }}
