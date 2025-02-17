@@ -433,9 +433,17 @@ jobs:
             fetch-depth: 0
       - uses: actions/download-artifact@v4
       - name: Copy bindings into place
+        id: copy-bindings
         run: |
-          cp bindings-*/ruby*.rs rbspy/ruby-structs/src/
+          if cp bindings-*/ruby*.rs rbspy/ruby-structs/src/; then
+            echo "generated_bindings=true" >> $GITHUB_OUTPUT
+          else
+            echo "No new bindings were generated. Everything is up to date."
+            echo "generated_bindings=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
       - name: Create branch
+        if: steps.copy-bindings.outputs.generated_bindings == 'true'
         run: |
           # Configure git just enough that it can push branches
           cat <<- EOF > $HOME/.netrc
