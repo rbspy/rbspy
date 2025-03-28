@@ -66,334 +66,334 @@ jobs:
         target: ["x86_64-unknown-linux-gnu"]
         include:
           - ruby-version: 1_9_3_551
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_0_0_648
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_1_0
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_1_1
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_1_2
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_1_3
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_1_4
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_1_5
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_1_6
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_1_7
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_1_8
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_1_9
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_1_10
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_2_0
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_2_1
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_2_2
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_2_3
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_2_4
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_2_5
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_2_6
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_2_7
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_2_8
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_2_9
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_2_10
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_3_0
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_3_1
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_3_2
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_3_3
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_3_4
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_3_5
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_3_6
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_3_7
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_3_8
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_4_0
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_4_1
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_4_2
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_4_3
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_4_4
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_4_5
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_4_6
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_4_7
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_4_8
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_4_9
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_4_10
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_5_0
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_5_1
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_5_2
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_5_3
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_5_4
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_5_5
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_5_6
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_5_7
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_5_8
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_5_9
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_6_0
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_6_1
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_6_2
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_6_3
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_6_4
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_6_5
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_6_6
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_6_7
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_6_8
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_6_9
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_6_10
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_7_0
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_7_1
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_7_2
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_7_3
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_7_4
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_7_5
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_7_6
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_7_7
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 2_7_8
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_0_0
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_0_1
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_0_2
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_0_3
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_0_4
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_0_5
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_0_6
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_0_7
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_1_0
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_1_1
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_1_2
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_1_3
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_1_4
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_1_5
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_1_6
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_1_7
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_2_0
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_2_1
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_2_2
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_2_3
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_2_4
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_2_5
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_2_6
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_2_7
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_2_8
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_3_0
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_3_1
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_3_2
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_3_3
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_3_4
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_3_5
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_3_6
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_3_7
-            ubuntu-version: 20.04
+            docker-ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_4_0
-            ubuntu-version: 24.04
+            docker-ubuntu-version: 24.04
             ruby-system-version: 3.3.6
           - ruby-version: 3_4_1
-            ubuntu-version: 24.04
+            docker-ubuntu-version: 24.04
             ruby-system-version: 3.3.6
           - ruby-version: 3_4_2
-            ubuntu-version: 24.04
+            docker-ubuntu-version: 24.04
             ruby-system-version: 3.3.6
     steps:
       - name: Checkout rbspy repository
