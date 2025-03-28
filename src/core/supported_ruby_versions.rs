@@ -556,6 +556,12 @@ pub fn get(v: &str) -> Result<RubyVersion> {
             get_stack_trace_fn: super::ruby_version::ruby_3_1_6::get_stack_trace,
             is_maybe_thread_fn: super::ruby_version::ruby_3_1_6::is_maybe_thread,
         }),
+        "3.1.7" => Ok(RubyVersion {
+            semver_version: Version::new(3, 1, 7),
+            get_execution_context_fn: super::ruby_version::ruby_3_1_7::get_execution_context,
+            get_stack_trace_fn: super::ruby_version::ruby_3_1_7::get_stack_trace,
+            is_maybe_thread_fn: super::ruby_version::ruby_3_1_7::is_maybe_thread,
+        }),
         "3.2.0" => Ok(RubyVersion {
             semver_version: Version::new(3, 2, 0),
             get_execution_context_fn: super::ruby_version::ruby_3_2_0::get_execution_context,
@@ -603,6 +609,12 @@ pub fn get(v: &str) -> Result<RubyVersion> {
             get_execution_context_fn: super::ruby_version::ruby_3_2_7::get_execution_context,
             get_stack_trace_fn: super::ruby_version::ruby_3_2_7::get_stack_trace,
             is_maybe_thread_fn: super::ruby_version::ruby_3_2_7::is_maybe_thread,
+        }),
+        "3.2.8" => Ok(RubyVersion {
+            semver_version: Version::new(3, 2, 8),
+            get_execution_context_fn: super::ruby_version::ruby_3_2_8::get_execution_context,
+            get_stack_trace_fn: super::ruby_version::ruby_3_2_8::get_stack_trace,
+            is_maybe_thread_fn: super::ruby_version::ruby_3_2_8::is_maybe_thread,
         }),
         "3.3.0" => Ok(RubyVersion {
             semver_version: Version::new(3, 3, 0),
