@@ -332,6 +332,9 @@ jobs:
           - ruby-version: 3_1_6
             ubuntu-version: 20.04
             ruby-system-version: 2.7.0
+          - ruby-version: 3_1_7
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
           - ruby-version: 3_2_0
             ubuntu-version: 20.04
             ruby-system-version: 2.7.0
@@ -354,6 +357,9 @@ jobs:
             ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_2_7
+            ubuntu-version: 20.04
+            ruby-system-version: 2.7.0
+          - ruby-version: 3_2_8
             ubuntu-version: 20.04
             ruby-system-version: 2.7.0
           - ruby-version: 3_3_0
