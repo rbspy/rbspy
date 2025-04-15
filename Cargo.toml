@@ -20,14 +20,14 @@ members = [
 ]
 
 [dependencies]
-anyhow = "1.0.94"
+anyhow = "1.0.98"
 chrono = { version = "0.4.39", default-features = false, features = ["clock", "std"] }
-clap = { version = "4.5.29", features = ["derive"] }
-ctrlc = "3.1.0"
+clap = { version = "4.5.36", features = ["derive"] }
+ctrlc = "3.4.6"
 directories = "6.0.0"
-env_logger = "0.11.2"
+env_logger = "0.11.8"
 inferno = "0.12.0"
-flate2 = "1.0.35"
+flate2 = "1.1.1"
 lazy_static = "1.4"
 libc = "0.2.168"
 log = "0.4.6"
