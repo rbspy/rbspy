@@ -238,6 +238,9 @@ jobs:
             mkdir -p /home/runner
             ln -s $(pwd)/.cargo /home/runner/.cargo
 
+            # Workaround for package mismatch warning when new releases come out
+            export IGNORE_OSVERSION=yes
+
             pkg install -y ruby
 
             ./rbspy --version
