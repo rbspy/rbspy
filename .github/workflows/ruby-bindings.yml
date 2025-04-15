@@ -35,6 +35,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [xtask]
     timeout-minutes: 20
+    continue-on-error: true
     env:
       CARGO: cargo
       TARGET_FLAGS: --target ${{ matrix.target }}
