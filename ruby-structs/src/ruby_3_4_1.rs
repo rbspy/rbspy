@@ -173,6 +173,23 @@ pub struct __sigset_t {
     pub __val: [usize; 16usize],
 }
 #[repr(C)]
+#[derive(Copy, Clone)]
+pub union __atomic_wide_counter {
+    pub __value64: ::std::os::raw::c_ulonglong,
+    pub __value32: __atomic_wide_counter__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct __atomic_wide_counter__bindgen_ty_1 {
+    pub __low: ::std::os::raw::c_uint,
+    pub __high: ::std::os::raw::c_uint,
+}
+impl ::std::fmt::Debug for __atomic_wide_counter {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "__atomic_wide_counter {{ union }}")
+    }
+}
+#[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct __pthread_internal_list {
     pub __prev: *mut __pthread_internal_list,
@@ -194,51 +211,17 @@ pub struct __pthread_mutex_s {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct __pthread_cond_s {
-    pub __bindgen_anon_1: __pthread_cond_s__bindgen_ty_1,
-    pub __bindgen_anon_2: __pthread_cond_s__bindgen_ty_2,
+    pub __wseq: __atomic_wide_counter,
+    pub __g1_start: __atomic_wide_counter,
     pub __g_refs: [::std::os::raw::c_uint; 2usize],
     pub __g_size: [::std::os::raw::c_uint; 2usize],
     pub __g1_orig_size: ::std::os::raw::c_uint,
     pub __wrefs: ::std::os::raw::c_uint,
     pub __g_signals: [::std::os::raw::c_uint; 2usize],
 }
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union __pthread_cond_s__bindgen_ty_1 {
-    pub __wseq: ::std::os::raw::c_ulonglong,
-    pub __wseq32: __pthread_cond_s__bindgen_ty_1__bindgen_ty_1,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct __pthread_cond_s__bindgen_ty_1__bindgen_ty_1 {
-    pub __low: ::std::os::raw::c_uint,
-    pub __high: ::std::os::raw::c_uint,
-}
-impl ::std::fmt::Debug for __pthread_cond_s__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "__pthread_cond_s__bindgen_ty_1 {{ union }}")
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union __pthread_cond_s__bindgen_ty_2 {
-    pub __g1_start: ::std::os::raw::c_ulonglong,
-    pub __g1_start32: __pthread_cond_s__bindgen_ty_2__bindgen_ty_1,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct __pthread_cond_s__bindgen_ty_2__bindgen_ty_1 {
-    pub __low: ::std::os::raw::c_uint,
-    pub __high: ::std::os::raw::c_uint,
-}
-impl ::std::fmt::Debug for __pthread_cond_s__bindgen_ty_2 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "__pthread_cond_s__bindgen_ty_2 {{ union }}")
-    }
-}
 impl ::std::fmt::Debug for __pthread_cond_s {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write ! (f , "__pthread_cond_s {{ __bindgen_anon_1: {:?}, __bindgen_anon_2: {:?}, __g_refs: {:?}, __g_size: {:?}, __g1_orig_size: {:?}, __wrefs: {:?}, __g_signals: {:?} }}" , self . __bindgen_anon_1 , self . __bindgen_anon_2 , self . __g_refs , self . __g_size , self . __g1_orig_size , self . __wrefs , self . __g_signals)
+        write ! (f , "__pthread_cond_s {{ __wseq: {:?}, __g1_start: {:?}, __g_refs: {:?}, __g_size: {:?}, __g1_orig_size: {:?}, __wrefs: {:?}, __g_signals: {:?} }}" , self . __wseq , self . __g1_start , self . __g_refs , self . __g_size , self . __g1_orig_size , self . __wrefs , self . __g_signals)
     }
 }
 pub type pthread_t = usize;
