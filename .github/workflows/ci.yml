@@ -291,6 +291,13 @@ jobs:
             fi
           done
 
+      - name: Calculate checksums
+        run: |
+          set -euo pipefail
+
+          cd archives
+          sha256sum * > checksums.txt
+
       - uses: marvinpinto/action-automatic-releases@919008cf3f741b179569b7a6fb4d8860689ab7f0 # v1.1.1
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
