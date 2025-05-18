@@ -17,7 +17,7 @@ permissions:
 jobs:
   format:
     name: Check code formatting
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -45,12 +45,12 @@ jobs:
           - windows
         include:
           - build: linux-x86_64
-            os: ubuntu-22.04
+            os: ubuntu-24.04
             ruby-version: 3.4.1
             run-tests: 'true'
             target: x86_64-unknown-linux-gnu
           - build: linux-aarch64
-            os: ubuntu-22.04
+            os: ubuntu-24.04
             ruby-version: 3.4.1
             run-tests: 'false'
             target: aarch64-unknown-linux-gnu
@@ -138,7 +138,7 @@ jobs:
 
   build-linux-cross:
     name: Build
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -174,7 +174,7 @@ jobs:
 
   build-freebsd:
     name: Build (FreeBSD)
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
@@ -269,7 +269,7 @@ jobs:
 
   release:
     name: Create draft release
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: "startsWith(github.ref, 'refs/tags/')"
     needs: [build, build-freebsd, build-linux-cross]
     steps:

@@ -11,7 +11,7 @@ permissions:
 jobs:
   publish-ruby-structs:
     name: Publish rbspy-ruby-structs crate
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust
@@ -25,7 +25,7 @@ jobs:
   publish-rbspy:
     name: Publish rbspy crate
     needs: [publish-ruby-structs]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@d388a4836fcdbde0e50e395dc79a2670ccdef13f # stable branch

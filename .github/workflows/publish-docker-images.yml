@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   musl:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Determine release version
         run: |
@@ -61,7 +61,7 @@ jobs:
           target: musl
 
   gnu:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Determine release version
         run: |
@@ -109,7 +109,7 @@ jobs:
           target: gnu
 
   readme:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
