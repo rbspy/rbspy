@@ -8,6 +8,10 @@ on:
         description: 'Ruby commit to test'
         required: true
         default: 'master'
+      system_ruby_version:
+        description: 'System Ruby version to test against'
+        required: false
+        default: '3.4.4'
       bisect_good:
         description: 'Healthy Ruby commit to end bisecting at'
         required: false
@@ -21,15 +25,20 @@ permissions:
 jobs:
   ruby-latest:
     name: Test rbspy with upstream Ruby's main branch
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
       MAKEFLAGS: -j4
-      RUBY_LATEST_STABLE_VERSION: 3.3.0
+      RUBY_LATEST_STABLE_VERSION: 3.4.3
       RUST_BACKTRACE: 1
     steps:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@d388a4836fcdbde0e50e395dc79a2670ccdef13f # stable branch
+      - name: Install Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "${{ inputs.system_ruby_version }}"
+          bundler-cache: false
       - name: Check out latest Ruby source
         uses: actions/checkout@v4
         with:
