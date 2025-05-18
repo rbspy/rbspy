@@ -20,7 +20,7 @@ RUN cargo run --release --package xtask
 
 FROM ubuntu:${UBUNTU_VERSION} AS generate
 
-ARG RUBY_VERSION=3.4.2
+ARG RUBY_VERSION=3.4.3
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV tz=UTC
