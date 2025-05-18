@@ -21,7 +21,7 @@ jobs:
           ruby-version: ${{ inputs.ruby-version }}
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@d388a4836fcdbde0e50e395dc79a2670ccdef13f # stable branch
+        uses: dtolnay/rust-toolchain@4305c38b25d97ef35a8ad1f985ccf2d2242004f2 # stable branch
 
       - name: Install gdb
         run: sudo apt-get install -y gdb
