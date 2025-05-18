@@ -109,8 +109,8 @@ impl Stats {
         top: Option<usize>,
         truncate: Option<usize>,
     ) -> Result<()> {
-        let top = top.unwrap_or(::std::usize::MAX);
-        let truncate = truncate.unwrap_or(::std::usize::MAX);
+        let top = top.unwrap_or(::std::u16::MAX as usize);
+        let truncate = truncate.unwrap_or(::std::u16::MAX as usize);
         let mut sorted: Vec<(u64, u64, &str)> = self
             .counts
             .iter()
