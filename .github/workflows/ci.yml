@@ -81,7 +81,7 @@ jobs:
         run: |
           sudo apt update -qq && sudo apt install -qq -y gcc-aarch64-linux-gnu
       - name: Cargo Cache
-        uses: Swatinem/rust-cache@v2.7.3
+        uses: Swatinem/rust-cache@v2.7.8
         with:
           cache-on-failure: "true"
           key: "${{ matrix.os }}-${{ matrix.target }}"
@@ -158,7 +158,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Cargo Cache
-        uses: Swatinem/rust-cache@v2.7.3
+        uses: Swatinem/rust-cache@v2.7.8
         with:
           prefix-key: "20230109"
       - name: Build
@@ -183,7 +183,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@d388a4836fcdbde0e50e395dc79a2670ccdef13f # stable branch
 
-      - uses: Swatinem/rust-cache@v2.7.3
+      - uses: Swatinem/rust-cache@v2.7.8
 
       - name: Cross-compile rbspy
         run: |
