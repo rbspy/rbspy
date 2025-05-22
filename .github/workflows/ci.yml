@@ -184,7 +184,7 @@ jobs:
 
       - name: Cross-compile rbspy
         run: |
-          wget -q -O cross https://github.com/acj/freebsd-firecracker/releases/download/v0.0.10/cross
+          wget -q -O cross https://github.com/acj/freebsd-firecracker/releases/download/v0.3.0/cross
           chmod +x cross
           mv cross /usr/local/bin/cross
 
@@ -194,7 +194,7 @@ jobs:
           cross test --release --no-run --target x86_64-unknown-freebsd
 
       - name: Launch Firecracker VM
-        uses: acj/freebsd-firecracker-action@v0.2.0
+        uses: acj/freebsd-firecracker-action@v0.3.0
         with:
           verbose: false
           pre-run: |
