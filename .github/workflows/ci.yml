@@ -296,7 +296,9 @@ jobs:
           set -euo pipefail
 
           cd archives
-          sha256sum * > checksums.txt
+          for file in *; do
+            sha256sum "$file" | awk '{print $1}' > "$file.sha256"
+          done
 
       - uses: marvinpinto/action-automatic-releases@919008cf3f741b179569b7a6fb4d8860689ab7f0 # v1.1.1
         with:
