@@ -37,7 +37,7 @@ jobs:
       - name: Install Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: "${{ inputs.system_ruby_version }}"
+          ruby-version: "${{ inputs.system_ruby_version || 'ruby' }}"
           bundler-cache: false
       - name: Check out latest Ruby source
         uses: actions/checkout@v4
