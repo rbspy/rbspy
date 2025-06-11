@@ -209,7 +209,8 @@ fn sample(
                 sender.send(ok_trace).context("send trace")?;
             }
             Ok(None) => {
-                continue;
+                // We didn't get a stack trace, which can happen if we're sampling on-CPU only and
+                // the ruby process is not on the CPU right now
             }
             Err(e) => {
                 if let Some(MemoryCopyError::ProcessEnded) = e.downcast_ref() {
