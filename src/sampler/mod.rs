@@ -209,7 +209,7 @@ fn sample(
                 sender.send(ok_trace).context("send trace")?;
             }
             Ok(None) => {
-                break;
+                continue;
             }
             Err(e) => {
                 if let Some(MemoryCopyError::ProcessEnded) = e.downcast_ref() {
