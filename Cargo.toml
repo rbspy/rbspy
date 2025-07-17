@@ -22,18 +22,18 @@ members = [
 [dependencies]
 anyhow = "1.0.98"
 chrono = { version = "0.4.39", default-features = false, features = ["clock", "std"] }
-clap = { version = "4.5.36", features = ["derive"] }
+clap = { version = "4.5.41", features = ["derive"] }
 ctrlc = "3.4.6"
 directories = "6.0.0"
 env_logger = "0.11.8"
-inferno = "0.12.0"
-flate2 = "1.1.1"
+inferno = "0.12.3"
+flate2 = "1.1.2"
 lazy_static = "1.4"
-libc = "0.2.168"
+libc = "0.2.174"
 log = "0.4.6"
-memmap2 = "0.9.5"
+memmap2 = "0.9.7"
 proc-maps = "0.4.0"
-prost = "0.13.4"
+prost = "0.14.1"
 rand = "0.9.0"
 rbspy-ruby-structs = { path = "ruby-structs", version="0.34.1" }
 remoteprocess = "0.5.0"
