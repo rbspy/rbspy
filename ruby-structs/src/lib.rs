@@ -2,6 +2,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
+#![allow(unnecessary_transmutes)]
 pub mod ruby_1_9_1_0;
 pub mod ruby_1_9_2_0;
 pub mod ruby_1_9_3_0;
