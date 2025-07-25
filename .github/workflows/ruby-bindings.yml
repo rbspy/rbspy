@@ -75,7 +75,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ "$(ruby -e 'puts ${{ matrix.ruby-version }} >= 3.4.0')" == "true" ]]; then
+          if [[ "$(ruby -e 'puts Gem::Version.new("${{ matrix.ruby-version }}".gsub("_", ".")) >= Gem::Version.new("3.4.0")')" == "true" ]]; then
             ubuntu_version=24.04
             ruby_system_version=3.3.6
           else
