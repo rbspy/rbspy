@@ -87,6 +87,8 @@ fn prepare_ruby_source(path: &Path, version_tag: &str) -> Result<()> {
                 .args(vec![
                     "clone",
                     "https://github.com/ruby/ruby.git",
+                    "--depth", "1",
+                    "--branch", version_tag,
                     &path.to_string_lossy(),
                 ])
                 .status()?;
@@ -110,15 +112,6 @@ fn prepare_ruby_source(path: &Path, version_tag: &str) -> Result<()> {
             "failed to fetch latest tags from ruby repository ({})",
             status
         ));
-    }
-
-    let status = Command::new("git")
-        .args(vec!["checkout", "-f", version_tag])
-        .current_dir(path)
-        .status()
-        .context("check out ruby repository")?;
-    if !status.success() {
-        return Err(anyhow!("failed to check out ruby repository ({})", status));
     }
 
     let status = Command::new("git")
