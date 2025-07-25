@@ -181,7 +181,7 @@ fn sample(
     on_cpu_only: bool,
 ) -> Result<(), Error> {
     let mut process =
-        crate::core::ruby_spy::RubySpy::retry_new(pid, 10, force_version, on_cpu_only)
+        crate::core::ruby_spy::RubySpy::retry_new(pid, 50, force_version, on_cpu_only)
             .context("new spy")?;
 
     let mut total = 0;
