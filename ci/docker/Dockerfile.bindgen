@@ -37,10 +37,7 @@ RUN apt-get update -qq && apt-get install -y -qq \
 SHELL ["/bin/bash", "-c"]
 ENV PATH="/root/.rbenv/bin:/root/.rbenv/shims:${PATH}"
 
-RUN curl -fsSL https://github.com/rbenv/rbenv-installer/raw/HEAD/bin/rbenv-installer | bash && \
-    ~/.rbenv/bin/rbenv init && \
-    rbenv install ${RUBY_VERSION} && \
-    rbenv global ${RUBY_VERSION}
+RUN ruby -v
 
 RUN mkdir -p ruby-structs/src
 
