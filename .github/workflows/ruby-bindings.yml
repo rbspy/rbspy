@@ -145,4 +145,4 @@ jobs:
           git checkout -b $branch_name
           git add ruby-structs/src/ruby*.rs
           git commit -a -m "Regenerate ruby C bindings" --author="GitHub Actions <actions@github.com>"
-          git push --set-upstream origin $branch_name
+          git push -f --set-upstream origin $branch_name
