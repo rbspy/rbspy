@@ -502,7 +502,18 @@ checksum = "daa0a64d21a7eb230583b4c5f4e23b7e4e57974f96620f42a7e75e08ae66d745"
 dependencies = [
  "log",
  "plain",
- "scroll",
+ "scroll 0.12.0",
+]
+
+[[package]]
+name = "goblin"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e961b33649994dcf69303af6b3a332c1228549e604d455d61ec5d2ab5e68d3a"
+dependencies = [
+ "log",
+ "plain",
+ "scroll 0.13.0",
 ]
 
 [[package]]
@@ -1037,7 +1048,7 @@ checksum = "89d3a777c4afd632e8964d7de070b3aede81a2c116cef6e048f5a9acf0cdda3d"
 dependencies = [
  "anyhow",
  "flate2",
- "goblin",
+ "goblin 0.9.3",
  "libc",
  "remoteprocess",
 ]
@@ -1111,7 +1122,7 @@ checksum = "e6194770c7afc1d2ca42acde19267938eb7d52ccb5b727f1a2eafa8d4d00ff20"
 dependencies = [
  "addr2line",
  "cfg-if",
- "goblin",
+ "goblin 0.9.3",
  "lazy_static",
  "libc",
  "libproc",
@@ -1200,7 +1211,16 @@ version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ab8598aa408498679922eff7fa985c25d58a90771bd6be794434c5277eab1a6"
 dependencies = [
- "scroll_derive",
+ "scroll_derive 0.12.1",
+]
+
+[[package]]
+name = "scroll"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1257cd4248b4132760d6524d6dda4e053bc648c9070b960929bf50cfb1e7add"
+dependencies = [
+ "scroll_derive 0.13.0",
 ]
 
 [[package]]
@@ -1208,6 +1228,17 @@ name = "scroll_derive"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1783eabc414609e28a5ba76aee5ddd52199f7107a0b24c2e9746a1ecc34a683d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "scroll_derive"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22fc4f90c27b57691bbaf11d8ecc7cfbfe98a4da6dbe60226115d322aa80c06e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1266,12 +1297,12 @@ checksum = "8917285742e9f3e1683f0a9c4e6b57960b7314d0b08d30d1ecd426713ee2eee9"
 
 [[package]]
 name = "spytools"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc173391e312b3ce786d2cd34b615f548e6756f5d486b1bd884eb5fe0f2e6ea9"
+checksum = "1b10cf0107e78203246e1872c161ec8d74ba119ff28d03709324cda5409c6403"
 dependencies = [
  "anyhow",
- "goblin",
+ "goblin 0.10.0",
  "lazy_static",
  "libc",
  "log",
