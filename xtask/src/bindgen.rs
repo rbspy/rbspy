@@ -87,8 +87,10 @@ fn prepare_ruby_source(path: &Path, version_tag: &str) -> Result<()> {
                 .args(vec![
                     "clone",
                     "https://github.com/ruby/ruby.git",
-                    "--depth", "1",
-                    "--branch", version_tag,
+                    "--depth",
+                    "1",
+                    "--branch",
+                    version_tag,
                     &path.to_string_lossy(),
                 ])
                 .status()?;
