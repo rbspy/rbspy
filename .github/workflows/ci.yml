@@ -182,10 +182,32 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.7.8
 
+      - name: Cache cross binary
+        id: cache-cross
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cross
+          key: ${{ runner.os }}-cross-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cross-
+
+      - name: Install cross
+        if: steps.cache-cross.outputs.cache-hit != 'true'
+        run: cargo install cross --git https://github.com/cross-rs/cross --rev 51f46f296253d8122c927c5bb933e3c4f27cc317
+
+      - name: Cargo Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
       - name: Cross-compile rbspy
         run: |
-          cargo install cross --git https://github.com/cross-rs/cross --rev 51f46f296253d8122c927c5bb933e3c4f27cc317
-
           cross build --release --target x86_64-unknown-freebsd
           cp target/x86_64-unknown-freebsd/release/rbspy rbspy
           rm -rf target/x86_64-unknown-freebsd/release/deps/rbspy-*
