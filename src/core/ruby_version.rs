@@ -296,7 +296,7 @@ macro_rules! ruby_version_v3_3_x(
             get_cfps!();
             get_pos!(rb_iseq_constant_body);
             get_lineno_2_6_0!();
-            get_stack_frame_2_5_0!();
+            get_stack_frame_3_3_0!();
             stack_field_2_5_0!();
             get_thread_status_2_6_0!();
             get_thread_id_3_2_0!();
@@ -905,6 +905,88 @@ macro_rules! get_stack_frame_2_5_0(
             ).context("couldn't get ruby string from iseq body")?;
             Ok(StackFrame{
                 name: get_ruby_string(body.location.label as usize, source)?,
+                relative_path: path,
+                absolute_path: Some(absolute_path),
+                lineno: match get_lineno(&body, cfp, source) {
+                    Ok(lineno) => Some(lineno),
+                    Err(e) => {
+                        warn!("couldn't get lineno: {}", e);
+                        None
+                    },
+                }
+            })
+        }
+    )
+);
+
+macro_rules! get_stack_frame_3_3_0(
+    () => (
+        fn get_stack_frame<T>(
+            iseq_struct: &rb_iseq_struct,
+            cfp: &rb_control_frame_t,
+            source: &T,
+        ) -> Result<StackFrame> where T: ProcessMemory {
+            let mut ep = cfp.ep as *mut usize;
+            let mut env_specval: usize = unsafe {
+                source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?
+            };
+            let mut env_me_cref: usize = unsafe {
+                source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-1) as usize)?
+            };
+
+            // #define VM_ENV_FLAG_LOCAL 0x02
+            while env_specval & 0x02 != 0 {
+                if !check_method_entry(env_me_cref, source)?.is_null() {
+                    break;
+                }
+                unsafe {
+                    ep = ep.offset(0) as *mut usize;
+                    env_specval = source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?;
+                    env_me_cref = source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-2) as usize)?;
+                }
+            }
+
+            let class_name = match source.copy_struct(env_me_cref).context(env_me_cref) {
+                Ok(method_struct) => {
+                    let imemo: rb_method_entry_struct = method_struct;
+                    match source.copy_struct(imemo.defined_class).context(imemo.defined_class) {
+                        Ok(rclass) => {
+                            let klass: RClass_and_rb_classext_t = rclass;
+                            if klass.classext.classpath != 0 {
+                                get_ruby_string(klass.classext.classpath as usize, source)?
+                            } else {
+                                "".to_string()
+                            }
+                        },
+                        Err(_) => "".to_string(),
+                    }
+                },
+                Err(_) => "".to_string(),
+            };
+
+            if iseq_struct.body == std::ptr::null_mut() {
+                return Err(format_err!("iseq body is null"));
+            }
+            let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
+                .context("couldn't copy rb_iseq_constant_body")?;
+
+            let rstring: RString = source.copy_struct(body.location.label as usize)
+                .context("couldn't copy RString")?;
+            let (path, absolute_path) = get_ruby_string_array(
+                body.location.pathobj as usize,
+                rstring.basic.klass as usize,
+                source
+            ).context("couldn't get ruby string from iseq body")?;
+
+            let method_name = get_ruby_string(body.location.label as usize, source)?;
+            let name = if class_name != "" {
+                format!("{}#{}", class_name, method_name)
+            } else {
+                method_name
+            };
+
+            Ok(StackFrame{
+                name: name,
                 relative_path: path,
                 absolute_path: Some(absolute_path),
                 lineno: match get_lineno(&body, cfp, source) {
