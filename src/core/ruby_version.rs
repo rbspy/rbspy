@@ -1663,7 +1663,7 @@ mod tests {
                 lineno: None,
             },
             StackFrame {
-                name: "aaa".to_string(),
+                name: "Object#aaa".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
                 absolute_path: Some(
                     "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite.rb".to_string(),
@@ -1671,7 +1671,7 @@ mod tests {
                 lineno: Some(3),
             },
             StackFrame {
-                name: "bbb".to_string(),
+                name: "Object#bbb".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
                 absolute_path: Some(
                     "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite.rb".to_string(),
@@ -1679,7 +1679,7 @@ mod tests {
                 lineno: Some(7),
             },
             StackFrame {
-                name: "ccc".to_string(),
+                name: "Object#ccc".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
                 absolute_path: Some(
                     "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite.rb".to_string(),
