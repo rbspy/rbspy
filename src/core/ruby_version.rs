@@ -921,12 +921,22 @@ macro_rules! get_stack_frame_2_5_0(
 
 macro_rules! get_stack_frame_3_3_0(
     () => (
-        fn get_stack_frame<T>(
-            iseq_struct: &rb_iseq_struct,
-            cfp: &rb_control_frame_t,
+        fn get_classname<T>(
+            ep: &*const usize,
             source: &T,
-        ) -> Result<StackFrame> where T: ProcessMemory {
-            let mut ep = cfp.ep as *mut usize;
+        ) -> Result<String> where T: ProcessMemory {
+            let mut ep = ep.clone() as *mut usize;
+
+            let frame_flag: usize = unsafe {
+                source.copy_struct(ep.offset(0) as usize).context(ep.offset(0) as usize)?
+            };
+
+            // VM_FRAME_MAGIC_MASK   = 0x7fff0001
+            // VM_FRAME_MAGIC_METHOD = 0x11110001
+            if (frame_flag & 0x7fff0001) != 0x11110001 {
+                return Err(anyhow::anyhow!(format!("frame flag {:x} does not match method mask, cannot read class", frame_flag)));
+            }
+
             let mut env_specval: usize = unsafe {
                 source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?
             };
@@ -940,7 +950,7 @@ macro_rules! get_stack_frame_3_3_0(
                     break;
                 }
                 unsafe {
-                    ep = ep.offset(0) as *mut usize;
+                    ep = env_specval.clone() as *mut usize;
                     env_specval = source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?;
                     env_me_cref = source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-2) as usize)?;
                 }
@@ -955,15 +965,23 @@ macro_rules! get_stack_frame_3_3_0(
                             if klass.classext.classpath != 0 {
                                 get_ruby_string(klass.classext.classpath as usize, source)?
                             } else {
-                                "".to_string()
+                                return Err(anyhow::anyhow!("classpath was empty"));
                             }
                         },
-                        Err(_) => "".to_string(),
+                        Err(e) => return Err(e),
                     }
                 },
-                Err(_) => "".to_string(),
+                Err(e) => return Err(e),
             };
 
+            return Ok(class_name.to_string())
+        }
+
+        fn get_stack_frame<T>(
+            iseq_struct: &rb_iseq_struct,
+            cfp: &rb_control_frame_t,
+            source: &T,
+        ) -> Result<StackFrame> where T: ProcessMemory {
             if iseq_struct.body == std::ptr::null_mut() {
                 return Err(format_err!("iseq body is null"));
             }
@@ -978,6 +996,7 @@ macro_rules! get_stack_frame_3_3_0(
                 source
             ).context("couldn't get ruby string from iseq body")?;
 
+            let class_name = get_classname(&cfp.ep, source).unwrap_or("".to_string());
             let method_name = get_ruby_string(body.location.label as usize, source)?;
             let name = if class_name != "" {
                 format!("{}#{}", class_name, method_name)
