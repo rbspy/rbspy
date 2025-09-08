@@ -1040,25 +1040,13 @@ macro_rules! get_stack_frame_3_3_0(
                 }
             }
 
-            let class_name = match source.copy_struct(env_me_cref).context(env_me_cref) {
-                Ok(method_struct) => {
-                    let imemo: rb_method_entry_struct = method_struct;
-                    match source.copy_struct(imemo.defined_class).context(imemo.defined_class) {
-                        Ok(rclass) => {
-                            let klass: RClass_and_rb_classext_t = rclass;
-                            if klass.classext.classpath != 0 {
-                                get_ruby_string(klass.classext.classpath as usize, source)?
-                            } else {
-                                return Err(anyhow::anyhow!("classpath was empty"));
-                            }
-                        },
-                        Err(e) => return Err(e),
-                    }
-                },
-                Err(e) => return Err(e),
-            };
-
-            return Ok(class_name.to_string())
+            let imemo: rb_method_entry_struct = source.copy_struct(env_me_cref).context(env_me_cref)?;
+            let klass: RClass_and_rb_classext_t = source.copy_struct(imemo.defined_class).context(imemo.defined_class)?;
+            if klass.classext.classpath == 0 {
+                return Err(anyhow::anyhow!("classpath was empty"));
+            }
+            let class_name = get_ruby_string(klass.classext.classpath as usize, source)?;
+            Ok(class_name.to_string())
         }
 
         fn get_stack_frame<T>(
