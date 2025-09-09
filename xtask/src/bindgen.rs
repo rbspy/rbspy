@@ -23,6 +23,8 @@ pub fn generate_ruby_bindings(
         .allowlist_type("imemo_type")
         .allowlist_type("iseq_insn_info_entry")
         .allowlist_type("RArray")
+        .allowlist_type("RClass_and_rb_classext_t")
+        .allowlist_type("rb_classext_t")
         .allowlist_type("rb_control_frame_struct")
         .allowlist_type("rb_execution_context_struct")
         .allowlist_type("rb_id_serial_t")
@@ -210,6 +212,11 @@ fn prepare_ruby_headers(
         )?;
     }
     if version >= semver::Version::new(3, 3, 0) {
+        writeln!(
+            wrapper,
+            "#include \"{}/internal/class.h\"",
+            path.to_string_lossy()
+        )?;
         writeln!(
             wrapper,
             "#include \"{}/prism/options.h\"",

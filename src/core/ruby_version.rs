@@ -292,11 +292,11 @@ macro_rules! ruby_version_v3_3_x(
             get_stack_trace!(rb_execution_context_struct);
             get_execution_context_from_vm!();
             get_ruby_string_3_3_0!();
-            get_ruby_string_array_3_2_0!();
+            get_ruby_string_array_3_3_0!();
             get_cfps!();
             get_pos!(rb_iseq_constant_body);
             get_lineno_2_6_0!();
-            get_stack_frame_2_5_0!();
+            get_stack_frame_3_3_0!();
             stack_field_2_5_0!();
             get_thread_status_2_6_0!();
             get_thread_id_3_2_0!();
@@ -664,11 +664,95 @@ macro_rules! get_ruby_string_array_3_2_0(
             // the reason I am not checking is that I don't know how to check yet
             let path_addr: usize = unsafe { rarray.as_.ary[0] as usize }; // 0 => relative path
             let abs_path_addr: usize = unsafe { rarray.as_.ary[1] as usize }; // 1 => absolute path
+
             let rel_path = get_ruby_string(path_addr, source)?;
             // In the case of internal ruby functions (and maybe others), we may not get a valid
             // pointer here
             let abs_path = get_ruby_string(abs_path_addr, source)
                 .unwrap_or(String::from("unknown"));
+
+            Ok((rel_path, abs_path))
+        }
+    )
+);
+
+macro_rules! get_ruby_string_array_3_3_0(
+    () => (
+        fn get_ruby_string_limit<T>(
+            addr: usize,
+            max: usize,
+            source: &T
+        ) -> Result<String> where T: ProcessMemory {
+            let rstring: RString = source.copy_struct(addr).context("couldn't copy rstring")?;
+            // See RSTRING_NOEMBED and RUBY_FL_USER1
+            let is_embedded_string = rstring.basic.flags & 1 << 13 == 0;
+            if is_embedded_string {
+                // Workaround for Windows strings until we have OS-specific bindings
+                #[cfg(target_os = "windows")]
+                let addr = addr + 4;
+
+                if (rstring.len as usize) > max {
+                    return Err(anyhow::anyhow!("string length {} exceeds maximum {}", rstring.len, max));
+                }
+                // The introduction of Variable Width Allocation (VWA) for strings means that
+                // the length of embedded strings varies at runtime. Instead of assuming a
+                // constant length, we need to read the length from the struct.
+                //
+                // See https://bugs.ruby-lang.org/issues/18239
+                let embedded_str_bytes = source.copy(
+                    addr + std::mem::size_of::<RBasic>() + std::mem::size_of::<std::os::raw::c_long>(),
+                    rstring.len as usize
+                ).context("couldn't copy rstring")?;
+                return String::from_utf8(embedded_str_bytes).context("couldn't convert ruby string bytes to string")
+            } else {
+                unsafe {
+                    let addr = rstring.as_.heap.ptr as usize;
+                    let len = rstring.len as usize;
+                    let heap_str_bytes = source.copy(addr as usize, len).context("couldn't copy ruby string from heap")?;
+                    return String::from_utf8(heap_str_bytes).context("couldn't convert ruby string bytes to string");
+                }
+            }
+        }
+
+
+        // Returns (path, absolute_path)
+        fn get_ruby_string_array<T>(addr: usize, string_class: usize, source: &T) -> Result<(String, String)> where T: ProcessMemory {
+            let rstring: RString = source.copy_struct(addr).context("couldn't copy RString")?;
+            if rstring.basic.klass as usize == string_class {
+                let s = get_ruby_string(addr, source)?;
+                return Ok((s.clone(), s))
+            }
+
+            // Due to VWA in ruby 3.2, we can't get the exact length of the RArray. So,
+            // we use these inline structs and assume that there are at least two array
+            // elements when we're reading a pathobj.
+            #[repr(C)]
+            #[derive(Copy, Clone)]
+            struct PaddedRArray {
+                pub basic: RBasic,
+                pub as_: PaddedRArray__bindgen_ty_1,
+            }
+            #[repr(C)]
+            #[derive(Copy, Clone)]
+            union PaddedRArray__bindgen_ty_1 {
+                pub heap: RArray__bindgen_ty_1__bindgen_ty_1,
+                pub ary: [VALUE; 2usize],
+            }
+
+            // otherwise it's an RArray
+            let rarray: PaddedRArray = source.copy_struct(addr).context("couldn't copy RArray")?;
+            // TODO: this assumes that the array contents are stored inline and not on the heap
+            // I think this will always be true but we should check instead
+            // the reason I am not checking is that I don't know how to check yet
+            let path_addr: usize = unsafe { rarray.as_.ary[0] as usize }; // 0 => relative path
+            let abs_path_addr: usize = unsafe { rarray.as_.ary[1] as usize }; // 1 => absolute path
+
+            let rel_path = get_ruby_string(path_addr, source)?;
+            // In the case of internal ruby functions (and maybe others), we may not get a valid
+            // pointer here
+            let abs_path = get_ruby_string_limit(abs_path_addr, 4096, source)
+                .unwrap_or(String::from("unknown"));
+
             Ok((rel_path, abs_path))
         }
     )
@@ -905,6 +989,95 @@ macro_rules! get_stack_frame_2_5_0(
             ).context("couldn't get ruby string from iseq body")?;
             Ok(StackFrame{
                 name: get_ruby_string(body.location.label as usize, source)?,
+                relative_path: path,
+                absolute_path: Some(absolute_path),
+                lineno: match get_lineno(&body, cfp, source) {
+                    Ok(lineno) => Some(lineno),
+                    Err(e) => {
+                        warn!("couldn't get lineno: {}", e);
+                        None
+                    },
+                }
+            })
+        }
+    )
+);
+
+macro_rules! get_stack_frame_3_3_0(
+    () => (
+        fn get_classname<T>(
+            ep: &*const usize,
+            source: &T,
+        ) -> Result<String> where T: ProcessMemory {
+            let mut ep = ep.clone() as *mut usize;
+
+            let frame_flag: usize = unsafe {
+                source.copy_struct(ep.offset(0) as usize).context(ep.offset(0) as usize)?
+            };
+
+            // VM_FRAME_MAGIC_MASK   = 0x7fff0001
+            // VM_FRAME_MAGIC_METHOD = 0x11110001
+            if (frame_flag & 0x7fff0001) != 0x11110001 {
+                return Err(anyhow::anyhow!(format!("frame flag {:x} does not match method mask, cannot read class", frame_flag)));
+            }
+
+            let mut env_specval: usize = unsafe {
+                source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?
+            };
+            let mut env_me_cref: usize = unsafe {
+                source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-1) as usize)?
+            };
+
+            // #define VM_ENV_FLAG_LOCAL 0x02
+            while env_specval & 0x02 != 0 {
+                if !check_method_entry(env_me_cref, source)?.is_null() {
+                    break;
+                }
+                unsafe {
+                    ep = env_specval.clone() as *mut usize;
+                    env_specval = source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?;
+                    env_me_cref = source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-2) as usize)?;
+                }
+            }
+
+            let imemo: rb_method_entry_struct = source.copy_struct(env_me_cref).context(env_me_cref)?;
+            let klass: RClass_and_rb_classext_t = source.copy_struct(imemo.defined_class).context(imemo.defined_class)?;
+            if klass.classext.classpath == 0 {
+                return Err(anyhow::anyhow!("classpath was empty"));
+            }
+            let class_name = get_ruby_string(klass.classext.classpath as usize, source)?;
+            Ok(class_name.to_string())
+        }
+
+        fn get_stack_frame<T>(
+            iseq_struct: &rb_iseq_struct,
+            cfp: &rb_control_frame_t,
+            source: &T,
+        ) -> Result<StackFrame> where T: ProcessMemory {
+            if iseq_struct.body == std::ptr::null_mut() {
+                return Err(format_err!("iseq body is null"));
+            }
+            let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
+                .context("couldn't copy rb_iseq_constant_body")?;
+
+            let rstring: RString = source.copy_struct(body.location.label as usize)
+                .context("couldn't copy RString")?;
+            let (path, absolute_path) = get_ruby_string_array(
+                body.location.pathobj as usize,
+                rstring.basic.klass as usize,
+                source
+            ).context("couldn't get ruby string from iseq body")?;
+
+            let class_name = get_classname(&cfp.ep, source).unwrap_or("".to_string());
+            let method_name = get_ruby_string(body.location.label as usize, source)?;
+            let name = if class_name != "" {
+                format!("{}#{}", class_name, method_name)
+            } else {
+                method_name
+            };
+
+            Ok(StackFrame{
+                name: name,
                 relative_path: path,
                 absolute_path: Some(absolute_path),
                 lineno: match get_lineno(&body, cfp, source) {
@@ -1581,7 +1754,7 @@ mod tests {
                 lineno: None,
             },
             StackFrame {
-                name: "aaa".to_string(),
+                name: "Object#aaa".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
                 absolute_path: Some(
                     "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite.rb".to_string(),
@@ -1589,7 +1762,7 @@ mod tests {
                 lineno: Some(3),
             },
             StackFrame {
-                name: "bbb".to_string(),
+                name: "Object#bbb".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
                 absolute_path: Some(
                     "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite.rb".to_string(),
@@ -1597,7 +1770,7 @@ mod tests {
                 lineno: Some(7),
             },
             StackFrame {
-                name: "ccc".to_string(),
+                name: "Object#ccc".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
                 absolute_path: Some(
                     "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite.rb".to_string(),
@@ -1617,6 +1790,53 @@ mod tests {
                 relative_path: "<internal:kernel>".to_string(),
                 absolute_path: Some("unknown".to_string()),
                 lineno: Some(192),
+            },
+        ]
+    }
+
+    fn real_stack_trace_with_classes_3_3_0() -> Vec<StackFrame> {
+        vec![
+            StackFrame {
+                name: "sleep [c function]".to_string(),
+                relative_path: "(unknown)".to_string(),
+                absolute_path: None,
+                lineno: None,
+            },
+            StackFrame {
+                name: "A#aaa".to_string(),
+                relative_path: "ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string()),
+                lineno: Some(10)
+            },
+            StackFrame {
+                name: "B::Ab#bbb".to_string(),
+                relative_path: "ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string()),
+                lineno: Some(17)
+            },
+            StackFrame {
+                name: "C::Cb#ccc".to_string(),
+                relative_path: "ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string()),
+                lineno: Some(25)
+            },
+            StackFrame {
+                name: "block in looper".to_string(),
+                relative_path: "ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string()),
+                lineno: Some(32)
+            },
+            StackFrame {
+                name: "loop".to_string(),
+                relative_path: "<internal:kernel>".to_string(),
+                absolute_path: Some("unknown".to_string()),
+                lineno: Some(192)
+            },
+            StackFrame {
+                name: "Object#looper".to_string(),
+                relative_path: "ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string()),
+                lineno: Some(33)
             },
         ]
     }
@@ -2410,6 +2630,27 @@ mod tests {
         .unwrap()
         .unwrap();
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.trace);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn test_get_ruby_stack_trace_with_classes_3_3_0() {
+        let source = coredump_with_classes_3_3_0();
+        let vm_addr = 0x7f58cb7f4988;
+        let global_symbols_addr = Some(0x7f58cb7e3c60);
+        let stack_trace = ruby_version::ruby_3_3_0::get_stack_trace::<CoreDump>(
+            0,
+            vm_addr,
+            global_symbols_addr,
+            &source,
+            0,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            real_stack_trace_with_classes_3_3_0(),
+            stack_trace.unwrap().trace
+        );
     }
 
     #[cfg(target_pointer_width = "64")]
