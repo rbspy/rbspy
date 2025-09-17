@@ -115,7 +115,7 @@ impl StackTrace {
         }
     }
 
-    pub fn iter(&self) -> std::slice::Iter<StackFrame> {
+    pub fn iter(&self) -> std::slice::Iter<'_, StackFrame> {
         self.trace.iter()
     }
 }
