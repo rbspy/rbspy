@@ -1004,22 +1004,41 @@ macro_rules! get_stack_frame_2_5_0(
 );
 
 macro_rules! get_stack_frame_3_3_0(
+
     () => (
         fn get_classname<T>(
             ep: &*const usize,
             source: &T,
-        ) -> Result<String> where T: ProcessMemory {
+        ) -> Result<(String, bool)> where T: ProcessMemory {
+            //https://github.com/ruby/ruby/blob/c149708018135595b2c19c5f74baf9475674f394/include/ruby/internal/value_type.h#L114¬
+            const RUBY_T_CLASS: usize = 0x2;
+            // https://github.com/ruby/ruby/blob/c149708018135595b2c19c5f74baf9475674f394/include/ruby/internal/value_type.h#L115C5-L115C74¬
+            const RUBY_T_MODULE: usize = 0x3;
+            //https://github.com/ruby/ruby/blob/c149708018135595b2c19c5f74baf9475674f394/include/ruby/internal/value_type.h#L138¬
+            const RUBY_T_ICLASS: usize = 0x1c;
+            // https://github.com/ruby/ruby/blob/c149708018135595b2c19c5f74baf9475674f394/include/ruby/internal/value_type.h#L142¬
+            const RUBY_T_MASK: usize = 0x1f;
+            // https://github.com/ruby/ruby/blob/1d1529629ce1550fad19c2d9410c4bf4995230d2/include/ruby/internal/fl_type.h#L158¬
+            const RUBY_FL_USHIFT: usize = 12;
+            // https://github.com/ruby/ruby/blob/1d1529629ce1550fad19c2d9410c4bf4995230d2/include/ruby/internal/fl_type.h#L323-L324¬
+            const RUBY_FL_USER1: usize = 1 << (RUBY_FL_USHIFT + 1);
+            // https://github.com/ruby/ruby/blob/1d1529629ce1550fad19c2d9410c4bf4995230d2/include/ruby/internal/fl_type.h#L394¬
+            const RUBY_FL_SINGLETON: usize = RUBY_FL_USER1;
+
             let mut ep = ep.clone() as *mut usize;
+            let mut singleton = false;
 
-            let frame_flag: usize = unsafe {
-                source.copy_struct(ep.offset(0) as usize).context(ep.offset(0) as usize)?
-            };
+            //let frame_flag: usize = unsafe {
+            //    source.copy_struct(ep.offset(0) as usize).context(ep.offset(0) as usize)?
+            //};
 
-            // VM_FRAME_MAGIC_MASK   = 0x7fff0001
-            // VM_FRAME_MAGIC_METHOD = 0x11110001
-            if (frame_flag & 0x7fff0001) != 0x11110001 {
-                return Err(anyhow::anyhow!(format!("frame flag {:x} does not match method mask, cannot read class", frame_flag)));
-            }
+
+            // TODO verify if this is needed, i don't think it is
+            //// VM_FRAME_MAGIC_MASK   = 0x7fff0001
+            //// VM_FRAME_MAGIC_METHOD = 0x11110001
+            //if (frame_flag & 0x7fff0001) != 0x11110001 {
+            //    return Err(anyhow::anyhow!(format!("frame flag {:x} does not match method mask, cannot read class", frame_flag)));
+            //}
 
             let mut env_specval: usize = unsafe {
                 source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?
@@ -1034,19 +1053,75 @@ macro_rules! get_stack_frame_3_3_0(
                     break;
                 }
                 unsafe {
-                    ep = env_specval.clone() as *mut usize;
+                    // https://github.com/ruby/ruby/blob/v3_4_5/vm_core.h#L1355
+                    ep = (env_specval.clone() & !0x03) as *mut usize; // FIXME need to mask this properly
                     env_specval = source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?;
                     env_me_cref = source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-2) as usize)?;
                 }
             }
 
+            let mut classpath_ptr = 0usize;
+
             let imemo: rb_method_entry_struct = source.copy_struct(env_me_cref).context(env_me_cref)?;
-            let klass: RClass_and_rb_classext_t = source.copy_struct(imemo.defined_class).context(imemo.defined_class)?;
-            if klass.classext.classpath == 0 {
+            // Read the class structure to get flags
+            let class_addr = imemo.defined_class;
+            let klass: RClass_and_rb_classext_t = source.copy_struct(class_addr).context(class_addr)?;
+
+            let rbasic: RBasic = source.copy_struct(class_addr).context(class_addr)?;
+            // Get flags from the RClass structure (assuming flags is the first field)
+            // You may need to adjust this based on your actual struct definition
+            let class_flags = rbasic.flags;
+            let class_mask = class_flags & RUBY_T_MASK;
+
+            // TODO have test cases that cover class and module, singleton, etc.
+            // see also how bmethod is handled
+            match class_mask {
+                RUBY_T_CLASS | RUBY_T_MODULE => {
+                    classpath_ptr = klass.classext.classpath as usize;
+
+                    // Check if it's a singleton class
+                    if class_flags & RUBY_FL_SINGLETON != 0 {
+                        log::debug!("Got singleton class");
+                        singleton = true;
+
+                        // For singleton classes, get the classpath from the attached object
+                        let singleton_object_addr: usize = unsafe {
+                            source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-1) as usize)?;
+                            klass.classext.as_.singleton_class.attached_object as usize
+                        };
+
+                        if singleton_object_addr != 0 {
+                            let singleton_obj: RClass_and_rb_classext_t = source
+                                .copy_struct(singleton_object_addr)
+                                .context(singleton_object_addr)?;
+                            classpath_ptr = singleton_obj.classext.classpath as usize;
+                        }
+                    }
+                }
+                RUBY_T_ICLASS => {
+                    // For iclass, get the classpath from the klass field
+                    // Assuming RClass has a 'basic' field with 'klass' member
+                    let klass_addr = rbasic.klass as usize;  // Adjust field name as needed
+
+                    if klass_addr != 0 {
+                        log::debug!("Using klass for iclass type");
+                        let actual_klass: RClass_and_rb_classext_t = source
+                            .copy_struct(klass_addr)
+                            .context(klass_addr)?;
+                        classpath_ptr = actual_klass.classext.classpath as usize;
+                    }
+                }
+                _ => {
+                    // Handle other types or anonymous classes
+                    classpath_ptr = klass.classext.classpath as usize;
+                }
+            }
+
+            if classpath_ptr == 0 {
                 return Err(anyhow::anyhow!("classpath was empty"));
             }
-            let class_name = get_ruby_string(klass.classext.classpath as usize, source)?;
-            Ok(class_name.to_string())
+            let class_name = get_ruby_string(classpath_ptr as usize, source)?;
+            Ok((class_name.to_string(), singleton))
         }
 
         fn get_stack_frame<T>(
@@ -1059,25 +1134,40 @@ macro_rules! get_stack_frame_3_3_0(
             }
             let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
                 .context("couldn't copy rb_iseq_constant_body")?;
-
             let rstring: RString = source.copy_struct(body.location.label as usize)
                 .context("couldn't copy RString")?;
+
+            let mut method_name = "".to_string();
+            if body.local_iseq != std::ptr::null_mut() {
+                let local_iseq: rb_iseq_t = source.copy_struct(body.local_iseq as usize)
+                    .context("couldn't read local iseq")?;
+                if local_iseq.body != std::ptr::null_mut() {
+                    let local_body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
+                        .context("couldn't copy rb_iseq_constant_body")?;
+                    method_name = get_ruby_string(local_body.location.base_label as usize, source)?;
+                }
+
+            }
+
             let (path, absolute_path) = get_ruby_string_array(
                 body.location.pathobj as usize,
                 rstring.basic.klass as usize,
                 source
             ).context("couldn't get ruby string from iseq body")?;
 
-            let class_name = get_classname(&cfp.ep, source).unwrap_or("".to_string());
-            let method_name = get_ruby_string(body.location.label as usize, source)?;
-            let name = if class_name != "" {
-                format!("{}#{}", class_name, method_name)
-            } else {
-                method_name
-            };
+            let (class_name, singleton) = get_classname(&cfp.ep, source).unwrap_or(("".to_string(), false));
+            let label = get_ruby_string(body.location.label as usize, source)?;
+            let base_label = get_ruby_string(body.location.base_label as usize, source)?;
+
+            let full_label = profile_frame_full_label(&class_name, &label, &base_label, &method_name, singleton);
+            //let name = if class_name != "" {
+            //    format!("{}#{}", class_name, method_name)
+            //} else {
+            //    method_name
+            //};
 
             Ok(StackFrame{
-                name: name,
+                name: full_label,
                 relative_path: path,
                 absolute_path: Some(absolute_path),
                 lineno: match get_lineno(&body, cfp, source) {
@@ -1088,6 +1178,55 @@ macro_rules! get_stack_frame_3_3_0(
                     },
                 }
             })
+        }
+
+        fn qualified_method_name(class_path: &str, method_name: &str, singleton: bool) -> String {
+            if method_name.is_empty() {
+                return method_name.to_string();
+            }
+
+            if !class_path.is_empty() {
+                let join_char = if singleton { "." } else { "#" };
+                return format!("{}{}{}", class_path, join_char, method_name);
+            }
+
+            method_name.to_string()
+        }
+
+        // TODO make some tests for profile_full_label_name to cover the various cases it needs
+        // to handle correctly
+        // TODO this should be saved in the cache, we shouldn't unconditionally run this
+        fn profile_frame_full_label(
+            class_path: &str,
+            label: &str,
+            base_label: &str,
+            method_name: &str,
+            singleton: bool,
+        ) -> String {
+            let qualified = qualified_method_name(class_path, method_name, singleton);
+
+            if qualified.is_empty() || qualified == base_label {
+                return label.to_string();
+            }
+
+            let label_length = label.len();
+            let base_label_length = base_label.len();
+            let mut prefix_len = label_length.saturating_sub(base_label_length);
+
+            // Ensure prefix_len doesn't exceed label length (defensive programming)
+            // Note: saturating_sub above already handles the < 0 case
+            if prefix_len > label_length {
+                prefix_len = label_length;
+            }
+
+            let profile_label = format!("{}{}", &label[..prefix_len], qualified);
+
+            if profile_label.is_empty() {
+                return String::new();
+            }
+
+            // Get the prefix from label and concatenate with qualified_method_name
+            profile_label
         }
     )
 );
@@ -1307,6 +1446,8 @@ macro_rules! get_cfunc_name(
             }
         }
 
+        // FIXME - cfunc_name should also be able to get classpath from CME
+        // we should read that here and return the qualified name
         fn get_cfunc_name<T: ProcessMemory>(
             cfp: &rb_control_frame_t,
             global_symbols_address: usize,
@@ -1333,13 +1474,15 @@ macro_rules! get_cfunc_name(
                 source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-1) as usize)?
             };
 
+            // FIXME this environment traversal is completely broken
+            // i think it only works because cfunc is usually local already...
             // #define VM_ENV_FLAG_LOCAL 0x02
             while env_specval & 0x02 != 0 {
                 if !check_method_entry(env_me_cref, source)?.is_null() {
                     break;
                 }
                 unsafe {
-                    ep = ep.offset(0) as *mut usize;
+                    ep = ep.offset(0) as *mut usize; // FIXME it never updates the PC, needs to get specval and mask it
                     env_specval = source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?;
                     env_me_cref = source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-2) as usize)?;
                 }
@@ -1350,6 +1493,10 @@ macro_rules! get_cfunc_name(
                 return Err(format_err!("No method definition").into());
             }
 
+            // FIXME read the classpath here from:
+            //rb_method_entry_struct.owner
+
+            // FIXME - i'm pretty sure this mask is wrong, it should be 0xff
             let ttype = ((imemo.flags >> 12) & 0x07) as usize;
             if ttype != imemo_type_imemo_ment as usize {
                 return Err(format_err!("Not a method entry").into());
