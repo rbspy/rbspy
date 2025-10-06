@@ -424,8 +424,32 @@ macro_rules! get_stack_trace(
             }
             let mut trace = Vec::new();
             let cfps = get_cfps(thread.cfp as usize, stack_base(&thread) as usize, source)?;
+            //println!("STACK SIZE {}", cfps.len());
             for cfp in cfps.iter() {
-                if cfp.iseq as usize == 0 {
+                let cfunc = ruby_frame_cfunc(&cfp, source)?;
+
+                //println!("CFP: {:?}", &cfp);
+                if !cfunc && cfp.pc as usize != 0 {
+                    let iseq_struct: rb_iseq_struct = source.copy_struct(cfp.iseq as usize)
+                        .context("couldn't copy iseq struct")?;
+
+                    let label_path  = get_stack_frame(&iseq_struct, &cfp, source);
+                    match label_path {
+                        Ok(call)  => trace.push(call),
+                        Err(x) => {
+                            debug!("Error: {:#?}", x);
+                            debug!("cfp: {:?}", cfp);
+                            debug!("thread: {:?}", thread);
+                            debug!("iseq struct: {:?}", iseq_struct);
+                            // this is a heuristic: the intent of this is that it skips function calls into C extensions
+                            if trace.len() > 0 {
+                                debug!("Skipping function call, possibly into C extension");
+                            } else {
+                                return Err(x);
+                            }
+                        }
+                    }
+                } else {
                     let mut frame = StackFrame::unknown_c_function();
                     if let Some(global_symbols_addr) = ruby_global_symbols_address_location {
                         match get_cfunc_name(cfp, global_symbols_addr, source, pid) {
@@ -444,29 +468,6 @@ macro_rules! get_stack_trace(
                     }
                     trace.push(frame);
                     continue;
-                }
-                if cfp.pc as usize == 0 {
-                    debug!("pc was 0. Not sure what that means, but skipping CFP");
-                    continue;
-                }
-                let iseq_struct: rb_iseq_struct = source.copy_struct(cfp.iseq as usize)
-                    .context("couldn't copy iseq struct")?;
-
-                let label_path  = get_stack_frame(&iseq_struct, &cfp, source);
-                match label_path {
-                    Ok(call)  => trace.push(call),
-                    Err(x) => {
-                        debug!("Error: {:#?}", x);
-                        debug!("cfp: {:?}", cfp);
-                        debug!("thread: {:?}", thread);
-                        debug!("iseq struct: {:?}", iseq_struct);
-                        // this is a heuristic: the intent of this is that it skips function calls into C extensions
-                        if trace.len() > 0 {
-                            debug!("Skipping function call, possibly into C extension");
-                        } else {
-                            return Err(x);
-                        }
-                    }
                 }
             }
             let thread_id = match get_thread_id(&thread, source) {
@@ -494,13 +495,13 @@ macro_rules! get_stack_trace(
         fn stack_base(thread: &$thread_type) -> i64 {
             // Ruby stack grows down, starting at
             //   ruby_current_thread->stack + ruby_current_thread->stack_size - 1 * sizeof(rb_control_frame_t)
-            // I don't know what the -1 is about. Also note that the stack_size is *not* in bytes! stack is a
-            // VALUE*, and so stack_size is in units of sizeof(VALUE).
+            // We must skip two dummy frames:
+            // https://github.com/ruby/ruby/blob/5445e0435260b449decf2ac16f9d09bae3cafe72/vm_backtrace.c#L477-L485%C2%A
             //
             // The base of the call stack is therefore at
             //   stack + stack_size * sizeof(VALUE) - sizeof(rb_control_frame_t)
             // (with everything in bytes).
-            stack_field(thread) + stack_size_field(thread) * std::mem::size_of::<VALUE>() as i64 - 1 * std::mem::size_of::<rb_control_frame_t>() as i64
+            stack_field(thread) + (stack_size_field(thread) * std::mem::size_of::<VALUE>() as i64) - (1 * std::mem::size_of::<rb_control_frame_t>() as i64)
         }
 
         pub fn is_maybe_thread<T>(candidate_thread_addr: usize, candidate_thread_addr_ptr: usize, source: &T, all_maps: &[MapRange]) -> bool where T: ProcessMemory {
@@ -1087,8 +1088,20 @@ macro_rules! get_stack_frame_3_3_0(
             if iseq_struct.body == std::ptr::null_mut() {
                 return Err(format_err!("iseq body is null"));
             }
-            let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
-                .context("couldn't copy rb_iseq_constant_body")?;
+            let cme = locate_method_entry(&cfp.ep, source)?;
+            let body: rb_iseq_constant_body = if cme == 0 {
+                //println!("IT IS AN ISEQ");
+                source.copy_struct(iseq_struct.body as usize)
+                    .context("couldn't copy rb_iseq_constant_body")?
+            } else {
+                //println!("IT IS A CME");
+                let imemo: rb_method_entry_struct = source.copy_struct(cme).context(cme)?;
+                let method_def: rb_method_definition_struct = source.copy_struct(imemo.def as usize).context(imemo.def as usize)?;
+                let iseq: rb_iseq_struct = unsafe {
+                    source.copy_struct(method_def.body.iseq.iseqptr as usize).context("")?
+                };
+                source.copy_struct(iseq.body as usize).context("couldn't copy iseq_constant_body from cme def body")?
+            };
             let rstring: RString = source.copy_struct(body.location.label as usize)
                 .context("couldn't copy RString")?;
 
@@ -1322,6 +1335,13 @@ macro_rules! get_cfps(
 
 macro_rules! get_cfunc_name_unsupported(
     () => (
+        fn ruby_frame_cfunc<T>(
+            _cfp: &rb_control_frame_t,
+            _source: &T
+        ) -> Result<bool> where T: ProcessMemory {
+            Ok(false)
+        }
+
         fn get_cfunc_name<T: ProcessMemory>(_cfp: &rb_control_frame_t, _global_symbols_address: usize, _source: &T, _pid: Pid) -> Result<String> {
             return Err(format_err!("C function resolution is not supported for this version of Ruby").into());
         }
@@ -1330,6 +1350,20 @@ macro_rules! get_cfunc_name_unsupported(
 
 macro_rules! get_cfunc_name(
     () => (
+
+        fn ruby_frame_cfunc<T>(
+            cfp: &rb_control_frame_t,
+            source: &T
+        ) -> Result<bool> where T: ProcessMemory {
+            let frame_flag: usize = unsafe {
+                source.copy_struct(cfp.ep.offset(0) as usize).context(cfp.ep.offset(0) as usize)?
+            };
+            const VM_FRAME_MAGIC_CFUNC: usize = 0x55550001;
+            const VM_FRAME_MAGIC_MASK: usize = 0x7fff0001;
+
+            Ok((frame_flag & VM_FRAME_MAGIC_MASK) == VM_FRAME_MAGIC_CFUNC)
+        }
+
         fn qualified_method_name(class_path: &str, method_name: &str, singleton: bool) -> String {
             if method_name.is_empty() {
                 return method_name.to_string();
@@ -1403,17 +1437,6 @@ macro_rules! get_cfunc_name(
             _pid: Pid
         ) -> Result<String> {
             const IMEMO_MASK: usize = 0x0f;
-
-            // The logic in this function is adapted from the .gdbinit script in
-            // github.com/ruby/ruby, in particular the print_id function.
-            let frame_flag: usize = unsafe {
-                source.copy_struct(cfp.ep.offset(0) as usize).context(cfp.ep.offset(0) as usize)?
-            };
-
-            // if VM_FRAME_TYPE($cfp->flag) != VM_FRAME_MAGIC_CFUNC
-            if frame_flag & 0xffff0001 != 0x55550001 {
-                return Err(format_err!("Not a C function control frame").into());
-            }
 
             let cme = locate_method_entry(&cfp.ep, source)?;
             let (class_path, singleton) = get_classpath(cme, true, source).unwrap_or(("".to_string(), false));
@@ -1664,7 +1687,6 @@ mod tests {
                 lineno: Some(14),
             },
             StackFrame::unknown_c_function(),
-            StackFrame::unknown_c_function(),
             StackFrame {
                 name: "<main>".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
@@ -1673,7 +1695,6 @@ mod tests {
                 ),
                 lineno: Some(13),
             },
-            StackFrame::unknown_c_function(),
         ]
     }
 
@@ -1827,7 +1848,7 @@ mod tests {
     fn real_stack_trace_3_3_0() -> Vec<StackFrame> {
         vec![
             StackFrame {
-                name: "sleep [c function]".to_string(),
+                name: "Kernel#sleep [c function]".to_string(),
                 relative_path: "(unknown)".to_string(),
                 absolute_path: None,
                 lineno: None,
@@ -1865,7 +1886,7 @@ mod tests {
                 lineno: Some(15),
             },
             StackFrame {
-                name: "loop".to_string(),
+                name: "Kernel#loop".to_string(),
                 relative_path: "<internal:kernel>".to_string(),
                 absolute_path: Some("unknown".to_string()),
                 lineno: Some(192),
@@ -1876,7 +1897,7 @@ mod tests {
     fn real_stack_trace_with_classes_3_3_0() -> Vec<StackFrame> {
         vec![
             StackFrame {
-                name: "sleep [c function]".to_string(),
+                name: "Kernel#sleep [c function]".to_string(),
                 relative_path: "(unknown)".to_string(),
                 absolute_path: None,
                 lineno: None,
@@ -1906,7 +1927,7 @@ mod tests {
                 lineno: Some(32)
             },
             StackFrame {
-                name: "loop".to_string(),
+                name: "Kernel#loop".to_string(),
                 relative_path: "<internal:kernel>".to_string(),
                 absolute_path: Some("unknown".to_string()),
                 lineno: Some(192)
