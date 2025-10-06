@@ -141,6 +141,8 @@ macro_rules! ruby_version_v2_5_x(
             get_cfunc_name_unsupported!();
             #[cfg(target_os = "linux")]
             get_cfunc_name!();
+            #[cfg(target_os = "linux")]
+            get_classpath_unsupported!();
         }
     )
 );
@@ -169,6 +171,8 @@ macro_rules! ruby_version_v2_6_x(
             get_cfunc_name_unsupported!();
             #[cfg(target_os = "linux")]
             get_cfunc_name!();
+            #[cfg(target_os = "linux")]
+            get_classpath_unsupported!();
         }
     )
 );
@@ -956,6 +960,8 @@ macro_rules! get_classpath(
             const RUBY_T_ICLASS: usize = 0x1c;
             // https://github.com/ruby/ruby/blob/c149708018135595b2c19c5f74baf9475674f394/include/ruby/internal/value_type.h#L142¬
             const RUBY_T_MASK: usize = 0x1f;
+
+            //TODO replace these with the flushift ocnstants ones already referenced
             // https://github.com/ruby/ruby/blob/1d1529629ce1550fad19c2d9410c4bf4995230d2/include/ruby/internal/fl_type.h#L158¬
             const RUBY_FL_USHIFT: usize = 12;
             // https://github.com/ruby/ruby/blob/1d1529629ce1550fad19c2d9410c4bf4995230d2/include/ruby/internal/fl_type.h#L323-L324¬
