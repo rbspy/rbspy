@@ -194,6 +194,7 @@ macro_rules! ruby_version_v2_7_x(
             get_thread_status_2_6_0!();
             get_thread_id_2_5_0!();
             get_cfunc_name!();
+            get_classpath_unsupported!();
         }
     )
 );
@@ -222,6 +223,7 @@ macro_rules! ruby_version_v3_0_x(
 
             #[allow(non_upper_case_globals)]
             const ruby_fl_type_RUBY_FL_USHIFT: ruby_fl_type = ruby_fl_ushift_RUBY_FL_USHIFT as i32;
+            get_classpath_unsupported!();
         }
     )
 );
@@ -250,6 +252,7 @@ macro_rules! ruby_version_v3_1_x(
 
             #[allow(non_upper_case_globals)]
             const ruby_fl_type_RUBY_FL_USHIFT: ruby_fl_type = ruby_fl_ushift_RUBY_FL_USHIFT as i32;
+            get_classpath_unsupported!();
         }
     )
 );
@@ -277,6 +280,7 @@ macro_rules! ruby_version_v3_2_x(
 
             #[allow(non_upper_case_globals)]
             const ruby_fl_type_RUBY_FL_USHIFT: ruby_fl_type = ruby_fl_ushift_RUBY_FL_USHIFT as i32;
+            get_classpath_unsupported!();
         }
     )
 );
@@ -304,6 +308,7 @@ macro_rules! ruby_version_v3_3_x(
 
             #[allow(non_upper_case_globals)]
             const ruby_fl_type_RUBY_FL_USHIFT: ruby_fl_type = ruby_fl_ushift_RUBY_FL_USHIFT as i32;
+            get_classpath!();
         }
     )
 );
@@ -924,13 +929,23 @@ macro_rules! get_stack_frame_2_5_0(
     )
 );
 
-macro_rules! get_stack_frame_3_3_0(
-
+macro_rules! get_classpath_unsupported(
     () => (
+        fn get_classpath<T>(
+            _cme: usize,
+            _cfunc: bool,
+            _source: &T,
+        ) -> Result<(String, bool)> where T: ProcessMemory {
+            return Err(format_err!("classpath resolution is not supported for this version of Ruby").into());
+        }
+    )
+);
 
-
-        fn get_classname<T>(
-            ep: &*const usize,
+macro_rules! get_classpath(
+    () => (
+        fn get_classpath<T>(
+            cme: usize,
+            cfunc: bool,
             source: &T,
         ) -> Result<(String, bool)> where T: ProcessMemory {
             //https://github.com/ruby/ruby/blob/c149708018135595b2c19c5f74baf9475674f394/include/ruby/internal/value_type.h#L114¬
@@ -952,10 +967,13 @@ macro_rules! get_stack_frame_3_3_0(
             let mut singleton = false;
             let mut classpath_ptr = 0usize;
 
-            let env_me_cref = locate_method_entry(&ep, source)?;
-            let imemo: rb_method_entry_struct = source.copy_struct(env_me_cref).context(env_me_cref)?;
+            let imemo: rb_method_entry_struct = source.copy_struct(cme).context(cme)?;
             // Read the class structure to get flags
-            let class_addr = imemo.defined_class;
+            let class_addr = if cfunc {
+                imemo.owner
+            } else {
+                imemo.defined_class
+            };
             let klass: RClass_and_rb_classext_t = source.copy_struct(class_addr).context(class_addr)?;
 
             let rbasic: RBasic = source.copy_struct(class_addr).context(class_addr)?;
@@ -1010,64 +1028,8 @@ macro_rules! get_stack_frame_3_3_0(
             if classpath_ptr == 0 {
                 return Err(anyhow::anyhow!("classpath was empty"));
             }
-            let class_name = get_ruby_string(classpath_ptr as usize, source)?;
-            Ok((class_name.to_string(), singleton))
-        }
-
-        fn get_stack_frame<T>(
-            iseq_struct: &rb_iseq_struct,
-            cfp: &rb_control_frame_t,
-            source: &T,
-        ) -> Result<StackFrame> where T: ProcessMemory {
-            if iseq_struct.body == std::ptr::null_mut() {
-                return Err(format_err!("iseq body is null"));
-            }
-            let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
-                .context("couldn't copy rb_iseq_constant_body")?;
-            let rstring: RString = source.copy_struct(body.location.label as usize)
-                .context("couldn't copy RString")?;
-
-            let mut method_name = "".to_string();
-            if body.local_iseq != std::ptr::null_mut() {
-                let local_iseq: rb_iseq_t = source.copy_struct(body.local_iseq as usize)
-                    .context("couldn't read local iseq")?;
-                if local_iseq.body != std::ptr::null_mut() {
-                    let local_body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
-                        .context("couldn't copy rb_iseq_constant_body")?;
-                    method_name = get_ruby_string(local_body.location.base_label as usize, source)?;
-                }
-
-            }
-
-            let (path, absolute_path) = get_ruby_string_array(
-                body.location.pathobj as usize,
-                rstring.basic.klass as usize,
-                source
-            ).context("couldn't get ruby string from iseq body")?;
-
-            let (class_name, singleton) = get_classname(&cfp.ep, source).unwrap_or(("".to_string(), false));
-            let label = get_ruby_string(body.location.label as usize, source)?;
-            let base_label = get_ruby_string(body.location.base_label as usize, source)?;
-
-            let full_label = profile_frame_full_label(&class_name, &label, &base_label, &method_name, singleton);
-            //let name = if class_name != "" {
-            //    format!("{}#{}", class_name, method_name)
-            //} else {
-            //    method_name
-            //};
-
-            Ok(StackFrame{
-                name: full_label,
-                relative_path: path,
-                absolute_path: Some(absolute_path),
-                lineno: match get_lineno(&body, cfp, source) {
-                    Ok(lineno) => Some(lineno),
-                    Err(e) => {
-                        warn!("couldn't get lineno: {}", e);
-                        None
-                    },
-                }
-            })
+            let class_path = get_ruby_string(classpath_ptr as usize, source)?;
+            Ok((class_path.to_string(), singleton))
         }
 
         // TODO make some tests for profile_full_label_name to cover the various cases it needs
@@ -1104,6 +1066,63 @@ macro_rules! get_stack_frame_3_3_0(
 
             // Get the prefix from label and concatenate with qualified_method_name
             profile_label
+        }
+    )
+);
+
+macro_rules! get_stack_frame_3_3_0(
+    () => (
+
+        fn get_stack_frame<T>(
+            iseq_struct: &rb_iseq_struct,
+            cfp: &rb_control_frame_t,
+            source: &T,
+        ) -> Result<StackFrame> where T: ProcessMemory {
+            if iseq_struct.body == std::ptr::null_mut() {
+                return Err(format_err!("iseq body is null"));
+            }
+            let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
+                .context("couldn't copy rb_iseq_constant_body")?;
+            let rstring: RString = source.copy_struct(body.location.label as usize)
+                .context("couldn't copy RString")?;
+
+            let mut method_name = "".to_string();
+            if body.local_iseq != std::ptr::null_mut() {
+                let local_iseq: rb_iseq_t = source.copy_struct(body.local_iseq as usize)
+                    .context("couldn't read local iseq")?;
+                if local_iseq.body != std::ptr::null_mut() {
+                    let local_body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
+                        .context("couldn't copy rb_iseq_constant_body")?;
+                    method_name = get_ruby_string(local_body.location.base_label as usize, source)?;
+                }
+
+            }
+
+            let (path, absolute_path) = get_ruby_string_array(
+                body.location.pathobj as usize,
+                rstring.basic.klass as usize,
+                source
+            ).context("couldn't get ruby string from iseq body")?;
+
+            let cme = locate_method_entry(&cfp.ep, source)?;
+            let (class_path, singleton) = get_classpath(cme, false, source).unwrap_or(("".to_string(), false));
+            let label = get_ruby_string(body.location.label as usize, source)?;
+            let base_label = get_ruby_string(body.location.base_label as usize, source)?;
+
+            let full_label = profile_frame_full_label(&class_path, &label, &base_label, &method_name, singleton);
+
+            Ok(StackFrame{
+                name: full_label,
+                relative_path: path,
+                absolute_path: Some(absolute_path),
+                lineno: match get_lineno(&body, cfp, source) {
+                    Ok(lineno) => Some(lineno),
+                    Err(e) => {
+                        warn!("couldn't get lineno: {}", e);
+                        None
+                    },
+                }
+            })
         }
     )
 );
@@ -1390,8 +1409,10 @@ macro_rules! get_cfunc_name(
                 return Err(format_err!("Not a C function control frame").into());
             }
 
-            let env_me_cref = locate_method_entry(&cfp.ep, source)?;
-            let imemo: rb_method_entry_struct = source.copy_struct(env_me_cref).context(env_me_cref)?;
+            let cme = locate_method_entry(&cfp.ep, source)?;
+            let (class_path, singleton) = get_classpath(cme, true, source).unwrap_or(("".to_string(), false));
+
+            let imemo: rb_method_entry_struct = source.copy_struct(cme).context(cme)?;
             if imemo.def.is_null() {
                 return Err(format_err!("No method definition").into());
             }
@@ -1404,7 +1425,7 @@ macro_rules! get_cfunc_name(
             }
             // TODO check the memo entry is of the CFUNC type now
 
-            let owner: rb_method_entry_struct = source.copy_struct(imemo.owner).context(imemo.owner)?;
+
             #[allow(non_camel_case_types)]
             type rb_id_serial_t = u32;
 
@@ -1466,8 +1487,8 @@ macro_rules! get_cfunc_name(
             let offset = (serial % 512) * 2;
             let rstring_remote_ptr = (array_ptr as usize) + offset * std::mem::size_of::<usize>();
             let rstring_ptr: usize = source.copy_struct(rstring_remote_ptr as usize).context(rstring_remote_ptr as usize)?;
-
-            Ok(get_ruby_string(rstring_ptr as usize, source)?)
+            let method_name = get_ruby_string(rstring_ptr as usize, source)?;
+            Ok(qualified_method_name(&class_path, &method_name, singleton))
         }
     )
 );
