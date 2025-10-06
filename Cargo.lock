@@ -1033,8 +1033,7 @@ version = "0.38.0"
 [[package]]
 name = "rbspy-testdata"
 version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ff51e6f270635f2969ab4a19435b3f46a102cca93a1730c5145e526fccb9e46"
+source = "git+https://github.com/dalehamel/rbspy-testdata.git?branch=update-coredumps#87923b87a12d3623bbef1e39fd24ea8b70f15db8"
 dependencies = [
  "anyhow",
  "flate2",
