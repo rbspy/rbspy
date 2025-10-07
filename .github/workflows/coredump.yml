@@ -40,19 +40,20 @@ jobs:
       - name: Run Ruby script
         id: ruby-script
         run: |
-          ruby ci/ruby-programs/infinite_on_cpu.rb &
+          ruby ci/ruby-programs/cme_complex_labels.rb &
           pid=$!
           echo "pid=$pid" >> $GITHUB_OUTPUT
 
       - name: Inspect process
         run: sudo ./target/release/rbspy inspect --pid ${{ steps.ruby-script.outputs.pid }}
 
+      # default coredump filter is 0x33, update it to basically dump all memory here
+      # to best mimic the real process otherwise heap data like strings may not
+      # be accessible
       - name: Create core dump
         shell: sudo bash {0}
         run: |
-          cat /proc/${{ steps.ruby-script.outputs.pid }}/coredump_filter
           echo 0x7f > /proc/${{ steps.ruby-script.outputs.pid }}/coredump_filter
-          cat /proc/${{ steps.ruby-script.outputs.pid }}/coredump_filter
           gcore ${{ steps.ruby-script.outputs.pid }}
           mv core.${{ steps.ruby-script.outputs.pid }} ruby-coredump-${{ inputs.ruby-version }}
           gzip -9 ruby-coredump-${{ inputs.ruby-version }}
