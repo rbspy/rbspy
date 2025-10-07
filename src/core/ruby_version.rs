@@ -948,6 +948,95 @@ macro_rules! get_classpath_unsupported(
 
 macro_rules! get_classpath(
     () => (
+        fn rb_class_real<T>(
+            klass: usize,
+            source: &T,
+        ) -> Result<usize> where T: ProcessMemory {
+            // https://github.com/ruby/ruby/blob/1d1529629ce1550fad19c2d9410c4bf4995230d2/include/ruby/internal/fl_type.h#L158¬
+            const RUBY_FL_USHIFT: usize = 12;
+            // https://github.com/ruby/ruby/blob/1d1529629ce1550fad19c2d9410c4bf4995230d2/include/ruby/internal/fl_type.h#L323-L324¬
+            const RUBY_FL_USER1: usize = 1 << (RUBY_FL_USHIFT + 1);
+
+            const RUBY_FL_SINGLETON: usize = RUBY_FL_USER1;
+            const RUBY_T_ICLASS: usize = 0x1c;
+            //https://github.com/ruby/ruby/blob/v3_4_5/object.c#L290
+            let mut klass = klass;
+            let mut rbasic: RBasic = source.copy_struct(klass).context(klass)?;
+            while (rbasic.flags & (RUBY_T_ICLASS | RUBY_FL_SINGLETON) != 0) {
+                let rclass: RClass = source.copy_struct(klass).context(klass)?;
+                klass = rclass.super_;
+                rbasic = source.copy_struct(klass).context(klass)?;
+            }
+            Ok(klass)
+        }
+
+        fn rb_tmp_class_path<T>(
+            klass: usize,
+            source: &T,
+        ) -> Result<usize> where T: ProcessMemory {
+            const RUBY_T_MODULE: usize = 0x3;
+            // https://github.com/ruby/ruby/blob/c149708018135595b2c19c5f74baf9475674f394/include/ruby/internal/value_type.h#L142¬
+            const RUBY_T_MASK: usize = 0x1f;
+
+            let ext: RClass_and_rb_classext_t = source.copy_struct(klass).context(klass)?;
+            //println!("KLASS {:X} REAL_KLASS {:X} {:?}", klass, real_klass, ext.classext.permanent_classpath());
+            let mut path_addr = if ext.classext.classpath == 0 {
+                0x0f // Qnil
+            } else {
+                ext.classext.classpath
+            };
+
+            let rbasic: RBasic = source.copy_struct(klass).context(klass)?;
+            if rbasic.flags & RUBY_T_MASK == RUBY_T_MODULE {
+                let real_klass = rb_class_real(rbasic.klass, source)?;
+                // https://github.com/ruby/ruby/blob/v3_4_5/variable.c#L359
+                let ext: RClass_and_rb_classext_t = source.copy_struct(real_klass).context(real_klass)?;
+                path_addr = if ext.classext.classpath != 0 {
+                    let modstr = get_ruby_string(ext.classext.classpath as usize, source)?;
+                    // Looking up the global symbol is not needed
+                    // we can just compare the string value, albeit less efficient
+                    if modstr == "Module".to_string() {
+                        0x00 // QFalse
+                    } else {
+                        rb_tmp_class_path(rbasic.klass, source)?
+                    }
+                } else {
+                    rb_tmp_class_path(rbasic.klass, source)?
+                }
+            }
+            return Ok(path_addr);
+        }
+
+        fn rb_class_path<T>(
+            klass: usize,
+            source: &T,
+        ) -> Result<String> where T: ProcessMemory {
+
+            let ext: RClass_and_rb_classext_t = source.copy_struct(klass).context(klass)?;
+            //println!("KLASS {:X} REAL_KLASS {:X} {:?}", klass, real_klass, ext.classext.permanent_classpath());
+            if ext.classext.classpath != 0 {
+                return get_ruby_string(ext.classext.classpath as usize, source);
+            };
+            let path = rb_tmp_class_path(klass, source)?;
+            let path_fallback = match path {
+                // Qnil
+                0x0f => {
+                    format!("#<Class:{:#08x}>", klass)
+                }
+                // QFalse
+                0x00 => {
+                    format!("#<Module:{:#08x}>", klass)
+                }
+                _ => {
+                    let path_str = get_ruby_string(path, source)?;
+                    format!("#<{}:{:#08x}>", path_str, klass)
+                }
+            };
+
+            //println!("PATH {}", path_fallback);
+            return Ok(path_fallback)
+        }
+
         fn get_classpath<T>(
             cme: usize,
             cfunc: bool,
@@ -970,73 +1059,75 @@ macro_rules! get_classpath(
             // https://github.com/ruby/ruby/blob/1d1529629ce1550fad19c2d9410c4bf4995230d2/include/ruby/internal/fl_type.h#L394¬
             const RUBY_FL_SINGLETON: usize = RUBY_FL_USER1;
 
+            // https://github.com/ruby/ruby/blob/7089a4e2d83a3cb1bc394c4ce3638cbc777f4cb9/include/ruby/internal/special_consts.h#L102
+            const RUBY_IMMEDIATE_MASK: usize = 0x07;
+
+            const RUBY_QNIL: usize = 0x04;
+
             //let mut ep = ep.clone() as *mut usize;
             let mut singleton = false;
-            let mut classpath_ptr = 0usize;
 
             let imemo: rb_method_entry_struct = source.copy_struct(cme).context(cme)?;
             // Read the class structure to get flags
-            let class_addr = if cfunc {
+            let mut klass = if cfunc {
                 imemo.owner
             } else {
                 imemo.defined_class
             };
-            let klass: RClass_and_rb_classext_t = source.copy_struct(class_addr).context(class_addr)?;
+            if klass == RUBY_QNIL {
+                return Ok(("".to_string(), false))
+            }
+            let rbasic: RBasic = source.copy_struct(klass).context(klass)?;
 
-            let rbasic: RBasic = source.copy_struct(class_addr).context(class_addr)?;
-            // Get flags from the RClass structure (assuming flags is the first field)
-            // You may need to adjust this based on your actual struct definition
             let class_flags = rbasic.flags;
             let class_mask = class_flags & RUBY_T_MASK;
 
-            // TODO have test cases that cover class and module, singleton, etc.
-            // see also how bmethod is handled
             match class_mask {
-                RUBY_T_CLASS | RUBY_T_MODULE => {
-                    classpath_ptr = klass.classext.classpath as usize;
-
+                RUBY_T_ICLASS => {
+                    //println!("ICLASS");
+                    // For iclass, get the classpath from the klass field
+                    // Assuming RClass has a 'basic' field with 'klass' member
+                    klass = rbasic.klass as usize;  // Adjust field name as needed
+                }
+                _ => {
                     // Check if it's a singleton class
                     if class_flags & RUBY_FL_SINGLETON != 0 {
-                        log::debug!("Got singleton class");
+                        //println!("SINGLETON");
+                        //log::debug!("Got singleton class");
                         singleton = true;
 
-                        // For singleton classes, get the classpath from the attached object
-                        let singleton_object_addr: usize = unsafe {
-                            klass.classext.as_.singleton_class.attached_object as usize
+                        let ext: RClass_and_rb_classext_t = source.copy_struct(klass).context(klass)?;
+                        klass = unsafe {
+                            ext.classext.as_.singleton_class.attached_object as usize
                         };
 
-                        if singleton_object_addr != 0 {
-                            let singleton_obj: RClass_and_rb_classext_t = source
-                                .copy_struct(singleton_object_addr)
-                                .context(singleton_object_addr)?;
-                            classpath_ptr = singleton_obj.classext.classpath as usize;
+                        let rbasic: RBasic = source.copy_struct(klass).context(klass)?;
+                        // Get flags from the RClass structure (assuming flags is the first field)
+                        // You may need to adjust this based on your actual struct definition
+                        let class_flags = rbasic.flags;
+                        let class_mask = class_flags & RUBY_T_MASK;
+                        if class_mask != RUBY_T_CLASS  && class_mask != RUBY_T_MODULE {
+                            //println!("NEITHER CLASS NOR MODULE {:X} {:X}", class_mask, singleton_object_addr);
+                            if (klass & RUBY_IMMEDIATE_MASK == 0) {
+                                klass = rb_class_real(rbasic.klass, source)?;
+                                let ext: RClass_and_rb_classext_t = source.copy_struct(klass).context(klass)?;
+                                let class_path = get_ruby_string(ext.classext.classpath as usize, source)?;
+                                return Ok((format!("#<{}:{:#08x}>", class_path, klass), singleton));
+                            } else {
+                                log::debug!("TODO: Immediate object case is unhandled!");
+                            }
                         }
                     }
                 }
-                RUBY_T_ICLASS => {
-                    // For iclass, get the classpath from the klass field
-                    // Assuming RClass has a 'basic' field with 'klass' member
-                    let klass_addr = rbasic.klass as usize;  // Adjust field name as needed
-
-                    if klass_addr != 0 {
-                        log::debug!("Using klass for iclass type");
-                        let actual_klass: RClass_and_rb_classext_t = source
-                            .copy_struct(klass_addr)
-                            .context(klass_addr)?;
-                        classpath_ptr = actual_klass.classext.classpath as usize;
-                    }
-                }
-                _ => {
-                    // Handle other types or anonymous classes
-                    classpath_ptr = klass.classext.classpath as usize;
-                }
             }
 
-            if classpath_ptr == 0 {
-                return Err(anyhow::anyhow!("classpath was empty"));
+            if klass == 0 {
+                return Err(anyhow::anyhow!("klass was empty"));
             }
-            let class_path = get_ruby_string(classpath_ptr as usize, source)?;
-            Ok((class_path.to_string(), singleton))
+
+            let class_path = rb_class_path(klass, source)?;
+            //let class_path = get_ruby_string(classpath_ptr as usize, source)?;
+            Ok((class_path, singleton))
         }
 
         // TODO make some tests for profile_full_label_name to cover the various cases it needs
@@ -1079,29 +1170,50 @@ macro_rules! get_classpath(
 
 macro_rules! get_stack_frame_3_3_0(
     () => (
-
         fn get_stack_frame<T>(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
         ) -> Result<StackFrame> where T: ProcessMemory {
-            if iseq_struct.body == std::ptr::null_mut() {
-                return Err(format_err!("iseq body is null"));
-            }
+            //if iseq_struct.body == std::ptr::null_mut() {
+            //    return Err(format_err!("iseq body is null"));
+            //}
             let cme = locate_method_entry(&cfp.ep, source)?;
-            let body: rb_iseq_constant_body = if cme == 0 {
-                //println!("IT IS AN ISEQ");
-                source.copy_struct(iseq_struct.body as usize)
-                    .context("couldn't copy rb_iseq_constant_body")?
-            } else {
-                //println!("IT IS A CME");
+            let mut class_path = "".to_string();
+            let mut singleton = false;
+            let iseq = if cme != 0 {
+                let res = get_classpath(cme, false, source);
+                match res {
+                    Ok((c, s)) => (class_path, singleton) = (c, s),
+                    Err(e) => {
+                        println!("ERROR GETTING CLASS {:?}", e);
+                    }
+                }
                 let imemo: rb_method_entry_struct = source.copy_struct(cme).context(cme)?;
-                let method_def: rb_method_definition_struct = source.copy_struct(imemo.def as usize).context(imemo.def as usize)?;
-                let iseq: rb_iseq_struct = unsafe {
-                    source.copy_struct(method_def.body.iseq.iseqptr as usize).context("")?
-                };
-                source.copy_struct(iseq.body as usize).context("couldn't copy iseq_constant_body from cme def body")?
+                let method_type = source.copy(imemo.def as usize, 1).context(imemo.def as usize)?;
+                let method_type = method_type[0] & 0xf;
+                if method_type == 0 {
+                    let method_def: rb_method_definition_struct = source.copy_struct(imemo.def as usize).context(imemo.def as usize)?;
+                    let iseq: rb_iseq_struct = unsafe {
+                        source.copy_struct(method_def.body.iseq.iseqptr as usize).context("")?
+                    };
+                    iseq
+                } else {
+                    *iseq_struct
+                }
+            } else {
+                *iseq_struct
             };
+            let body: rb_iseq_constant_body =
+                source.copy_struct(iseq.body as usize)
+                    .context("couldn't copy rb_iseq_constant_body")?;
+
+
+            let frame_flag: usize = unsafe {
+                source.copy_struct(cfp.ep.offset(0) as usize).context(cfp.ep.offset(0) as usize)?
+            };
+            let failed = format!("FAILED {:X}", frame_flag);
+
             let rstring: RString = source.copy_struct(body.location.label as usize)
                 .context("couldn't copy RString")?;
 
@@ -1116,21 +1228,19 @@ macro_rules! get_stack_frame_3_3_0(
                 }
 
             }
-
             let (path, absolute_path) = get_ruby_string_array(
                 body.location.pathobj as usize,
                 rstring.basic.klass as usize,
                 source
-            ).context("couldn't get ruby string from iseq body")?;
+            ).context(format!("couldn't get ruby path string array from iseq body: {:X}", frame_flag)).unwrap_or(("FAILED".to_string(), "FAILED".to_string()));
 
-            let cme = locate_method_entry(&cfp.ep, source)?;
-            let (class_path, singleton) = get_classpath(cme, false, source).unwrap_or(("".to_string(), false));
-            let label = get_ruby_string(body.location.label as usize, source)?;
-            let base_label = get_ruby_string(body.location.base_label as usize, source)?;
-
+            let label = get_ruby_string_limit(body.location.label as usize, 1024, source).unwrap_or(failed.clone());
+            let base_label = get_ruby_string_limit(body.location.base_label as usize, 1024, source).unwrap_or(failed.clone());
             let full_label = profile_frame_full_label(&class_path, &label, &base_label, &method_name, singleton);
+            //println!("({}) ({}) ({}) ({})", method_name, label, base_label, full_label);
 
             Ok(StackFrame{
+                //name: format!("{} ({:X})",full_label, frame_flag),
                 name: full_label,
                 relative_path: path,
                 absolute_path: Some(absolute_path),
