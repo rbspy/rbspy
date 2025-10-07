@@ -205,11 +205,3 @@ end
 def top_level_hello
   ClassN.new.hello
 end
-
-SAMPLE_BACKGROUND_THREAD = Thread.new do
-  1.times {
-    1.times {
-      eval("top_level_hello()")
-    }
-  }
-end

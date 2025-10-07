@@ -424,11 +424,9 @@ macro_rules! get_stack_trace(
             }
             let mut trace = Vec::new();
             let cfps = get_cfps(thread.cfp as usize, stack_base(&thread) as usize, source)?;
-            //println!("STACK SIZE {}", cfps.len());
             for cfp in cfps.iter() {
                 let cfunc = ruby_frame_cfunc(&cfp, source)?;
 
-                //println!("CFP: {:?}", &cfp);
                 if !cfunc && cfp.pc as usize != 0 {
                     let iseq_struct: rb_iseq_struct = source.copy_struct(cfp.iseq as usize)
                         .context("couldn't copy iseq struct")?;
@@ -979,7 +977,6 @@ macro_rules! get_classpath(
             const RUBY_T_MASK: usize = 0x1f;
 
             let ext: RClass_and_rb_classext_t = source.copy_struct(klass).context(klass)?;
-            //println!("KLASS {:X} REAL_KLASS {:X} {:?}", klass, real_klass, ext.classext.permanent_classpath());
             let mut path_addr = if ext.classext.classpath == 0 {
                 0x0f // Qnil
             } else {
@@ -1013,10 +1010,10 @@ macro_rules! get_classpath(
         ) -> Result<String> where T: ProcessMemory {
 
             let ext: RClass_and_rb_classext_t = source.copy_struct(klass).context(klass)?;
-            //println!("KLASS {:X} REAL_KLASS {:X} {:?}", klass, real_klass, ext.classext.permanent_classpath());
             if ext.classext.classpath != 0 {
                 return get_ruby_string(ext.classext.classpath as usize, source);
             };
+
             let path = rb_tmp_class_path(klass, source)?;
             let path_fallback = match path {
                 // Qnil
@@ -1033,7 +1030,6 @@ macro_rules! get_classpath(
                 }
             };
 
-            //println!("PATH {}", path_fallback);
             return Ok(path_fallback)
         }
 
@@ -1084,16 +1080,13 @@ macro_rules! get_classpath(
 
             match class_mask {
                 RUBY_T_ICLASS => {
-                    //println!("ICLASS");
                     // For iclass, get the classpath from the klass field
-                    // Assuming RClass has a 'basic' field with 'klass' member
-                    klass = rbasic.klass as usize;  // Adjust field name as needed
+                    klass = rbasic.klass as usize;
                 }
                 _ => {
                     // Check if it's a singleton class
                     if class_flags & RUBY_FL_SINGLETON != 0 {
-                        //println!("SINGLETON");
-                        //log::debug!("Got singleton class");
+                        log::debug!("Got singleton class");
                         singleton = true;
 
                         let ext: RClass_and_rb_classext_t = source.copy_struct(klass).context(klass)?;
@@ -1102,12 +1095,9 @@ macro_rules! get_classpath(
                         };
 
                         let rbasic: RBasic = source.copy_struct(klass).context(klass)?;
-                        // Get flags from the RClass structure (assuming flags is the first field)
-                        // You may need to adjust this based on your actual struct definition
                         let class_flags = rbasic.flags;
                         let class_mask = class_flags & RUBY_T_MASK;
                         if class_mask != RUBY_T_CLASS  && class_mask != RUBY_T_MODULE {
-                            //println!("NEITHER CLASS NOR MODULE {:X} {:X}", class_mask, singleton_object_addr);
                             if (klass & RUBY_IMMEDIATE_MASK == 0) {
                                 klass = rb_class_real(rbasic.klass, source)?;
                                 let ext: RClass_and_rb_classext_t = source.copy_struct(klass).context(klass)?;
@@ -1126,7 +1116,6 @@ macro_rules! get_classpath(
             }
 
             let class_path = rb_class_path(klass, source)?;
-            //let class_path = get_ruby_string(classpath_ptr as usize, source)?;
             Ok((class_path, singleton))
         }
 
@@ -1182,17 +1171,11 @@ macro_rules! get_stack_frame_3_3_0(
             let mut class_path = "".to_string();
             let mut singleton = false;
             let iseq = if cme != 0 {
-                let res = get_classpath(cme, false, source);
-                match res {
-                    Ok((c, s)) => (class_path, singleton) = (c, s),
-                    Err(e) => {
-                        println!("ERROR GETTING CLASS {:?}", e);
-                    }
-                }
                 let imemo: rb_method_entry_struct = source.copy_struct(cme).context(cme)?;
                 let method_type = source.copy(imemo.def as usize, 1).context(imemo.def as usize)?;
                 let method_type = method_type[0] & 0xf;
                 if method_type == 0 {
+                    (class_path, singleton) = get_classpath(cme, false, source)?;
                     let method_def: rb_method_definition_struct = source.copy_struct(imemo.def as usize).context(imemo.def as usize)?;
                     let iseq: rb_iseq_struct = unsafe {
                         source.copy_struct(method_def.body.iseq.iseqptr as usize).context("")?
@@ -1207,13 +1190,9 @@ macro_rules! get_stack_frame_3_3_0(
             let body: rb_iseq_constant_body =
                 source.copy_struct(iseq.body as usize)
                     .context("couldn't copy rb_iseq_constant_body")?;
-
-
             let frame_flag: usize = unsafe {
                 source.copy_struct(cfp.ep.offset(0) as usize).context(cfp.ep.offset(0) as usize)?
             };
-            let failed = format!("FAILED {:X}", frame_flag);
-
             let rstring: RString = source.copy_struct(body.location.label as usize)
                 .context("couldn't copy RString")?;
 
@@ -1234,13 +1213,11 @@ macro_rules! get_stack_frame_3_3_0(
                 source
             ).context(format!("couldn't get ruby path string array from iseq body: {:X}", frame_flag)).unwrap_or(("FAILED".to_string(), "FAILED".to_string()));
 
-            let label = get_ruby_string_limit(body.location.label as usize, 1024, source).unwrap_or(failed.clone());
-            let base_label = get_ruby_string_limit(body.location.base_label as usize, 1024, source).unwrap_or(failed.clone());
+            let label = get_ruby_string_limit(body.location.label as usize, 1024, source)?;
+            let base_label = get_ruby_string_limit(body.location.base_label as usize, 1024, source)?;
             let full_label = profile_frame_full_label(&class_path, &label, &base_label, &method_name, singleton);
-            //println!("({}) ({}) ({}) ({})", method_name, label, base_label, full_label);
 
             Ok(StackFrame{
-                //name: format!("{} ({:X})",full_label, frame_flag),
                 name: full_label,
                 relative_path: path,
                 absolute_path: Some(absolute_path),
@@ -1493,48 +1470,64 @@ macro_rules! get_cfunc_name(
         ) -> Result<usize> where T: ProcessMemory {
             const VM_ENV_FLAG_LOCAL: usize = 0x2;
             let mut ep = ep.clone() as *mut usize;
-            //let env_me_cref: usize = 0;
+            let mut env_flags: usize = source.copy_struct(ep as usize).context(ep as usize)?;
             let mut env_specval: usize = unsafe {
                 source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?
             };
             let mut env_me_cref: usize = unsafe {
-                source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-1) as usize)?
+                source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-2) as usize)?
             };
 
-
-            while env_specval & VM_ENV_FLAG_LOCAL != 0 {
-                if !check_method_entry(env_me_cref, source)?.is_null() {
-                    break;
+            if env_flags & VM_ENV_FLAG_LOCAL == 0 {
+                //println!("ALREADY LOCAL {:X}", env_me_cref);
+            }
+            while env_flags & VM_ENV_FLAG_LOCAL != 0 {
+                //println!("CHECK NON LOCAL");
+                let me = check_method_entry(env_me_cref, false, source)?;
+                if me != 0{
+                    return Ok(me);
                 }
                 unsafe {
                     // https://github.com/ruby/ruby/blob/v3_4_5/vm_core.h#L1356
                     // we must strip off the GC marking bits from the EP, and mimic
                     // https://github.com/ruby/ruby/blob/v3_4_5/vm_core.h#L1501
                     ep = (env_specval.clone() & !0x03) as *mut usize;
+                    env_flags = source.copy_struct(ep as usize).context(ep as usize)?;
                     env_specval = source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?;
                     env_me_cref = source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-2) as usize)?;
                 }
             }
 
-            Ok(env_me_cref)
+            let me = check_method_entry(env_me_cref, true, source)?;
+            //println!("ME {:X} {:X}", me, env_me_cref);
+            Ok(me)
         }
+
         fn check_method_entry<T: ProcessMemory>(
             raw_imemo: usize,
+            can_be_svar: bool,
             source: &T
-        ) -> Result<*const rb_method_entry_struct> {
+        ) -> Result<usize> {
             //https://github.com/ruby/ruby/blob/v3_4_5/internal/imemo.h#L21
             const IMEMO_MASK: usize = 0x0f;
+            if raw_imemo == 0 {
+                return Ok(0);
+            }
             let imemo: rb_method_entry_struct = source.copy_struct(raw_imemo).context(raw_imemo)?;
 
             // These type constants are defined in ruby's internal/imemo.h
             #[allow(non_upper_case_globals)]
             match ((imemo.flags >> ruby_fl_type_RUBY_FL_USHIFT) & IMEMO_MASK) as u32 {
-                imemo_type_imemo_ment => Ok(&imemo as *const rb_method_entry_struct),
+                imemo_type_imemo_ment => Ok(raw_imemo),
                 imemo_type_imemo_svar => {
-                    let svar: vm_svar = source.copy_struct(raw_imemo).context(raw_imemo)?;
-                    check_method_entry(svar.cref_or_me as usize, source)
+                    if can_be_svar {
+                        let svar: vm_svar = source.copy_struct(raw_imemo).context(raw_imemo)?;
+                        check_method_entry(svar.cref_or_me as usize, false, source)
+                    } else {
+                        Ok(0)
+                    }
                 },
-                _ => Ok(raw_imemo as *const rb_method_entry_struct)
+                _ => Ok(0)
             }
         }
 
