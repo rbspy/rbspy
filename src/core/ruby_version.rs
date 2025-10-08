@@ -1122,7 +1122,7 @@ macro_rules! get_classpath(
         // TODO make some tests for profile_full_label_name to cover the various cases it needs
         // to handle correctly
         // TODO this should be saved in the cache, we shouldn't unconditionally run this
-        fn profile_frame_full_label(
+        pub fn profile_frame_full_label(
             class_path: &str,
             label: &str,
             base_label: &str,
@@ -1131,7 +1131,7 @@ macro_rules! get_classpath(
         ) -> String {
             let qualified = qualified_method_name(class_path, method_name, singleton);
 
-            if qualified.is_empty() || qualified == base_label {
+            if qualified.is_empty() || qualified == base_label.to_string() {
                 return label.to_string();
             }
 
@@ -1451,7 +1451,7 @@ macro_rules! get_cfunc_name(
             Ok((frame_flag & VM_FRAME_MAGIC_MASK) == VM_FRAME_MAGIC_CFUNC)
         }
 
-        fn qualified_method_name(class_path: &str, method_name: &str, singleton: bool) -> String {
+        pub fn qualified_method_name(class_path: &str, method_name: &str, singleton: bool) -> String {
             if method_name.is_empty() {
                 return method_name.to_string();
             }
@@ -1750,6 +1750,7 @@ ruby_version_v3_3_x!(ruby_3_4_7);
 #[cfg(test)]
 mod tests {
     use rbspy_testdata::*;
+    use rstest::rstest;
 
     use crate::core::ruby_version;
     use crate::core::types::StackFrame;
@@ -3226,5 +3227,65 @@ mod tests {
         )
         .unwrap();
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
+    }
+
+    #[rstest]
+    #[case::no_class_not_singleton("", "foo", false, "foo")]
+    #[case::class_not_singleton("ClassA", "foo", false, "ClassA#foo")]
+    #[case::class_with_singleton("ClassA", "foo", true, "ClassA.foo")]
+    #[case::empty_returns_empty("", "", false, "")]
+    fn test_qualified_method_name(
+        #[case] class_path: &str,
+        #[case] method_name: &str,
+        #[case] singleton: bool,
+        #[case] expected: &str,
+    ) {
+        let qualified =
+            ruby_version::ruby_3_3_0::qualified_method_name(class_path, method_name, singleton);
+        assert_eq!(expected.to_string(), qualified);
+    }
+    #[rstest]
+    #[case::no_class_uses_label("", "block in foo", "foo", "foo", false, "block in foo")]
+    #[case::no_method_uses_label("", "block in foo", "foo", "", false, "block in foo")]
+    #[case::no_class_no_base_label_no_method_uses_label(
+        "",
+        "block in foo",
+        "",
+        "",
+        false,
+        "block in foo"
+    )]
+    #[case::class_uses_label_prefix(
+        "ClassA",
+        "block in foo",
+        "foo",
+        "foo",
+        false,
+        "block in ClassA#foo"
+    )]
+    #[case::class_uses_label_prefix_singleton(
+        "ClassA",
+        "block in foo",
+        "foo",
+        "foo",
+        true,
+        "block in ClassA.foo"
+    )]
+    fn test_profile_frame_full_label(
+        #[case] class_path: &str,
+        #[case] label: &str,
+        #[case] base_label: &str,
+        #[case] method_name: &str,
+        #[case] singleton: bool,
+        #[case] expected: &str,
+    ) {
+        let full_label = ruby_version::ruby_3_3_0::profile_frame_full_label(
+            class_path,
+            label,
+            base_label,
+            method_name,
+            singleton,
+        );
+        assert_eq!(expected.to_string(), full_label);
     }
 }

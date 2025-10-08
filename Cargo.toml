@@ -58,6 +58,7 @@ winapi = { version = "0.3.9", features = ["timeapi", "wow64apiset"] }
 [dev-dependencies]
 byteorder = "1.4.3"
 rbspy-testdata = { git = "https://github.com/dalehamel/rbspy-testdata.git", branch = "update-coredumps" }
+rstest = "0.24"
 
 [profile.release]
 lto = true
