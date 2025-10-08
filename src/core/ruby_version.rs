@@ -950,13 +950,9 @@ macro_rules! get_classpath(
             klass: usize,
             source: &T,
         ) -> Result<usize> where T: ProcessMemory {
-            // https://github.com/ruby/ruby/blob/1d1529629ce1550fad19c2d9410c4bf4995230d2/include/ruby/internal/fl_type.h#L158¬
-            const RUBY_FL_USHIFT: usize = 12;
-            // https://github.com/ruby/ruby/blob/1d1529629ce1550fad19c2d9410c4bf4995230d2/include/ruby/internal/fl_type.h#L323-L324¬
-            const RUBY_FL_USER1: usize = 1 << (RUBY_FL_USHIFT + 1);
-
-            const RUBY_FL_SINGLETON: usize = RUBY_FL_USER1;
             const RUBY_T_ICLASS: usize = 0x1c;
+            const RUBY_FL_SINGLETON: usize = ruby_fl_type_RUBY_FL_USER1 as usize;
+
             //https://github.com/ruby/ruby/blob/v3_4_5/object.c#L290
             let mut klass = klass;
             let mut rbasic: RBasic = source.copy_struct(klass).context(klass)?;
@@ -968,12 +964,13 @@ macro_rules! get_classpath(
             Ok(klass)
         }
 
+        // https://github.com/ruby/ruby/blob/v3_3_0/variable.c#L260
         fn rb_tmp_class_path<T>(
             klass: usize,
             source: &T,
         ) -> Result<usize> where T: ProcessMemory {
             const RUBY_T_MODULE: usize = 0x3;
-            // https://github.com/ruby/ruby/blob/c149708018135595b2c19c5f74baf9475674f394/include/ruby/internal/value_type.h#L142¬
+            // https://github.com/ruby/ruby/blob/c149708018135595b2c19c5f74baf9475674f394/include/ruby/internal/value_type.h#L142
             const RUBY_T_MASK: usize = 0x1f;
 
             let ext: RClass_and_rb_classext_t = source.copy_struct(klass).context(klass)?;
@@ -1004,6 +1001,10 @@ macro_rules! get_classpath(
             return Ok(path_addr);
         }
 
+        // https://github.com/ruby/ruby/blob/v3_3_0/variable.c#L283
+        // note the logic of https://github.com/ruby/ruby/blob/v3_3_0/variable.c#L239
+        // is folded in here, and the base case of the returning classpath
+        // early if it is a valid string is also moved here
         fn rb_class_path<T>(
             klass: usize,
             source: &T,
@@ -1033,6 +1034,7 @@ macro_rules! get_classpath(
             return Ok(path_fallback)
         }
 
+        // Tries to copy https://github.com/ruby/ruby/blob/v3_3_0/vm_backtrace.c#L1772
         fn get_classpath<T>(
             cme: usize,
             cfunc: bool,
@@ -1047,13 +1049,7 @@ macro_rules! get_classpath(
             // https://github.com/ruby/ruby/blob/c149708018135595b2c19c5f74baf9475674f394/include/ruby/internal/value_type.h#L142¬
             const RUBY_T_MASK: usize = 0x1f;
 
-            //TODO replace these with the flushift ocnstants ones already referenced
-            // https://github.com/ruby/ruby/blob/1d1529629ce1550fad19c2d9410c4bf4995230d2/include/ruby/internal/fl_type.h#L158¬
-            const RUBY_FL_USHIFT: usize = 12;
-            // https://github.com/ruby/ruby/blob/1d1529629ce1550fad19c2d9410c4bf4995230d2/include/ruby/internal/fl_type.h#L323-L324¬
-            const RUBY_FL_USER1: usize = 1 << (RUBY_FL_USHIFT + 1);
-            // https://github.com/ruby/ruby/blob/1d1529629ce1550fad19c2d9410c4bf4995230d2/include/ruby/internal/fl_type.h#L394¬
-            const RUBY_FL_SINGLETON: usize = RUBY_FL_USER1;
+            const RUBY_FL_SINGLETON: usize = ruby_fl_type_RUBY_FL_USER1 as usize;
 
             // https://github.com/ruby/ruby/blob/7089a4e2d83a3cb1bc394c4ce3638cbc777f4cb9/include/ruby/internal/special_consts.h#L102
             const RUBY_IMMEDIATE_MASK: usize = 0x07;
@@ -1119,9 +1115,7 @@ macro_rules! get_classpath(
             Ok((class_path, singleton))
         }
 
-        // TODO make some tests for profile_full_label_name to cover the various cases it needs
-        // to handle correctly
-        // TODO this should be saved in the cache, we shouldn't unconditionally run this
+        // https://github.com/ruby/ruby/blob/v3_3_0/vm_backtrace.c#L1841
         pub fn profile_frame_full_label(
             class_path: &str,
             label: &str,
@@ -1164,16 +1158,15 @@ macro_rules! get_stack_frame_3_3_0(
             cfp: &rb_control_frame_t,
             source: &T,
         ) -> Result<StackFrame> where T: ProcessMemory {
-            //if iseq_struct.body == std::ptr::null_mut() {
-            //    return Err(format_err!("iseq body is null"));
-            //}
             let cme = locate_method_entry(&cfp.ep, source)?;
             let mut class_path = "".to_string();
             let mut singleton = false;
             let iseq = if cme != 0 {
                 let imemo: rb_method_entry_struct = source.copy_struct(cme).context(cme)?;
                 let method_type = source.copy(imemo.def as usize, 1).context(imemo.def as usize)?;
+                // https://github.com/ruby/ruby/blob/v3_3_0/internal/imemo.h#L21
                 let method_type = method_type[0] & 0xf;
+                // https://github.com/ruby/ruby/blob/v3_3_0/method.h#L110
                 if method_type == 0 {
                     (class_path, singleton) = get_classpath(cme, false, source)?;
                     let method_def: rb_method_definition_struct = source.copy_struct(imemo.def as usize).context(imemo.def as usize)?;
@@ -1187,6 +1180,9 @@ macro_rules! get_stack_frame_3_3_0(
             } else {
                 *iseq_struct
             };
+            if iseq_struct.body == std::ptr::null_mut() {
+                return Err(format_err!("iseq body is null"));
+            }
             let body: rb_iseq_constant_body =
                 source.copy_struct(iseq.body as usize)
                     .context("couldn't copy rb_iseq_constant_body")?;
@@ -1198,6 +1194,8 @@ macro_rules! get_stack_frame_3_3_0(
 
             let mut method_name = "".to_string();
             if body.local_iseq != std::ptr::null_mut() {
+                // https://github.com/ruby/ruby/blob/v3_3_0/vm_backtrace.c#L1801 calls
+                // https://github.com/ruby/ruby/blob/v3_3_0/iseq.c#L1234
                 let local_iseq: rb_iseq_t = source.copy_struct(body.local_iseq as usize)
                     .context("couldn't read local iseq")?;
                 if local_iseq.body != std::ptr::null_mut() {
@@ -1451,6 +1449,7 @@ macro_rules! get_cfunc_name(
             Ok((frame_flag & VM_FRAME_MAGIC_MASK) == VM_FRAME_MAGIC_CFUNC)
         }
 
+        // https://github.com/ruby/ruby/blob/v3_3_0/vm_backtrace.c#L1813
         pub fn qualified_method_name(class_path: &str, method_name: &str, singleton: bool) -> String {
             if method_name.is_empty() {
                 return method_name.to_string();
@@ -1464,6 +1463,8 @@ macro_rules! get_cfunc_name(
             method_name.to_string()
         }
 
+        // tries to mimic rb_vm_frame_method_entry
+        // https://github.com/ruby/ruby/blob/v3_3_0/vm_insnhelper.c#L733
         fn locate_method_entry<T>(
             ep: &*const usize,
             source: &T,
@@ -1478,11 +1479,7 @@ macro_rules! get_cfunc_name(
                 source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-2) as usize)?
             };
 
-            if env_flags & VM_ENV_FLAG_LOCAL == 0 {
-                //println!("ALREADY LOCAL {:X}", env_me_cref);
-            }
             while env_flags & VM_ENV_FLAG_LOCAL != 0 {
-                //println!("CHECK NON LOCAL");
                 let me = check_method_entry(env_me_cref, false, source)?;
                 if me != 0{
                     return Ok(me);
@@ -1499,10 +1496,10 @@ macro_rules! get_cfunc_name(
             }
 
             let me = check_method_entry(env_me_cref, true, source)?;
-            //println!("ME {:X} {:X}", me, env_me_cref);
             Ok(me)
         }
 
+        // tries to mimic https://github.com/ruby/ruby/blob/v3_3_0/vm_insnhelper.c#L707
         fn check_method_entry<T: ProcessMemory>(
             raw_imemo: usize,
             can_be_svar: bool,
@@ -1531,7 +1528,6 @@ macro_rules! get_cfunc_name(
             }
         }
 
-        // FIXME - cfunc_name should also be able to get classpath from CME
         // we should read that here and return the qualified name
         fn get_cfunc_name<T: ProcessMemory>(
             cfp: &rb_control_frame_t,
@@ -1550,13 +1546,10 @@ macro_rules! get_cfunc_name(
             }
 
 
-            // FIXME - i'm pretty sure this mask is wrong, it should be 0xff
             let ttype = ((imemo.flags >> ruby_fl_type_RUBY_FL_USHIFT) & IMEMO_MASK) as usize;
             if ttype != imemo_type_imemo_ment as usize {
                 return Err(format_err!("Not a method entry").into());
             }
-            // TODO check the memo entry is of the CFUNC type now
-
 
             #[allow(non_camel_case_types)]
             type rb_id_serial_t = u32;
@@ -3215,8 +3208,8 @@ mod tests {
     #[test]
     fn test_get_ruby_stack_trace_3_4_7() {
         let source = coredump_3_3_0();
-        let vm_addr = 0x7f7ff21f1868;
-        let global_symbols_addr = Some(0x7f7ff21e0c60);
+        let vm_addr = 0x7f43435f4988;
+        let global_symbols_addr = Some(0x7f43435e3c60);
         let stack_trace = ruby_version::ruby_3_4_7::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
