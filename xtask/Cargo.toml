@@ -1,6 +1,6 @@
 [package]
 name = "xtask"
-version = "0.37.1"
+version = "0.38.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
