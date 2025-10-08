@@ -1033,7 +1033,7 @@ version = "0.38.0"
 [[package]]
 name = "rbspy-testdata"
 version = "0.2.4"
-source = "git+https://github.com/dalehamel/rbspy-testdata.git?branch=update-coredumps#87923b87a12d3623bbef1e39fd24ea8b70f15db8"
+source = "git+https://github.com/dalehamel/rbspy-testdata.git?branch=update-coredumps#8e2e10ecfac1b437b9b3a50f1097f02eac96b069"
 dependencies = [
  "anyhow",
  "flate2",
