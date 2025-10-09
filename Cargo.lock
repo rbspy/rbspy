@@ -539,9 +539,9 @@ checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
 
 [[package]]
 name = "goblin"
-version = "0.10.1"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6a80adfd63bd7ffd94fefc3d22167880c440a724303080e5aa686fa36abaa96"
+checksum = "7be320f077239a0361c20d608b4768c62a1b77aa4946dd76395aa4cd502cba7d"
 dependencies = [
  "log",
  "plain",
@@ -1097,8 +1097,9 @@ version = "0.38.0"
 
 [[package]]
 name = "rbspy-testdata"
-version = "0.2.4"
-source = "git+https://github.com/dalehamel/rbspy-testdata.git?branch=update-coredumps#8e2e10ecfac1b437b9b3a50f1097f02eac96b069"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ae8e387be083980a098f928bd9aa32c5a0f8fbc1621ce3b0a8e044a9cb000fb"
 dependencies = [
  "anyhow",
  "flate2",
