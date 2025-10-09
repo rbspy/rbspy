@@ -1211,8 +1211,8 @@ macro_rules! get_stack_frame_3_3_0(
                 source
             ).context(format!("couldn't get ruby path string array from iseq body: {:X}", frame_flag)).unwrap_or(("FAILED".to_string(), "FAILED".to_string()));
 
-            let label = get_ruby_string_limit(body.location.label as usize, 1024, source)?;
-            let base_label = get_ruby_string_limit(body.location.base_label as usize, 1024, source)?;
+            let label = get_ruby_string(body.location.label as usize, source)?;
+            let base_label = get_ruby_string(body.location.base_label as usize, source)?;
             let full_label = profile_frame_full_label(&class_path, &label, &base_label, &method_name, singleton);
 
             Ok(StackFrame{
