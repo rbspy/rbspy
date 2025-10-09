@@ -141,6 +141,8 @@ macro_rules! ruby_version_v2_5_x(
             get_cfunc_name_unsupported!();
             #[cfg(target_os = "linux")]
             get_cfunc_name!();
+            #[cfg(target_os = "linux")]
+            get_classpath_unsupported!();
         }
     )
 );
@@ -169,6 +171,8 @@ macro_rules! ruby_version_v2_6_x(
             get_cfunc_name_unsupported!();
             #[cfg(target_os = "linux")]
             get_cfunc_name!();
+            #[cfg(target_os = "linux")]
+            get_classpath_unsupported!();
         }
     )
 );
@@ -194,6 +198,7 @@ macro_rules! ruby_version_v2_7_x(
             get_thread_status_2_6_0!();
             get_thread_id_2_5_0!();
             get_cfunc_name!();
+            get_classpath_unsupported!();
         }
     )
 );
@@ -222,6 +227,7 @@ macro_rules! ruby_version_v3_0_x(
 
             #[allow(non_upper_case_globals)]
             const ruby_fl_type_RUBY_FL_USHIFT: ruby_fl_type = ruby_fl_ushift_RUBY_FL_USHIFT as i32;
+            get_classpath_unsupported!();
         }
     )
 );
@@ -250,6 +256,7 @@ macro_rules! ruby_version_v3_1_x(
 
             #[allow(non_upper_case_globals)]
             const ruby_fl_type_RUBY_FL_USHIFT: ruby_fl_type = ruby_fl_ushift_RUBY_FL_USHIFT as i32;
+            get_classpath_unsupported!();
         }
     )
 );
@@ -277,6 +284,7 @@ macro_rules! ruby_version_v3_2_x(
 
             #[allow(non_upper_case_globals)]
             const ruby_fl_type_RUBY_FL_USHIFT: ruby_fl_type = ruby_fl_ushift_RUBY_FL_USHIFT as i32;
+            get_classpath_unsupported!();
         }
     )
 );
@@ -304,6 +312,7 @@ macro_rules! ruby_version_v3_3_x(
 
             #[allow(non_upper_case_globals)]
             const ruby_fl_type_RUBY_FL_USHIFT: ruby_fl_type = ruby_fl_ushift_RUBY_FL_USHIFT as i32;
+            get_classpath!();
         }
     )
 );
@@ -416,7 +425,29 @@ macro_rules! get_stack_trace(
             let mut trace = Vec::new();
             let cfps = get_cfps(thread.cfp as usize, stack_base(&thread) as usize, source)?;
             for cfp in cfps.iter() {
-                if cfp.iseq as usize == 0 {
+                let cfunc = ruby_frame_cfunc(&cfp, source)?;
+
+                if !cfunc && cfp.pc as usize != 0 {
+                    let iseq_struct: rb_iseq_struct = source.copy_struct(cfp.iseq as usize)
+                        .context("couldn't copy iseq struct")?;
+
+                    let label_path  = get_stack_frame(&iseq_struct, &cfp, source);
+                    match label_path {
+                        Ok(call)  => trace.push(call),
+                        Err(x) => {
+                            debug!("Error: {:#?}", x);
+                            debug!("cfp: {:?}", cfp);
+                            debug!("thread: {:?}", thread);
+                            debug!("iseq struct: {:?}", iseq_struct);
+                            // this is a heuristic: the intent of this is that it skips function calls into C extensions
+                            if trace.len() > 0 {
+                                debug!("Skipping function call, possibly into C extension");
+                            } else {
+                                return Err(x);
+                            }
+                        }
+                    }
+                } else {
                     let mut frame = StackFrame::unknown_c_function();
                     if let Some(global_symbols_addr) = ruby_global_symbols_address_location {
                         match get_cfunc_name(cfp, global_symbols_addr, source, pid) {
@@ -435,29 +466,6 @@ macro_rules! get_stack_trace(
                     }
                     trace.push(frame);
                     continue;
-                }
-                if cfp.pc as usize == 0 {
-                    debug!("pc was 0. Not sure what that means, but skipping CFP");
-                    continue;
-                }
-                let iseq_struct: rb_iseq_struct = source.copy_struct(cfp.iseq as usize)
-                    .context("couldn't copy iseq struct")?;
-
-                let label_path  = get_stack_frame(&iseq_struct, &cfp, source);
-                match label_path {
-                    Ok(call)  => trace.push(call),
-                    Err(x) => {
-                        debug!("Error: {:#?}", x);
-                        debug!("cfp: {:?}", cfp);
-                        debug!("thread: {:?}", thread);
-                        debug!("iseq struct: {:?}", iseq_struct);
-                        // this is a heuristic: the intent of this is that it skips function calls into C extensions
-                        if trace.len() > 0 {
-                            debug!("Skipping function call, possibly into C extension");
-                        } else {
-                            return Err(x);
-                        }
-                    }
                 }
             }
             let thread_id = match get_thread_id(&thread, source) {
@@ -485,13 +493,13 @@ macro_rules! get_stack_trace(
         fn stack_base(thread: &$thread_type) -> i64 {
             // Ruby stack grows down, starting at
             //   ruby_current_thread->stack + ruby_current_thread->stack_size - 1 * sizeof(rb_control_frame_t)
-            // I don't know what the -1 is about. Also note that the stack_size is *not* in bytes! stack is a
-            // VALUE*, and so stack_size is in units of sizeof(VALUE).
+            // We must skip two dummy frames:
+            // https://github.com/ruby/ruby/blob/5445e0435260b449decf2ac16f9d09bae3cafe72/vm_backtrace.c#L477-L485%C2%A
             //
             // The base of the call stack is therefore at
             //   stack + stack_size * sizeof(VALUE) - sizeof(rb_control_frame_t)
             // (with everything in bytes).
-            stack_field(thread) + stack_size_field(thread) * std::mem::size_of::<VALUE>() as i64 - 1 * std::mem::size_of::<rb_control_frame_t>() as i64
+            stack_field(thread) + (stack_size_field(thread) * std::mem::size_of::<VALUE>() as i64) - (1 * std::mem::size_of::<rb_control_frame_t>() as i64)
         }
 
         pub fn is_maybe_thread<T>(candidate_thread_addr: usize, candidate_thread_addr_ptr: usize, source: &T, all_maps: &[MapRange]) -> bool where T: ProcessMemory {
@@ -924,81 +932,291 @@ macro_rules! get_stack_frame_2_5_0(
     )
 );
 
-macro_rules! get_stack_frame_3_3_0(
+macro_rules! get_classpath_unsupported(
     () => (
-        fn get_classname<T>(
-            ep: &*const usize,
+        fn get_classpath<T>(
+            _cme: usize,
+            _cfunc: bool,
+            _source: &T,
+        ) -> Result<(String, bool)> where T: ProcessMemory {
+            return Err(format_err!("classpath resolution is not supported for this version of Ruby").into());
+        }
+    )
+);
+
+macro_rules! get_classpath(
+    () => (
+        fn rb_class_real<T>(
+            klass: usize,
             source: &T,
-        ) -> Result<String> where T: ProcessMemory {
-            let mut ep = ep.clone() as *mut usize;
+        ) -> Result<usize> where T: ProcessMemory {
+            const RUBY_T_ICLASS: usize = 0x1c;
+            const RUBY_FL_SINGLETON: usize = ruby_fl_type_RUBY_FL_USER1 as usize;
 
-            let frame_flag: usize = unsafe {
-                source.copy_struct(ep.offset(0) as usize).context(ep.offset(0) as usize)?
-            };
-
-            // VM_FRAME_MAGIC_MASK   = 0x7fff0001
-            // VM_FRAME_MAGIC_METHOD = 0x11110001
-            if (frame_flag & 0x7fff0001) != 0x11110001 {
-                return Err(anyhow::anyhow!(format!("frame flag {:x} does not match method mask, cannot read class", frame_flag)));
+            //https://github.com/ruby/ruby/blob/v3_4_5/object.c#L290
+            let mut klass = klass;
+            let mut rbasic: RBasic = source.copy_struct(klass).context(klass)?;
+            while (rbasic.flags & (RUBY_T_ICLASS | RUBY_FL_SINGLETON) != 0) {
+                let rclass: RClass = source.copy_struct(klass).context(klass)?;
+                klass = rclass.super_;
+                rbasic = source.copy_struct(klass).context(klass)?;
             }
-
-            let mut env_specval: usize = unsafe {
-                source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?
-            };
-            let mut env_me_cref: usize = unsafe {
-                source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-1) as usize)?
-            };
-
-            // #define VM_ENV_FLAG_LOCAL 0x02
-            while env_specval & 0x02 != 0 {
-                if !check_method_entry(env_me_cref, source)?.is_null() {
-                    break;
-                }
-                unsafe {
-                    ep = env_specval.clone() as *mut usize;
-                    env_specval = source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?;
-                    env_me_cref = source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-2) as usize)?;
-                }
-            }
-
-            let imemo: rb_method_entry_struct = source.copy_struct(env_me_cref).context(env_me_cref)?;
-            let klass: RClass_and_rb_classext_t = source.copy_struct(imemo.defined_class).context(imemo.defined_class)?;
-            if klass.classext.classpath == 0 {
-                return Err(anyhow::anyhow!("classpath was empty"));
-            }
-            let class_name = get_ruby_string(klass.classext.classpath as usize, source)?;
-            Ok(class_name.to_string())
+            Ok(klass)
         }
 
+        // https://github.com/ruby/ruby/blob/v3_3_0/variable.c#L260
+        fn rb_tmp_class_path<T>(
+            klass: usize,
+            source: &T,
+        ) -> Result<usize> where T: ProcessMemory {
+            const RUBY_T_MODULE: usize = 0x3;
+            // https://github.com/ruby/ruby/blob/c149708018135595b2c19c5f74baf9475674f394/include/ruby/internal/value_type.h#L142
+            const RUBY_T_MASK: usize = 0x1f;
+
+            let ext: RClass_and_rb_classext_t = source.copy_struct(klass).context(klass)?;
+            let mut path_addr = if ext.classext.classpath == 0 {
+                0x0f // Qnil
+            } else {
+                ext.classext.classpath
+            };
+
+            let rbasic: RBasic = source.copy_struct(klass).context(klass)?;
+            if rbasic.flags & RUBY_T_MASK == RUBY_T_MODULE {
+                let real_klass = rb_class_real(rbasic.klass, source)?;
+                // https://github.com/ruby/ruby/blob/v3_4_5/variable.c#L359
+                let ext: RClass_and_rb_classext_t = source.copy_struct(real_klass).context(real_klass)?;
+                path_addr = if ext.classext.classpath != 0 {
+                    let modstr = get_ruby_string(ext.classext.classpath as usize, source)?;
+                    // Looking up the global symbol is not needed
+                    // we can just compare the string value, albeit less efficient
+                    if modstr == "Module".to_string() {
+                        0x00 // QFalse
+                    } else {
+                        rb_tmp_class_path(rbasic.klass, source)?
+                    }
+                } else {
+                    rb_tmp_class_path(rbasic.klass, source)?
+                }
+            }
+            return Ok(path_addr);
+        }
+
+        // https://github.com/ruby/ruby/blob/v3_3_0/variable.c#L283
+        // note the logic of https://github.com/ruby/ruby/blob/v3_3_0/variable.c#L239
+        // is folded in here, and the base case of the returning classpath
+        // early if it is a valid string is also moved here
+        fn rb_class_path<T>(
+            klass: usize,
+            source: &T,
+        ) -> Result<String> where T: ProcessMemory {
+
+            let ext: RClass_and_rb_classext_t = source.copy_struct(klass).context(klass)?;
+            if ext.classext.classpath != 0 {
+                return get_ruby_string(ext.classext.classpath as usize, source);
+            };
+
+            let path = rb_tmp_class_path(klass, source)?;
+            let path_fallback = match path {
+                // Qnil
+                0x0f => {
+                    format!("#<Class:{:#08x}>", klass)
+                }
+                // QFalse
+                0x00 => {
+                    format!("#<Module:{:#08x}>", klass)
+                }
+                _ => {
+                    let path_str = get_ruby_string(path, source)?;
+                    format!("#<{}:{:#08x}>", path_str, klass)
+                }
+            };
+
+            return Ok(path_fallback)
+        }
+
+        // Tries to copy https://github.com/ruby/ruby/blob/v3_3_0/vm_backtrace.c#L1772
+        fn get_classpath<T>(
+            cme: usize,
+            cfunc: bool,
+            source: &T,
+        ) -> Result<(String, bool)> where T: ProcessMemory {
+            //https://github.com/ruby/ruby/blob/c149708018135595b2c19c5f74baf9475674f394/include/ruby/internal/value_type.h#L114¬
+            const RUBY_T_CLASS: usize = 0x2;
+            // https://github.com/ruby/ruby/blob/c149708018135595b2c19c5f74baf9475674f394/include/ruby/internal/value_type.h#L115C5-L115C74¬
+            const RUBY_T_MODULE: usize = 0x3;
+            //https://github.com/ruby/ruby/blob/c149708018135595b2c19c5f74baf9475674f394/include/ruby/internal/value_type.h#L138¬
+            const RUBY_T_ICLASS: usize = 0x1c;
+            // https://github.com/ruby/ruby/blob/c149708018135595b2c19c5f74baf9475674f394/include/ruby/internal/value_type.h#L142¬
+            const RUBY_T_MASK: usize = 0x1f;
+
+            const RUBY_FL_SINGLETON: usize = ruby_fl_type_RUBY_FL_USER1 as usize;
+
+            // https://github.com/ruby/ruby/blob/7089a4e2d83a3cb1bc394c4ce3638cbc777f4cb9/include/ruby/internal/special_consts.h#L102
+            const RUBY_IMMEDIATE_MASK: usize = 0x07;
+
+            const RUBY_QNIL: usize = 0x04;
+
+            //let mut ep = ep.clone() as *mut usize;
+            let mut singleton = false;
+
+            let imemo: rb_method_entry_struct = source.copy_struct(cme).context(cme)?;
+            // Read the class structure to get flags
+            let mut klass = if cfunc {
+                imemo.owner
+            } else {
+                imemo.defined_class
+            };
+            if klass == RUBY_QNIL {
+                return Ok(("".to_string(), false))
+            }
+            let rbasic: RBasic = source.copy_struct(klass).context(klass)?;
+
+            let class_flags = rbasic.flags;
+            let class_mask = class_flags & RUBY_T_MASK;
+
+            match class_mask {
+                RUBY_T_ICLASS => {
+                    // For iclass, get the classpath from the klass field
+                    klass = rbasic.klass as usize;
+                }
+                _ => {
+                    // Check if it's a singleton class
+                    if class_flags & RUBY_FL_SINGLETON != 0 {
+                        log::debug!("Got singleton class");
+                        singleton = true;
+
+                        let ext: RClass_and_rb_classext_t = source.copy_struct(klass).context(klass)?;
+                        klass = unsafe {
+                            ext.classext.as_.singleton_class.attached_object as usize
+                        };
+
+                        let rbasic: RBasic = source.copy_struct(klass).context(klass)?;
+                        let class_flags = rbasic.flags;
+                        let class_mask = class_flags & RUBY_T_MASK;
+                        if class_mask != RUBY_T_CLASS  && class_mask != RUBY_T_MODULE {
+                            if (klass & RUBY_IMMEDIATE_MASK == 0) {
+                                klass = rb_class_real(rbasic.klass, source)?;
+                                let ext: RClass_and_rb_classext_t = source.copy_struct(klass).context(klass)?;
+                                let class_path = get_ruby_string(ext.classext.classpath as usize, source)?;
+                                return Ok((format!("#<{}:{:#08x}>", class_path, klass), singleton));
+                            } else {
+                                log::debug!("TODO: Immediate object case is unhandled!");
+                            }
+                        }
+                    }
+                }
+            }
+
+            if klass == 0 {
+                return Err(anyhow::anyhow!("klass was empty"));
+            }
+
+            let class_path = rb_class_path(klass, source)?;
+            Ok((class_path, singleton))
+        }
+
+        // https://github.com/ruby/ruby/blob/v3_3_0/vm_backtrace.c#L1841
+        pub fn profile_frame_full_label(
+            class_path: &str,
+            label: &str,
+            base_label: &str,
+            method_name: &str,
+            singleton: bool,
+        ) -> String {
+            let qualified = qualified_method_name(class_path, method_name, singleton);
+
+            if qualified.is_empty() || qualified == base_label.to_string() {
+                return label.to_string();
+            }
+
+            let label_length = label.len();
+            let base_label_length = base_label.len();
+            let mut prefix_len = label_length.saturating_sub(base_label_length);
+
+            // Ensure prefix_len doesn't exceed label length (defensive programming)
+            // Note: saturating_sub above already handles the < 0 case
+            if prefix_len > label_length {
+                prefix_len = label_length;
+            }
+
+            let profile_label = format!("{}{}", &label[..prefix_len], qualified);
+
+            if profile_label.is_empty() {
+                return String::new();
+            }
+
+            // Get the prefix from label and concatenate with qualified_method_name
+            profile_label
+        }
+    )
+);
+
+macro_rules! get_stack_frame_3_3_0(
+    () => (
         fn get_stack_frame<T>(
             iseq_struct: &rb_iseq_struct,
             cfp: &rb_control_frame_t,
             source: &T,
         ) -> Result<StackFrame> where T: ProcessMemory {
+            let cme = locate_method_entry(&cfp.ep, source)?;
+            let mut class_path = "".to_string();
+            let mut singleton = false;
+            let iseq = if cme != 0 {
+                let imemo: rb_method_entry_struct = source.copy_struct(cme).context(cme)?;
+                let method_type = source.copy(imemo.def as usize, 1).context(imemo.def as usize)?;
+                // https://github.com/ruby/ruby/blob/v3_3_0/internal/imemo.h#L21
+                let method_type = method_type[0] & 0xf;
+                // https://github.com/ruby/ruby/blob/v3_3_0/method.h#L110
+                if method_type == 0 {
+                    (class_path, singleton) = get_classpath(cme, false, source)?;
+                    let method_def: rb_method_definition_struct = source.copy_struct(imemo.def as usize).context(imemo.def as usize)?;
+                    let iseq: rb_iseq_struct = unsafe {
+                        source.copy_struct(method_def.body.iseq.iseqptr as usize).context("")?
+                    };
+                    iseq
+                } else {
+                    *iseq_struct
+                }
+            } else {
+                *iseq_struct
+            };
             if iseq_struct.body == std::ptr::null_mut() {
                 return Err(format_err!("iseq body is null"));
             }
-            let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
-                .context("couldn't copy rb_iseq_constant_body")?;
-
+            let body: rb_iseq_constant_body =
+                source.copy_struct(iseq.body as usize)
+                    .context("couldn't copy rb_iseq_constant_body")?;
+            let frame_flag: usize = unsafe {
+                source.copy_struct(cfp.ep.offset(0) as usize).context(cfp.ep.offset(0) as usize)?
+            };
             let rstring: RString = source.copy_struct(body.location.label as usize)
                 .context("couldn't copy RString")?;
+
+            let mut method_name = "".to_string();
+            if body.local_iseq != std::ptr::null_mut() {
+                // https://github.com/ruby/ruby/blob/v3_3_0/vm_backtrace.c#L1801 calls
+                // https://github.com/ruby/ruby/blob/v3_3_0/iseq.c#L1234
+                let local_iseq: rb_iseq_t = source.copy_struct(body.local_iseq as usize)
+                    .context("couldn't read local iseq")?;
+                if local_iseq.body != std::ptr::null_mut() {
+                    let local_body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
+                        .context("couldn't copy rb_iseq_constant_body")?;
+                    method_name = get_ruby_string(local_body.location.base_label as usize, source)?;
+                }
+
+            }
             let (path, absolute_path) = get_ruby_string_array(
                 body.location.pathobj as usize,
                 rstring.basic.klass as usize,
                 source
-            ).context("couldn't get ruby string from iseq body")?;
+            ).context(format!("couldn't get ruby path string array from iseq body: {:X}", frame_flag)).unwrap_or(("FAILED".to_string(), "FAILED".to_string()));
 
-            let class_name = get_classname(&cfp.ep, source).unwrap_or("".to_string());
-            let method_name = get_ruby_string(body.location.label as usize, source)?;
-            let name = if class_name != "" {
-                format!("{}#{}", class_name, method_name)
-            } else {
-                method_name
-            };
+            let label = get_ruby_string(body.location.label as usize, source)?;
+            let base_label = get_ruby_string(body.location.base_label as usize, source)?;
+            let full_label = profile_frame_full_label(&class_path, &label, &base_label, &method_name, singleton);
 
             Ok(StackFrame{
-                name: name,
+                name: full_label,
                 relative_path: path,
                 absolute_path: Some(absolute_path),
                 lineno: match get_lineno(&body, cfp, source) {
@@ -1202,6 +1420,13 @@ macro_rules! get_cfps(
 
 macro_rules! get_cfunc_name_unsupported(
     () => (
+        fn ruby_frame_cfunc<T>(
+            _cfp: &rb_control_frame_t,
+            _source: &T
+        ) -> Result<bool> where T: ProcessMemory {
+            Ok(false)
+        }
+
         fn get_cfunc_name<T: ProcessMemory>(_cfp: &rb_control_frame_t, _global_symbols_address: usize, _source: &T, _pid: Pid) -> Result<String> {
             return Err(format_err!("C function resolution is not supported for this version of Ruby").into());
         }
@@ -1210,68 +1435,118 @@ macro_rules! get_cfunc_name_unsupported(
 
 macro_rules! get_cfunc_name(
     () => (
+
+        fn ruby_frame_cfunc<T>(
+            cfp: &rb_control_frame_t,
+            source: &T
+        ) -> Result<bool> where T: ProcessMemory {
+            let frame_flag: usize = unsafe {
+                source.copy_struct(cfp.ep.offset(0) as usize).context(cfp.ep.offset(0) as usize)?
+            };
+            const VM_FRAME_MAGIC_CFUNC: usize = 0x55550001;
+            const VM_FRAME_MAGIC_MASK: usize = 0x7fff0001;
+
+            Ok((frame_flag & VM_FRAME_MAGIC_MASK) == VM_FRAME_MAGIC_CFUNC)
+        }
+
+        // https://github.com/ruby/ruby/blob/v3_3_0/vm_backtrace.c#L1813
+        pub fn qualified_method_name(class_path: &str, method_name: &str, singleton: bool) -> String {
+            if method_name.is_empty() {
+                return method_name.to_string();
+            }
+
+            if !class_path.is_empty() {
+                let join_char = if singleton { "." } else { "#" };
+                return format!("{}{}{}", class_path, join_char, method_name);
+            }
+
+            method_name.to_string()
+        }
+
+        // tries to mimic rb_vm_frame_method_entry
+        // https://github.com/ruby/ruby/blob/v3_3_0/vm_insnhelper.c#L733
+        fn locate_method_entry<T>(
+            ep: &*const usize,
+            source: &T,
+        ) -> Result<usize> where T: ProcessMemory {
+            const VM_ENV_FLAG_LOCAL: usize = 0x2;
+            let mut ep = ep.clone() as *mut usize;
+            let mut env_flags: usize = source.copy_struct(ep as usize).context(ep as usize)?;
+            let mut env_specval: usize = unsafe {
+                source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?
+            };
+            let mut env_me_cref: usize = unsafe {
+                source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-2) as usize)?
+            };
+
+            while env_flags & VM_ENV_FLAG_LOCAL != 0 {
+                let me = check_method_entry(env_me_cref, false, source)?;
+                if me != 0{
+                    return Ok(me);
+                }
+                unsafe {
+                    // https://github.com/ruby/ruby/blob/v3_4_5/vm_core.h#L1356
+                    // we must strip off the GC marking bits from the EP, and mimic
+                    // https://github.com/ruby/ruby/blob/v3_4_5/vm_core.h#L1501
+                    ep = (env_specval.clone() & !0x03) as *mut usize;
+                    env_flags = source.copy_struct(ep as usize).context(ep as usize)?;
+                    env_specval = source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?;
+                    env_me_cref = source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-2) as usize)?;
+                }
+            }
+
+            let me = check_method_entry(env_me_cref, true, source)?;
+            Ok(me)
+        }
+
+        // tries to mimic https://github.com/ruby/ruby/blob/v3_3_0/vm_insnhelper.c#L707
         fn check_method_entry<T: ProcessMemory>(
             raw_imemo: usize,
+            can_be_svar: bool,
             source: &T
-        ) -> Result<*const rb_method_entry_struct> {
+        ) -> Result<usize> {
+            //https://github.com/ruby/ruby/blob/v3_4_5/internal/imemo.h#L21
+            const IMEMO_MASK: usize = 0x0f;
+            if raw_imemo == 0 {
+                return Ok(0);
+            }
             let imemo: rb_method_entry_struct = source.copy_struct(raw_imemo).context(raw_imemo)?;
 
             // These type constants are defined in ruby's internal/imemo.h
             #[allow(non_upper_case_globals)]
-            match ((imemo.flags >> 12) & 0x07) as u32 {
-                imemo_type_imemo_ment => Ok(&imemo as *const rb_method_entry_struct),
+            match ((imemo.flags >> ruby_fl_type_RUBY_FL_USHIFT) & IMEMO_MASK) as u32 {
+                imemo_type_imemo_ment => Ok(raw_imemo),
                 imemo_type_imemo_svar => {
-                    let svar: vm_svar = source.copy_struct(raw_imemo).context(raw_imemo)?;
-                    check_method_entry(svar.cref_or_me as usize, source)
+                    if can_be_svar {
+                        let svar: vm_svar = source.copy_struct(raw_imemo).context(raw_imemo)?;
+                        check_method_entry(svar.cref_or_me as usize, false, source)
+                    } else {
+                        Ok(0)
+                    }
                 },
-                _ => Ok(raw_imemo as *const rb_method_entry_struct)
+                _ => Ok(0)
             }
         }
 
+        // we should read that here and return the qualified name
         fn get_cfunc_name<T: ProcessMemory>(
             cfp: &rb_control_frame_t,
             global_symbols_address: usize,
             source: &T,
             _pid: Pid
         ) -> Result<String> {
-            // The logic in this function is adapted from the .gdbinit script in
-            // github.com/ruby/ruby, in particular the print_id function.
+            const IMEMO_MASK: usize = 0x0f;
 
-            let mut ep = cfp.ep as *mut usize;
-            let frame_flag: usize = unsafe {
-                source.copy_struct(ep.offset(0) as usize).context(ep.offset(0) as usize)?
-            };
+            let cme = locate_method_entry(&cfp.ep, source)?;
+            let (class_path, singleton) = get_classpath(cme, true, source).unwrap_or(("".to_string(), false));
 
-            // if VM_FRAME_TYPE($cfp->flag) != VM_FRAME_MAGIC_CFUNC
-            if frame_flag & 0xffff0001 != 0x55550001 {
-                return Err(format_err!("Not a C function control frame").into());
-            }
-
-            let mut env_specval: usize = unsafe {
-                source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?
-            };
-            let mut env_me_cref: usize = unsafe {
-                source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-1) as usize)?
-            };
-
-            // #define VM_ENV_FLAG_LOCAL 0x02
-            while env_specval & 0x02 != 0 {
-                if !check_method_entry(env_me_cref, source)?.is_null() {
-                    break;
-                }
-                unsafe {
-                    ep = ep.offset(0) as *mut usize;
-                    env_specval = source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?;
-                    env_me_cref = source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-2) as usize)?;
-                }
-            }
-
-            let imemo: rb_method_entry_struct = source.copy_struct(env_me_cref).context(env_me_cref)?;
+            let imemo: rb_method_entry_struct = source.copy_struct(cme).context(cme)?;
             if imemo.def.is_null() {
                 return Err(format_err!("No method definition").into());
             }
 
-            let ttype = ((imemo.flags >> 12) & 0x07) as usize;
+
+            let ttype = ((imemo.flags >> ruby_fl_type_RUBY_FL_USHIFT) & IMEMO_MASK) as usize;
             if ttype != imemo_type_imemo_ment as usize {
                 return Err(format_err!("Not a method entry").into());
             }
@@ -1337,8 +1612,8 @@ macro_rules! get_cfunc_name(
             let offset = (serial % 512) * 2;
             let rstring_remote_ptr = (array_ptr as usize) + offset * std::mem::size_of::<usize>();
             let rstring_ptr: usize = source.copy_struct(rstring_remote_ptr as usize).context(rstring_remote_ptr as usize)?;
-
-            Ok(get_ruby_string(rstring_ptr as usize, source)?)
+            let method_name = get_ruby_string(rstring_ptr as usize, source)?;
+            Ok(qualified_method_name(&class_path, &method_name, singleton))
         }
     )
 );
@@ -1468,6 +1743,7 @@ ruby_version_v3_3_x!(ruby_3_4_7);
 #[cfg(test)]
 mod tests {
     use rbspy_testdata::*;
+    use rstest::rstest;
 
     use crate::core::ruby_version;
     use crate::core::types::StackFrame;
@@ -1508,7 +1784,6 @@ mod tests {
                 lineno: Some(14),
             },
             StackFrame::unknown_c_function(),
-            StackFrame::unknown_c_function(),
             StackFrame {
                 name: "<main>".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
@@ -1517,7 +1792,6 @@ mod tests {
                 ),
                 lineno: Some(13),
             },
-            StackFrame::unknown_c_function(),
         ]
     }
 
@@ -1671,48 +1945,56 @@ mod tests {
     fn real_stack_trace_3_3_0() -> Vec<StackFrame> {
         vec![
             StackFrame {
-                name: "sleep [c function]".to_string(),
+                name: "Kernel#sleep [c function]".to_string(),
                 relative_path: "(unknown)".to_string(),
                 absolute_path: None,
                 lineno: None,
             },
             StackFrame {
                 name: "Object#aaa".to_string(),
-                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                relative_path: "ci/ruby-programs/infinite_on_cpu.rb".to_string(),
                 absolute_path: Some(
-                    "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                    "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu.rb".to_string(),
                 ),
-                lineno: Some(3),
+                lineno: Some(9),
             },
             StackFrame {
                 name: "Object#bbb".to_string(),
-                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                relative_path: "ci/ruby-programs/infinite_on_cpu.rb".to_string(),
                 absolute_path: Some(
-                    "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                    "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu.rb".to_string(),
                 ),
-                lineno: Some(7),
+                lineno: Some(13),
             },
             StackFrame {
                 name: "Object#ccc".to_string(),
-                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                relative_path: "ci/ruby-programs/infinite_on_cpu.rb".to_string(),
                 absolute_path: Some(
-                    "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                    "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu.rb".to_string(),
                 ),
-                lineno: Some(11),
+                lineno: Some(17),
             },
             StackFrame {
                 name: "block in <main>".to_string(),
-                relative_path: "ci/ruby-programs/infinite.rb".to_string(),
+                relative_path: "ci/ruby-programs/infinite_on_cpu.rb".to_string(),
                 absolute_path: Some(
-                    "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite.rb".to_string(),
+                    "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu.rb".to_string(),
                 ),
-                lineno: Some(15),
+                lineno: Some(21),
             },
             StackFrame {
-                name: "loop".to_string(),
+                name: "Kernel#loop".to_string(),
                 relative_path: "<internal:kernel>".to_string(),
                 absolute_path: Some("unknown".to_string()),
                 lineno: Some(192),
+            },
+            StackFrame {
+                name: "<main>".to_string(),
+                relative_path: "ci/ruby-programs/infinite_on_cpu.rb".to_string(),
+                absolute_path: Some(
+                    "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu.rb".to_string(),
+                ),
+                lineno: Some(19),
             },
         ]
     }
@@ -1720,7 +2002,7 @@ mod tests {
     fn real_stack_trace_with_classes_3_3_0() -> Vec<StackFrame> {
         vec![
             StackFrame {
-                name: "sleep [c function]".to_string(),
+                name: "Kernel#sleep [c function]".to_string(),
                 relative_path: "(unknown)".to_string(),
                 absolute_path: None,
                 lineno: None,
@@ -1750,7 +2032,7 @@ mod tests {
                 lineno: Some(32)
             },
             StackFrame {
-                name: "loop".to_string(),
+                name: "Kernel#loop".to_string(),
                 relative_path: "<internal:kernel>".to_string(),
                 absolute_path: Some("unknown".to_string()),
                 lineno: Some(192)
@@ -1761,6 +2043,59 @@ mod tests {
                 absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string()),
                 lineno: Some(33)
             },
+        ]
+    }
+
+    fn real_complex_trace_with_classes_3_4_5() -> Vec<StackFrame> {
+        vec![
+            StackFrame { name: "Kernel#sleep [c function]".to_string(), relative_path: "(unknown)".to_string(), absolute_path: None, lineno: None },
+            StackFrame { name: "block in hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(41) },
+            StackFrame { name: "Kernel#loop".to_string(), relative_path: "<internal:kernel>".to_string(), absolute_path: Some("unknown".to_string()), lineno: Some(173) },
+            StackFrame { name: "ClassA#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(42) },
+            StackFrame { name: "ModuleB::ClassB#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(49) },
+            StackFrame { name: "ModuleC.hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(56) },
+            StackFrame { name: "ClassWithStaticMethod.hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(62) },
+            StackFrame { name: "ModuleD#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(68) },
+            StackFrame { name: "block in <top (required)>".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(75) },
+            StackFrame { name: "block in <top (required)>".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(77) },
+            StackFrame { name: "#<ClassD:0x7f27035d2448>.hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(85) },
+            StackFrame { name: "ClassE#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(90) },
+            StackFrame { name: "UnboundMethod#bind_call [c function]".to_string(), relative_path: "(unknown)".to_string(), absolute_path: None, lineno: None },
+            StackFrame { name: "#<Refinement:0x7f27035d1d68>#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(108) },
+            StackFrame { name: "ModuleE.hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(118) },
+            StackFrame { name: "ClassH#method_missing".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(126) },
+            StackFrame { name: "block in hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(133) },
+            StackFrame { name: "Integer#times".to_string(), relative_path: "<internal:numeric>".to_string(), absolute_path: Some("unknown".to_string()), lineno: Some(261) },
+            StackFrame { name: "ClassF#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(134) },
+            StackFrame { name: "block (2 levels) in <top (required)>".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(140) },
+            StackFrame { name: "#<Class:0x7f27035df648>.hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(147) },
+            StackFrame { name: "#<Class:0x7f27035dee28>#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(152) },
+            StackFrame { name: "#<Module:0x7f27035dece8>.hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(158) },
+            StackFrame { name: "Object#method_with_complex_parameters".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(163) },
+            StackFrame { name: "block (2 levels) in hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(174) },
+            StackFrame { name: "ClassJ#hello_helper".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(168) },
+            StackFrame { name: "block in hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(175) },
+            StackFrame { name: "ClassJ#hello_helper".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(168) },
+            StackFrame { name: "ClassJ#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(176) },
+            StackFrame { name: "<compiled>".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("unknown".to_string()), lineno: Some(181) },
+            StackFrame { name: "Kernel#eval [c function]".to_string(), relative_path: "(unknown)".to_string(), absolute_path: None, lineno: None },
+            StackFrame { name: "ClassK#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(182) },
+            StackFrame { name: "<compiled>".to_string(), relative_path: "(eval at /home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb:187)".to_string(), absolute_path: Some("unknown".to_string()), lineno: Some(1) },
+            StackFrame { name: "BasicObject#instance_eval [c function]".to_string(), relative_path: "(unknown)".to_string(), absolute_path: None, lineno: None },
+            StackFrame { name: "ClassL#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(188) },
+            StackFrame { name: "<compiled>".to_string(), relative_path: "(eval at /home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb:193)".to_string(), absolute_path: Some("unknown".to_string()), lineno: Some(1) },
+            StackFrame { name: "Kernel#eval [c function]".to_string(), relative_path: "(unknown)".to_string(), absolute_path: None, lineno: None },
+            StackFrame { name: "ClassM#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(194) },
+            StackFrame { name: "block (3 levels) in <top (required)>".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(201) },
+            StackFrame { name: "Integer#times".to_string(), relative_path: "<internal:numeric>".to_string(), absolute_path: Some("unknown".to_string()), lineno: Some(261) },
+            StackFrame { name: "block (2 levels) in <top (required)>".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(202) },
+            StackFrame { name: "Object#top_level_hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(207) },
+            StackFrame { name: "InstanceMethod#work".to_string(), relative_path: "ci/ruby-programs/cme_complex_labels.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/cme_complex_labels.rb".to_string()), lineno: Some(6) },
+            StackFrame { name: "ModuleMethod#call_instance".to_string(), relative_path: "ci/ruby-programs/cme_complex_labels.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/cme_complex_labels.rb".to_string()), lineno: Some(12) },
+            StackFrame { name: "Object#work_main".to_string(), relative_path: "ci/ruby-programs/cme_complex_labels.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/cme_complex_labels.rb".to_string()), lineno: Some(22) },
+            StackFrame { name: "block in <main>".to_string(), relative_path: "ci/ruby-programs/cme_complex_labels.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/cme_complex_labels.rb".to_string()), lineno: Some(26) },
+            StackFrame { name: "Kernel#loop".to_string(), relative_path: "<internal:kernel>".to_string(), absolute_path: Some("unknown".to_string()), lineno: Some(173) },
+            StackFrame { name: "<main>".to_string(), relative_path: "ci/ruby-programs/cme_complex_labels.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/cme_complex_labels.rb".to_string()), lineno: Some(24) },
         ]
     }
 
@@ -2540,8 +2875,8 @@ mod tests {
     #[test]
     fn test_get_ruby_stack_trace_3_3_0() {
         let source = coredump_3_3_0();
-        let vm_addr = 0x7f7ff21f1868;
-        let global_symbols_addr = Some(0x7f7ff21e0c60);
+        let vm_addr = 0x7f43435f4988;
+        let global_symbols_addr = Some(0x7f43435e3c60);
         let stack_trace = ruby_version::ruby_3_3_0::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
@@ -2580,8 +2915,8 @@ mod tests {
     #[test]
     fn test_get_ruby_stack_trace_3_3_1() {
         let source = coredump_3_3_0();
-        let vm_addr = 0x7f7ff21f1868;
-        let global_symbols_addr = Some(0x7f7ff21e0c60);
+        let vm_addr = 0x7f43435f4988;
+        let global_symbols_addr = Some(0x7f43435e3c60);
         let stack_trace = ruby_version::ruby_3_3_1::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
@@ -2599,8 +2934,8 @@ mod tests {
     #[test]
     fn test_get_ruby_stack_trace_3_3_2() {
         let source = coredump_3_3_0();
-        let vm_addr = 0x7f7ff21f1868;
-        let global_symbols_addr = Some(0x7f7ff21e0c60);
+        let vm_addr = 0x7f43435f4988;
+        let global_symbols_addr = Some(0x7f43435e3c60);
         let stack_trace = ruby_version::ruby_3_3_2::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
@@ -2618,8 +2953,8 @@ mod tests {
     #[test]
     fn test_get_ruby_stack_trace_3_3_3() {
         let source = coredump_3_3_0();
-        let vm_addr = 0x7f7ff21f1868;
-        let global_symbols_addr = Some(0x7f7ff21e0c60);
+        let vm_addr = 0x7f43435f4988;
+        let global_symbols_addr = Some(0x7f43435e3c60);
         let stack_trace = ruby_version::ruby_3_3_3::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
@@ -2636,8 +2971,8 @@ mod tests {
     #[test]
     fn test_get_ruby_stack_trace_3_3_4() {
         let source = coredump_3_3_0();
-        let vm_addr = 0x7f7ff21f1868;
-        let global_symbols_addr = Some(0x7f7ff21e0c60);
+        let vm_addr = 0x7f43435f4988;
+        let global_symbols_addr = Some(0x7f43435e3c60);
         let stack_trace = ruby_version::ruby_3_3_4::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
@@ -2654,8 +2989,8 @@ mod tests {
     #[test]
     fn test_get_ruby_stack_trace_3_3_5() {
         let source = coredump_3_3_0();
-        let vm_addr = 0x7f7ff21f1868;
-        let global_symbols_addr = Some(0x7f7ff21e0c60);
+        let vm_addr = 0x7f43435f4988;
+        let global_symbols_addr = Some(0x7f43435e3c60);
         let stack_trace = ruby_version::ruby_3_3_5::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
@@ -2672,8 +3007,8 @@ mod tests {
     #[test]
     fn test_get_ruby_stack_trace_3_3_6() {
         let source = coredump_3_3_0();
-        let vm_addr = 0x7f7ff21f1868;
-        let global_symbols_addr = Some(0x7f7ff21e0c60);
+        let vm_addr = 0x7f43435f4988;
+        let global_symbols_addr = Some(0x7f43435e3c60);
         let stack_trace = ruby_version::ruby_3_3_6::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
@@ -2690,8 +3025,8 @@ mod tests {
     #[test]
     fn test_get_ruby_stack_trace_3_3_7() {
         let source = coredump_3_3_0();
-        let vm_addr = 0x7f7ff21f1868;
-        let global_symbols_addr = Some(0x7f7ff21e0c60);
+        let vm_addr = 0x7f43435f4988;
+        let global_symbols_addr = Some(0x7f43435e3c60);
         let stack_trace = ruby_version::ruby_3_3_7::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
@@ -2708,8 +3043,8 @@ mod tests {
     #[test]
     fn test_get_ruby_stack_trace_3_3_8() {
         let source = coredump_3_3_0();
-        let vm_addr = 0x7f7ff21f1868;
-        let global_symbols_addr = Some(0x7f7ff21e0c60);
+        let vm_addr = 0x7f43435f4988;
+        let global_symbols_addr = Some(0x7f43435e3c60);
         let stack_trace = ruby_version::ruby_3_3_8::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
@@ -2726,8 +3061,8 @@ mod tests {
     #[test]
     fn test_get_ruby_stack_trace_3_4_0() {
         let source = coredump_3_3_0();
-        let vm_addr = 0x7f7ff21f1868;
-        let global_symbols_addr = Some(0x7f7ff21e0c60);
+        let vm_addr = 0x7f43435f4988;
+        let global_symbols_addr = Some(0x7f43435e3c60);
         let stack_trace = ruby_version::ruby_3_4_0::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
@@ -2744,8 +3079,8 @@ mod tests {
     #[test]
     fn test_get_ruby_stack_trace_3_4_1() {
         let source = coredump_3_3_0();
-        let vm_addr = 0x7f7ff21f1868;
-        let global_symbols_addr = Some(0x7f7ff21e0c60);
+        let vm_addr = 0x7f43435f4988;
+        let global_symbols_addr = Some(0x7f43435e3c60);
         let stack_trace = ruby_version::ruby_3_4_1::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
@@ -2762,8 +3097,8 @@ mod tests {
     #[test]
     fn test_get_ruby_stack_trace_3_4_2() {
         let source = coredump_3_3_0();
-        let vm_addr = 0x7f7ff21f1868;
-        let global_symbols_addr = Some(0x7f7ff21e0c60);
+        let vm_addr = 0x7f43435f4988;
+        let global_symbols_addr = Some(0x7f43435e3c60);
         let stack_trace = ruby_version::ruby_3_4_2::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
@@ -2780,8 +3115,8 @@ mod tests {
     #[test]
     fn test_get_ruby_stack_trace_3_4_3() {
         let source = coredump_3_3_0();
-        let vm_addr = 0x7f7ff21f1868;
-        let global_symbols_addr = Some(0x7f7ff21e0c60);
+        let vm_addr = 0x7f43435f4988;
+        let global_symbols_addr = Some(0x7f43435e3c60);
         let stack_trace = ruby_version::ruby_3_4_3::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
@@ -2798,8 +3133,8 @@ mod tests {
     #[test]
     fn test_get_ruby_stack_trace_3_4_4() {
         let source = coredump_3_3_0();
-        let vm_addr = 0x7f7ff21f1868;
-        let global_symbols_addr = Some(0x7f7ff21e0c60);
+        let vm_addr = 0x7f43435f4988;
+        let global_symbols_addr = Some(0x7f43435e3c60);
         let stack_trace = ruby_version::ruby_3_4_4::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
@@ -2816,8 +3151,8 @@ mod tests {
     #[test]
     fn test_get_ruby_stack_trace_3_4_5() {
         let source = coredump_3_3_0();
-        let vm_addr = 0x7f7ff21f1868;
-        let global_symbols_addr = Some(0x7f7ff21e0c60);
+        let vm_addr = 0x7f43435f4988;
+        let global_symbols_addr = Some(0x7f43435e3c60);
         let stack_trace = ruby_version::ruby_3_4_5::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
@@ -2832,10 +3167,31 @@ mod tests {
 
     #[cfg(target_pointer_width = "64")]
     #[test]
+    fn test_get_ruby_stack_trace_complex_3_4_5() {
+        let source = coredump_complex_3_4_5();
+        let vm_addr = 0x7f271feb5390;
+        let global_symbols_addr = Some(0x7f271fea3dc0);
+        let stack_trace = ruby_version::ruby_3_3_0::get_stack_trace::<CoreDump>(
+            0,
+            vm_addr,
+            global_symbols_addr,
+            &source,
+            0,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            real_complex_trace_with_classes_3_4_5(),
+            stack_trace.unwrap().trace
+        );
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
     fn test_get_ruby_stack_trace_3_4_6() {
         let source = coredump_3_3_0();
-        let vm_addr = 0x7f7ff21f1868;
-        let global_symbols_addr = Some(0x7f7ff21e0c60);
+        let vm_addr = 0x7f43435f4988;
+        let global_symbols_addr = Some(0x7f43435e3c60);
         let stack_trace = ruby_version::ruby_3_4_6::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
@@ -2852,8 +3208,8 @@ mod tests {
     #[test]
     fn test_get_ruby_stack_trace_3_4_7() {
         let source = coredump_3_3_0();
-        let vm_addr = 0x7f7ff21f1868;
-        let global_symbols_addr = Some(0x7f7ff21e0c60);
+        let vm_addr = 0x7f43435f4988;
+        let global_symbols_addr = Some(0x7f43435e3c60);
         let stack_trace = ruby_version::ruby_3_4_7::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
@@ -2864,5 +3220,65 @@ mod tests {
         )
         .unwrap();
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
+    }
+
+    #[rstest]
+    #[case::no_class_not_singleton("", "foo", false, "foo")]
+    #[case::class_not_singleton("ClassA", "foo", false, "ClassA#foo")]
+    #[case::class_with_singleton("ClassA", "foo", true, "ClassA.foo")]
+    #[case::empty_returns_empty("", "", false, "")]
+    fn test_qualified_method_name(
+        #[case] class_path: &str,
+        #[case] method_name: &str,
+        #[case] singleton: bool,
+        #[case] expected: &str,
+    ) {
+        let qualified =
+            ruby_version::ruby_3_3_0::qualified_method_name(class_path, method_name, singleton);
+        assert_eq!(expected.to_string(), qualified);
+    }
+    #[rstest]
+    #[case::no_class_uses_label("", "block in foo", "foo", "foo", false, "block in foo")]
+    #[case::no_method_uses_label("", "block in foo", "foo", "", false, "block in foo")]
+    #[case::no_class_no_base_label_no_method_uses_label(
+        "",
+        "block in foo",
+        "",
+        "",
+        false,
+        "block in foo"
+    )]
+    #[case::class_uses_label_prefix(
+        "ClassA",
+        "block in foo",
+        "foo",
+        "foo",
+        false,
+        "block in ClassA#foo"
+    )]
+    #[case::class_uses_label_prefix_singleton(
+        "ClassA",
+        "block in foo",
+        "foo",
+        "foo",
+        true,
+        "block in ClassA.foo"
+    )]
+    fn test_profile_frame_full_label(
+        #[case] class_path: &str,
+        #[case] label: &str,
+        #[case] base_label: &str,
+        #[case] method_name: &str,
+        #[case] singleton: bool,
+        #[case] expected: &str,
+    ) {
+        let full_label = ruby_version::ruby_3_3_0::profile_frame_full_label(
+            class_path,
+            label,
+            base_label,
+            method_name,
+            singleton,
+        );
+        assert_eq!(expected.to_string(), full_label);
     }
 }
