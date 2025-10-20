@@ -1,14 +1,14 @@
 require_relative './interesting_backtrace_helper'
 
 class InstanceMethod
-  def work()
+  def work
     top_level_hello
   end
 end
 
 module ModuleMethod
-  def call_instance()
-      InstanceMethod.new.work()
+  def call_instance
+    InstanceMethod.new.work
   end
 end
 
@@ -17,10 +17,10 @@ class IncludedMethod
 end
 
 # Top level method test too (block in main)
-def work_main()
-  IncludedMethod.new.call_instance()
+def work_main
+  IncludedMethod.new.call_instance
 end
 
 loop do
-    work_main()
+  work_main
 end
