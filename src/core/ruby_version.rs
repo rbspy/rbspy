@@ -1056,7 +1056,6 @@ macro_rules! get_classpath(
 
             const RUBY_QNIL: usize = 0x04;
 
-            //let mut ep = ep.clone() as *mut usize;
             let mut singleton = false;
 
             let imemo: rb_method_entry_struct = source.copy_struct(cme).context(cme)?;
