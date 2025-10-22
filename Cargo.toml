@@ -1,6 +1,6 @@
 [package]
 name = "rbspy"
-version = "0.38.0"
+version = "0.38.1"
 authors = ["Adam Jensen <acjensen@gmail.com>", "Julia Evans <julia@jvns.ca>"]
 description = "Sampling CPU profiler for Ruby"
 keywords = ["ruby", "profiler", "MRI"]
@@ -35,7 +35,7 @@ memmap2 = "0.9.8"
 proc-maps = "0.4.0"
 prost = "0.14.1"
 rand = "0.9.2"
-rbspy-ruby-structs = { path = "ruby-structs", version="0.38.0" }
+rbspy-ruby-structs = { path = "ruby-structs", version="0.38.1" }
 remoteprocess = "0.5.0"
 semver = "1.0.27"
 serde = "1.0.228"
