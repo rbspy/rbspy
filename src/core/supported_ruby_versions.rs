@@ -682,6 +682,12 @@ pub fn get(v: &str) -> Result<RubyVersion> {
             get_stack_trace_fn: super::ruby_version::ruby_3_3_9::get_stack_trace,
             is_maybe_thread_fn: super::ruby_version::ruby_3_3_9::is_maybe_thread,
         }),
+        "3.3.10" => Ok(RubyVersion {
+            semver_version: Version::new(3, 3, 10),
+            get_execution_context_fn: super::ruby_version::ruby_3_3_10::get_execution_context,
+            get_stack_trace_fn: super::ruby_version::ruby_3_3_10::get_stack_trace,
+            is_maybe_thread_fn: super::ruby_version::ruby_3_3_10::is_maybe_thread,
+        }),
         "3.4.0" => Ok(RubyVersion {
             semver_version: Version::new(3, 4, 0),
             get_execution_context_fn: super::ruby_version::ruby_3_4_0::get_execution_context,
