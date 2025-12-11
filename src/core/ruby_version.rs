@@ -313,6 +313,36 @@ macro_rules! ruby_version_v3_3_x(
             #[allow(non_upper_case_globals)]
             const ruby_fl_type_RUBY_FL_USHIFT: ruby_fl_type = ruby_fl_ushift_RUBY_FL_USHIFT as i32;
             get_classpath!();
+            rb_class_real_3_0_0!();
+        }
+    )
+);
+
+macro_rules! ruby_version_v4_0_x(
+    ($ruby_version:ident) => (
+        pub mod $ruby_version {
+            use std;
+            use anyhow::{Context, format_err, Result};
+            use bindings::$ruby_version::*;
+            use crate::core::process::ProcessMemory;
+
+            get_stack_trace!(rb_execution_context_struct);
+            get_execution_context_from_vm!();
+            get_ruby_string_3_3_0!();
+            get_ruby_string_array_3_2_0!();
+            get_cfps!();
+            get_pos!(rb_iseq_constant_body);
+            get_lineno_2_6_0!();
+            get_stack_frame_3_3_0!();
+            stack_field_2_5_0!();
+            get_thread_status_2_6_0!();
+            get_thread_id_3_2_0!();
+            get_cfunc_name!();
+
+            #[allow(non_upper_case_globals)]
+            const ruby_fl_type_RUBY_FL_USHIFT: ruby_fl_type = ruby_fl_ushift_RUBY_FL_USHIFT as i32;
+            get_classpath!();
+            rb_class_real_4_0_0!();
         }
     )
 );
@@ -944,7 +974,7 @@ macro_rules! get_classpath_unsupported(
     )
 );
 
-macro_rules! get_classpath(
+macro_rules! rb_class_real_3_0_0(
     () => (
         fn rb_class_real<T>(
             klass: usize,
@@ -953,7 +983,7 @@ macro_rules! get_classpath(
             const RUBY_T_ICLASS: usize = 0x1c;
             const RUBY_FL_SINGLETON: usize = ruby_fl_type_RUBY_FL_USER1 as usize;
 
-            //https://github.com/ruby/ruby/blob/v3_4_5/object.c#L290
+            // https://github.com/ruby/ruby/blob/v3_4_5/object.c#L290
             let mut klass = klass;
             let mut rbasic: RBasic = source.copy_struct(klass).context(klass)?;
             while (rbasic.flags & (RUBY_T_ICLASS | RUBY_FL_SINGLETON) != 0) {
@@ -963,7 +993,38 @@ macro_rules! get_classpath(
             }
             Ok(klass)
         }
+    )
+);
 
+// As part of ruby 4.0.0 [0], the super field was moved from RClass [1] to rb_classext_struct [2].
+//
+// [0]: https://github.com/ruby/ruby/commit/382645d440d5da66a0c04557f3ff2ca226de3a27
+// [1]: https://github.com/ruby/ruby/blob/7a5688e2a27668e48f8d6ff4af5b2208b98a2f5e/internal/class.h#L82
+// [2]: https://github.com/ruby/ruby/blob/b49ff7cc700ffdba26fabaaf8167eee189797edf/internal/class.h#L81
+macro_rules! rb_class_real_4_0_0(
+    () => (
+        fn rb_class_real<T>(
+            klass: usize,
+            source: &T,
+        ) -> Result<usize> where T: ProcessMemory {
+            const RUBY_T_ICLASS: usize = 0x1c;
+            const RUBY_FL_SINGLETON: usize = ruby_fl_type_RUBY_FL_USER1 as usize;
+
+            // https://github.com/ruby/ruby/blob/v3_4_5/object.c#L290
+            let mut klass = klass;
+            let mut rbasic: RBasic = source.copy_struct(klass).context(klass)?;
+            while (rbasic.flags & (RUBY_T_ICLASS | RUBY_FL_SINGLETON) != 0) {
+                let rclass_ext: RClass_and_rb_classext_t = source.copy_struct(klass).context(klass)?;
+                klass = rclass_ext.classext.super_;
+                rbasic = source.copy_struct(klass).context(klass)?;
+            }
+            Ok(klass)
+        }
+    )
+);
+
+macro_rules! get_classpath(
+    () => (
         // https://github.com/ruby/ruby/blob/v3_3_0/variable.c#L260
         fn rb_tmp_class_path<T>(
             klass: usize,
