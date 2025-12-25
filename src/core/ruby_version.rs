@@ -1800,6 +1800,7 @@ ruby_version_v3_3_x!(ruby_3_4_5);
 ruby_version_v3_3_x!(ruby_3_4_6);
 ruby_version_v3_3_x!(ruby_3_4_7);
 ruby_version_v3_3_x!(ruby_3_4_8);
+ruby_version_v4_0_x!(ruby_4_0_0);
 
 #[cfg(not(debug_assertions))]
 #[cfg(test)]
