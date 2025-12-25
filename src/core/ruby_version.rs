@@ -212,6 +212,7 @@ macro_rules! ruby_version_v3_0_x(
             use crate::core::process::ProcessMemory;
 
             get_stack_trace!(rb_execution_context_struct);
+            ec_search_start_offset_3_0_0!();
             get_execution_context_from_vm!();
             rstring_as_array_1_9_1!();
             get_ruby_string_1_9_1!();
@@ -241,6 +242,7 @@ macro_rules! ruby_version_v3_1_x(
             use crate::core::process::ProcessMemory;
 
             get_stack_trace!(rb_execution_context_struct);
+            ec_search_start_offset_3_0_0!();
             get_execution_context_from_vm!();
             rstring_as_array_3_1_0!();
             get_ruby_string_1_9_1!();
@@ -270,6 +272,7 @@ macro_rules! ruby_version_v3_2_x(
             use crate::core::process::ProcessMemory;
 
             get_stack_trace!(rb_execution_context_struct);
+            ec_search_start_offset_3_0_0!();
             get_execution_context_from_vm!();
             get_ruby_string_3_2_0!();
             get_ruby_string_array_3_2_0!();
@@ -298,6 +301,7 @@ macro_rules! ruby_version_v3_3_x(
             use crate::core::process::ProcessMemory;
 
             get_stack_trace!(rb_execution_context_struct);
+            ec_search_start_offset_3_0_0!();
             get_execution_context_from_vm!();
             get_ruby_string_3_3_0!();
             get_ruby_string_array_3_2_0!();
@@ -327,6 +331,7 @@ macro_rules! ruby_version_v4_0_x(
             use crate::core::process::ProcessMemory;
 
             get_stack_trace!(rb_execution_context_struct);
+            ec_search_start_offset_4_0_0!();
             get_execution_context_from_vm!();
             get_ruby_string_3_3_0!();
             get_ruby_string_array_3_2_0!();
@@ -360,6 +365,34 @@ macro_rules! get_execution_context_from_thread(
     )
 );
 
+macro_rules! ec_search_start_offset_3_0_0(
+    () => (
+        pub fn ec_search_start_offset() -> usize {
+            // The initial offsets were found by experimenting
+            return
+                if cfg!(target_os = "windows") {
+                    32
+                } else {
+                    48
+                };
+        }
+    )
+);
+
+macro_rules! ec_search_start_offset_4_0_0(
+    () => (
+        pub fn ec_search_start_offset() -> usize {
+            // The initial offsets were found by experimenting
+            return
+                if cfg!(target_os = "windows") {
+                    30
+                } else {
+                    38
+                };
+        }
+    )
+);
+
 macro_rules! get_execution_context_from_vm(
     () => (
         pub fn get_execution_context<T: ProcessMemory>(
@@ -383,14 +416,8 @@ macro_rules! get_execution_context_from_vm(
             // is in the memory word just before main_thread (see rb_ractor_struct).
             //
             // The initial offsets were found by experimenting.
-            const INITIAL_OFFSET: usize =
-                if cfg!(target_os = "windows") {
-                    32
-                } else {
-                    48
-                };
             const ADDRESSES_TO_CHECK: usize = 32;
-            let offset = INITIAL_OFFSET * std::mem::size_of::<usize>();
+            let offset = ec_search_start_offset() * std::mem::size_of::<usize>();
             let main_ractor_address = vm.ractor.main_ractor as usize;
             let candidate_addresses: [usize; ADDRESSES_TO_CHECK] =
                 source.copy_struct(main_ractor_address + offset)
