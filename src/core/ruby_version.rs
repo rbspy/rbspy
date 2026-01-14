@@ -3366,6 +3366,25 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn test_get_ruby_stack_trace_4_0_0() {
+        let source = coredump_4_0_0();
+        let vm_addr = 0x7f43435f4988;
+        let global_symbols_addr = Some(0x7f43435e3c60);
+        let stack_trace = ruby_version::ruby_4_0_0::get_stack_trace::<CoreDump>(
+            0,
+            vm_addr,
+            global_symbols_addr,
+            &source,
+            0,
+            false,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(real_stack_trace_4_0_0(), stack_trace.trace);
+    }
+
     #[rstest]
     #[case::no_class_not_singleton("", "foo", false, "foo")]
     #[case::class_not_singleton("ClassA", "foo", false, "ClassA#foo")]
