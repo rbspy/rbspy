@@ -43,7 +43,8 @@ jobs:
         build:
           - linux-x86_64
           - linux-aarch64
-          - macos
+          - macos-intel
+          - macos-aarch64
           - windows
         include:
           - build: linux-x86_64
@@ -56,11 +57,16 @@ jobs:
             ruby-version: 4.0.0
             run-tests: 'true'
             target: aarch64-unknown-linux-gnu
-          - build: macos
-            os: macos-14
+          - build: macos-intel
+            os: macos-15-intel
             ruby-version: 4.0.0
             run-tests: 'true'
             target: x86_64-apple-darwin
+          - build: macos-aarch64
+            os: macos-15
+            ruby-version: 4.0.0
+            run-tests: 'true'
+            target: aarch64-apple-darwin
           - build: windows
             os: windows-2022
             ruby-version: 3.4.8
