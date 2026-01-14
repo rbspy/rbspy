@@ -1,6 +1,6 @@
 [package]
 name = "rbspy"
-version = "0.41.0"
+version = "0.42.0"
 authors = ["Adam Jensen <acjensen@gmail.com>", "Julia Evans <julia@jvns.ca>"]
 description = "Sampling CPU profiler for Ruby"
 keywords = ["ruby", "profiler", "MRI"]
