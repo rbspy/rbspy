@@ -7,16 +7,17 @@ ENV tz=UTC
 RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
     build-essential \
     ca-certificates \
-    cargo \
-    git \
-    rustc
+    curl \
+    git
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
   
 COPY Cargo.toml config.toml ./
 COPY src src
 COPY ruby-structs ruby-structs
 COPY xtask xtask
 
-RUN cargo run --release --package xtask
+RUN ~/.cargo/bin/cargo run --release --package xtask
 
 FROM ubuntu:${UBUNTU_VERSION} AS generate
 
