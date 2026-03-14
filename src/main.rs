@@ -2,7 +2,7 @@ use anyhow::format_err;
 use anyhow::{Context, Error, Result};
 use chrono::prelude::*;
 use clap::{arg, ArgMatches};
-use rand::{distr::Alphanumeric, Rng};
+use rand::{distr::Alphanumeric, RngExt};
 use rbspy::recorder;
 use rbspy::report;
 use rbspy::{OutputFormat, Pid};
