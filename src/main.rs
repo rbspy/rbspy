@@ -132,9 +132,13 @@ fn do_main() -> Result<(), Error> {
             force_version,
             on_cpu_only,
         } => {
-            let pid = match target {
-                Target::Pid { pid } => pid,
-                Target::Subprocess { prog, args } => spawn_subprocess(prog, args, no_drop_root)?,
+            let (pid, mut child) = match target {
+                Target::Pid { pid } => (pid, None),
+                Target::Subprocess { prog, args } => {
+                    let child = spawn_subprocess(prog, args, no_drop_root)?;
+                    let pid = child.id() as Pid;
+                    (pid, Some(child))
+                }
             };
 
             let config = recorder::RecordConfig {
@@ -201,6 +205,12 @@ fn do_main() -> Result<(), Error> {
 
             let recording_result = recorder.record();
 
+            // If we spawned the process that we're sampling, then clean it up when we're done
+            if let Some(ref mut child) = child {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+
             interrupted.store(true, Ordering::Relaxed);
             summary_thread.join().expect("couldn't join summary thread");
             eprintln!(
@@ -230,9 +240,13 @@ fn do_main() -> Result<(), Error> {
             target,
             force_version,
         } => {
-            let pid = match target {
-                Target::Pid { pid } => pid,
-                Target::Subprocess { prog, args } => spawn_subprocess(prog, args, true)?,
+            let (pid, _child) = match target {
+                Target::Pid { pid } => (pid, None),
+                Target::Subprocess { prog, args } => {
+                    let child = spawn_subprocess(prog, args, true)?;
+                    let pid = child.id() as Pid;
+                    (pid, Some(child))
+                }
             };
             rbspy::inspect(pid, force_version)
         }
@@ -319,7 +333,6 @@ fn arg_parser() -> clap::Command {
                 .arg(
                     arg!(-d --duration <DURATION> "Number of seconds to record for")
                         .value_parser(clap::value_parser!(u64))
-                        .conflicts_with("cmd")
                         .required(false),
                 )
                 .arg(
@@ -570,7 +583,11 @@ fn output_filename(maybe_filename: Option<&str>, extension: &str) -> Result<Path
     }
 }
 
-fn spawn_subprocess(prog: String, args: Vec<String>, no_drop_root: bool) -> Result<Pid> {
+fn spawn_subprocess(
+    prog: String,
+    args: Vec<String>,
+    no_drop_root: bool,
+) -> Result<std::process::Child> {
     if cfg!(target_os = "macos") {
         // sleep to prevent freezes (because of High Sierra kernel bug)
         // TODO: figure out how to work around this race in a cleaner way
@@ -595,14 +612,12 @@ fn spawn_subprocess(prog: String, args: Vec<String>, no_drop_root: bool) -> Resu
                 .uid(uid)
                 .args(args)
                 .spawn()
-                .context(context)?
-                .id() as Pid)
+                .context(context)?)
         } else {
             Ok(std::process::Command::new(prog)
                 .args(args)
                 .spawn()
-                .context(context)?
-                .id() as Pid)
+                .context(context)?)
         }
     }
     #[cfg(windows)]
@@ -611,8 +626,7 @@ fn spawn_subprocess(prog: String, args: Vec<String>, no_drop_root: bool) -> Resu
         Ok(std::process::Command::new(prog)
             .args(args)
             .spawn()
-            .context(context)?
-            .id() as Pid)
+            .context(context)?)
     }
 }
 
