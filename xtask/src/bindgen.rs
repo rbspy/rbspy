@@ -64,7 +64,7 @@ pub fn generate_ruby_bindings(
     };
 
     let version_number = version_tag.trim_start_matches("v");
-    let default_filename = format!("ruby_{}.rs", version_number);
+    let default_filename = format!("ruby_{}.rs", version_number.replace(".", "_"));
     let output_filename = output_filename.unwrap_or(default_filename.as_str());
     let bindings_path = format!("ruby-structs/src/{}", output_filename);
     std::fs::create_dir_all("ruby-structs/src")?;
