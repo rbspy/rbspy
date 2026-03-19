@@ -588,12 +588,6 @@ fn spawn_subprocess(
     args: Vec<String>,
     no_drop_root: bool,
 ) -> Result<std::process::Child> {
-    if cfg!(target_os = "macos") {
-        // sleep to prevent freezes (because of High Sierra kernel bug)
-        // TODO: figure out how to work around this race in a cleaner way
-        std::thread::sleep(std::time::Duration::from_millis(10));
-    }
-
     let context = format!("spawn subprocess '{}'", prog.clone());
 
     #[cfg(unix)]
