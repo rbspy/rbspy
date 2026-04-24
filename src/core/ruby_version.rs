@@ -1834,6 +1834,7 @@ ruby_version_v3_3_x!(ruby_3_4_9);
 ruby_version_v4_0_x!(ruby_4_0_0);
 ruby_version_v4_0_x!(ruby_4_0_1);
 ruby_version_v4_0_x!(ruby_4_0_2);
+ruby_version_v4_0_x!(ruby_4_0_3);
 
 #[cfg(not(debug_assertions))]
 #[cfg(test)]
@@ -3548,6 +3549,25 @@ mod tests {
         let vm_addr = 0x7fa56b875738;
         let global_symbols_addr = Some(0x7fa56b862b50);
         let stack_trace = ruby_version::ruby_4_0_2::get_stack_trace::<CoreDump>(
+            0,
+            vm_addr,
+            global_symbols_addr,
+            &source,
+            0,
+            false,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(real_stack_trace_4_0_0(), stack_trace.trace);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn test_get_ruby_stack_trace_4_0_3() {
+        let source = coredump_4_0_0();
+        let vm_addr = 0x7fa56b875738;
+        let global_symbols_addr = Some(0x7fa56b862b50);
+        let stack_trace = ruby_version::ruby_4_0_3::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
             global_symbols_addr,
