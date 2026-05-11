@@ -47,7 +47,7 @@ tempfile = "3.23.0"
 thiserror = "2.0.17"
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.31.2", features = ["user"] }
+nix = { version = "0.31.3", features = ["user"] }
 
 [target.'cfg(target_os="macos")'.dependencies]
 libproc = "0.14.11"
