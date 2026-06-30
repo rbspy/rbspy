@@ -11,9 +11,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Cargo Cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -25,7 +25,7 @@ jobs:
           docker build -t xtask -f ci/docker/Dockerfile.bindgen --target=builder .
           docker run --rm -v $PWD:/workdir xtask cp target/release/xtask /workdir/xtask.bin
       - name: Upload xtask binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: xtask
           path: xtask.bin
@@ -64,7 +64,7 @@ jobs:
         target: ["x86_64-unknown-linux-gnu"]
     steps:
       - name: Checkout rbspy repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
             path: "rbspy"
       - name: Download xtask binary
@@ -96,7 +96,7 @@ jobs:
           git add ruby-structs/src
           cp $(git diff --name-only --staged | xargs) ../bindings-staging || echo "No new or modified files - bindings are up to date"
       - name: Upload Bindings
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           if-no-files-found: ignore
           name: bindings-${{ matrix.ruby-version }}
@@ -108,7 +108,7 @@ jobs:
     needs: [generate]
     steps:
       - name: Checkout rbspy repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
             path: "rbspy"
             fetch-depth: 0

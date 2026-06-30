@@ -25,7 +25,7 @@ jobs:
             target: x86_64-unknown-linux-gnu
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Rust
         uses: dtolnay/rust-toolchain@4305c38b25d97ef35a8ad1f985ccf2d2242004f2 # stable branch
       - name: Install Rust toolchain target
@@ -37,7 +37,7 @@ jobs:
           echo "Test binary path is $test_binary_path"
           cp $test_binary_path rbspy-test
       - name: Upload binaries
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rbspy-test
           path: rbspy-test
@@ -65,7 +65,7 @@ jobs:
         ]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Rust
         uses: dtolnay/rust-toolchain@4305c38b25d97ef35a8ad1f985ccf2d2242004f2 # stable branch
       - name: Install Ruby

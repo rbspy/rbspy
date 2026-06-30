@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Rust
         uses: dtolnay/rust-toolchain@4305c38b25d97ef35a8ad1f985ccf2d2242004f2 # stable branch
       - name: Install rustfmt
@@ -74,7 +74,7 @@ jobs:
             target: x86_64-pc-windows-msvc
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -109,13 +109,13 @@ jobs:
 
       - name: Upload Linux and macOS Binaries
         if: runner.os != 'windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rbspy-${{ matrix.target }}
           path: rbspy-${{ matrix.target }}
       - name: Upload Windows Binaries
         if: runner.os == 'windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rbspy-${{ matrix.target }}.exe
           path: rbspy-${{ matrix.target }}.exe
@@ -161,7 +161,7 @@ jobs:
         RUSTUP_HOME: /root/.rustup
         CARGO_HOME: /root/.cargo
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Cargo Cache
         uses: Swatinem/rust-cache@v2.7.8
         with:
@@ -172,7 +172,7 @@ jobs:
         run: |
           cp target/*/release/rbspy rbspy-${{ matrix.triple }}
       - name: Upload Binaries
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rbspy-${{ matrix.triple }}
           path: rbspy-${{ matrix.triple }}
@@ -183,7 +183,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@4305c38b25d97ef35a8ad1f985ccf2d2242004f2 # stable branch
@@ -192,7 +192,7 @@ jobs:
 
       - name: Cache cross binary
         id: cache-cross
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/bin/cross
@@ -208,7 +208,7 @@ jobs:
           cross --version
 
       - name: Cargo Cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -290,7 +290,7 @@ jobs:
         run: |
           mv rbspy rbspy-x86_64-unknown-freebsd
       - name: Upload Binaries
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rbspy-x86_64-unknown-freebsd
           path: rbspy-x86_64-unknown-freebsd

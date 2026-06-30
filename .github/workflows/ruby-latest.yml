@@ -43,18 +43,18 @@ jobs:
           ruby-version: "${{ inputs.system_ruby_version || 'ruby' }}"
           bundler-cache: false
       - name: Check out latest Ruby source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: ruby
           repository: ruby/ruby
           ref: ${{ inputs.ruby_commit }}
           fetch-depth: 0
       - name: Check out rbspy source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: rbspy
       - name: Cargo Cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
