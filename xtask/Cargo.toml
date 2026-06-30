@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.40"
-bindgen = "0.72.0"
-log = "0.4.6"
-semver = "1.0.10"
-tempfile = "3.4.0"
+anyhow = "1.0.103"
+bindgen = "0.72.1"
+log = "0.4.33"
+semver = "1.0.28"
+tempfile = "3.27.0"
