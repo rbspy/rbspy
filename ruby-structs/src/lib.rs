@@ -136,3 +136,4 @@ pub mod ruby_4_0_2;
 pub mod ruby_4_0_3;
 pub mod ruby_4_0_4;
 pub mod ruby_4_0_5;
+pub mod ruby_4_0_6;
