@@ -20,16 +20,16 @@ members = [
 ]
 
 [dependencies]
-anyhow = "1.0.103"
+anyhow = "1.0.104"
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
-clap = { version = "4.5.54", features = ["derive"] }
+clap = { version = "4.6.4", features = ["derive"] }
 ctrlc = "3.5.0"
 directories = "6.0.0"
 env_logger = "0.11.11"
-inferno = "0.12.3"
+inferno = "0.12.8"
 flate2 = "1.1.8"
 lazy_static = "1.4"
-libc = "0.2.180"
+libc = "0.2.189"
 log = "0.4.33"
 memmap2 = "0.9.11"
 proc-maps = "0.5.0"
@@ -38,13 +38,13 @@ rand = "0.10.0"
 rbspy-ruby-structs = { path = "ruby-structs", version="0.50.0" }
 remoteprocess = "0.5.0"
 semver = "1.0.27"
-serde = "1.0.228"
-serde_derive = "1.0.228"
-serde_json = "1.0.150"
+serde = "1.0.229"
+serde_derive = "1.0.229"
+serde_json = "1.0.151"
 spytools = "0.5.0"
 terminal_size = "0.4.3"
 tempfile = "3.23.0"
-thiserror = "2.0.17"
+thiserror = "2.0.19"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.31.3", features = ["user"] }
