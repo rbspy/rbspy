@@ -144,7 +144,6 @@ impl RubySpy {
 
 #[cfg(all(windows, target_arch = "x86_64"))]
 fn is_wow64_process(pid: Pid) -> Result<bool> {
-    use std::os::windows::io::RawHandle;
     use winapi::shared::minwindef::{BOOL, FALSE, PBOOL};
     use winapi::um::processthreadsapi::OpenProcess;
     use winapi::um::winnt::PROCESS_QUERY_INFORMATION;
@@ -152,7 +151,7 @@ fn is_wow64_process(pid: Pid) -> Result<bool> {
 
     let handle = unsafe { OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid) };
 
-    if handle == (0 as RawHandle) {
+    if handle.is_null() {
         return Err(format_err!(
             "Unable to fetch process handle for process {}",
             pid
