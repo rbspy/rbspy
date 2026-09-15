@@ -145,6 +145,7 @@ impl RubySpy {
 #[cfg(all(windows, target_arch = "x86_64"))]
 fn is_wow64_process(pid: Pid) -> Result<bool> {
     use winapi::shared::minwindef::{BOOL, FALSE, PBOOL};
+    use winapi::um::handleapi::CloseHandle;
     use winapi::um::processthreadsapi::OpenProcess;
     use winapi::um::winnt::PROCESS_QUERY_INFORMATION;
     use winapi::um::wow64apiset::IsWow64Process;
@@ -159,8 +160,10 @@ fn is_wow64_process(pid: Pid) -> Result<bool> {
     }
 
     let mut is_wow64: BOOL = 0;
+    let succeeded = unsafe { IsWow64Process(handle, &mut is_wow64 as PBOOL) };
+    unsafe { CloseHandle(handle) };
 
-    if unsafe { IsWow64Process(handle, &mut is_wow64 as PBOOL) } == FALSE {
+    if succeeded == FALSE {
         return Err(format_err!("Could not determine process bitness! {}", pid));
     }
 

@@ -53,7 +53,7 @@ nix = { version = "0.31.3", features = ["user"] }
 libproc = "0.14.11"
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3.9", features = ["timeapi", "wow64apiset"] }
+winapi = { version = "0.3.9", features = ["handleapi", "timeapi", "wow64apiset"] }
 
 [dev-dependencies]
 byteorder = "1.4.3"
