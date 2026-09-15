@@ -1,13 +1,13 @@
 [package]
 name = "xtask"
-version = "0.51.0"
+version = "0.52.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 anyhow = "1.0.103"
-bindgen = "0.72.1"
+bindgen = "0.73.2"
 log = "0.4.33"
 semver = "1.0.28"
 tempfile = "3.27.0"
