@@ -261,7 +261,7 @@ jobs:
               --include-from "$include_path" \
               --exclude "*" \
               . firecracker:
-            rm -f "$exclude_path"
+            rm -f "$include_path"
           run-in-vm: |
             mkdir -p /home/runner
             ln -s $(pwd)/.cargo /home/runner/.cargo
