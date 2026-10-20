@@ -1081,9 +1081,9 @@ pub struct rb_box_struct {
     pub ruby_dln_libmap: VALUE,
     pub gvar_tbl: VALUE,
     pub classext_cow_classes: *mut st_table,
-    pub is_root: bool,
-    pub is_user: bool,
-    pub is_optional: bool,
+    pub is_root: u8,
+    pub is_user: u8,
+    pub is_optional: u8,
 }
 pub type rb_box_t = rb_box_struct;
 pub type rb_serial_t = ::std::os::raw::c_ulonglong;
@@ -1601,8 +1601,8 @@ pub struct rb_thread_sched_item {
     pub node: rb_thread_sched_item__bindgen_ty_1,
     pub waiting_reason: rb_thread_sched_waiting,
     pub event_serial: u32,
-    pub finished: bool,
-    pub malloc_stack: bool,
+    pub finished: u8,
+    pub malloc_stack: u8,
     pub context_stack: *mut ::std::os::raw::c_void,
     pub context: *mut coroutine_context,
 }
@@ -1611,7 +1611,7 @@ pub struct rb_thread_sched_item {
 pub struct rb_thread_sched_item__bindgen_ty_1 {
     pub ubf: ccan_list_node,
     pub readyq: ccan_list_node,
-    pub is_ready: bool,
+    pub is_ready: u8,
     pub timeslice_threads: ccan_list_node,
     pub running_threads: ccan_list_node,
     pub zombie_threads: ccan_list_node,
@@ -1653,9 +1653,9 @@ pub struct rb_thread_sched {
     pub running: *mut rb_thread_struct,
     pub runnable_hot_th: *mut rb_thread_struct,
     pub runnable_hot_th_waiting: ::std::os::raw::c_int,
-    pub is_running: bool,
-    pub is_running_timeslice: bool,
-    pub enable_mn_threads: bool,
+    pub is_running: u8,
+    pub is_running_timeslice: u8,
+    pub enable_mn_threads: u8,
     pub readyq: ccan_list_head,
     pub readyq_cnt: ::std::os::raw::c_int,
     pub grq_node: ccan_list_node,
@@ -1723,7 +1723,7 @@ pub struct rb_calling_info {
     pub block_handler: VALUE,
     pub recv: VALUE,
     pub argc: ::std::os::raw::c_int,
-    pub kw_splat: bool,
+    pub kw_splat: u8,
     pub heap_argv: VALUE,
 }
 #[repr(C)]
@@ -1779,7 +1779,7 @@ pub struct rb_iseq_constant_body {
     pub ci_size: ::std::os::raw::c_uint,
     pub stack_max: ::std::os::raw::c_uint,
     pub builtin_attrs: ::std::os::raw::c_uint,
-    pub prism: bool,
+    pub prism: u8,
     pub mark_bits: rb_iseq_constant_body__bindgen_ty_2,
     pub outer_variables: *mut rb_id_table,
     pub mandatory_only_iseq: *const rb_iseq_t,
@@ -2487,7 +2487,7 @@ pub struct rb_hook_list_struct {
     pub events: rb_event_flag_t,
     pub running: ::std::os::raw::c_uint,
     pub type_: rb_hook_list_type,
-    pub need_clean: bool,
+    pub need_clean: u8,
 }
 pub type rb_hook_list_t = rb_hook_list_struct;
 #[repr(C)]
@@ -2559,7 +2559,7 @@ pub struct rb_vm_struct__bindgen_ty_1__bindgen_ty_1 {
     pub lock_owner: *mut rb_ractor_struct,
     pub lock_rec: ::std::os::raw::c_uint,
     pub terminate_cond: rb_nativethread_cond_t,
-    pub terminate_waiting: bool,
+    pub terminate_waiting: u8,
 }
 impl ::std::fmt::Debug for rb_vm_struct__bindgen_ty_1__bindgen_ty_1 {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -2571,7 +2571,7 @@ impl ::std::fmt::Debug for rb_vm_struct__bindgen_ty_1__bindgen_ty_1 {
 pub struct rb_vm_struct__bindgen_ty_1__bindgen_ty_2 {
     pub lock: rb_nativethread_lock_t,
     pub lock_owner: *mut rb_ractor_struct,
-    pub locked: bool,
+    pub locked: u8,
     pub cond: rb_nativethread_cond_t,
     pub snt_cnt: ::std::os::raw::c_uint,
     pub dnt_cnt: ::std::os::raw::c_uint,
@@ -2582,10 +2582,10 @@ pub struct rb_vm_struct__bindgen_ty_1__bindgen_ty_2 {
     pub running_threads: ccan_list_head,
     pub timeslice_threads: ccan_list_head,
     pub zombie_threads: ccan_list_head,
-    pub timeslice_wait_inf: bool,
+    pub timeslice_wait_inf: u8,
     pub barrier_complete_cond: rb_nativethread_cond_t,
     pub barrier_release_cond: rb_nativethread_cond_t,
-    pub barrier_waiting: bool,
+    pub barrier_waiting: u8,
     pub barrier_waiting_cnt: ::std::os::raw::c_uint,
     pub barrier_serial: ::std::os::raw::c_uint,
     pub barrier_ractor: *mut rb_ractor_struct,
@@ -2954,7 +2954,7 @@ pub type rb_execution_context_t = rb_execution_context_struct;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct rb_ext_config {
-    pub ractor_safe: bool,
+    pub ractor_safe: u8,
 }
 pub type rb_ractor_t = rb_ractor_struct;
 #[repr(C)]
@@ -2967,7 +2967,7 @@ pub struct rb_thread_struct {
     pub nt: *mut rb_native_thread,
     pub ec: *mut rb_execution_context_t,
     pub sched: rb_thread_sched_item,
-    pub mn_schedulable: bool,
+    pub mn_schedulable: u8,
     pub serial: rb_atomic_t,
     pub last_status: VALUE,
     pub calling: *mut rb_calling_info,
@@ -3330,7 +3330,7 @@ pub struct rb_ractor_sync {
     pub monitors: ccan_list_head,
     pub successor: *mut rb_ractor_t,
     pub legacy: VALUE,
-    pub legacy_exc: bool,
+    pub legacy_exc: u8,
 }
 impl ::std::fmt::Debug for rb_ractor_sync {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -3362,7 +3362,7 @@ pub struct rb_ractor_struct {
     pub r_stderr: VALUE,
     pub verbose: VALUE,
     pub debug: VALUE,
-    pub malloc_gc_disabled: bool,
+    pub malloc_gc_disabled: u8,
     pub newobj_cache: *mut ::std::os::raw::c_void,
 }
 #[repr(C)]
@@ -3730,7 +3730,7 @@ pub struct iseq_compile_data {
     pub catch_table_ary: VALUE,
     pub iseq_size: ::std::os::raw::c_uint,
     pub iseq_encoded: *mut VALUE,
-    pub is_single_mark_bit: bool,
+    pub is_single_mark_bit: u8,
     pub mark_bits: iseq_compile_data__bindgen_ty_1,
     pub start_label: *mut iseq_label_data,
     pub end_label: *mut iseq_label_data,
@@ -3739,8 +3739,8 @@ pub struct iseq_compile_data {
     pub ensure_node_stack: *mut iseq_compile_data_ensure_node_stack,
     pub node: iseq_compile_data__bindgen_ty_2,
     pub insn: iseq_compile_data__bindgen_ty_3,
-    pub in_rescue: bool,
-    pub in_masgn: bool,
+    pub in_rescue: u8,
+    pub in_masgn: u8,
     pub loopval_popped: ::std::os::raw::c_int,
     pub last_line: ::std::os::raw::c_int,
     pub label_no: ::std::os::raw::c_int,
@@ -3752,7 +3752,7 @@ pub struct iseq_compile_data {
     pub ivar_cache_table: *mut rb_id_table,
     pub builtin_function_table: *const rb_builtin_function,
     pub root_node: *const NODE,
-    pub catch_except_p: bool,
+    pub catch_except_p: u8,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]

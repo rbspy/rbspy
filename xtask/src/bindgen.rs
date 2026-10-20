@@ -70,7 +70,7 @@ pub fn generate_ruby_bindings(
     std::fs::create_dir_all("ruby-structs/src")?;
     bindings.write_to_file(&bindings_path)?;
 
-    postprocess_bindings_for_windows(&PathBuf::from(bindings_path.clone()))?;
+    postprocess_bindings(&PathBuf::from(bindings_path.clone()))?;
 
     eprintln!("Wrote bindings to {}", bindings_path);
     Ok(())
@@ -228,8 +228,8 @@ fn prepare_ruby_headers(
     return Ok(wrapper_path);
 }
 
-/// Workaround for types that won't compile on Windows targets
-fn postprocess_bindings_for_windows(path: &Path) -> Result<()> {
+/// Adjust generated bindings for cross-platform compilation and process-memory reads.
+fn postprocess_bindings(path: &Path) -> Result<()> {
     fn regex_replace(expr: &str, path: &Path) -> Result<()> {
         let status = Command::new("perl")
             .args(vec!["-pi", "-e", expr, &path.to_string_lossy()])
@@ -242,12 +242,82 @@ fn postprocess_bindings_for_windows(path: &Path) -> Result<()> {
         Ok(())
     }
 
+    // Work around types that won't compile on Windows targets.
     regex_replace("s/::std::os::raw::c_ulong;/usize;/g", path)?;
     regex_replace("s/63u8\\) as u64/63u8\\) as usize/g", path)?;
     regex_replace("s/let val: u64 =/let val: usize =/g", path)?;
     regex_replace("s/let num_entries: u64 =/let num_entries: usize =/g", path)?;
 
+    // On every platform, C `_Bool` maps to Rust `bool`, but memory copied from
+    // another process can contain any byte. Use `u8` because it accepts every value.
+    // See https://github.com/benfred/remoteprocess/pull/129.
+    regex_replace(
+        r"s/^(\h*pub\h+(?:r#)?[A-Za-z_][A-Za-z_0-9]*\h*):\h*bool\h*,\h*$/$1: u8,/",
+        path,
+    )?;
+
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::postprocess_bindings;
+
+    #[test]
+    fn postprocess_bool_fields_accepts_horizontal_whitespace() -> anyhow::Result<()> {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("bindings.rs");
+        for (input, expected) in [
+            ("pub enabled:bool,\n", "pub enabled: u8,\n"),
+            ("  pub Flag_2 :  bool ,  \n", "  pub Flag_2 : u8,\n"),
+            ("\tpub\tr#type\t:\tbool\t,\t\n", "\tpub\tr#type\t: u8,\n"),
+            ("        pub _enabled: bool,", "        pub _enabled: u8,"),
+            ("\n\tpub enabled: bool,\n\n", "\n\tpub enabled: u8,\n\n"),
+        ] {
+            std::fs::write(&path, input)?;
+            postprocess_bindings(&path)?;
+            assert_eq!(std::fs::read_to_string(&path)?, expected, "{input:?}");
+            postprocess_bindings(&path)?;
+            assert_eq!(std::fs::read_to_string(&path)?, expected, "{input:?}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn postprocess_bool_fields_preserves_methods_and_is_idempotent() -> anyhow::Result<()> {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("bindings.rs");
+        let input = r#"pub struct Example {
+    pub enabled: bool,
+    pub Flag_2: bool,
+    pub r#type: bool,
+    pub count: u8,
+}
+impl Example {
+    pub fn set_bit(&mut self, index: usize, val: bool) {}
+    pub fn enabled(&self) -> bool { true }
+}
+"#;
+        let expected = r#"pub struct Example {
+    pub enabled: u8,
+    pub Flag_2: u8,
+    pub r#type: u8,
+    pub count: u8,
+}
+impl Example {
+    pub fn set_bit(&mut self, index: usize, val: bool) {}
+    pub fn enabled(&self) -> bool { true }
+}
+"#;
+        std::fs::write(&path, input)?;
+
+        postprocess_bindings(&path)?;
+        assert_eq!(std::fs::read_to_string(&path)?, expected);
+
+        postprocess_bindings(&path)?;
+        assert_eq!(std::fs::read_to_string(&path)?, expected);
+        Ok(())
+    }
 }
 
 // Helper functions
