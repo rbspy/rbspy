@@ -2002,8 +2002,8 @@ pub struct rb_iseq_constant_body {
     pub icvarc_size: ::std::os::raw::c_uint,
     pub ci_size: ::std::os::raw::c_uint,
     pub stack_max: ::std::os::raw::c_uint,
-    pub catch_except_p: bool,
-    pub builtin_inline_p: bool,
+    pub catch_except_p: u8,
+    pub builtin_inline_p: u8,
     pub mark_bits: rb_iseq_constant_body__bindgen_ty_3,
     pub outer_variables: *mut rb_id_table,
     pub mandatory_only_iseq: *const rb_iseq_t,
@@ -2544,8 +2544,8 @@ pub struct rb_hook_list_struct {
     pub hooks: *mut rb_event_hook_struct,
     pub events: rb_event_flag_t,
     pub running: ::std::os::raw::c_uint,
-    pub need_clean: bool,
-    pub is_local: bool,
+    pub need_clean: u8,
+    pub is_local: u8,
 }
 pub type rb_hook_list_t = rb_hook_list_struct;
 #[repr(C)]
@@ -2622,11 +2622,11 @@ pub struct rb_vm_struct__bindgen_ty_1__bindgen_ty_1 {
     pub lock: rb_nativethread_lock_t,
     pub lock_owner: *mut rb_ractor_struct,
     pub lock_rec: ::std::os::raw::c_uint,
-    pub barrier_waiting: bool,
+    pub barrier_waiting: u8,
     pub barrier_cnt: ::std::os::raw::c_uint,
     pub barrier_cond: rb_nativethread_cond_t,
     pub terminate_cond: rb_nativethread_cond_t,
-    pub terminate_waiting: bool,
+    pub terminate_waiting: u8,
 }
 impl ::std::fmt::Debug for rb_vm_struct__bindgen_ty_1__bindgen_ty_1 {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -2984,7 +2984,7 @@ pub type rb_execution_context_t = rb_execution_context_struct;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct rb_ext_config {
-    pub ractor_safe: bool,
+    pub ractor_safe: u8,
 }
 pub type rb_ractor_t = rb_ractor_struct;
 #[repr(C)]
@@ -3351,7 +3351,7 @@ pub type rb_ractor_basket_type = ::std::os::raw::c_uint;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct rb_ractor_basket {
-    pub exception: bool,
+    pub exception: u8,
     pub type_: rb_ractor_basket_type,
     pub v: VALUE,
     pub sender: VALUE,
@@ -3394,8 +3394,8 @@ pub struct rb_ractor_sync {
     pub cond: rb_nativethread_cond_t,
     pub incoming_queue: rb_ractor_queue,
     pub taking_ractors: rb_ractor_waiting_list,
-    pub incoming_port_closed: bool,
-    pub outgoing_port_closed: bool,
+    pub incoming_port_closed: u8,
+    pub outgoing_port_closed: u8,
     pub wait: rb_ractor_sync_ractor_wait,
 }
 #[repr(C)]
@@ -3422,7 +3422,7 @@ pub struct rb_ractor_struct {
     pub pub_: rb_ractor_pub,
     pub sync: rb_ractor_sync,
     pub receiving_mutex: VALUE,
-    pub yield_atexit: bool,
+    pub yield_atexit: u8,
     pub barrier_wait_cond: rb_nativethread_cond_t,
     pub threads: rb_ractor_struct__bindgen_ty_1,
     pub thgroup_default: VALUE,
@@ -3480,7 +3480,7 @@ pub struct iseq_compile_data {
     pub ensure_node_stack: *mut iseq_compile_data_ensure_node_stack,
     pub node: iseq_compile_data__bindgen_ty_1,
     pub insn: iseq_compile_data__bindgen_ty_2,
-    pub in_rescue: bool,
+    pub in_rescue: u8,
     pub loopval_popped: ::std::os::raw::c_int,
     pub last_line: ::std::os::raw::c_int,
     pub label_no: ::std::os::raw::c_int,

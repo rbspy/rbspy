@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   format:
-    name: Check code formatting
+    name: Check code formatting and bindings
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
@@ -28,6 +28,10 @@ jobs:
       - name: Run cargo fmt
         run: |
           cargo fmt --all -- --check
+      - name: Test binding postprocessor
+        run: cargo test --locked -p xtask
+      - name: Check bindings for bool fields
+        run: cargo test --locked -p rbspy-ruby-structs "tests::"
 
   build:
     name: Build
