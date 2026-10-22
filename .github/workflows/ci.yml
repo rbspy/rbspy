@@ -31,7 +31,7 @@ jobs:
       - name: Test binding postprocessor
         run: cargo test --locked -p xtask
       - name: Check bindings for bool fields
-        run: cargo test --locked -p rbspy-ruby-structs tests::
+        run: cargo test --locked -p rbspy-ruby-structs "tests::"
 
   build:
     name: Build
