@@ -140,6 +140,7 @@ pub mod ruby_4_0_4;
 pub mod ruby_4_0_5;
 pub mod ruby_4_0_6;
 pub mod ruby_4_0_7;
+pub mod ruby_4_0_8;
 
 #[cfg(test)]
 mod tests {
