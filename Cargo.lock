@@ -1130,7 +1130,7 @@ checksum = "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69"
 
 [[package]]
 name = "rbspy"
-version = "0.54.0"
+version = "0.55.0"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -1167,7 +1167,7 @@ dependencies = [
 
 [[package]]
 name = "rbspy-ruby-structs"
-version = "0.54.0"
+version = "0.55.0"
 dependencies = [
  "proc-macro2",
  "syn 3.0.9",
@@ -1788,7 +1788,7 @@ checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
 
 [[package]]
 name = "xtask"
-version = "0.54.0"
+version = "0.55.0"
 dependencies = [
  "anyhow",
  "bindgen 0.73.2",
