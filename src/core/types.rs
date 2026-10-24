@@ -2,7 +2,6 @@
 use std::cmp::Ordering;
 use std::fmt;
 use std::time::SystemTime;
-use std::{self, convert::From};
 
 use anyhow::{Error, Result};
 use clap::ValueEnum;
@@ -45,18 +44,10 @@ pub type GetExecutionContextFn = fn(usize, usize, &Process) -> Result<usize>;
 
 #[derive(Error, Debug)]
 pub enum MemoryCopyError {
-    #[error("The operation completed successfully")]
-    OperationSucceeded,
-    #[error("Permission denied when reading from process. If you're not running as root, try again with sudo. If you're using Docker, try passing `--cap-add=SYS_PTRACE` to `docker run`")]
-    PermissionDenied,
-    #[error("Failed to copy memory address {:x}", _0)]
-    Io(usize, std::io::Error),
     #[error("Process isn't running")]
     ProcessEnded,
     #[error("Copy error: {}", _0)]
     Message(String),
-    #[error("Tried to read invalid memory address {:x}", _0)]
-    InvalidAddressError(usize),
 }
 
 impl StackFrame {
@@ -124,25 +115,6 @@ impl fmt::Display for StackTrace {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let frames: Vec<String> = self.iter().rev().map(|s| s.to_string()).collect();
         write!(f, "{}", frames.join("\n"))
-    }
-}
-
-impl From<Error> for MemoryCopyError {
-    fn from(error: Error) -> Self {
-        let addr = *error.downcast_ref::<usize>().unwrap_or(&0);
-        let error = std::io::Error::last_os_error();
-
-        if error.kind() == std::io::ErrorKind::PermissionDenied {
-            return MemoryCopyError::PermissionDenied;
-        }
-
-        match error.raw_os_error() {
-            // Sometimes Windows returns this error code
-            Some(0) => MemoryCopyError::OperationSucceeded,
-            // On *nix EFAULT means that the address was invalid
-            Some(14) => MemoryCopyError::InvalidAddressError(addr),
-            _ => MemoryCopyError::Io(addr, error),
-        }
     }
 }
 
