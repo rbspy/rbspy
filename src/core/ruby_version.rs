@@ -749,7 +749,7 @@ macro_rules! get_thread_status_2_5_0(
         fn get_thread_status<T>(thread_struct: &rb_execution_context_struct, source: &T)
                             -> Result<u32> where T: ProcessMemory {
             let thread: rb_thread_struct = source.copy_struct(thread_struct.thread_ptr as usize)
-                .context(thread_struct.thread_ptr as usize)?;
+                .with_context(|| format!("couldn't copy rb_thread_struct at {:#x}", thread_struct.thread_ptr as usize))?;
             Ok(thread.status as u32)
         }
     )
@@ -761,7 +761,7 @@ macro_rules! get_thread_status_2_6_0(
         fn get_thread_status<T>(thread_struct: &rb_execution_context_struct, source: &T)
                             -> Result<u32> where T: ProcessMemory {
             let thread: rb_thread_struct = source.copy_struct(thread_struct.thread_ptr as usize)
-                .context(thread_struct.thread_ptr as usize)?;
+                .with_context(|| format!("couldn't copy rb_thread_struct at {:#x}", thread_struct.thread_ptr as usize))?;
             Ok(thread.status() as u32)
         }
     )
@@ -1070,7 +1070,7 @@ macro_rules! get_stack_frame_2_3_0(
             source: &T,
         ) -> Result<StackFrame> where T: ProcessMemory {
             let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
-                .context(iseq_struct.body as usize)?;
+                .with_context(|| format!("couldn't copy rb_iseq_constant_body at {:#x}", iseq_struct.body as usize))?;
             Ok(StackFrame{
                 name: get_ruby_string(body.location.label as usize, source)?,
                 relative_path: get_ruby_string(body.location.path as usize, source)?,
@@ -1145,11 +1145,11 @@ macro_rules! rb_class_real_3_0_0(
 
             // https://github.com/ruby/ruby/blob/v3_4_5/object.c#L290
             let mut klass = klass;
-            let mut rbasic: RBasic = source.copy_struct(klass).context(klass)?;
+            let mut rbasic: RBasic = source.copy_struct(klass).with_context(|| format!("couldn't copy RBasic at {:#x}", klass))?;
             while (rbasic.flags & (RUBY_T_ICLASS | RUBY_FL_SINGLETON) != 0) {
-                let rclass: RClass = source.copy_struct(klass).context(klass)?;
+                let rclass: RClass = source.copy_struct(klass).with_context(|| format!("couldn't copy RClass at {:#x}", klass))?;
                 klass = rclass.super_;
-                rbasic = source.copy_struct(klass).context(klass)?;
+                rbasic = source.copy_struct(klass).with_context(|| format!("couldn't copy RBasic at {:#x}", klass))?;
             }
             Ok(klass)
         }
@@ -1172,11 +1172,11 @@ macro_rules! rb_class_real_4_0_0(
 
             // https://github.com/ruby/ruby/blob/v3_4_5/object.c#L290
             let mut klass = klass;
-            let mut rbasic: RBasic = source.copy_struct(klass).context(klass)?;
+            let mut rbasic: RBasic = source.copy_struct(klass).with_context(|| format!("couldn't copy RBasic at {:#x}", klass))?;
             while (rbasic.flags & (RUBY_T_ICLASS | RUBY_FL_SINGLETON) != 0) {
-                let rclass_ext: RClass_and_rb_classext_t = source.copy_struct(klass).context(klass)?;
+                let rclass_ext: RClass_and_rb_classext_t = source.copy_struct(klass).with_context(|| format!("couldn't copy RClass_and_rb_classext_t at {:#x}", klass))?;
                 klass = rclass_ext.classext.super_;
-                rbasic = source.copy_struct(klass).context(klass)?;
+                rbasic = source.copy_struct(klass).with_context(|| format!("couldn't copy RBasic at {:#x}", klass))?;
             }
             Ok(klass)
         }
@@ -1194,18 +1194,18 @@ macro_rules! get_classpath(
             // https://github.com/ruby/ruby/blob/c149708018135595b2c19c5f74baf9475674f394/include/ruby/internal/value_type.h#L142
             const RUBY_T_MASK: usize = 0x1f;
 
-            let ext: RClass_and_rb_classext_t = source.copy_struct(klass).context(klass)?;
+            let ext: RClass_and_rb_classext_t = source.copy_struct(klass).with_context(|| format!("couldn't copy RClass_and_rb_classext_t at {:#x}", klass))?;
             let mut path_addr = if ext.classext.classpath == 0 {
                 0x0f // Qnil
             } else {
                 ext.classext.classpath
             };
 
-            let rbasic: RBasic = source.copy_struct(klass).context(klass)?;
+            let rbasic: RBasic = source.copy_struct(klass).with_context(|| format!("couldn't copy RBasic at {:#x}", klass))?;
             if rbasic.flags & RUBY_T_MASK == RUBY_T_MODULE {
                 let real_klass = rb_class_real(rbasic.klass, source)?;
                 // https://github.com/ruby/ruby/blob/v3_4_5/variable.c#L359
-                let ext: RClass_and_rb_classext_t = source.copy_struct(real_klass).context(real_klass)?;
+                let ext: RClass_and_rb_classext_t = source.copy_struct(real_klass).with_context(|| format!("couldn't copy RClass_and_rb_classext_t at {:#x}", real_klass))?;
                 path_addr = if ext.classext.classpath != 0 {
                     let modstr = get_ruby_string(ext.classext.classpath as usize, source)?;
                     // Looking up the global symbol is not needed
@@ -1231,7 +1231,7 @@ macro_rules! get_classpath(
             source: &T,
         ) -> Result<String> where T: ProcessMemory {
 
-            let ext: RClass_and_rb_classext_t = source.copy_struct(klass).context(klass)?;
+            let ext: RClass_and_rb_classext_t = source.copy_struct(klass).with_context(|| format!("couldn't copy RClass_and_rb_classext_t at {:#x}", klass))?;
             if ext.classext.classpath != 0 {
                 return get_ruby_string(ext.classext.classpath as usize, source);
             };
@@ -1279,7 +1279,7 @@ macro_rules! get_classpath(
 
             let mut singleton = false;
 
-            let imemo: rb_method_entry_struct = source.copy_struct(cme).context(cme)?;
+            let imemo: rb_method_entry_struct = source.copy_struct(cme).with_context(|| format!("couldn't copy rb_method_entry_struct at {:#x}", cme))?;
             // Read the class structure to get flags
             let mut klass = if cfunc {
                 imemo.owner
@@ -1289,7 +1289,7 @@ macro_rules! get_classpath(
             if klass == RUBY_QNIL {
                 return Ok(("".to_string(), false))
             }
-            let rbasic: RBasic = source.copy_struct(klass).context(klass)?;
+            let rbasic: RBasic = source.copy_struct(klass).with_context(|| format!("couldn't copy RBasic at {:#x}", klass))?;
 
             let class_flags = rbasic.flags;
             let class_mask = class_flags & RUBY_T_MASK;
@@ -1305,18 +1305,18 @@ macro_rules! get_classpath(
                         log::debug!("Got singleton class");
                         singleton = true;
 
-                        let ext: RClass_and_rb_classext_t = source.copy_struct(klass).context(klass)?;
+                        let ext: RClass_and_rb_classext_t = source.copy_struct(klass).with_context(|| format!("couldn't copy RClass_and_rb_classext_t at {:#x}", klass))?;
                         klass = unsafe {
                             ext.classext.as_.singleton_class.attached_object as usize
                         };
 
-                        let rbasic: RBasic = source.copy_struct(klass).context(klass)?;
+                        let rbasic: RBasic = source.copy_struct(klass).with_context(|| format!("couldn't copy RBasic at {:#x}", klass))?;
                         let class_flags = rbasic.flags;
                         let class_mask = class_flags & RUBY_T_MASK;
                         if class_mask != RUBY_T_CLASS  && class_mask != RUBY_T_MODULE {
                             if (klass & RUBY_IMMEDIATE_MASK == 0) {
                                 klass = rb_class_real(rbasic.klass, source)?;
-                                let ext: RClass_and_rb_classext_t = source.copy_struct(klass).context(klass)?;
+                                let ext: RClass_and_rb_classext_t = source.copy_struct(klass).with_context(|| format!("couldn't copy RClass_and_rb_classext_t at {:#x}", klass))?;
                                 let class_path = get_ruby_string(ext.classext.classpath as usize, source)?;
                                 return Ok((format!("#<{}:{:#08x}>", class_path, klass), singleton));
                             } else {
@@ -1382,14 +1382,14 @@ macro_rules! get_stack_frame_3_3_0(
             let mut class_path = "".to_string();
             let mut singleton = false;
             let iseq = if cme != 0 {
-                let imemo: rb_method_entry_struct = source.copy_struct(cme).context(cme)?;
-                let method_type = source.copy(imemo.def as usize, 1).context(imemo.def as usize)?;
+                let imemo: rb_method_entry_struct = source.copy_struct(cme).with_context(|| format!("couldn't copy rb_method_entry_struct at {:#x}", cme))?;
+                let method_type = source.copy(imemo.def as usize, 1).with_context(|| format!("couldn't copy method definition type at {:#x}", imemo.def as usize))?;
                 // https://github.com/ruby/ruby/blob/v3_3_0/internal/imemo.h#L21
                 let method_type = method_type[0] & 0xf;
                 // https://github.com/ruby/ruby/blob/v3_3_0/method.h#L110
                 if method_type == 0 {
                     (class_path, singleton) = get_classpath(cme, false, source)?;
-                    let method_def: rb_method_definition_struct = source.copy_struct(imemo.def as usize).context(imemo.def as usize)?;
+                    let method_def: rb_method_definition_struct = source.copy_struct(imemo.def as usize).with_context(|| format!("couldn't copy rb_method_definition_struct at {:#x}", imemo.def as usize))?;
                     let iseq: rb_iseq_struct = unsafe {
                         source.copy_struct(method_def.body.iseq.iseqptr as usize).context("")?
                     };
@@ -1407,7 +1407,7 @@ macro_rules! get_stack_frame_3_3_0(
                 source.copy_struct(iseq.body as usize)
                     .context("couldn't copy rb_iseq_constant_body")?;
             let frame_flag: usize = unsafe {
-                source.copy_struct(cfp.ep.offset(0) as usize).context(cfp.ep.offset(0) as usize)?
+                source.copy_struct(cfp.ep.offset(0) as usize).with_context(|| format!("couldn't copy frame flag at {:#x}", cfp.ep.offset(0) as usize))?
             };
             let rstring: RString = source.copy_struct(body.location.label as usize)
                 .context("couldn't copy RString")?;
@@ -1609,7 +1609,7 @@ macro_rules! get_lineno_2_6_0(
                 // TODO: To handle this properly, we need to imitate ruby's succinct bit vector lookup.
                 // See https://github.com/rbspy/rbspy/issues/213#issuecomment-826363857
                 let table: Vec<iseq_insn_info_entry> = source.copy_vec(iseq_struct.insns_info.body as usize, t_size as usize)
-                    .context(iseq_struct.insns_info.body as usize)?;
+                    .with_context(|| format!("couldn't copy iseq_insn_info_entry table at {:#x}", iseq_struct.insns_info.body as usize))?;
                 Ok(table[t_size-1].line_no as usize)
             }
         }
@@ -1661,7 +1661,7 @@ macro_rules! get_cfunc_name(
             source: &T
         ) -> Result<bool> where T: ProcessMemory {
             let frame_flag: usize = unsafe {
-                source.copy_struct(cfp.ep.offset(0) as usize).context(cfp.ep.offset(0) as usize)?
+                source.copy_struct(cfp.ep.offset(0) as usize).with_context(|| format!("couldn't copy frame flag at {:#x}", cfp.ep.offset(0) as usize))?
             };
             const VM_FRAME_MAGIC_CFUNC: usize = 0x55550001;
             const VM_FRAME_MAGIC_MASK: usize = 0x7fff0001;
@@ -1691,12 +1691,12 @@ macro_rules! get_cfunc_name(
         ) -> Result<usize> where T: ProcessMemory {
             const VM_ENV_FLAG_LOCAL: usize = 0x2;
             let mut ep = ep.clone() as *mut usize;
-            let mut env_flags: usize = source.copy_struct(ep as usize).context(ep as usize)?;
+            let mut env_flags: usize = source.copy_struct(ep as usize).with_context(|| format!("couldn't copy env flags at {:#x}", ep as usize))?;
             let mut env_specval: usize = unsafe {
-                source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?
+                source.copy_struct(ep.offset(-1) as usize).with_context(|| format!("couldn't copy env specval at {:#x}", ep.offset(-1) as usize))?
             };
             let mut env_me_cref: usize = unsafe {
-                source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-2) as usize)?
+                source.copy_struct(ep.offset(-2) as usize).with_context(|| format!("couldn't copy env me_cref at {:#x}", ep.offset(-2) as usize))?
             };
 
             while env_flags & VM_ENV_FLAG_LOCAL != 0 {
@@ -1709,9 +1709,9 @@ macro_rules! get_cfunc_name(
                     // we must strip off the GC marking bits from the EP, and mimic
                     // https://github.com/ruby/ruby/blob/v3_4_5/vm_core.h#L1501
                     ep = (env_specval.clone() & !0x03) as *mut usize;
-                    env_flags = source.copy_struct(ep as usize).context(ep as usize)?;
-                    env_specval = source.copy_struct(ep.offset(-1) as usize).context(ep.offset(-1) as usize)?;
-                    env_me_cref = source.copy_struct(ep.offset(-2) as usize).context(ep.offset(-2) as usize)?;
+                    env_flags = source.copy_struct(ep as usize).with_context(|| format!("couldn't copy env flags at {:#x}", ep as usize))?;
+                    env_specval = source.copy_struct(ep.offset(-1) as usize).with_context(|| format!("couldn't copy env specval at {:#x}", ep.offset(-1) as usize))?;
+                    env_me_cref = source.copy_struct(ep.offset(-2) as usize).with_context(|| format!("couldn't copy env me_cref at {:#x}", ep.offset(-2) as usize))?;
                 }
             }
 
@@ -1730,7 +1730,7 @@ macro_rules! get_cfunc_name(
             if raw_imemo == 0 {
                 return Ok(0);
             }
-            let imemo: rb_method_entry_struct = source.copy_struct(raw_imemo).context(raw_imemo)?;
+            let imemo: rb_method_entry_struct = source.copy_struct(raw_imemo).with_context(|| format!("couldn't copy rb_method_entry_struct at {:#x}", raw_imemo))?;
 
             // These type constants are defined in ruby's internal/imemo.h
             #[allow(non_upper_case_globals)]
@@ -1738,7 +1738,7 @@ macro_rules! get_cfunc_name(
                 imemo_type_imemo_ment => Ok(raw_imemo),
                 imemo_type_imemo_svar => {
                     if can_be_svar {
-                        let svar: vm_svar = source.copy_struct(raw_imemo).context(raw_imemo)?;
+                        let svar: vm_svar = source.copy_struct(raw_imemo).with_context(|| format!("couldn't copy vm_svar at {:#x}", raw_imemo))?;
                         check_method_entry(svar.cref_or_me as usize, false, source)
                     } else {
                         Ok(0)
@@ -1760,7 +1760,7 @@ macro_rules! get_cfunc_name(
             let cme = locate_method_entry(&cfp.ep, source)?;
             let (class_path, singleton) = get_classpath(cme, true, source).unwrap_or(("".to_string(), false));
 
-            let imemo: rb_method_entry_struct = source.copy_struct(cme).context(cme)?;
+            let imemo: rb_method_entry_struct = source.copy_struct(cme).with_context(|| format!("couldn't copy rb_method_entry_struct at {:#x}", cme))?;
             if imemo.def.is_null() {
                 return Err(format_err!("No method definition").into());
             }
@@ -1785,8 +1785,8 @@ macro_rules! get_cfunc_name(
                 dsymbol_fstr_hash: VALUE,
             }
 
-            let global_symbols: rb_symbols_t = source.copy_struct(global_symbols_address as usize).context(global_symbols_address as usize)?;
-            let def: rb_method_definition_struct = source.copy_struct(imemo.def as usize).context(imemo.def as usize)?;
+            let global_symbols: rb_symbols_t = source.copy_struct(global_symbols_address as usize).with_context(|| format!("couldn't copy rb_symbols_t at {:#x}", global_symbols_address as usize))?;
+            let def: rb_method_definition_struct = source.copy_struct(imemo.def as usize).with_context(|| format!("couldn't copy rb_method_definition_struct at {:#x}", imemo.def as usize))?;
             let method_id = def.original_id as usize;
 
             // rb_id_to_serial
@@ -1802,7 +1802,7 @@ macro_rules! get_cfunc_name(
             // ID_ENTRY_UNIT is defined in symbol.c, so not accessible by bindgen
             let id_entry_unit = 512;
             let idx = serial / id_entry_unit;
-            let ids: RArray = source.copy_struct(global_symbols.ids as usize).context(global_symbols.ids as usize)?;
+            let ids: RArray = source.copy_struct(global_symbols.ids as usize).with_context(|| format!("couldn't copy RArray of symbol ids at {:#x}", global_symbols.ids as usize))?;
             let flags = ids.basic.flags as usize;
 
             // string2cstring
@@ -1820,8 +1820,8 @@ macro_rules! get_cfunc_name(
             // pointer, then copy the _pointer_ into our memory space, and then finally copy the
             // pointed-to array into our memory space
             let array_remote_ptr = (ids_ptr as usize) + (idx as usize) * std::mem::size_of::<usize>();
-            let array_ptr: usize = source.copy_struct(array_remote_ptr).context(array_remote_ptr)?;
-            let array: RArray = source.copy_struct(array_ptr).context(array_ptr)?;
+            let array_ptr: usize = source.copy_struct(array_remote_ptr).with_context(|| format!("couldn't copy symbol id array pointer at {:#x}", array_remote_ptr))?;
+            let array: RArray = source.copy_struct(array_ptr).with_context(|| format!("couldn't copy RArray of symbol ids at {:#x}", array_ptr))?;
 
             let mut array_ptr = unsafe { array.as_.heap.ptr };
             let flags = array.basic.flags as usize;
@@ -1831,7 +1831,7 @@ macro_rules! get_cfunc_name(
 
             let offset = (serial % 512) * 2;
             let rstring_remote_ptr = (array_ptr as usize) + offset * std::mem::size_of::<usize>();
-            let rstring_ptr: usize = source.copy_struct(rstring_remote_ptr as usize).context(rstring_remote_ptr as usize)?;
+            let rstring_ptr: usize = source.copy_struct(rstring_remote_ptr as usize).with_context(|| format!("couldn't copy RString pointer at {:#x}", rstring_remote_ptr as usize))?;
             let method_name = get_ruby_string(rstring_ptr as usize, source)?;
             Ok(qualified_method_name(&class_path, &method_name, singleton))
         }
