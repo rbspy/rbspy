@@ -1685,11 +1685,13 @@ macro_rules! get_cfunc_name(
 
         // tries to mimic rb_vm_frame_method_entry
         // https://github.com/ruby/ruby/blob/v3_3_0/vm_insnhelper.c#L733
-        fn locate_method_entry<T>(
+        pub fn locate_method_entry<T>(
             ep: &*const usize,
             source: &T,
         ) -> Result<usize> where T: ProcessMemory {
             const VM_ENV_FLAG_LOCAL: usize = 0x2;
+            // Stops the walk from looping forever on a cycle read while the VM is changing memory.
+            const MAX_ENV_CHAIN: usize = 4096;
             let mut ep = ep.clone() as *mut usize;
             let mut env_flags: usize = source.copy_struct(ep as usize).with_context(|| format!("couldn't copy env flags at {:#x}", ep as usize))?;
             let mut env_specval: usize = unsafe {
@@ -1699,10 +1701,15 @@ macro_rules! get_cfunc_name(
                 source.copy_struct(ep.offset(-2) as usize).with_context(|| format!("couldn't copy env me_cref at {:#x}", ep.offset(-2) as usize))?
             };
 
+            let mut hops = 0;
             while env_flags & VM_ENV_FLAG_LOCAL != 0 {
                 let me = check_method_entry(env_me_cref, false, source)?;
                 if me != 0{
                     return Ok(me);
+                }
+                hops += 1;
+                if hops > MAX_ENV_CHAIN {
+                    return Err(format_err!("env chain longer than {} entries", MAX_ENV_CHAIN));
                 }
                 unsafe {
                     // https://github.com/ruby/ruby/blob/v3_4_5/vm_core.h#L1356
@@ -3344,6 +3351,29 @@ mod tests {
         let found =
             ruby_version::ruby_3_3_0::get_execution_context(0, vm_ptr_slot, &memory).unwrap();
         assert_eq!(ec_addr, found);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn test_locate_method_entry_with_cyclic_env_chain() {
+        const BASE: usize = 0x1000_0000;
+        const VM_ENV_FLAG_LOCAL: usize = 0x2;
+        let word = std::mem::size_of::<usize>();
+
+        // Two envs that are each other's parent (A -> B -> A), with no method entry.
+        let ep_a = BASE + 10 * word;
+        let ep_b = BASE + 20 * word;
+
+        let mut memory = FakeMemory::new(BASE, 0x1000);
+        for (ep, next_ep) in [(ep_a, ep_b), (ep_b, ep_a)] {
+            memory.write_word(ep, VM_ENV_FLAG_LOCAL); // ep[0]: flags
+            memory.write_word(ep - word, next_ep | 0x1); // ep[-1]: specval
+            memory.write_word(ep - 2 * word, 0); // ep[-2]: me_cref
+        }
+
+        let result =
+            ruby_version::ruby_4_0_7::locate_method_entry(&(ep_a as *const usize), &memory);
+        assert!(result.is_err());
     }
 
     #[cfg(target_pointer_width = "64")]
