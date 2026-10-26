@@ -1685,7 +1685,7 @@ macro_rules! get_cfunc_name(
 
         // tries to mimic rb_vm_frame_method_entry
         // https://github.com/ruby/ruby/blob/v3_3_0/vm_insnhelper.c#L733
-        pub fn locate_method_entry<T>(
+        pub(crate) fn locate_method_entry<T>(
             ep: &*const usize,
             source: &T,
         ) -> Result<usize> where T: ProcessMemory {
