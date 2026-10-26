@@ -1136,17 +1136,24 @@ macro_rules! get_classpath_unsupported(
 
 macro_rules! rb_class_real_3_0_0(
     () => (
-        fn rb_class_real<T>(
+        pub(crate) fn rb_class_real<T>(
             klass: usize,
             source: &T,
         ) -> Result<usize> where T: ProcessMemory {
             const RUBY_T_ICLASS: usize = 0x1c;
             const RUBY_FL_SINGLETON: usize = ruby_fl_type_RUBY_FL_USER1 as usize;
+            // Stops the walk from looping forever on a cycle read while the VM is changing memory.
+            const MAX_CLASS_CHAIN: usize = 4096;
 
             // https://github.com/ruby/ruby/blob/v3_4_5/object.c#L290
             let mut klass = klass;
             let mut rbasic: RBasic = source.copy_struct(klass).with_context(|| format!("couldn't copy RBasic at {:#x}", klass))?;
+            let mut hops = 0;
             while (rbasic.flags & (RUBY_T_ICLASS | RUBY_FL_SINGLETON) != 0) {
+                hops += 1;
+                if hops > MAX_CLASS_CHAIN {
+                    return Err(format_err!("class chain longer than {} entries", MAX_CLASS_CHAIN));
+                }
                 let rclass: RClass = source.copy_struct(klass).with_context(|| format!("couldn't copy RClass at {:#x}", klass))?;
                 klass = rclass.super_;
                 rbasic = source.copy_struct(klass).with_context(|| format!("couldn't copy RBasic at {:#x}", klass))?;
@@ -1163,17 +1170,24 @@ macro_rules! rb_class_real_3_0_0(
 // [2]: https://github.com/ruby/ruby/blob/b49ff7cc700ffdba26fabaaf8167eee189797edf/internal/class.h#L81
 macro_rules! rb_class_real_4_0_0(
     () => (
-        fn rb_class_real<T>(
+        pub(crate) fn rb_class_real<T>(
             klass: usize,
             source: &T,
         ) -> Result<usize> where T: ProcessMemory {
             const RUBY_T_ICLASS: usize = 0x1c;
             const RUBY_FL_SINGLETON: usize = ruby_fl_type_RUBY_FL_USER1 as usize;
+            // Stops the walk from looping forever on a cycle read while the VM is changing memory.
+            const MAX_CLASS_CHAIN: usize = 4096;
 
             // https://github.com/ruby/ruby/blob/v3_4_5/object.c#L290
             let mut klass = klass;
             let mut rbasic: RBasic = source.copy_struct(klass).with_context(|| format!("couldn't copy RBasic at {:#x}", klass))?;
+            let mut hops = 0;
             while (rbasic.flags & (RUBY_T_ICLASS | RUBY_FL_SINGLETON) != 0) {
+                hops += 1;
+                if hops > MAX_CLASS_CHAIN {
+                    return Err(format_err!("class chain longer than {} entries", MAX_CLASS_CHAIN));
+                }
                 let rclass_ext: RClass_and_rb_classext_t = source.copy_struct(klass).with_context(|| format!("couldn't copy RClass_and_rb_classext_t at {:#x}", klass))?;
                 klass = rclass_ext.classext.super_;
                 rbasic = source.copy_struct(klass).with_context(|| format!("couldn't copy RBasic at {:#x}", klass))?;
@@ -3351,6 +3365,50 @@ mod tests {
         let found =
             ruby_version::ruby_3_3_0::get_execution_context(0, vm_ptr_slot, &memory).unwrap();
         assert_eq!(ec_addr, found);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn test_rb_class_real_with_cyclic_super_chain_3_3_0() {
+        use bindings::ruby_3_3_0::RClass;
+        const BASE: usize = 0x1000_0000;
+        const RUBY_T_ICLASS: usize = 0x1c;
+
+        // Two iclasses that are each other's superclass (A -> B -> A).
+        let class_a = BASE;
+        let class_b = BASE + 0x100;
+
+        let mut memory = FakeMemory::new(BASE, 0x1000);
+        for (klass, super_) in [(class_a, class_b), (class_b, class_a)] {
+            memory.write_word(klass, RUBY_T_ICLASS); // basic.flags
+            memory.write_word(klass + std::mem::offset_of!(RClass, super_), super_);
+        }
+
+        let result = ruby_version::ruby_3_3_0::rb_class_real(class_a, &memory);
+        assert!(result.is_err());
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn test_rb_class_real_with_cyclic_super_chain_4_0_7() {
+        use bindings::ruby_4_0_7::{rb_classext_struct, RClass_and_rb_classext_t};
+        const BASE: usize = 0x1000_0000;
+        const RUBY_T_ICLASS: usize = 0x1c;
+
+        // Two iclasses that are each other's superclass (A -> B -> A).
+        let class_a = BASE;
+        let class_b = BASE + 0x200;
+        let super_offset = std::mem::offset_of!(RClass_and_rb_classext_t, classext)
+            + std::mem::offset_of!(rb_classext_struct, super_);
+
+        let mut memory = FakeMemory::new(BASE, 0x1000);
+        for (klass, super_) in [(class_a, class_b), (class_b, class_a)] {
+            memory.write_word(klass, RUBY_T_ICLASS); // basic.flags
+            memory.write_word(klass + super_offset, super_);
+        }
+
+        let result = ruby_version::ruby_4_0_7::rb_class_real(class_a, &memory);
+        assert!(result.is_err());
     }
 
     #[cfg(target_pointer_width = "64")]
