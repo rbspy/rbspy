@@ -1499,7 +1499,9 @@ macro_rules! get_lineno_1_9_0(
             } else {
                 let table: Vec<iseq_insn_info_entry> = source.copy_vec(iseq_struct.insn_info_table as usize, t_size as usize)
                     .context("couldn't copy instruction table")?;
-                for i in 0..t_size {
+                // Start at 1 like ruby does, so a pc before the first entry can't index table[-1]
+                // https://github.com/ruby/ruby/blob/v2_5_0/iseq.c#L1318
+                for i in 1..t_size {
                     if pos == table[i].position as usize {
                         return Ok(table[i].line_no as usize)
                     } else if table[i].position as usize > pos {
@@ -1530,7 +1532,9 @@ macro_rules! get_lineno_2_0_0(
             } else {
                 let table: Vec<iseq_line_info_entry> = source.copy_vec(iseq_struct.line_info_table as usize, t_size as usize)
                     .context("couldn't copy instruction table")?;
-                for i in 0..t_size {
+                // Start at 1 like ruby does, so a pc before the first entry can't index table[-1]
+                // https://github.com/ruby/ruby/blob/v2_5_0/iseq.c#L1318
+                for i in 1..t_size {
                     if pos == table[i].position as usize {
                         return Ok(table[i].line_no as usize)
                     } else if table[i].position as usize > pos {
@@ -1561,7 +1565,9 @@ macro_rules! get_lineno_2_3_0(
             } else {
                 let table: Vec<iseq_line_info_entry> = source.copy_vec(iseq_struct.line_info_table as usize, t_size as usize)
                     .context("couldn't copy instruction table")?;
-                for i in 0..t_size {
+                // Start at 1 like ruby does, so a pc before the first entry can't index table[-1]
+                // https://github.com/ruby/ruby/blob/v2_5_0/iseq.c#L1318
+                for i in 1..t_size {
                     if pos == table[i].position as usize {
                         return Ok(table[i].line_no as usize)
                     } else if table[i].position as usize > pos {
@@ -1576,7 +1582,7 @@ macro_rules! get_lineno_2_3_0(
 
 macro_rules! get_lineno_2_5_0(
     () => (
-        fn get_lineno<T>(
+        pub(crate) fn get_lineno<T>(
             iseq_struct: &rb_iseq_constant_body,
             cfp: &rb_control_frame_t,
             source: &T,
@@ -1592,7 +1598,9 @@ macro_rules! get_lineno_2_5_0(
             } else {
                 let table: Vec<iseq_insn_info_entry> = source.copy_vec(iseq_struct.insns_info as usize, t_size as usize)
                     .context("couldn't copy instruction table")?;
-                for i in 0..t_size {
+                // Start at 1 like ruby does, so a pc before the first entry can't index table[-1]
+                // https://github.com/ruby/ruby/blob/v2_5_0/iseq.c#L1318
+                for i in 1..t_size {
                     if pos == table[i].position as usize {
                         return Ok(table[i].line_no as usize)
                     } else if table[i].position as usize > pos {
@@ -3286,6 +3294,12 @@ mod tests {
             self.bytes[start..start + std::mem::size_of::<usize>()]
                 .copy_from_slice(&value.to_ne_bytes());
         }
+
+        fn write_u32(&mut self, addr: usize, value: u32) {
+            let start = addr - self.base;
+            self.bytes[start..start + std::mem::size_of::<u32>()]
+                .copy_from_slice(&value.to_ne_bytes());
+        }
     }
 
     impl crate::core::process::ProcessMemory for FakeMemory {
@@ -3365,6 +3379,40 @@ mod tests {
         let found =
             ruby_version::ruby_3_3_0::get_execution_context(0, vm_ptr_slot, &memory).unwrap();
         assert_eq!(ec_addr, found);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn test_get_lineno_with_pc_before_first_entry_2_5_0() {
+        use bindings::ruby_2_5_0::{
+            iseq_insn_info_entry, rb_control_frame_t, rb_iseq_constant_body,
+        };
+        const BASE: usize = 0x1000_0000;
+        let entry_size = std::mem::size_of::<iseq_insn_info_entry>();
+
+        // A pc of iseq_encoded gives pos 0, which comes before the first entry's position.
+        let mut memory = FakeMemory::new(BASE, 0x1000);
+        for (i, (position, line_no)) in [(10, 7), (20, 8)].into_iter().enumerate() {
+            let entry = BASE + i * entry_size;
+            memory.write_u32(
+                entry + std::mem::offset_of!(iseq_insn_info_entry, position),
+                position,
+            );
+            memory.write_u32(
+                entry + std::mem::offset_of!(iseq_insn_info_entry, line_no),
+                line_no,
+            );
+        }
+
+        let mut iseq: rb_iseq_constant_body = unsafe { std::mem::zeroed() };
+        iseq.iseq_encoded = 0x2000_0000 as *const _;
+        iseq.insns_info = BASE as *const _;
+        iseq.insns_info_size = 2;
+        let mut cfp: rb_control_frame_t = unsafe { std::mem::zeroed() };
+        cfp.pc = iseq.iseq_encoded;
+
+        let lineno = ruby_version::ruby_2_5_0::get_lineno(&iseq, &cfp, &memory).unwrap();
+        assert_eq!(lineno, 7);
     }
 
     #[cfg(target_pointer_width = "64")]
