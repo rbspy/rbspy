@@ -1475,7 +1475,7 @@ macro_rules! get_stack_frame_3_3_0(
             } else {
                 *iseq_struct
             };
-            if iseq_struct.body.is_null() {
+            if iseq.body.is_null() {
                 return Err(format_err!("iseq body is null"));
             }
             let body: rb_iseq_constant_body =
@@ -1494,9 +1494,11 @@ macro_rules! get_stack_frame_3_3_0(
                 let local_iseq: rb_iseq_t = source.copy_struct(body.local_iseq as usize)
                     .context("couldn't read local iseq")?;
                 if !local_iseq.body.is_null() {
-                    let local_body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
-                        .context("couldn't copy rb_iseq_constant_body")?;
-                    method_name = get_ruby_string(local_body.location.base_label as usize, source)?;
+                    let local_body: rb_iseq_constant_body = source.copy_struct(local_iseq.body as usize)
+                        .context("couldn't copy local rb_iseq_constant_body")?;
+                    if local_body.type_ == rb_iseq_type_ISEQ_TYPE_METHOD {
+                        method_name = get_ruby_string(local_body.location.base_label as usize, source)?;
+                    }
                 }
 
             }
@@ -1786,47 +1788,22 @@ macro_rules! get_cfunc_name(
             method_name.to_string()
         }
 
-        // tries to mimic rb_vm_frame_method_entry
+        // Like rb_vm_frame_method_entry, but only checks the frame's own env
         // https://github.com/ruby/ruby/blob/v3_3_0/vm_insnhelper.c#L733
+        //
+        // Ruby walks from a block's env up to its method's env, so rb_profile_frames names a
+        // block frame after its method. Checking only the frame's own env keeps labels like
+        // "block in foo" and keeps the frame's own iseq for line numbers. A method's env is
+        // local, so it never walks, and its slot may hold an svar wrapping the method entry
+        // once the method uses $~ or $_.
         pub(crate) fn locate_method_entry<T>(
             ep: &*const usize,
             source: &T,
         ) -> Result<usize> where T: ProcessMemory {
-            const VM_ENV_FLAG_LOCAL: usize = 0x2;
-            // Stops the walk from looping forever on a cycle read while the VM is changing memory.
-            const MAX_ENV_CHAIN: usize = 4096;
-            let mut ep = ep.clone() as *mut usize;
-            let mut env_flags: usize = source.copy_struct(ep as usize).with_context(|| format!("couldn't copy env flags at {:#x}", ep as usize))?;
-            let mut env_specval: usize = unsafe {
-                source.copy_struct(ep.offset(-1) as usize).with_context(|| format!("couldn't copy env specval at {:#x}", ep.offset(-1) as usize))?
-            };
-            let mut env_me_cref: usize = unsafe {
-                source.copy_struct(ep.offset(-2) as usize).with_context(|| format!("couldn't copy env me_cref at {:#x}", ep.offset(-2) as usize))?
-            };
-
-            let mut hops = 0;
-            while env_flags & VM_ENV_FLAG_LOCAL != 0 {
-                let me = check_method_entry(env_me_cref, false, source)?;
-                if me != 0{
-                    return Ok(me);
-                }
-                hops += 1;
-                if hops > MAX_ENV_CHAIN {
-                    return Err(format_err!("env chain longer than {} entries", MAX_ENV_CHAIN));
-                }
-                unsafe {
-                    // https://github.com/ruby/ruby/blob/v3_4_5/vm_core.h#L1356
-                    // we must strip off the GC marking bits from the EP, and mimic
-                    // https://github.com/ruby/ruby/blob/v3_4_5/vm_core.h#L1501
-                    ep = (env_specval.clone() & !0x03) as *mut usize;
-                    env_flags = source.copy_struct(ep as usize).with_context(|| format!("couldn't copy env flags at {:#x}", ep as usize))?;
-                    env_specval = source.copy_struct(ep.offset(-1) as usize).with_context(|| format!("couldn't copy env specval at {:#x}", ep.offset(-1) as usize))?;
-                    env_me_cref = source.copy_struct(ep.offset(-2) as usize).with_context(|| format!("couldn't copy env me_cref at {:#x}", ep.offset(-2) as usize))?;
-                }
-            }
-
-            let me = check_method_entry(env_me_cref, true, source)?;
-            Ok(me)
+            let me_cref_addr = unsafe { ep.offset(-2) } as usize;
+            let env_me_cref: usize = source.copy_struct(me_cref_addr)
+                .with_context(|| format!("couldn't copy env me_cref at {:#x}", me_cref_addr))?;
+            check_method_entry(env_me_cref, true, source)
         }
 
         // tries to mimic https://github.com/ruby/ruby/blob/v3_3_0/vm_insnhelper.c#L707
@@ -3770,27 +3747,65 @@ mod tests {
         assert!(result.is_err());
     }
 
+    /// Writes an imemo of `imemo_type` at `addr` whose first field after the flags is `field`
     #[cfg(target_pointer_width = "64")]
-    #[test]
-    fn test_locate_method_entry_with_cyclic_env_chain() {
+    fn write_imemo(memory: &mut FakeMemory, addr: usize, imemo_type: u32, field: usize) {
+        use bindings::ruby_4_0_7::ruby_fl_ushift_RUBY_FL_USHIFT;
+        let word = std::mem::size_of::<usize>();
+        memory.write_word(addr, (imemo_type as usize) << ruby_fl_ushift_RUBY_FL_USHIFT);
+        memory.write_word(addr + word, field);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[rstest]
+    #[case::method_entry(true)]
+    // A method that has used $~ or $_ keeps an svar, wrapping its method entry, in the slot
+    #[case::svar(false)]
+    fn test_locate_method_entry_in_local_env(#[case] direct: bool) {
+        use bindings::ruby_4_0_7::{imemo_type_imemo_ment, imemo_type_imemo_svar};
         const BASE: usize = 0x1000_0000;
         const VM_ENV_FLAG_LOCAL: usize = 0x2;
         let word = std::mem::size_of::<usize>();
-
-        // Two envs that are each other's parent (A -> B -> A), with no method entry.
-        let ep_a = BASE + 10 * word;
-        let ep_b = BASE + 20 * word;
+        let ep = BASE + 10 * word;
+        let cme = BASE + 0x100;
+        let svar = BASE + 0x200;
 
         let mut memory = FakeMemory::new(BASE, 0x1000);
-        for (ep, next_ep) in [(ep_a, ep_b), (ep_b, ep_a)] {
-            memory.write_word(ep, VM_ENV_FLAG_LOCAL); // ep[0]: flags
-            memory.write_word(ep - word, next_ep | 0x1); // ep[-1]: specval
-            memory.write_word(ep - 2 * word, 0); // ep[-2]: me_cref
-        }
+        memory.write_word(ep, VM_ENV_FLAG_LOCAL); // ep[0]: flags
+        memory.write_word(ep - word, 0); // ep[-1]: specval, the block handler in a local env
+        memory.write_word(ep - 2 * word, if direct { cme } else { svar }); // ep[-2]: me_cref
+        write_imemo(&mut memory, cme, imemo_type_imemo_ment, 0);
+        write_imemo(&mut memory, svar, imemo_type_imemo_svar, cme);
 
-        let result =
-            ruby_version::ruby_4_0_7::locate_method_entry(&(ep_a as *const usize), &memory);
-        assert!(result.is_err());
+        let found =
+            ruby_version::ruby_4_0_7::locate_method_entry(&(ep as *const usize), &memory).unwrap();
+        assert_eq!(found, cme);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn test_locate_method_entry_in_block_env() {
+        use bindings::ruby_4_0_7::imemo_type_imemo_ment;
+        const BASE: usize = 0x1000_0000;
+        let word = std::mem::size_of::<usize>();
+        let block_ep = BASE + 10 * word;
+        let method_ep = BASE + 20 * word;
+        let cme = BASE + 0x100;
+
+        // A block's env points at its method's env, which holds the method entry. Ruby would
+        // walk up to it; rbspy doesn't, so the block keeps its own label.
+        let mut memory = FakeMemory::new(BASE, 0x1000);
+        memory.write_word(block_ep, 0); // flags: not local
+        memory.write_word(block_ep - word, method_ep | 0x1); // specval: guarded prev ep
+        memory.write_word(block_ep - 2 * word, 0);
+        memory.write_word(method_ep, 0x2);
+        memory.write_word(method_ep - 2 * word, cme);
+        write_imemo(&mut memory, cme, imemo_type_imemo_ment, 0);
+
+        let found =
+            ruby_version::ruby_4_0_7::locate_method_entry(&(block_ep as *const usize), &memory)
+                .unwrap();
+        assert_eq!(found, 0);
     }
 
     #[cfg(target_pointer_width = "64")]

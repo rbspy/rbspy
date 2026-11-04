@@ -323,6 +323,61 @@ mod tests {
     }
 
     #[test]
+    fn test_get_trace_in_method_with_svar() {
+        #[cfg(target_os = "macos")]
+        if !nix::unistd::Uid::effective().is_root() {
+            println!("Skipping test because we're not running as root");
+            return;
+        }
+
+        // `matcher` uses =~, so its env holds an svar instead of a bare method entry
+        let mut cmd = RubyScript::new("./ci/ruby-programs/svar.rb");
+        let mut spy =
+            RubySpy::retry_new(cmd.id(), 100, None, false).expect("couldn't initialize spy");
+
+        let has_matcher = |trace: &crate::core::types::StackTrace| {
+            trace
+                .trace
+                .iter()
+                .any(|frame| frame.name.ends_with("matcher"))
+        };
+
+        // Wait out ruby's startup (e.g. rubygems), which can take a good share of the samples
+        let started = std::time::Instant::now();
+        while !matches!(spy.get_stack_trace(true), Ok(Some(ref trace)) if has_matcher(trace)) {
+            assert!(
+                started.elapsed() < std::time::Duration::from_secs(10),
+                "`matcher` never started running"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+
+        let (mut ok, mut in_matcher, mut errors) = (0, 0, vec![]);
+        for _ in 0..200 {
+            match spy.get_stack_trace(true) {
+                Ok(Some(trace)) => {
+                    ok += 1;
+                    if has_matcher(&trace) {
+                        in_matcher += 1;
+                    }
+                }
+                Ok(None) => {}
+                Err(e) => errors.push(format!("{e:#}")),
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        cmd.kill().expect("couldn't clean up test process");
+
+        errors.dedup();
+        println!("{ok} traces, {in_matcher} in `matcher`, errors: {errors:?}");
+        assert!(ok >= 160, "too many failed samples: {errors:?}");
+        assert!(
+            in_matcher * 10 >= ok * 9,
+            "expected most samples in `matcher`: {in_matcher}/{ok}"
+        );
+    }
+
+    #[test]
     fn test_get_trace_when_process_has_exited() {
         #[cfg(target_os = "macos")]
         if !nix::unistd::Uid::effective().is_root() {
