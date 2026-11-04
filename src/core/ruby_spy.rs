@@ -284,6 +284,45 @@ mod tests {
     }
 
     #[test]
+    fn test_get_trace_line_numbers() {
+        #[cfg(target_os = "macos")]
+        if !nix::unistd::Uid::effective().is_root() {
+            println!("Skipping test because we're not running as root");
+            return;
+        }
+
+        let mut cmd = RubyScript::new("./ci/ruby-programs/line_numbers.rb");
+        let mut spy =
+            RubySpy::retry_new(cmd.id(), 100, None, false).expect("couldn't initialize spy");
+
+        let mut lines = std::collections::BTreeMap::<usize, usize>::new();
+        for _ in 0..200 {
+            if let Ok(Some(trace)) = spy.get_stack_trace(true) {
+                let lineno = trace.trace.iter().find_map(|frame| {
+                    (frame.name.ends_with("work")
+                        && frame.relative_path.ends_with("line_numbers.rb"))
+                    .then_some(frame.lineno)
+                    .flatten()
+                });
+                if let Some(lineno) = lineno {
+                    *lines.entry(lineno).or_default() += 1;
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        cmd.kill().expect("couldn't clean up test process");
+
+        println!("samples of `work` by line: {lines:?}");
+        let total: usize = lines.values().sum();
+        let in_loops: usize = [3, 4, 7, 8].iter().filter_map(|l| lines.get(l)).sum();
+        assert!(total >= 100, "too few samples of `work`: {lines:?}");
+        assert!(
+            in_loops * 10 >= total * 9,
+            "expected most samples on lines 3, 4, 7, and 8: {lines:?}"
+        );
+    }
+
+    #[test]
     fn test_get_trace_when_process_has_exited() {
         #[cfg(target_os = "macos")]
         if !nix::unistd::Uid::effective().is_root() {

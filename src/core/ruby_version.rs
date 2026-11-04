@@ -8,6 +8,67 @@
  * Defines a bunch of submodules, one per Ruby version (`ruby_1_9_3`, `ruby_2_2_0`, etc.)
  */
 
+/// Ruby 2.6+ finds an instruction's line table entry through a succinct bitvector,
+/// `struct succ_index_table`. The bindings only see it as an opaque type. Its layout and lookup
+/// are unchanged from 2.6.0 through 4.0, so they're defined once here.
+/// https://github.com/ruby/ruby/blob/v3_4_0/iseq.c#L4194
+pub(crate) mod succ_index_table {
+    use anyhow::Result;
+
+    use crate::core::process::ProcessMemory;
+
+    pub(crate) const IMMEDIATE_TABLE_SIZE: usize = 54;
+    pub(crate) const IMM_PART_LEN: usize = IMMEDIATE_TABLE_SIZE / 9;
+
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub(crate) struct SuccDictBlock {
+        pub(crate) rank: u32,
+        pub(crate) small_block_ranks: u64,
+        pub(crate) bits: [u64; 8],
+    }
+
+    #[repr(C)]
+    pub(crate) struct SuccIndexTable {
+        pub(crate) imm_part: [u64; IMM_PART_LEN],
+        pub(crate) succ_part: [SuccDictBlock; 0],
+    }
+
+    /// Port of succ_index_lookup: the number of line table entries whose position is <= `pos`.
+    /// `pos` must be less than the iseq's size to avoid reading past the end of the table.
+    pub(crate) fn lookup<T: ProcessMemory>(
+        table_addr: usize,
+        pos: usize,
+        source: &T,
+    ) -> Result<usize> {
+        if pos < IMMEDIATE_TABLE_SIZE {
+            let word: u64 = source.copy_struct(
+                table_addr
+                    + std::mem::offset_of!(SuccIndexTable, imm_part)
+                    + (pos / 9) * std::mem::size_of::<u64>(),
+            )?;
+            Ok(((word >> ((pos % 9) * 7)) & 0x7f) as usize)
+        } else {
+            let block_index = (pos - IMMEDIATE_TABLE_SIZE) / 512;
+            let block: SuccDictBlock = source.copy_struct(
+                table_addr
+                    + std::mem::offset_of!(SuccIndexTable, succ_part)
+                    + block_index * std::mem::size_of::<SuccDictBlock>(),
+            )?;
+            let block_bit_index = (pos - IMMEDIATE_TABLE_SIZE) % 512;
+            let small_block_index = block_bit_index / 64;
+            let small_block_rank = if small_block_index == 0 {
+                0
+            } else {
+                (block.small_block_ranks >> ((small_block_index - 1) * 9)) & 0x1ff
+            };
+            let popcnt =
+                (block.bits[small_block_index] << (63 - block_bit_index % 64)).count_ones();
+            Ok(block.rank as usize + small_block_rank as usize + popcnt as usize)
+        }
+    }
+}
+
 macro_rules! ruby_version_v_1_9_1(
     ($ruby_version:ident) => (
         pub mod $ruby_version {
@@ -1467,12 +1528,16 @@ macro_rules! get_stack_frame_3_3_0(
 
 macro_rules! get_pos(
     ($iseq_type:ident) => (
-        #[allow(unused)] // this doesn't get used in every ruby version
+        /// The index of the instruction that `cfp.pc` is in, counted in VALUE-sized words like
+        /// ruby's `pc - iseq_encoded`
         fn get_pos(iseq_struct: &$iseq_type, cfp: &rb_control_frame_t) -> Result<usize> {
-            if (cfp.pc as usize) < (iseq_struct.iseq_encoded as usize) {
+            let pc = cfp.pc as usize;
+            let start = iseq_struct.iseq_encoded as usize;
+            if pc < start || (pc - start) % std::mem::size_of::<VALUE>() != 0 {
                 return Err(crate::core::types::MemoryCopyError::Message(format!("program counter and iseq are out of sync")).into());
             }
-            let mut pos = cfp.pc as usize - iseq_struct.iseq_encoded as usize;
+            let mut pos = (pc - start) / std::mem::size_of::<VALUE>();
+            // pc points at the next instruction, so step back into the current one
             if pos != 0 {
                 pos -= 1;
             }
@@ -1549,7 +1614,7 @@ macro_rules! get_lineno_2_0_0(
 
 macro_rules! get_lineno_2_3_0(
     () => (
-        fn get_lineno<T>(
+        pub(crate) fn get_lineno<T>(
             iseq_struct: &rb_iseq_constant_body,
             cfp: &rb_control_frame_t,
             source: &T,
@@ -1615,25 +1680,41 @@ macro_rules! get_lineno_2_5_0(
 
 macro_rules! get_lineno_2_6_0(
     () => (
-        fn get_lineno<T>(
+        // Port of calc_pos and get_insn_info_succinct_bitvector
+        // https://github.com/ruby/ruby/blob/v3_4_0/vm_backtrace.c#L38
+        // https://github.com/ruby/ruby/blob/v3_4_0/iseq.c#L2211
+        pub(crate) fn get_lineno<T>(
             iseq_struct: &rb_iseq_constant_body,
-            _cfp: &rb_control_frame_t,
+            cfp: &rb_control_frame_t,
             source: &T,
         ) -> Result<usize> where T: ProcessMemory {
             let t_size = iseq_struct.insns_info.size as usize;
-            if t_size == 0 {
-                Err(format_err!("line number is not available"))
-            } else if t_size == 1 {
-                let table: [iseq_insn_info_entry; 1] = source.copy_struct(iseq_struct.insns_info.body as usize)
-                    .context("couldn't copy instruction table")?;
-                Ok(table[0].line_no as usize)
-            } else {
-                // TODO: To handle this properly, we need to imitate ruby's succinct bit vector lookup.
-                // See https://github.com/rbspy/rbspy/issues/213#issuecomment-826363857
-                let table: Vec<iseq_insn_info_entry> = source.copy_vec(iseq_struct.insns_info.body as usize, t_size as usize)
-                    .with_context(|| format!("couldn't copy iseq_insn_info_entry table at {:#x}", iseq_struct.insns_info.body as usize))?;
-                Ok(table[t_size-1].line_no as usize)
-            }
+            let index = match t_size {
+                0 => return Err(format_err!("line number is not available")),
+                1 => 0,
+                _ => {
+                    let pos = get_pos(iseq_struct, cfp)?;
+                    // Positions past the end would read past the end of succ_index_table
+                    if pos >= iseq_struct.iseq_size as usize {
+                        return Err(format_err!("program counter is past the end of the iseq"));
+                    }
+
+                    let table = iseq_struct.insns_info.succ_index_table as usize;
+                    if table == 0 {
+                        return Err(format_err!("instruction position table is missing"));
+                    }
+                    let rank = crate::core::ruby_version::succ_index_table::lookup(table, pos, source)
+                        .with_context(|| format!("couldn't look up position {} in succ_index_table at {:#x}", pos, table))?;
+                    if rank == 0 || rank > t_size {
+                        return Err(format_err!("line table index {} is out of range for {} entries", rank, t_size));
+                    }
+                    rank - 1
+                }
+            };
+            let entry_addr = iseq_struct.insns_info.body as usize + index * std::mem::size_of::<iseq_insn_info_entry>();
+            let entry: iseq_insn_info_entry = source.copy_struct(entry_addr)
+                .with_context(|| format!("couldn't copy iseq_insn_info_entry at {:#x}", entry_addr))?;
+            Ok(entry.line_no as usize)
         }
     )
 );
@@ -2077,25 +2158,25 @@ mod tests {
                 name: "aaa".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
                 absolute_path: Some("/vagrant/ci/ruby-programs/infinite.rb".to_string()),
-                lineno: Some(3),
+                lineno: Some(2),
             },
             StackFrame {
                 name: "bbb".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
                 absolute_path: Some("/vagrant/ci/ruby-programs/infinite.rb".to_string()),
-                lineno: Some(7),
+                lineno: Some(6),
             },
             StackFrame {
                 name: "ccc".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
                 absolute_path: Some("/vagrant/ci/ruby-programs/infinite.rb".to_string()),
-                lineno: Some(11),
+                lineno: Some(10),
             },
             StackFrame {
                 name: "block in <main>".to_string(),
                 relative_path: "ci/ruby-programs/infinite.rb".to_string(),
                 absolute_path: Some("/vagrant/ci/ruby-programs/infinite.rb".to_string()),
-                lineno: Some(15),
+                lineno: Some(14),
             },
             StackFrame {
                 name: "loop [c function]".to_string(),
@@ -2120,7 +2201,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/acj/workspace/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: Some(3),
+                lineno: Some(2),
             },
             StackFrame {
                 name: "bbb".to_string(),
@@ -2128,7 +2209,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/acj/workspace/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: Some(7),
+                lineno: Some(6),
             },
             StackFrame {
                 name: "ccc".to_string(),
@@ -2136,7 +2217,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/acj/workspace/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: Some(11),
+                lineno: Some(10),
             },
             StackFrame {
                 name: "block in <main>".to_string(),
@@ -2144,7 +2225,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/acj/workspace/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: Some(15),
+                lineno: Some(14),
             },
             StackFrame {
                 name: "loop [c function]".to_string(),
@@ -2169,7 +2250,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/parallels/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: Some(3),
+                lineno: Some(2),
             },
             StackFrame {
                 name: "bbb".to_string(),
@@ -2177,7 +2258,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/parallels/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: Some(7),
+                lineno: Some(6),
             },
             StackFrame {
                 name: "ccc".to_string(),
@@ -2185,7 +2266,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/parallels/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: Some(11),
+                lineno: Some(10),
             },
             StackFrame {
                 name: "block in <main>".to_string(),
@@ -2193,7 +2274,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/parallels/rbspy/ci/ruby-programs/infinite.rb".to_string(),
                 ),
-                lineno: Some(15),
+                lineno: Some(14),
             },
             StackFrame {
                 name: "loop [c function]".to_string(),
@@ -2226,7 +2307,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu.rb".to_string(),
                 ),
-                lineno: Some(9),
+                lineno: Some(8),
             },
             StackFrame {
                 name: "Object#bbb".to_string(),
@@ -2234,7 +2315,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu.rb".to_string(),
                 ),
-                lineno: Some(13),
+                lineno: Some(12),
             },
             StackFrame {
                 name: "Object#ccc".to_string(),
@@ -2242,7 +2323,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu.rb".to_string(),
                 ),
-                lineno: Some(17),
+                lineno: Some(16),
             },
             StackFrame {
                 name: "block in <main>".to_string(),
@@ -2250,13 +2331,13 @@ mod tests {
                 absolute_path: Some(
                     "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu.rb".to_string(),
                 ),
-                lineno: Some(21),
+                lineno: Some(20),
             },
             StackFrame {
                 name: "Kernel#loop".to_string(),
                 relative_path: "<internal:kernel>".to_string(),
                 absolute_path: Some("unknown".to_string()),
-                lineno: Some(192),
+                lineno: Some(187),
             },
             StackFrame {
                 name: "<main>".to_string(),
@@ -2281,37 +2362,37 @@ mod tests {
                 name: "A#aaa".to_string(),
                 relative_path: "ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string(),
                 absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string()),
-                lineno: Some(10)
+                lineno: Some(9)
             },
             StackFrame {
                 name: "B::Ab#bbb".to_string(),
                 relative_path: "ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string(),
                 absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string()),
-                lineno: Some(17)
+                lineno: Some(16)
             },
             StackFrame {
                 name: "C::Cb#ccc".to_string(),
                 relative_path: "ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string(),
                 absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string()),
-                lineno: Some(25)
+                lineno: Some(24)
             },
             StackFrame {
                 name: "block in looper".to_string(),
                 relative_path: "ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string(),
                 absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string()),
-                lineno: Some(32)
+                lineno: Some(31)
             },
             StackFrame {
                 name: "Kernel#loop".to_string(),
                 relative_path: "<internal:kernel>".to_string(),
                 absolute_path: Some("unknown".to_string()),
-                lineno: Some(192)
+                lineno: Some(187)
             },
             StackFrame {
                 name: "Object#looper".to_string(),
                 relative_path: "ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string(),
                 absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu_with_classes.rb".to_string()),
-                lineno: Some(33)
+                lineno: Some(30)
             },
         ]
     }
@@ -2319,52 +2400,52 @@ mod tests {
     fn real_complex_trace_with_classes_3_4_5() -> Vec<StackFrame> {
         vec![
             StackFrame { name: "Kernel#sleep [c function]".to_string(), relative_path: "(unknown)".to_string(), absolute_path: None, lineno: None },
-            StackFrame { name: "block in hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(41) },
-            StackFrame { name: "Kernel#loop".to_string(), relative_path: "<internal:kernel>".to_string(), absolute_path: Some("unknown".to_string()), lineno: Some(173) },
-            StackFrame { name: "ClassA#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(42) },
-            StackFrame { name: "ModuleB::ClassB#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(49) },
-            StackFrame { name: "ModuleC.hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(56) },
-            StackFrame { name: "ClassWithStaticMethod.hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(62) },
-            StackFrame { name: "ModuleD#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(68) },
+            StackFrame { name: "block in hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(40) },
+            StackFrame { name: "Kernel#loop".to_string(), relative_path: "<internal:kernel>".to_string(), absolute_path: Some("unknown".to_string()), lineno: Some(168) },
+            StackFrame { name: "ClassA#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(39) },
+            StackFrame { name: "ModuleB::ClassB#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(48) },
+            StackFrame { name: "ModuleC.hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(55) },
+            StackFrame { name: "ClassWithStaticMethod.hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(61) },
+            StackFrame { name: "ModuleD#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(67) },
             StackFrame { name: "block in <top (required)>".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(75) },
             StackFrame { name: "block in <top (required)>".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(77) },
-            StackFrame { name: "#<ClassD:0x7f27035d2448>.hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(85) },
-            StackFrame { name: "ClassE#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(90) },
+            StackFrame { name: "#<ClassD:0x7f27035d2448>.hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(84) },
+            StackFrame { name: "ClassE#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(89) },
             StackFrame { name: "UnboundMethod#bind_call [c function]".to_string(), relative_path: "(unknown)".to_string(), absolute_path: None, lineno: None },
-            StackFrame { name: "#<Refinement:0x7f27035d1d68>#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(108) },
-            StackFrame { name: "ModuleE.hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(118) },
-            StackFrame { name: "ClassH#method_missing".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(126) },
-            StackFrame { name: "block in hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(133) },
-            StackFrame { name: "Integer#times".to_string(), relative_path: "<internal:numeric>".to_string(), absolute_path: Some("unknown".to_string()), lineno: Some(261) },
-            StackFrame { name: "ClassF#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(134) },
-            StackFrame { name: "block (2 levels) in <top (required)>".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(140) },
-            StackFrame { name: "#<Class:0x7f27035df648>.hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(147) },
-            StackFrame { name: "#<Class:0x7f27035dee28>#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(152) },
-            StackFrame { name: "#<Module:0x7f27035dece8>.hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(158) },
-            StackFrame { name: "Object#method_with_complex_parameters".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(163) },
-            StackFrame { name: "block (2 levels) in hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(174) },
-            StackFrame { name: "ClassJ#hello_helper".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(168) },
-            StackFrame { name: "block in hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(175) },
-            StackFrame { name: "ClassJ#hello_helper".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(168) },
-            StackFrame { name: "ClassJ#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(176) },
+            StackFrame { name: "#<Refinement:0x7f27035d1d68>#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(104) },
+            StackFrame { name: "ModuleE.hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(117) },
+            StackFrame { name: "ClassH#method_missing".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(125) },
+            StackFrame { name: "block in hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(132) },
+            StackFrame { name: "Integer#times".to_string(), relative_path: "<internal:numeric>".to_string(), absolute_path: Some("unknown".to_string()), lineno: Some(257) },
+            StackFrame { name: "ClassF#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(131) },
+            StackFrame { name: "block (2 levels) in <top (required)>".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(139) },
+            StackFrame { name: "#<Class:0x7f27035df648>.hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(146) },
+            StackFrame { name: "#<Class:0x7f27035dee28>#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(151) },
+            StackFrame { name: "#<Module:0x7f27035dece8>.hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(157) },
+            StackFrame { name: "Object#method_with_complex_parameters".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(162) },
+            StackFrame { name: "block (2 levels) in hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(173) },
+            StackFrame { name: "ClassJ#hello_helper".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(167) },
+            StackFrame { name: "block in hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(172) },
+            StackFrame { name: "ClassJ#hello_helper".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(167) },
+            StackFrame { name: "ClassJ#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(171) },
             StackFrame { name: "<compiled>".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("unknown".to_string()), lineno: Some(181) },
             StackFrame { name: "Kernel#eval [c function]".to_string(), relative_path: "(unknown)".to_string(), absolute_path: None, lineno: None },
-            StackFrame { name: "ClassK#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(182) },
+            StackFrame { name: "ClassK#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(181) },
             StackFrame { name: "<compiled>".to_string(), relative_path: "(eval at /home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb:187)".to_string(), absolute_path: Some("unknown".to_string()), lineno: Some(1) },
             StackFrame { name: "BasicObject#instance_eval [c function]".to_string(), relative_path: "(unknown)".to_string(), absolute_path: None, lineno: None },
-            StackFrame { name: "ClassL#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(188) },
+            StackFrame { name: "ClassL#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(187) },
             StackFrame { name: "<compiled>".to_string(), relative_path: "(eval at /home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb:193)".to_string(), absolute_path: Some("unknown".to_string()), lineno: Some(1) },
             StackFrame { name: "Kernel#eval [c function]".to_string(), relative_path: "(unknown)".to_string(), absolute_path: None, lineno: None },
-            StackFrame { name: "ClassM#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(194) },
-            StackFrame { name: "block (3 levels) in <top (required)>".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(201) },
-            StackFrame { name: "Integer#times".to_string(), relative_path: "<internal:numeric>".to_string(), absolute_path: Some("unknown".to_string()), lineno: Some(261) },
-            StackFrame { name: "block (2 levels) in <top (required)>".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(202) },
-            StackFrame { name: "Object#top_level_hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(207) },
-            StackFrame { name: "InstanceMethod#work".to_string(), relative_path: "ci/ruby-programs/cme_complex_labels.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/cme_complex_labels.rb".to_string()), lineno: Some(6) },
-            StackFrame { name: "ModuleMethod#call_instance".to_string(), relative_path: "ci/ruby-programs/cme_complex_labels.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/cme_complex_labels.rb".to_string()), lineno: Some(12) },
-            StackFrame { name: "Object#work_main".to_string(), relative_path: "ci/ruby-programs/cme_complex_labels.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/cme_complex_labels.rb".to_string()), lineno: Some(22) },
-            StackFrame { name: "block in <main>".to_string(), relative_path: "ci/ruby-programs/cme_complex_labels.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/cme_complex_labels.rb".to_string()), lineno: Some(26) },
-            StackFrame { name: "Kernel#loop".to_string(), relative_path: "<internal:kernel>".to_string(), absolute_path: Some("unknown".to_string()), lineno: Some(173) },
+            StackFrame { name: "ClassM#hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(193) },
+            StackFrame { name: "block (3 levels) in <top (required)>".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(200) },
+            StackFrame { name: "Integer#times".to_string(), relative_path: "<internal:numeric>".to_string(), absolute_path: Some("unknown".to_string()), lineno: Some(257) },
+            StackFrame { name: "block (2 levels) in <top (required)>".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(199) },
+            StackFrame { name: "Object#top_level_hello".to_string(), relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()), lineno: Some(206) },
+            StackFrame { name: "InstanceMethod#work".to_string(), relative_path: "ci/ruby-programs/cme_complex_labels.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/cme_complex_labels.rb".to_string()), lineno: Some(5) },
+            StackFrame { name: "ModuleMethod#call_instance".to_string(), relative_path: "ci/ruby-programs/cme_complex_labels.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/cme_complex_labels.rb".to_string()), lineno: Some(11) },
+            StackFrame { name: "Object#work_main".to_string(), relative_path: "ci/ruby-programs/cme_complex_labels.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/cme_complex_labels.rb".to_string()), lineno: Some(21) },
+            StackFrame { name: "block in <main>".to_string(), relative_path: "ci/ruby-programs/cme_complex_labels.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/cme_complex_labels.rb".to_string()), lineno: Some(25) },
+            StackFrame { name: "Kernel#loop".to_string(), relative_path: "<internal:kernel>".to_string(), absolute_path: Some("unknown".to_string()), lineno: Some(168) },
             StackFrame { name: "<main>".to_string(), relative_path: "ci/ruby-programs/cme_complex_labels.rb".to_string(), absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/cme_complex_labels.rb".to_string()), lineno: Some(24) },
         ]
     }
@@ -2383,7 +2464,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu.rb".to_string(),
                 ),
-                lineno: Some(9),
+                lineno: Some(8),
             },
             StackFrame {
                 name: "Object#bbb".to_string(),
@@ -2391,7 +2472,7 @@ mod tests {
                 absolute_path: Some(
                     "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu.rb".to_string(),
                 ),
-                lineno: Some(13),
+                lineno: Some(12),
             },
             StackFrame {
                 name: "Object#ccc".to_string(),
@@ -2399,13 +2480,13 @@ mod tests {
                 absolute_path: Some(
                     "/home/runner/work/rbspy/rbspy/ci/ruby-programs/infinite_on_cpu.rb".to_string(),
                 ),
-                lineno: Some(17),
+                lineno: Some(16),
             },
             StackFrame {
                 name: "Kernel#loop".to_string(),
                 relative_path: "<internal:kernel>".to_string(),
                 absolute_path: Some("unknown".to_string()),
-                lineno: Some(174),
+                lineno: Some(169),
             },
         ]
     }
@@ -3381,6 +3462,86 @@ mod tests {
         assert_eq!(ec_addr, found);
     }
 
+    // The line table of `work` from https://github.com/rbspy/rbspy/issues/409
+    const WORK_LINE_TABLE: [(u32, u32); 10] = [
+        (0, 2),
+        (3, 3),
+        (9, 4),
+        (16, 3),
+        (26, 6),
+        (29, 7),
+        (35, 8),
+        (42, 7),
+        (52, 10),
+        (58, 11),
+    ];
+
+    /// Writes (position, line_no) entries at `base` in the layout of `$entry`, which is
+    /// iseq_line_info_entry or iseq_insn_info_entry before ruby 2.6
+    macro_rules! write_position_line_table(
+        ($entry:ty, $memory:expr, $base:expr, $entries:expr) => (
+            for (i, (position, line_no)) in $entries.iter().enumerate() {
+                let entry = $base + i * std::mem::size_of::<$entry>();
+                $memory.write_u32(entry + std::mem::offset_of!($entry, position), *position);
+                $memory.write_u32(entry + std::mem::offset_of!($entry, line_no), *line_no);
+            }
+        )
+    );
+
+    #[cfg(target_pointer_width = "64")]
+    #[rstest]
+    #[case::first_loop_body(14, 4)]
+    #[case::first_loop_condition(22, 3)]
+    #[case::second_loop_body(40, 8)]
+    #[case::sum(56, 10)]
+    #[case::pc_at_end(59, 11)]
+    fn test_get_lineno_2_5_0(#[case] pc_words: usize, #[case] expected: usize) {
+        use bindings::ruby_2_5_0::{
+            iseq_insn_info_entry, rb_control_frame_t, rb_iseq_constant_body,
+        };
+        const BASE: usize = 0x1000_0000;
+        let mut memory = FakeMemory::new(BASE, 0x1000);
+        write_position_line_table!(iseq_insn_info_entry, memory, BASE, WORK_LINE_TABLE);
+
+        let mut iseq: rb_iseq_constant_body = unsafe { std::mem::zeroed() };
+        iseq.iseq_encoded = 0x2000_0000 as *const _;
+        iseq.iseq_size = 59;
+        iseq.insns_info = BASE as *const _;
+        iseq.insns_info_size = WORK_LINE_TABLE.len() as u32;
+        let mut cfp: rb_control_frame_t = unsafe { std::mem::zeroed() };
+        cfp.pc = (iseq.iseq_encoded as usize + pc_words * std::mem::size_of::<usize>()) as *const _;
+
+        let lineno = ruby_version::ruby_2_5_0::get_lineno(&iseq, &cfp, &memory).unwrap();
+        assert_eq!(lineno, expected);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[rstest]
+    #[case::first_loop_body(14, 4)]
+    #[case::first_loop_condition(22, 3)]
+    #[case::second_loop_body(40, 8)]
+    #[case::sum(56, 10)]
+    #[case::pc_at_end(59, 11)]
+    fn test_get_lineno_2_4_0(#[case] pc_words: usize, #[case] expected: usize) {
+        use bindings::ruby_2_4_0::{
+            iseq_line_info_entry, rb_control_frame_t, rb_iseq_constant_body,
+        };
+        const BASE: usize = 0x1000_0000;
+        let mut memory = FakeMemory::new(BASE, 0x1000);
+        write_position_line_table!(iseq_line_info_entry, memory, BASE, WORK_LINE_TABLE);
+
+        let mut iseq: rb_iseq_constant_body = unsafe { std::mem::zeroed() };
+        iseq.iseq_encoded = 0x2000_0000 as *const _;
+        iseq.iseq_size = 59;
+        iseq.line_info_table = BASE as *const _;
+        iseq.line_info_size = WORK_LINE_TABLE.len() as u32;
+        let mut cfp: rb_control_frame_t = unsafe { std::mem::zeroed() };
+        cfp.pc = (iseq.iseq_encoded as usize + pc_words * std::mem::size_of::<usize>()) as *const _;
+
+        let lineno = ruby_version::ruby_2_4_0::get_lineno(&iseq, &cfp, &memory).unwrap();
+        assert_eq!(lineno, expected);
+    }
+
     #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_lineno_with_pc_before_first_entry_2_5_0() {
@@ -3413,6 +3574,156 @@ mod tests {
 
         let lineno = ruby_version::ruby_2_5_0::get_lineno(&iseq, &cfp, &memory).unwrap();
         assert_eq!(lineno, 7);
+    }
+
+    /// Port of succ_index_table_create from iseq.c, for building tables to read back.
+    /// https://github.com/ruby/ruby/blob/v3_4_0/iseq.c#L4211
+    fn build_succ_index_table(max_pos: usize, positions: &[usize]) -> Vec<u8> {
+        use ruby_version::succ_index_table::{
+            SuccDictBlock, SuccIndexTable, IMMEDIATE_TABLE_SIZE, IMM_PART_LEN,
+        };
+        let imm_size = if max_pos < IMMEDIATE_TABLE_SIZE {
+            max_pos.div_ceil(9)
+        } else {
+            IMM_PART_LEN
+        };
+        let succ_size = if max_pos < IMMEDIATE_TABLE_SIZE {
+            0
+        } else {
+            (max_pos - IMMEDIATE_TABLE_SIZE).div_ceil(512)
+        };
+        let mut imm_part = [0u64; IMM_PART_LEN];
+        let mut blocks = vec![];
+        let mut r = 0;
+        for (j, imm) in imm_part.iter_mut().enumerate().take(imm_size) {
+            for i in 0..9 {
+                if r < positions.len() && positions[r] == j * 9 + i {
+                    r += 1;
+                }
+                *imm |= (r as u64) << (7 * i);
+            }
+        }
+        for k in 0..succ_size {
+            let mut block = SuccDictBlock {
+                rank: r as u32,
+                small_block_ranks: 0,
+                bits: [0; 8],
+            };
+            let mut small_rank = 0u64;
+            for j in 0..8 {
+                if j > 0 {
+                    block.small_block_ranks |= small_rank << (9 * (j - 1));
+                }
+                for i in 0..64 {
+                    if r < positions.len()
+                        && positions[r] == k * 512 + j * 64 + i + IMMEDIATE_TABLE_SIZE
+                    {
+                        block.bits[j] |= 1 << i;
+                        r += 1;
+                    }
+                }
+                small_rank += block.bits[j].count_ones() as u64;
+            }
+            blocks.push(block);
+        }
+        assert_eq!(r, positions.len(), "positions must be sorted and < max_pos");
+
+        let block_size = std::mem::size_of::<SuccDictBlock>();
+        let succ_offset = std::mem::offset_of!(SuccIndexTable, succ_part);
+        let mut bytes = vec![0u8; succ_offset + blocks.len() * block_size];
+        for (i, word) in imm_part.iter().enumerate() {
+            bytes[i * 8..i * 8 + 8].copy_from_slice(&word.to_ne_bytes());
+        }
+        for (k, block) in blocks.iter().enumerate() {
+            let start = succ_offset + k * block_size;
+            let raw = unsafe {
+                std::slice::from_raw_parts(block as *const SuccDictBlock as *const u8, block_size)
+            };
+            bytes[start..start + block_size].copy_from_slice(raw);
+        }
+        bytes
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[rstest]
+    #[case::immediate_only(40, vec![0, 3, 9, 16, 26, 29, 35])]
+    #[case::boundary(60, vec![0, 8, 9, 53, 54, 55, 59])]
+    #[case::many_blocks(1800, (0..1800).filter(|p| p % 7 == 0 || p % 64 == 63 || (565..640).contains(p)).collect())]
+    fn test_succ_index_lookup(#[case] max_pos: usize, #[case] positions: Vec<usize>) {
+        const BASE: usize = 0x1000_0000;
+        let bytes = build_succ_index_table(max_pos, &positions);
+        let mut memory = FakeMemory::new(BASE, bytes.len());
+        memory.bytes.copy_from_slice(&bytes);
+
+        for pos in 0..max_pos {
+            let expected = positions.iter().filter(|&&p| p <= pos).count();
+            let rank = ruby_version::succ_index_table::lookup(BASE, pos, &memory).unwrap();
+            assert_eq!(rank, expected, "pos {pos}");
+        }
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    fn fake_iseq_3_4_10(
+        iseq_size: usize,
+        entries: &[(usize, u32)],
+    ) -> (bindings::ruby_3_4_10::rb_iseq_constant_body, FakeMemory) {
+        use bindings::ruby_3_4_10::{iseq_insn_info_entry, rb_iseq_constant_body};
+        const BASE: usize = 0x1000_0000;
+        const TABLE: usize = BASE + 0x1000;
+        let entry_size = std::mem::size_of::<iseq_insn_info_entry>();
+
+        let positions: Vec<usize> = entries.iter().map(|e| e.0).collect();
+        let table = build_succ_index_table(iseq_size, &positions);
+        let mut memory = FakeMemory::new(BASE, 0x1000 + table.len());
+        memory.bytes[0x1000..].copy_from_slice(&table);
+        for (i, (_, line_no)) in entries.iter().enumerate() {
+            memory.write_u32(
+                BASE + i * entry_size + std::mem::offset_of!(iseq_insn_info_entry, line_no),
+                *line_no,
+            );
+        }
+
+        let mut iseq: rb_iseq_constant_body = unsafe { std::mem::zeroed() };
+        iseq.iseq_encoded = 0x2000_0000 as *mut _;
+        iseq.iseq_size = iseq_size as u32;
+        iseq.insns_info.body = BASE as *mut _;
+        iseq.insns_info.size = entries.len() as u32;
+        iseq.insns_info.succ_index_table = TABLE as *mut _;
+        (iseq, memory)
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[rstest]
+    #[case::pc_at_start(0, 2)]
+    #[case::first_loop_body(14, 4)]
+    #[case::first_loop_condition(22, 3)]
+    #[case::second_loop_body(40, 8)]
+    #[case::second_loop_condition(48, 7)]
+    #[case::sum(56, 10)]
+    #[case::pc_at_end(59, 11)]
+    fn test_get_lineno_3_4_10(#[case] pc_words: usize, #[case] expected: usize) {
+        use bindings::ruby_3_4_10::rb_control_frame_t;
+        let entries = WORK_LINE_TABLE.map(|(position, line)| (position as usize, line));
+        let (iseq, memory) = fake_iseq_3_4_10(59, &entries);
+        let mut cfp: rb_control_frame_t = unsafe { std::mem::zeroed() };
+        cfp.pc = (iseq.iseq_encoded as usize + pc_words * std::mem::size_of::<usize>()) as *const _;
+
+        let lineno = ruby_version::ruby_3_4_10::get_lineno(&iseq, &cfp, &memory).unwrap();
+        assert_eq!(lineno, expected);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[rstest]
+    #[case::pc_before_iseq(-8)]
+    #[case::pc_misaligned(5)]
+    #[case::pc_past_end(60 * 8)]
+    fn test_get_lineno_with_bad_pc_3_4_10(#[case] pc_offset: isize) {
+        use bindings::ruby_3_4_10::rb_control_frame_t;
+        let (iseq, memory) = fake_iseq_3_4_10(59, &[(0, 2), (58, 11)]);
+        let mut cfp: rb_control_frame_t = unsafe { std::mem::zeroed() };
+        cfp.pc = (iseq.iseq_encoded as isize + pc_offset) as *const _;
+
+        assert!(ruby_version::ruby_3_4_10::get_lineno(&iseq, &cfp, &memory).is_err());
     }
 
     #[cfg(target_pointer_width = "64")]
