@@ -214,12 +214,9 @@ fn do_main() -> Result<(), Error> {
             interrupted.store(true, Ordering::Relaxed);
             summary_thread.join().expect("couldn't join summary thread");
             eprintln!(
-                "{}",
-                format!(
-                    "Wrote raw data to {}\nWrote formatted output to {}",
-                    raw_path.display(),
-                    out_path.display()
-                )
+                "Wrote raw data to {}\nWrote formatted output to {}",
+                raw_path.display(),
+                out_path.display()
             );
 
             recording_result
@@ -448,10 +445,9 @@ impl Args {
                     .get_one::<Pid>("pid")
                     .expect("this shouldn't happen because clap requires a pid"),
                 lock_process: !*submatches.get_one::<bool>("nonblocking").unwrap(),
-                force_version: match submatches.get_one::<String>("force-version") {
-                    Some(version) => Some(version.to_string()),
-                    None => None,
-                },
+                force_version: submatches
+                    .get_one::<String>("force-version")
+                    .map(|version| version.to_string()),
                 on_cpu_only: *submatches.get_one::<bool>("on-cpu").unwrap(),
             },
             Some(("record", submatches)) => {
@@ -468,12 +464,8 @@ impl Args {
                     submatches.get_one::<String>("file").map(|x| x.as_str()),
                     &format.extension(),
                 )?;
-                let maybe_duration = match ArgMatches::get_one::<u64>(submatches, "duration") {
-                    Some(integer_duration) => {
-                        Some(std::time::Duration::from_secs(*integer_duration))
-                    }
-                    None => None,
-                };
+                let maybe_duration = ArgMatches::get_one::<u64>(submatches, "duration")
+                    .map(|integer_duration| std::time::Duration::from_secs(*integer_duration));
 
                 let no_drop_root = *submatches.get_one::<bool>("no-drop-root").unwrap();
                 let silent = *submatches.get_one::<bool>("silent").unwrap();
@@ -512,7 +504,7 @@ impl Args {
                     flame_min_width,
                     lock_process: !nonblocking,
                     force_version,
-                    on_cpu_only: on_cpu_only,
+                    on_cpu_only,
                 }
             }
             Some(("report", submatches)) => {
@@ -575,9 +567,7 @@ fn output_filename(maybe_filename: Option<&str>, extension: &str) -> Result<Path
                     ))
                 }
             };
-            DirBuilder::new()
-                .recursive(true)
-                .create(&dirs.cache_dir())?;
+            DirBuilder::new().recursive(true).create(dirs.cache_dir())?;
             Ok(dirs.cache_dir().join(&filename))
         }
     }
@@ -592,12 +582,11 @@ fn spawn_subprocess(
 
     #[cfg(unix)]
     {
-        let uid_str = std::env::var("SUDO_UID");
-        if nix::unistd::Uid::effective().is_root() && !no_drop_root && uid_str.is_ok() {
-            let uid: u32 = uid_str
-                .unwrap()
-                .parse::<u32>()
-                .context("Failed to parse UID")?;
+        let sudo_uid = std::env::var("SUDO_UID")
+            .ok()
+            .filter(|_| nix::unistd::Uid::effective().is_root() && !no_drop_root);
+        if let Some(uid_str) = sudo_uid {
+            let uid: u32 = uid_str.parse::<u32>().context("Failed to parse UID")?;
             eprintln!(
                 "Dropping permissions: running Ruby command as user {}",
                 std::env::var("SUDO_USER").context("SUDO_USER")?

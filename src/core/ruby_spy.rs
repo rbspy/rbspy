@@ -90,17 +90,15 @@ impl RubySpy {
         }
         match self.get_trace_from_current_thread(lock_process) {
             Ok(Some(mut trace)) => {
-                return {
-                    trace.pid = Some(self.process.pid);
-                    Ok(Some(trace))
-                };
+                trace.pid = Some(self.process.pid);
+                Ok(Some(trace))
             }
             Ok(None) => Ok(None),
             Err(e) => {
                 if self.process.exe().is_err() {
                     return Err(MemoryCopyError::ProcessEnded.into());
                 }
-                return Err(e.into());
+                Err(e)
             }
         }
     }
@@ -114,7 +112,7 @@ impl RubySpy {
                 .context("locking process during stack trace retrieval")?;
         }
 
-        (&self.vm.ruby_version.get_stack_trace_fn)(
+        (self.vm.ruby_version.get_stack_trace_fn)(
             self.vm.current_thread_addr_location,
             self.vm.ruby_vm_addr_location,
             self.vm.global_symbols_addr_location,
@@ -205,25 +203,19 @@ mod tests {
 
     #[test]
     fn test_initialize_with_nonexistent_process() {
-        match RubySpy::new(65535, None, false) {
-            Ok(_) => assert!(
-                false,
-                "Expected error because process probably doesn't exist"
-            ),
-            _ => {}
-        }
+        assert!(
+            RubySpy::new(65535, None, false).is_err(),
+            "Expected error because process probably doesn't exist"
+        );
     }
 
     #[test]
     #[cfg(target_os = "linux")]
     fn test_initialize_with_disallowed_process() {
-        match RubySpy::new(1, None, false) {
-            Ok(_) => assert!(
-                false,
-                "Expected error because we shouldn't be allowed to profile the init process"
-            ),
-            _ => {}
-        }
+        assert!(
+            RubySpy::new(1, None, false).is_err(),
+            "Expected error because we shouldn't be allowed to profile the init process"
+        );
     }
 
     #[test]
@@ -233,15 +225,13 @@ mod tests {
         let mut process = Command::new("/usr/bin/ruby").spawn().unwrap();
         let pid = process.id() as Pid;
 
-        match RubySpy::new(pid, None, false) {
-            Ok(_) => assert!(
-                false,
-                "Expected error because we shouldn't be allowed to profile system processes"
-            ),
-            _ => {}
-        }
+        assert!(
+            RubySpy::new(pid, None, false).is_err(),
+            "Expected error because we shouldn't be allowed to profile system processes"
+        );
 
         process.kill().expect("couldn't clean up test process");
+        process.wait().expect("couldn't reap test process");
     }
 
     #[test]
@@ -275,7 +265,7 @@ mod tests {
 
         let cmd = RubyScript::new_with_args(
             "./ci/ruby-programs/infinite_off_cpu.rb",
-            &[coordination_file_path.clone()],
+            std::slice::from_ref(&coordination_file_path),
         );
         let pid = cmd.id() as Pid;
 
@@ -308,16 +298,11 @@ mod tests {
 
         let mut i = 0;
         loop {
-            match getter.get_stack_trace(false) {
-                Err(e) => {
-                    if let Some(crate::core::types::MemoryCopyError::ProcessEnded) =
-                        e.downcast_ref()
-                    {
-                        // This is the expected error
-                        return;
-                    }
+            if let Err(e) = getter.get_stack_trace(false) {
+                if let Some(crate::core::types::MemoryCopyError::ProcessEnded) = e.downcast_ref() {
+                    // This is the expected error
+                    return;
                 }
-                _ => {}
             };
             std::thread::sleep(std::time::Duration::from_millis(100));
             i += 1;

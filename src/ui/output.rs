@@ -94,7 +94,7 @@ pub struct Speedscope(pub speedscope::Stats);
 
 impl Outputter for Speedscope {
     fn record(&mut self, stack: &StackTrace) -> Result<()> {
-        self.0.record(&stack)
+        self.0.record(stack)
     }
 
     fn complete(&mut self, write: &mut dyn Write) -> Result<()> {

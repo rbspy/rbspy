@@ -27,12 +27,11 @@ fn main() {
     };
     let recorder = Recorder::new(config);
     match recorder.record() {
-        Ok(_) => println!(
-            "A flamegraph was saved to {}",
-            out_path.display().to_string()
-        ),
+        Ok(_) => println!("A flamegraph was saved to {}", out_path.display()),
         Err(e) => println!("Failed to record: {:?}", e),
     }
 
     process.kill().expect("couldn't clean up ruby process");
+
+    process.wait().expect("couldn't reap ruby process");
 }

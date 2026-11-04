@@ -146,14 +146,14 @@ impl Stats {
         let mut labels: Vec<Label> = Vec::new();
         if let Some(pid) = stack.pid {
             labels.push(Label {
-                key: self.string_id(&"pid".to_string()),
+                key: self.string_id("pid"),
                 num: pid as i64,
                 ..Label::default()
             });
         }
         if let Some(thread_id) = stack.thread_id {
             labels.push(Label {
-                key: self.string_id(&"thread_id".to_string()),
+                key: self.string_id("thread_id"),
                 num: thread_id as i64,
                 ..Label::default()
             });

@@ -64,15 +64,14 @@ impl Sampler {
         result_sender: Sender<Result<(), Error>>,
     ) -> Result<(), Error> {
         let done = self.done.clone();
-        let root_pid = self.root_pid.clone();
-        let sample_rate = self.sample_rate.clone();
-        let maybe_stop_time = match self.time_limit {
-            Some(duration) => Some(std::time::Instant::now() + duration),
-            None => None,
-        };
-        let lock_process = self.lock_process.clone();
+        let root_pid = self.root_pid;
+        let sample_rate = self.sample_rate;
+        let maybe_stop_time = self
+            .time_limit
+            .map(|duration| std::time::Instant::now() + duration);
+        let lock_process = self.lock_process;
         let force_version = self.force_version.clone();
-        let on_cpu_only = self.on_cpu_only.clone();
+        let on_cpu_only = self.on_cpu_only;
         let result_sender = result_sender.clone();
         let timing_error_traces = self.timing_error_traces.clone();
         let total_traces = self.total_traces.clone();
@@ -110,7 +109,6 @@ impl Sampler {
                         let total_traces = total_traces.clone();
                         let trace_sender_clone = trace_sender.clone();
                         let force_version = force_version.clone();
-                        let on_cpu_only = on_cpu_only.clone();
                         std::thread::spawn(move || {
                             let result = sample(
                                 pid,
@@ -159,7 +157,7 @@ impl Sampler {
             });
         }
 
-        return Ok(());
+        Ok(())
     }
 
     pub fn stop(&self) {
@@ -168,6 +166,7 @@ impl Sampler {
 }
 
 /// Samples stack traces and sends them to a channel in another thread where they can be aggregated
+#[allow(clippy::too_many_arguments)]
 fn sample(
     pid: Pid,
     sample_rate: u32,

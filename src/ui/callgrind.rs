@@ -312,7 +312,7 @@ mod tests {
             .locations
             .0
             .get(&f)
-            .expect(format!("No location for {}", f).as_ref());
+            .unwrap_or_else(|| panic!("No location for {}", f));
         assert_eq!(loc.exclusive, exclusive, "Bad exclusive time for {}", f,);
         assert_eq!(loc.calls.len(), children, "Bad children count for {}", f,);
     }
@@ -329,11 +329,11 @@ mod tests {
             .locations
             .0
             .get(&parent)
-            .expect(format!("No location for {}", parent).as_ref());
+            .unwrap_or_else(|| panic!("No location for {}", parent));
         let call = ploc
             .calls
             .get(&child)
-            .expect(format!("No call of {} in {}", child, parent).as_ref());
+            .unwrap_or_else(|| panic!("No call of {} in {}", child, parent));
         assert_eq!(
             call.count, count,
             "Bad inclusive count for {} in {}",
@@ -350,12 +350,12 @@ mod tests {
     fn build_test_stats() -> Stats {
         let mut stats = Stats::new();
 
-        stats.add(&vec![f(1)]);
-        stats.add(&vec![f(3), f(2), f(1)]);
-        stats.add(&vec![f(2), f(1)]);
-        stats.add(&vec![f(3), f(1)]);
-        stats.add(&vec![f(2), f(1)]);
-        stats.add(&vec![f(3), fdup(), f(1)]);
+        stats.add(&[f(1)]);
+        stats.add(&[f(3), f(2), f(1)]);
+        stats.add(&[f(2), f(1)]);
+        stats.add(&[f(3), f(1)]);
+        stats.add(&[f(2), f(1)]);
+        stats.add(&[f(3), fdup(), f(1)]);
         stats.finish();
 
         stats

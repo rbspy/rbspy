@@ -15,6 +15,12 @@ pub struct Stats {
     total_traces: u32,
 }
 
+impl Default for Stats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Stats {
     const HEADER: &'static str = "% self  % total  name";
 
@@ -79,7 +85,7 @@ impl Stats {
         self.inc_self(Stats::name_lineno(&stack[0]));
         let mut set: HashSet<&StackFrame> = HashSet::new();
         for frame in stack {
-            set.insert(&frame);
+            set.insert(frame);
         }
         for frame in set {
             self.inc_tot(Stats::name_lineno(frame));
@@ -109,8 +115,8 @@ impl Stats {
         top: Option<usize>,
         truncate: Option<usize>,
     ) -> Result<()> {
-        let top = top.unwrap_or(::std::u16::MAX as usize);
-        let truncate = truncate.unwrap_or(::std::u16::MAX as usize);
+        let top = top.unwrap_or(u16::MAX as usize);
+        let truncate = truncate.unwrap_or(u16::MAX as usize);
         let mut sorted: Vec<(u64, u64, &str)> = self
             .counts
             .iter()
@@ -151,11 +157,11 @@ mod tests {
     fn stats_by_function() {
         let mut stats = Stats::new();
 
-        stats.add_function_name(&vec![f(1)]);
-        stats.add_function_name(&vec![f(3), f(2), f(1)]);
-        stats.add_function_name(&vec![f(2), f(1)]);
-        stats.add_function_name(&vec![f(3), f(1)]);
-        stats.add_function_name(&vec![f(2), f(3), f(1)]);
+        stats.add_function_name(&[f(1)]);
+        stats.add_function_name(&[f(3), f(2), f(1)]);
+        stats.add_function_name(&[f(2), f(1)]);
+        stats.add_function_name(&[f(3), f(1)]);
+        stats.add_function_name(&[f(2), f(3), f(1)]);
 
         let expected = "% self  % total  name
  40.00    60.00  func3 - file3.rb:3
@@ -173,11 +179,11 @@ mod tests {
     fn stats_by_line_number() {
         let mut stats = Stats::new();
 
-        stats.add_lineno(&vec![f(1)]);
-        stats.add_lineno(&vec![f(3), f(2), f(1)]);
-        stats.add_lineno(&vec![f(2), f(1)]);
-        stats.add_lineno(&vec![f(3), f(1)]);
-        stats.add_lineno(&vec![f(2), f(3), f(1)]);
+        stats.add_lineno(&[f(1)]);
+        stats.add_lineno(&[f(3), f(2), f(1)]);
+        stats.add_lineno(&[f(2), f(1)]);
+        stats.add_lineno(&[f(3), f(1)]);
+        stats.add_lineno(&[f(2), f(3), f(1)]);
 
         let expected = "% self  % total  name
  40.00    60.00  func3 - file3.rb:3

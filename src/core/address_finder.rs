@@ -69,11 +69,9 @@ pub fn inspect_ruby_process(
     };
     let current_thread_address =
         get_current_thread_address(process_info, process, &ruby_version, ruby_vm_address)?;
-    let global_symbols_address = match process_info.get_symbol(&ruby_globals_symbol(&version)) {
-        Some(addr) => Some(*addr as usize),
-        // The global symbols address lookup is allowed to fail (e.g. on older rubies)
-        None => None,
-    };
+    let global_symbols_address = process_info
+        .get_symbol(&ruby_globals_symbol(&version))
+        .map(|addr| *addr as usize);
 
     let addresses_status = format!(
         "version: {:x?}\n\
@@ -84,12 +82,12 @@ pub fn inspect_ruby_process(
     );
 
     info!("Ruby VM addresses: {}", addresses_status);
-    return Ok(RubyVM {
+    Ok(RubyVM {
         ruby_version,
         current_thread_addr_location: current_thread_address,
         ruby_vm_addr_location: ruby_vm_address,
         global_symbols_addr_location: global_symbols_address,
-    });
+    })
 }
 
 fn get_current_thread_address(
@@ -146,15 +144,12 @@ fn get_current_thread_address(
     // Before giving up, try again if there is a shared library
     if let Some(ref library) = process_info.library {
         info!("Failed to get current thread from binary BSS, so scanning libruby BSS");
-        match get_thread_address_from_binary(
+        get_thread_address_from_binary(
             library,
             &process_info.maps,
             process,
             ruby_version.is_maybe_thread_fn,
-        ) {
-            Ok(addr) => return Ok(addr),
-            Err(lib_err) => Err(err).unwrap_or(Err(lib_err)),
-        }
+        )
     } else {
         err.expect("Both ruby and libruby are invalid.")
     }
@@ -211,7 +206,7 @@ fn check_thread_addresses(
                     Err(_) => continue,
                 };
 
-                if is_maybe_thread(thread_addr, addr, &process, maps) {
+                if is_maybe_thread(thread_addr, addr, process, maps) {
                     return Ok(addr);
                 }
             }

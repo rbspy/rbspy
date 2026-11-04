@@ -85,13 +85,11 @@ pub mod tests {
 
     impl Drop for RubyScript {
         fn drop(&mut self) {
-            match self.child.kill() {
-                Err(e) => debug!("Failed to kill process {}: {:?}", self.id(), e),
-                _ => (),
+            if let Err(e) = self.child.kill() {
+                debug!("Failed to kill process {}: {:?}", self.id(), e)
             }
-            match self.child.wait() {
-                Err(e) => debug!("Failed to wait for process {}: {:?}", self.id(), e),
-                _ => (),
+            if let Err(e) = self.child.wait() {
+                debug!("Failed to wait for process {}: {:?}", self.id(), e)
             }
         }
     }

@@ -73,7 +73,7 @@ impl StackFrame {
 impl fmt::Display for StackFrame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let lineno = match self.lineno {
-            Some(lineno) => format!(":{}", lineno.to_string()),
+            Some(lineno) => format!(":{}", lineno),
             None => "".to_string(),
         };
         write!(f, "{} - {}{}", self.name, self.path(), lineno)

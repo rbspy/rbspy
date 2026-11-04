@@ -170,7 +170,7 @@ impl Stats {
                 let frames = &mut self.frames;
                 *self.frame_to_index.entry(frame.clone()).or_insert_with(|| {
                     let len = frames.len();
-                    frames.push(Frame::new(&frame));
+                    frames.push(Frame::new(frame));
                     len
                 })
             })
@@ -179,7 +179,7 @@ impl Stats {
 
         self.samples
             .entry(stack.pid)
-            .or_insert_with(|| vec![])
+            .or_default()
             .push(frame_indices);
 
         if let Some(time) = stack.time {

@@ -607,7 +607,7 @@ macro_rules! get_stack_trace(
                 return Ok(Some(StackTrace {
                     pid: Some(pid),
                     trace: vec!(StackFrame::unknown_c_function()),
-                    thread_id: thread_id,
+                    thread_id,
                     time: Some(SystemTime::now()),
                     on_cpu: None,
                 }));
@@ -1094,7 +1094,7 @@ macro_rules! get_stack_frame_2_5_0(
             cfp: &rb_control_frame_t,
             source: &T,
         ) -> Result<StackFrame> where T: ProcessMemory {
-            if iseq_struct.body == std::ptr::null_mut() {
+            if iseq_struct.body.is_null() {
                 return Err(format_err!("iseq body is null"));
             }
             let body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
@@ -1224,7 +1224,7 @@ macro_rules! get_classpath(
                     let modstr = get_ruby_string(ext.classext.classpath as usize, source)?;
                     // Looking up the global symbol is not needed
                     // we can just compare the string value, albeit less efficient
-                    if modstr == "Module".to_string() {
+                    if modstr == "Module" {
                         0x00 // QFalse
                     } else {
                         rb_tmp_class_path(rbasic.klass, source)?
@@ -1359,7 +1359,7 @@ macro_rules! get_classpath(
         ) -> String {
             let qualified = qualified_method_name(class_path, method_name, singleton);
 
-            if qualified.is_empty() || qualified == base_label.to_string() {
+            if qualified.is_empty() || qualified == base_label {
                 return label.to_string();
             }
 
@@ -1414,7 +1414,7 @@ macro_rules! get_stack_frame_3_3_0(
             } else {
                 *iseq_struct
             };
-            if iseq_struct.body == std::ptr::null_mut() {
+            if iseq_struct.body.is_null() {
                 return Err(format_err!("iseq body is null"));
             }
             let body: rb_iseq_constant_body =
@@ -1427,12 +1427,12 @@ macro_rules! get_stack_frame_3_3_0(
                 .context("couldn't copy RString")?;
 
             let mut method_name = "".to_string();
-            if body.local_iseq != std::ptr::null_mut() {
+            if !body.local_iseq.is_null() {
                 // https://github.com/ruby/ruby/blob/v3_3_0/vm_backtrace.c#L1801 calls
                 // https://github.com/ruby/ruby/blob/v3_3_0/iseq.c#L1234
                 let local_iseq: rb_iseq_t = source.copy_struct(body.local_iseq as usize)
                     .context("couldn't read local iseq")?;
-                if local_iseq.body != std::ptr::null_mut() {
+                if !local_iseq.body.is_null() {
                     let local_body: rb_iseq_constant_body = source.copy_struct(iseq_struct.body as usize)
                         .context("couldn't copy rb_iseq_constant_body")?;
                     method_name = get_ruby_string(local_body.location.base_label as usize, source)?;

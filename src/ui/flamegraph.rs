@@ -48,7 +48,7 @@ impl Stats {
         } else {
             self.get_lines()
                 .iter()
-                .try_for_each(|line| write!(w, "{}\n", line))?;
+                .try_for_each(|line| writeln!(w, "{}", line))?;
         }
         Ok(())
     }
@@ -83,12 +83,12 @@ mod tests {
     // Build test stats
     fn build_stats() -> Result<Stats> {
         let mut stats = Stats::default();
-        stats.record(&vec![f(1)])?;
-        stats.record(&vec![f(2), f(1)])?;
-        stats.record(&vec![f(2), f(1)])?;
-        stats.record(&vec![f(2), f(3), f(1)])?;
-        stats.record(&vec![f(2), f(3), f(1)])?;
-        stats.record(&vec![f(2), f(3), f(1)])?;
+        stats.record(&[f(1)])?;
+        stats.record(&[f(2), f(1)])?;
+        stats.record(&[f(2), f(1)])?;
+        stats.record(&[f(2), f(3), f(1)])?;
+        stats.record(&[f(2), f(3), f(1)])?;
+        stats.record(&[f(2), f(3), f(1)])?;
         Ok(stats)
     }
 

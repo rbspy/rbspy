@@ -18,4 +18,6 @@ fn main() {
     }
 
     process.kill().expect("couldn't clean up ruby process");
+
+    process.wait().expect("couldn't reap ruby process");
 }

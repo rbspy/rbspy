@@ -98,7 +98,7 @@ impl Recorder {
         }
         let mut raw_store = None;
         if let Some(raw_path) = &self.raw_path {
-            raw_store = Some(Store::new(&raw_path, self.sample_rate)?);
+            raw_store = Some(Store::new(raw_path, self.sample_rate)?);
         }
 
         for trace in trace_receiver {
@@ -118,7 +118,7 @@ impl Recorder {
             if out_path.display().to_string() == "-" {
                 out.complete(&mut std::io::stdout())?;
             } else {
-                let mut out_file = File::create(&out_path).context(format!(
+                let mut out_file = File::create(out_path).context(format!(
                     "Failed to create output file {}",
                     &out_path.display()
                 ))?;
@@ -154,10 +154,7 @@ impl Recorder {
 
     /// Writes a summary of collected traces
     pub fn write_summary(&self, w: &mut dyn std::io::Write) -> Result<(), Error> {
-        let width = match terminal_size::terminal_size() {
-            Some((w, _)) => Some(w.0 as usize),
-            None => None,
-        };
+        let width = terminal_size::terminal_size().map(|(w, _)| w.0 as usize);
         let timing_error_traces = self.sampler.timing_error_traces();
         let total_traces = self.sampler.total_traces();
         let percent_timing_error = (timing_error_traces as f64) / (total_traces as f64) * 100.0;
