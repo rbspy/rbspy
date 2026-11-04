@@ -72,7 +72,7 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby_version }}
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
       - name: Run tests
         timeout-minutes: 5
         run: |
