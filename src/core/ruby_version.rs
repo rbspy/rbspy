@@ -2067,8 +2067,7 @@ ruby_version_v4_0_x!(ruby_4_0_7);
 ruby_version_v4_0_x!(ruby_4_0_8);
 ruby_version_v4_0_x!(ruby_4_0_9);
 
-#[cfg(not(debug_assertions))]
-#[cfg(test)]
+#[cfg(all(test, not(debug_assertions), target_pointer_width = "64"))]
 mod tests {
     use rbspy_testdata::*;
     use rstest::rstest;
@@ -2557,7 +2556,6 @@ mod tests {
     // These tests on core dumps don't work on 32bit platforms (error is
     // "Not enough memory resources are available to complete this operation.")
     // disable.
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_1_9_3() {
         let current_thread_addr = 0x823930;
@@ -2574,7 +2572,6 @@ mod tests {
         assert_eq!(real_stack_trace_1_9_3(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_2_1_6() {
         let current_thread_addr = 0x562658abd7f0;
@@ -2591,7 +2588,6 @@ mod tests {
         assert_eq!(real_stack_trace_main(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_2_1_6_2() {
         // this stack is from a ruby program that is just running `select`
@@ -2609,7 +2605,6 @@ mod tests {
         assert_eq!(vec!(StackFrame::unknown_c_function()), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_2_4_0() {
         let current_thread_addr = 0x55df44959920;
@@ -2626,7 +2621,6 @@ mod tests {
         assert_eq!(real_stack_trace(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_2_5_0() {
         let current_thread_addr = 0x55dd8c3b7758;
@@ -2643,7 +2637,6 @@ mod tests {
         assert_eq!(real_stack_trace(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_2_7_2() {
         let current_thread_addr = 0x7fdd8d626070;
@@ -2661,7 +2654,6 @@ mod tests {
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_2_7_3() {
         let current_thread_addr = 0x7fdd8d626070;
@@ -2679,7 +2671,6 @@ mod tests {
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_2_7_4() {
         let current_thread_addr = 0x7fdd8d626070;
@@ -2697,7 +2688,6 @@ mod tests {
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_2_7_5() {
         let current_thread_addr = 0x7fdd8d626070;
@@ -2715,7 +2705,6 @@ mod tests {
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_2_7_6() {
         let current_thread_addr = 0x7fdd8d626070;
@@ -2733,7 +2722,6 @@ mod tests {
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_2_7_7() {
         let current_thread_addr = 0x7fdd8d626070;
@@ -2751,7 +2739,6 @@ mod tests {
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_2_7_8() {
         let current_thread_addr = 0x7fdd8d626070;
@@ -2769,7 +2756,6 @@ mod tests {
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_0_0() {
         let source = coredump_3_0_0();
@@ -2788,7 +2774,6 @@ mod tests {
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_0_1() {
         let source = coredump_3_0_0();
@@ -2807,7 +2792,6 @@ mod tests {
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_0_2() {
         let source = coredump_3_0_0();
@@ -2826,7 +2810,6 @@ mod tests {
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_0_3() {
         let source = coredump_3_0_0();
@@ -2845,7 +2828,6 @@ mod tests {
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_0_4() {
         let source = coredump_3_0_0();
@@ -2864,7 +2846,6 @@ mod tests {
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_0_5() {
         let source = coredump_3_0_0();
@@ -2883,7 +2864,6 @@ mod tests {
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_0_6() {
         let source = coredump_3_0_0();
@@ -2902,7 +2882,6 @@ mod tests {
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_0_7() {
         let source = coredump_3_0_0();
@@ -2921,7 +2900,6 @@ mod tests {
         assert_eq!(real_stack_trace_2_7_2(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_1_0() {
         let source = coredump_3_1_0();
@@ -2940,7 +2918,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_1_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_1_1() {
         let source = coredump_3_1_0();
@@ -2959,7 +2936,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_1_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_1_2() {
         let source = coredump_3_1_0();
@@ -2978,7 +2954,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_1_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_1_3() {
         let source = coredump_3_1_0();
@@ -2997,7 +2972,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_1_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_1_4() {
         let source = coredump_3_1_0();
@@ -3016,7 +2990,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_1_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_1_5() {
         let source = coredump_3_1_0();
@@ -3035,7 +3008,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_1_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_1_6() {
         let source = coredump_3_1_0();
@@ -3054,7 +3026,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_1_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_1_7() {
         let source = coredump_3_1_0();
@@ -3073,7 +3044,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_1_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_2_0() {
         let source = coredump_3_2_0();
@@ -3092,7 +3062,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_2_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_2_1() {
         let source = coredump_3_2_0();
@@ -3111,7 +3080,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_2_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_2_2() {
         let source = coredump_3_2_0();
@@ -3130,7 +3098,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_2_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_2_3() {
         let source = coredump_3_2_0();
@@ -3149,7 +3116,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_2_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_2_4() {
         let source = coredump_3_2_0();
@@ -3168,7 +3134,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_2_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_2_5() {
         let source = coredump_3_2_0();
@@ -3186,7 +3151,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_2_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_2_6() {
         let source = coredump_3_2_0();
@@ -3204,7 +3168,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_2_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_2_7() {
         let source = coredump_3_2_0();
@@ -3222,7 +3185,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_2_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_2_8() {
         let source = coredump_3_2_0();
@@ -3240,7 +3202,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_2_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_2_9() {
         let source = coredump_3_2_0();
@@ -3258,7 +3219,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_2_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_2_10() {
         let source = coredump_3_2_0();
@@ -3276,7 +3236,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_2_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_2_11() {
         let source = coredump_3_2_0();
@@ -3294,7 +3253,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_2_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_3_0() {
         let source = coredump_3_3_0();
@@ -3313,7 +3271,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_with_classes_3_3_0() {
         let source = coredump_with_classes_3_3_0();
@@ -3374,7 +3331,6 @@ mod tests {
         }
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[rstest]
     #[case::without_vm_clock(0)] // Non-Windows platforms
     #[case::with_vm_clock(std::mem::size_of::<usize>())] // Windows
@@ -3465,7 +3421,6 @@ mod tests {
         )
     );
 
-    #[cfg(target_pointer_width = "64")]
     #[rstest]
     #[case::first_loop_body(14, 4)]
     #[case::first_loop_condition(22, 3)]
@@ -3492,7 +3447,6 @@ mod tests {
         assert_eq!(lineno, expected);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[rstest]
     #[case::first_loop_body(14, 4)]
     #[case::first_loop_condition(22, 3)]
@@ -3519,7 +3473,6 @@ mod tests {
         assert_eq!(lineno, expected);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_lineno_with_pc_before_first_entry_2_5_0() {
         use bindings::ruby_2_5_0::{
@@ -3621,7 +3574,6 @@ mod tests {
         bytes
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[rstest]
     #[case::immediate_only(40, vec![0, 3, 9, 16, 26, 29, 35])]
     #[case::boundary(60, vec![0, 8, 9, 53, 54, 55, 59])]
@@ -3639,7 +3591,6 @@ mod tests {
         }
     }
 
-    #[cfg(target_pointer_width = "64")]
     fn fake_iseq_3_4_10(
         iseq_size: usize,
         entries: &[(usize, u32)],
@@ -3669,7 +3620,6 @@ mod tests {
         (iseq, memory)
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[rstest]
     #[case::pc_at_start(0, 2)]
     #[case::first_loop_body(14, 4)]
@@ -3689,7 +3639,6 @@ mod tests {
         assert_eq!(lineno, expected);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[rstest]
     #[case::pc_before_iseq(-8)]
     #[case::pc_misaligned(5)]
@@ -3703,7 +3652,6 @@ mod tests {
         assert!(ruby_version::ruby_3_4_10::get_lineno(&iseq, &cfp, &memory).is_err());
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_rb_class_real_with_cyclic_super_chain_3_3_0() {
         use bindings::ruby_3_3_0::RClass;
@@ -3724,7 +3672,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_rb_class_real_with_cyclic_super_chain_4_0_7() {
         use bindings::ruby_4_0_7::{rb_classext_struct, RClass_and_rb_classext_t};
@@ -3748,7 +3695,6 @@ mod tests {
     }
 
     /// Writes an imemo of `imemo_type` at `addr` whose first field after the flags is `field`
-    #[cfg(target_pointer_width = "64")]
     fn write_imemo(memory: &mut FakeMemory, addr: usize, imemo_type: u32, field: usize) {
         use bindings::ruby_4_0_7::ruby_fl_ushift_RUBY_FL_USHIFT;
         let word = std::mem::size_of::<usize>();
@@ -3756,7 +3702,6 @@ mod tests {
         memory.write_word(addr + word, field);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[rstest]
     #[case::method_entry(true)]
     // A method that has used $~ or $_ keeps an svar, wrapping its method entry, in the slot
@@ -3782,7 +3727,6 @@ mod tests {
         assert_eq!(found, cme);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_locate_method_entry_in_block_env() {
         use bindings::ruby_4_0_7::imemo_type_imemo_ment;
@@ -3808,7 +3752,6 @@ mod tests {
         assert_eq!(found, 0);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_3_1() {
         let source = coredump_3_3_0();
@@ -3827,7 +3770,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_3_2() {
         let source = coredump_3_3_0();
@@ -3846,7 +3788,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_3_3() {
         let source = coredump_3_3_0();
@@ -3864,7 +3805,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_3_4() {
         let source = coredump_3_3_0();
@@ -3882,7 +3822,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_3_5() {
         let source = coredump_3_3_0();
@@ -3900,7 +3839,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_3_6() {
         let source = coredump_3_3_0();
@@ -3918,7 +3856,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_3_7() {
         let source = coredump_3_3_0();
@@ -3936,7 +3873,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_3_8() {
         let source = coredump_3_3_0();
@@ -3954,7 +3890,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_3_9() {
         let source = coredump_3_3_0();
@@ -3972,7 +3907,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_3_10() {
         let source = coredump_3_3_0();
@@ -3990,7 +3924,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_3_11() {
         let source = coredump_3_3_0();
@@ -4008,7 +3941,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_3_12() {
         let source = coredump_3_3_0();
@@ -4026,7 +3958,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_3_13() {
         let source = coredump_3_3_0();
@@ -4044,7 +3975,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_4_0() {
         let source = coredump_3_3_0();
@@ -4062,7 +3992,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_4_1() {
         let source = coredump_3_3_0();
@@ -4080,7 +4009,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_4_2() {
         let source = coredump_3_3_0();
@@ -4098,7 +4026,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_4_3() {
         let source = coredump_3_3_0();
@@ -4116,7 +4043,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_4_4() {
         let source = coredump_3_3_0();
@@ -4134,7 +4060,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_4_5() {
         let source = coredump_3_3_0();
@@ -4152,7 +4077,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_complex_3_4_5() {
         let source = coredump_complex_3_4_5();
@@ -4173,7 +4097,6 @@ mod tests {
         );
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_4_6() {
         let source = coredump_3_3_0();
@@ -4191,7 +4114,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_4_7() {
         let source = coredump_3_3_0();
@@ -4209,7 +4131,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_4_8() {
         let source = coredump_3_3_0();
@@ -4227,7 +4148,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_4_9() {
         let source = coredump_3_3_0();
@@ -4245,7 +4165,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_4_10() {
         let source = coredump_3_3_0();
@@ -4263,7 +4182,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_4_11() {
         let source = coredump_3_3_0();
@@ -4281,7 +4199,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_3_4_12() {
         let source = coredump_3_3_0();
@@ -4299,7 +4216,6 @@ mod tests {
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_4_0_0() {
         let source = coredump_4_0_0();
@@ -4318,7 +4234,6 @@ mod tests {
         assert_eq!(real_stack_trace_4_0_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_4_0_1() {
         let source = coredump_4_0_0();
@@ -4337,7 +4252,6 @@ mod tests {
         assert_eq!(real_stack_trace_4_0_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_4_0_2() {
         let source = coredump_4_0_0();
@@ -4356,7 +4270,6 @@ mod tests {
         assert_eq!(real_stack_trace_4_0_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_4_0_3() {
         let source = coredump_4_0_0();
@@ -4375,7 +4288,6 @@ mod tests {
         assert_eq!(real_stack_trace_4_0_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_4_0_4() {
         let source = coredump_4_0_0();
@@ -4412,7 +4324,6 @@ mod tests {
         assert_eq!(real_stack_trace_4_0_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_4_0_6() {
         let source = coredump_4_0_0();
@@ -4431,7 +4342,6 @@ mod tests {
         assert_eq!(real_stack_trace_4_0_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_4_0_7() {
         let source = coredump_4_0_0();
@@ -4450,7 +4360,6 @@ mod tests {
         assert_eq!(real_stack_trace_4_0_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_4_0_8() {
         let source = coredump_4_0_0();
@@ -4469,7 +4378,6 @@ mod tests {
         assert_eq!(real_stack_trace_4_0_0(), stack_trace.trace);
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_get_ruby_stack_trace_4_0_9() {
         let source = coredump_4_0_0();
