@@ -2373,6 +2373,257 @@ mod tests {
         ]
     }
 
+    fn real_complex_trace_with_classes_3_3_0() -> Vec<StackFrame> {
+        vec![
+            StackFrame {
+                name: "Kernel#sleep [c function]".to_string(),
+                relative_path: "(unknown)".to_string(),
+                absolute_path: None,
+                lineno: None,
+            },
+            StackFrame {
+                name: "block in hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(40),
+            },
+            StackFrame {
+                name: "Kernel#loop".to_string(),
+                relative_path: "<internal:kernel>".to_string(),
+                absolute_path: Some("unknown".to_string()),
+                lineno: Some(187),
+            },
+            StackFrame {
+                name: "ClassA#hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(39),
+            },
+            StackFrame {
+                name: "ModuleB::ClassB#hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(48),
+            },
+            StackFrame {
+                name: "ModuleC.hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(55),
+            },
+            StackFrame {
+                name: "ClassWithStaticMethod.hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(61),
+            },
+            StackFrame {
+                name: "ModuleD#hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(67),
+            },
+            StackFrame {
+                name: "#<ClassD:0x7fab8a26c770>.hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(84),
+            },
+            StackFrame {
+                name: "ClassE#hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(89),
+            },
+            StackFrame {
+                name: "UnboundMethod#bind_call [c function]".to_string(),
+                relative_path: "(unknown)".to_string(),
+                absolute_path: None,
+                lineno: None,
+            },
+            StackFrame {
+                name: "#<Refinement:0x7fab8a26bff0>#hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(104),
+            },
+            StackFrame {
+                name: "ModuleE.hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(117),
+            },
+            StackFrame {
+                name: "ClassH#method_missing".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(125),
+            },
+            StackFrame {
+                name: "block in hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(132),
+            },
+            StackFrame {
+                name: "Integer#times".to_string(),
+                relative_path: "<internal:numeric>".to_string(),
+                absolute_path: Some("unknown".to_string()),
+                lineno: Some(237),
+            },
+            StackFrame {
+                name: "ClassF#hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(131),
+            },
+            StackFrame {
+                name: "#<Class:0x7fab8a26b190>.hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(146),
+            },
+            StackFrame {
+                name: "#<Class:0x7fab8a26afb0>#hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(151),
+            },
+            StackFrame {
+                name: "#<Module:0x7fab8a26ad30>.hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(157),
+            },
+            StackFrame {
+                name: "Object#method_with_complex_parameters".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(162),
+            },
+            StackFrame {
+                name: "block (2 levels) in hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(173),
+            },
+            StackFrame {
+                name: "ClassJ#hello_helper".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(167),
+            },
+            StackFrame {
+                name: "block in hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(172),
+            },
+            StackFrame {
+                name: "ClassJ#hello_helper".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(167),
+            },
+            StackFrame {
+                name: "ClassJ#hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(171),
+            },
+            StackFrame {
+                name: "hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("unknown".to_string()),
+                lineno: Some(181),
+            },
+            StackFrame {
+                name: "Kernel#eval [c function]".to_string(),
+                relative_path: "(unknown)".to_string(),
+                absolute_path: None,
+                lineno: None,
+            },
+            StackFrame {
+                name: "ClassK#hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(181),
+            },
+            StackFrame {
+                name: "hello".to_string(),
+                relative_path: "(eval at /home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb:187)".to_string(),
+                absolute_path: Some("unknown".to_string()),
+                lineno: Some(1),
+            },
+            StackFrame {
+                name: "BasicObject#instance_eval [c function]".to_string(),
+                relative_path: "(unknown)".to_string(),
+                absolute_path: None,
+                lineno: None,
+            },
+            StackFrame {
+                name: "ClassL#hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(187),
+            },
+            StackFrame {
+                name: "hello".to_string(),
+                relative_path: "(eval at /home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb:193)".to_string(),
+                absolute_path: Some("unknown".to_string()),
+                lineno: Some(1),
+            },
+            StackFrame {
+                name: "Kernel#eval [c function]".to_string(),
+                relative_path: "(unknown)".to_string(),
+                absolute_path: None,
+                lineno: None,
+            },
+            StackFrame {
+                name: "ClassM#hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(193),
+            },
+            StackFrame {
+                name: "Integer#times".to_string(),
+                relative_path: "<internal:numeric>".to_string(),
+                absolute_path: Some("unknown".to_string()),
+                lineno: Some(237),
+            },
+            StackFrame {
+                name: "Object#top_level_hello".to_string(),
+                relative_path: "/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/interesting_backtrace_helper.rb".to_string()),
+                lineno: Some(206),
+            },
+            StackFrame {
+                name: "InstanceMethod#work".to_string(),
+                relative_path: "ci/ruby-programs/cme_complex_labels.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/cme_complex_labels.rb".to_string()),
+                lineno: Some(5),
+            },
+            StackFrame {
+                name: "ModuleMethod#call_instance".to_string(),
+                relative_path: "ci/ruby-programs/cme_complex_labels.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/cme_complex_labels.rb".to_string()),
+                lineno: Some(11),
+            },
+            StackFrame {
+                name: "Object#work_main".to_string(),
+                relative_path: "ci/ruby-programs/cme_complex_labels.rb".to_string(),
+                absolute_path: Some("/home/runner/work/rbspy/rbspy/ci/ruby-programs/cme_complex_labels.rb".to_string()),
+                lineno: Some(21),
+            },
+            StackFrame {
+                name: "Kernel#loop".to_string(),
+                relative_path: "<internal:kernel>".to_string(),
+                absolute_path: Some("unknown".to_string()),
+                lineno: Some(187),
+            },
+        ]
+    }
+
     fn real_complex_trace_with_classes_3_4_5() -> Vec<StackFrame> {
         vec![
             StackFrame { name: "Kernel#sleep [c function]".to_string(), relative_path: "(unknown)".to_string(), absolute_path: None, lineno: None },
@@ -4075,6 +4326,26 @@ mod tests {
         )
         .unwrap();
         assert_eq!(real_stack_trace_3_3_0(), stack_trace.unwrap().trace);
+    }
+
+    #[test]
+    fn test_get_ruby_stack_trace_complex_3_3_0() {
+        let source = coredump_complex_3_3_0();
+        let vm_addr = 0x7faba69f4988;
+        let global_symbols_addr = Some(0x7faba69e3c60);
+        let stack_trace = ruby_version::ruby_3_3_0::get_stack_trace::<CoreDump>(
+            0,
+            vm_addr,
+            global_symbols_addr,
+            &source,
+            0,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            real_complex_trace_with_classes_3_3_0(),
+            stack_trace.unwrap().trace
+        );
     }
 
     #[test]
