@@ -1202,7 +1202,7 @@ macro_rules! rb_class_real_3_0_0(
             source: &T,
         ) -> Result<usize> where T: ProcessMemory {
             const RUBY_T_ICLASS: usize = 0x1c;
-            const RUBY_FL_SINGLETON: usize = ruby_fl_type_RUBY_FL_USER1 as usize;
+            const RUBY_FL_SINGLETON: usize = ruby_fl_type_RUBY_FL_SINGLETON as usize;
             // Stops the walk from looping forever on a cycle read while the VM is changing memory.
             const MAX_CLASS_CHAIN: usize = 4096;
 
@@ -1236,7 +1236,7 @@ macro_rules! rb_class_real_4_0_0(
             source: &T,
         ) -> Result<usize> where T: ProcessMemory {
             const RUBY_T_ICLASS: usize = 0x1c;
-            const RUBY_FL_SINGLETON: usize = ruby_fl_type_RUBY_FL_USER1 as usize;
+            const RUBY_FL_SINGLETON: usize = ruby_fl_type_RUBY_FL_SINGLETON as usize;
             // Stops the walk from looping forever on a cycle read while the VM is changing memory.
             const MAX_CLASS_CHAIN: usize = 4096;
 
@@ -1345,7 +1345,7 @@ macro_rules! get_classpath(
             // https://github.com/ruby/ruby/blob/c149708018135595b2c19c5f74baf9475674f394/include/ruby/internal/value_type.h#L142¬
             const RUBY_T_MASK: usize = 0x1f;
 
-            const RUBY_FL_SINGLETON: usize = ruby_fl_type_RUBY_FL_USER1 as usize;
+            const RUBY_FL_SINGLETON: usize = ruby_fl_type_RUBY_FL_SINGLETON as usize;
 
             // https://github.com/ruby/ruby/blob/7089a4e2d83a3cb1bc394c4ce3638cbc777f4cb9/include/ruby/internal/special_consts.h#L102
             const RUBY_IMMEDIATE_MASK: usize = 0x07;
