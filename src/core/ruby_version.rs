@@ -4082,7 +4082,7 @@ mod tests {
         let source = coredump_complex_3_4_5();
         let vm_addr = 0x7f271feb5390;
         let global_symbols_addr = Some(0x7f271fea3dc0);
-        let stack_trace = ruby_version::ruby_3_3_0::get_stack_trace::<CoreDump>(
+        let stack_trace = ruby_version::ruby_3_4_5::get_stack_trace::<CoreDump>(
             0,
             vm_addr,
             global_symbols_addr,
