@@ -6,6 +6,10 @@ on:
       ruby-version:
         description: 'Ruby version'
         required: true
+      script:
+        description: 'Ruby program to run (relative to repo root)'
+        required: false
+        default: 'ci/ruby-programs/infinite_on_cpu.rb'
 
 permissions:
   contents: read
@@ -39,8 +43,10 @@ jobs:
       
       - name: Run Ruby script
         id: ruby-script
+        env:
+          SCRIPT: ${{ inputs.script }}
         run: |
-          ruby ci/ruby-programs/infinite_on_cpu.rb &
+          ruby "$SCRIPT" &
           pid=$!
           echo "pid=$pid" >> $GITHUB_OUTPUT
 
