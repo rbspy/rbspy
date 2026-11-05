@@ -1187,7 +1187,6 @@ macro_rules! get_classpath_unsupported(
     () => (
         fn get_classpath<T>(
             _cme: usize,
-            _cfunc: bool,
             _source: &T,
         ) -> Result<(String, bool)> where T: ProcessMemory {
             return Err(format_err!("classpath resolution is not supported for this version of Ruby").into());
@@ -1333,7 +1332,6 @@ macro_rules! get_classpath(
         // Tries to copy https://github.com/ruby/ruby/blob/v3_3_0/vm_backtrace.c#L1772
         fn get_classpath<T>(
             cme: usize,
-            cfunc: bool,
             source: &T,
         ) -> Result<(String, bool)> where T: ProcessMemory {
             //https://github.com/ruby/ruby/blob/c149708018135595b2c19c5f74baf9475674f394/include/ruby/internal/value_type.h#L114¬
@@ -1355,12 +1353,9 @@ macro_rules! get_classpath(
             let mut singleton = false;
 
             let imemo: rb_method_entry_struct = source.copy_struct(cme).with_context(|| format!("couldn't copy rb_method_entry_struct at {:#x}", cme))?;
-            // Read the class structure to get flags
-            let mut klass = if cfunc {
-                imemo.owner
-            } else {
-                imemo.defined_class
-            };
+            // Use defined_class for both iseq and C frames, like rb_profile_frame_classpath:
+            // https://github.com/ruby/ruby/blob/v3_4_0/vm_backtrace.c#L1891
+            let mut klass = imemo.defined_class;
             if klass == RUBY_QNIL {
                 return Ok(("".to_string(), false))
             }
@@ -1463,7 +1458,7 @@ macro_rules! get_stack_frame_3_3_0(
                 let method_type = method_type[0] & 0xf;
                 // https://github.com/ruby/ruby/blob/v3_3_0/method.h#L110
                 if method_type == 0 {
-                    (class_path, singleton) = get_classpath(cme, false, source)?;
+                    (class_path, singleton) = get_classpath(cme, source)?;
                     let method_def: rb_method_definition_struct = source.copy_struct(imemo.def as usize).with_context(|| format!("couldn't copy rb_method_definition_struct at {:#x}", imemo.def as usize))?;
                     let iseq: rb_iseq_struct = unsafe {
                         source.copy_struct(method_def.body.iseq.iseqptr as usize).context("")?
@@ -1845,7 +1840,7 @@ macro_rules! get_cfunc_name(
             const IMEMO_MASK: usize = 0x0f;
 
             let cme = locate_method_entry(&cfp.ep, source)?;
-            let (class_path, singleton) = get_classpath(cme, true, source).unwrap_or(("".to_string(), false));
+            let (class_path, singleton) = get_classpath(cme, source).unwrap_or(("".to_string(), false));
 
             let imemo: rb_method_entry_struct = source.copy_struct(cme).with_context(|| format!("couldn't copy rb_method_entry_struct at {:#x}", cme))?;
             if imemo.def.is_null() {
