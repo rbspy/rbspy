@@ -144,6 +144,21 @@ jobs:
           os_triple="$(echo ${{ matrix.target }} | sed 's/unknown-linux-gnu/linux-gnu/')"
           target/${{ matrix.target }}/release/rbspy record env LD_PRELOAD=/usr/lib/$os_triple/libjemalloc.so.2 ruby ci/ruby-programs/short_program.rb
           target/${{ matrix.target }}/release/rbspy record env LD_PRELOAD=/usr/lib/$os_triple/libtcmalloc_minimal.so.4 ruby ci/ruby-programs/short_program.rb
+      - name: Profile puma under load (single mode)
+        if: runner.os != 'windows' && matrix.run-tests == 'true'
+        timeout-minutes: 5
+        env:
+          RBSPY: target/${{ matrix.target }}/release/rbspy
+          USE_SUDO: '1'
+        run: ci/test-puma.sh
+      - name: Profile puma under load (cluster mode)
+        if: runner.os != 'windows' && matrix.run-tests == 'true'
+        timeout-minutes: 5
+        env:
+          RBSPY: target/${{ matrix.target }}/release/rbspy
+          USE_SUDO: '1'
+          WORKERS: '2'
+        run: ci/test-puma.sh
 
   build-linux-cross:
     name: Build
