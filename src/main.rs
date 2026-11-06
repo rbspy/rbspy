@@ -30,7 +30,7 @@ enum SubCmd {
     Record {
         target: Target,
         out_path: PathBuf,
-        raw_path: PathBuf,
+        raw_path: Option<PathBuf>,
         sample_rate: u32,
         maybe_duration: Option<std::time::Duration>,
         format: OutputFormat,
@@ -144,7 +144,7 @@ fn do_main() -> Result<(), Error> {
 
             let config = recorder::RecordConfig {
                 format,
-                raw_path: Some(raw_path.clone()),
+                raw_path: raw_path.clone(),
                 out_path: Some(out_path.clone()),
                 pid,
                 with_subprocesses,
@@ -215,11 +215,12 @@ fn do_main() -> Result<(), Error> {
 
             interrupted.store(true, Ordering::Relaxed);
             summary_thread.join().expect("couldn't join summary thread");
-            eprintln!(
-                "Wrote raw data to {}\nWrote formatted output to {}",
-                raw_path.display(),
-                out_path.display()
-            );
+            if let Some(raw_path) = &raw_path {
+                eprintln!("Wrote raw data to {}", raw_path.display());
+            }
+            if out_path.as_os_str() != "-" {
+                eprintln!("Wrote formatted output to {}", out_path.display());
+            }
 
             recording_result
         }
@@ -300,12 +301,12 @@ fn arg_parser() -> clap::Command {
                 )
                 .arg(
                     clap::Arg::new("raw-file")
-                        .help("File to write raw data to (will be gzipped)")
+                        .help("File to write raw data to (will be gzipped). Raw data can be converted to other formats later with `rbspy report`. Not written unless this option is given")
                         .long("raw-file")
                         .required(false),
                 )
                 .arg(
-                    arg!(-f --file <FILE> "File to write formatted output to")
+                    arg!(-f --file <FILE> "File to write formatted output to. Use '-' to write to stdout")
                         .required(false),
                 )
                 .arg(
@@ -458,10 +459,7 @@ impl Args {
                         .unwrap()
                         .clone();
 
-                let raw_path = output_filename(
-                    submatches.get_one::<String>("raw-file").map(|x| x.as_str()),
-                    "raw.gz",
-                )?;
+                let raw_path = submatches.get_one::<String>("raw-file").map(PathBuf::from);
                 let out_path = output_filename(
                     submatches.get_one::<String>("file").map(|x| x.as_str()),
                     &format.extension(),
@@ -680,7 +678,7 @@ mod tests {
                 cmd: SubCmd::Record {
                     target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
-                    raw_path: "raw.gz".into(),
+                    raw_path: Some("raw.gz".into()),
                     sample_rate: 99,
                     maybe_duration: None,
                     format: OutputFormat::flamegraph,
@@ -705,7 +703,7 @@ mod tests {
                 cmd: SubCmd::Record {
                     target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
-                    raw_path: "raw.gz".into(),
+                    raw_path: Some("raw.gz".into()),
                     sample_rate: 25,
                     maybe_duration: None,
                     format: OutputFormat::flamegraph,
@@ -730,7 +728,7 @@ mod tests {
                 cmd: SubCmd::Record {
                     target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
-                    raw_path: "raw.gz".into(),
+                    raw_path: Some("raw.gz".into()),
                     sample_rate: 99,
                     maybe_duration: Some(std::time::Duration::from_secs(60)),
                     format: OutputFormat::flamegraph,
@@ -754,7 +752,7 @@ mod tests {
                 cmd: SubCmd::Record {
                     target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
-                    raw_path: "raw.gz".into(),
+                    raw_path: Some("raw.gz".into()),
                     sample_rate: 99,
                     maybe_duration: Some(std::time::Duration::from_secs(60)),
                     format: OutputFormat::callgrind,
@@ -779,7 +777,7 @@ mod tests {
                 cmd: SubCmd::Record {
                     target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
-                    raw_path: "raw.gz".into(),
+                    raw_path: Some("raw.gz".into()),
                     sample_rate: 99,
                     maybe_duration: None,
                     format: OutputFormat::flamegraph,
@@ -804,7 +802,7 @@ mod tests {
                 cmd: SubCmd::Record {
                     target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
-                    raw_path: "raw.gz".into(),
+                    raw_path: Some("raw.gz".into()),
                     sample_rate: 99,
                     maybe_duration: None,
                     format: OutputFormat::flamegraph,
@@ -829,7 +827,7 @@ mod tests {
                 cmd: SubCmd::Record {
                     target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
-                    raw_path: "raw.gz".into(),
+                    raw_path: Some("raw.gz".into()),
                     sample_rate: 99,
                     maybe_duration: None,
                     format: OutputFormat::flamegraph,
@@ -854,7 +852,7 @@ mod tests {
                 cmd: SubCmd::Record {
                     target: Target::Pid { pid: 1234 },
                     out_path: "foo.txt".into(),
-                    raw_path: "raw.gz".into(),
+                    raw_path: Some("raw.gz".into()),
                     sample_rate: 99,
                     maybe_duration: None,
                     format: OutputFormat::flamegraph,
