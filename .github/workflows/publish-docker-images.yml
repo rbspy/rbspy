@@ -26,7 +26,7 @@ jobs:
           echo "release_tag=$release_tag" >> $GITHUB_ENV
           echo "release_version=$release_version" >> $GITHUB_ENV
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up QEMU
         uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - name: Set up Docker Buildx
@@ -74,7 +74,7 @@ jobs:
           echo "release_tag=$release_tag" >> $GITHUB_ENV
           echo "release_version=$release_version" >> $GITHUB_ENV
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up QEMU
         uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - name: Set up Docker Buildx
@@ -112,7 +112,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.inputs.tag || github.event.release.tag_name }}
       - name: Sync README to Docker Hub
