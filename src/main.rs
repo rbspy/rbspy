@@ -8,6 +8,7 @@ use rbspy::report;
 use rbspy::{OutputFormat, Pid};
 use std::env;
 use std::fs::DirBuilder;
+use std::io::IsTerminal;
 #[cfg(unix)]
 use std::os::unix::prelude::*;
 use std::path::PathBuf;
@@ -174,6 +175,7 @@ fn do_main() -> Result<(), Error> {
 
             eprintln!("rbspy is recording traces. Press Ctrl+C to stop.");
 
+            let silent = silent || !std::io::stderr().is_terminal();
             let summary_thread = std::thread::spawn(move || {
                 if silent {
                     return;
@@ -187,8 +189,8 @@ fn do_main() -> Result<(), Error> {
 
                     // Print a summary every second
                     if std::time::Instant::now() > summary_time {
-                        println!("{}[2J", 27 as char); // clear screen
-                        println!("{}[0;0H", 27 as char); // go to 0,0
+                        eprintln!("{}[2J", 27 as char); // clear screen
+                        eprintln!("{}[0;0H", 27 as char); // go to 0,0
                         match recorder_summary.write_summary(&mut std::io::stderr()) {
                             Ok(()) => {}
                             Err(e) => {
