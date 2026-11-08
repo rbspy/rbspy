@@ -277,10 +277,25 @@ mod tests {
         }
 
         let mut spy = RubySpy::retry_new(pid, 100, None, true).expect("couldn't initialize spy");
-        let trace = spy
-            .get_stack_trace(false)
-            .expect("couldn't get stack trace");
-        assert!(trace.is_none());
+
+        // The script creates the ready file just before it calls `sleep`, so its main thread can
+        // still be runnable for a while after we see the file if it gets preempted on a busy
+        // machine. Sample until it settles into `sleep`.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            let trace = spy
+                .get_stack_trace(false)
+                .expect("couldn't get stack trace");
+            if trace.is_none() {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "expected no trace from a sleeping process, got {:?}",
+                trace
+            );
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
     }
 
     #[test]
