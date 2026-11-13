@@ -243,7 +243,7 @@ jobs:
           cross test --release --no-run --target x86_64-unknown-freebsd
 
       - name: Launch Firecracker VM
-        uses: acj/freebsd-firecracker-action@53cfec625fd81cfb34160e6d9ec19c9d9baa8adf # v0.10.3
+        uses: acj/freebsd-firecracker-action@ee77f05b7e0e9618b4c8134aa74b2c6d56779563 # v0.13.0
         with:
           verbose: false
           pre-run: |
