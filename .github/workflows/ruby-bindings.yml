@@ -11,9 +11,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
       - name: Cargo Cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache@v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -25,7 +25,7 @@ jobs:
           docker build -t xtask -f ci/docker/Dockerfile.bindgen --target=builder .
           docker run --rm -v $PWD:/workdir xtask cp target/release/xtask /workdir/xtask.bin
       - name: Upload xtask binary
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: xtask
           path: xtask.bin
@@ -64,11 +64,11 @@ jobs:
         target: ["x86_64-unknown-linux-gnu"]
     steps:
       - name: Checkout rbspy repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
         with:
             path: "rbspy"
       - name: Download xtask binary
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: actions/download-artifact@v8.0.2
         with:
           name: xtask
           path: xtask
@@ -96,7 +96,7 @@ jobs:
           git add ruby-structs/src
           cp $(git diff --name-only --staged | xargs) ../bindings-staging || echo "No new or modified files - bindings are up to date"
       - name: Upload Bindings
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           if-no-files-found: ignore
           name: bindings-${{ matrix.ruby-version }}
@@ -108,11 +108,11 @@ jobs:
     needs: [generate]
     steps:
       - name: Checkout rbspy repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
         with:
             path: "rbspy"
             fetch-depth: 0
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      - uses: actions/download-artifact@v8.0.2
       - name: Copy bindings into place
         id: copy-bindings
         run: |

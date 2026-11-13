@@ -25,9 +25,9 @@ jobs:
             target: x86_64-unknown-linux-gnu
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@4305c38b25d97ef35a8ad1f985ccf2d2242004f2 # stable branch
+        uses: dtolnay/rust-toolchain@stable
       - name: Install Rust toolchain target
         run: |
           rustup target add ${{ matrix.target }}
@@ -37,7 +37,7 @@ jobs:
           echo "Test binary path is $test_binary_path"
           cp $test_binary_path rbspy-test
       - name: Upload binaries
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: rbspy-test
           path: rbspy-test
@@ -65,14 +65,14 @@ jobs:
         ]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@4305c38b25d97ef35a8ad1f985ccf2d2242004f2 # stable branch
+        uses: dtolnay/rust-toolchain@stable
       - name: Install Ruby
-        uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1.336.0
+        uses: ruby/setup-ruby@v1.336.0
         with:
           ruby-version: ${{ matrix.ruby_version }}
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      - uses: actions/download-artifact@v8.0.2
       - name: Run tests
         timeout-minutes: 5
         run: |

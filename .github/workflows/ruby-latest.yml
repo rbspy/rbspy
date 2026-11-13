@@ -36,25 +36,25 @@ jobs:
       RUST_BACKTRACE: 1
     steps:
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@4305c38b25d97ef35a8ad1f985ccf2d2242004f2 # stable branch
+        uses: dtolnay/rust-toolchain@stable
       - name: Install Ruby
-        uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1.336.0
+        uses: ruby/setup-ruby@v1.336.0
         with:
           ruby-version: "${{ inputs.system_ruby_version || 'ruby' }}"
           bundler-cache: false
       - name: Check out latest Ruby source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
         with:
           path: ruby
           repository: ruby/ruby
           ref: ${{ inputs.ruby_commit }}
           fetch-depth: 0
       - name: Check out rbspy source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
         with:
           path: rbspy
       - name: Cargo Cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache@v6.1.0
         with:
           path: |
             ~/.cargo/registry
