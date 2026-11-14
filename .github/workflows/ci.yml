@@ -200,7 +200,8 @@ jobs:
     name: Build (FreeBSD)
     runs-on: ubuntu-24.04
     env:
-      CROSS_REV: 51f46f296253d8122c927c5bb933e3c4f27cc317
+      FREEBSD_RELEASE: 14.4-RELEASE
+      FREEBSD_BASE_SHA256: 769f60a6eea2938ad6b7943cfbcc17dfaf7d1f7ba59a32b869a00349302df853
 
     steps:
       - name: Checkout repository
@@ -208,33 +209,48 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-freebsd
 
       - uses: Swatinem/rust-cache@v2.9.3
 
-      - name: Cache cross binary
-        id: cache-cross
+      - name: Cache FreeBSD sysroot
+        id: cache-sysroot
         uses: actions/cache@v6.1.0
         with:
-          path: |
-            ~/.cargo/bin/cross
-          key: ${{ runner.os }}-cross-${{ env.CROSS_REV }}
+          path: ~/freebsd-sysroot
+          key: freebsd-sysroot-${{ env.FREEBSD_RELEASE }}-${{ env.FREEBSD_BASE_SHA256 }}
 
-      - name: Install cross
-        if: steps.cache-cross.outputs.cache-hit != 'true'
+      - name: Fetch FreeBSD sysroot
+        if: steps.cache-sysroot.outputs.cache-hit != 'true'
         run: |
-          cargo install cross --git https://github.com/cross-rs/cross --rev $CROSS_REV
-          cross --version
+          curl -fsSL -o "$RUNNER_TEMP/base.txz" "https://download.freebsd.org/releases/amd64/$FREEBSD_RELEASE/base.txz"
+          echo "$FREEBSD_BASE_SHA256  $RUNNER_TEMP/base.txz" | sha256sum -c -
+          mkdir -p ~/freebsd-sysroot
+          tar -x -C ~/freebsd-sysroot \
+            --exclude './usr/lib/clang' --exclude './usr/lib/libprivate*' \
+            -f "$RUNNER_TEMP/base.txz" ./lib ./usr/lib
+          find ~/freebsd-sysroot/usr/lib -maxdepth 1 -name '*.a' \
+            ! -name 'libgcc*.a' ! -name 'libcompiler_rt.a' ! -name '*_nonshared.a' -delete
+          du -sh ~/freebsd-sysroot
+
+      - name: Configure FreeBSD linker
+        run: |
+          host="$(rustc -vV | sed -n 's/^host: //p')"
+          lld="$(rustc --print sysroot)/lib/rustlib/$host/bin/gcc-ld/ld.lld"
+          test -x "$lld"
+          echo "CARGO_TARGET_X86_64_UNKNOWN_FREEBSD_LINKER=clang" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_X86_64_UNKNOWN_FREEBSD_RUSTFLAGS=-C link-arg=--target=x86_64-unknown-freebsd${FREEBSD_RELEASE%-RELEASE} -C link-arg=--sysroot=$HOME/freebsd-sysroot -C link-arg=--ld-path=$lld" >> "$GITHUB_ENV"
 
       - name: Cross-compile rbspy
         shell: bash
         run: |
-          cross build --release --target x86_64-unknown-freebsd
+          cargo build --release --locked --target x86_64-unknown-freebsd
           cp target/x86_64-unknown-freebsd/release/rbspy rbspy
 
           mkdir -p fbsd-tests
-          cross test --release --no-run --target x86_64-unknown-freebsd --message-format=json-render-diagnostics \
+          cargo test --release --locked --no-run --target x86_64-unknown-freebsd --message-format=json-render-diagnostics \
             | jq -r 'select(.reason == "compiler-artifact" and .profile.test and .executable != null) | .executable' \
-            | sed 's|^/target/|target/|' \
             | xargs -I{} cp {} fbsd-tests/
           ls -l fbsd-tests
           test -n "$(ls fbsd-tests)"
