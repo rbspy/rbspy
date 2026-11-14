@@ -245,7 +245,7 @@ jobs:
       - name: Cross-compile rbspy
         shell: bash
         run: |
-          cargo build --release --locked --target x86_64-unknown-freebsd
+          cargo build --release --all-targets --locked --target x86_64-unknown-freebsd
           cp target/x86_64-unknown-freebsd/release/rbspy rbspy
 
           mkdir -p fbsd-tests
