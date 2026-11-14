@@ -20,7 +20,7 @@ jobs:
 
     steps:
       - name: Set up Ruby
-        uses: ruby/setup-ruby@v1.336.0
+        uses: ruby/setup-ruby@v1.338.0
         with:
           ruby-version: ${{ inputs.ruby-version }}
 
