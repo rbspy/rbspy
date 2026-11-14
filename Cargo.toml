@@ -50,7 +50,7 @@ thiserror = "2.0.19"
 nix = { version = "0.31.3", features = ["user"] }
 
 [target.'cfg(target_os="macos")'.dependencies]
-libproc = "0.14.11"
+libproc = "0.15.0"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.9", features = ["handleapi", "timeapi", "wow64apiset"] }
