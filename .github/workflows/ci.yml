@@ -236,11 +236,18 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Cross-compile rbspy
+        shell: bash
         run: |
           cross build --release --target x86_64-unknown-freebsd
           cp target/x86_64-unknown-freebsd/release/rbspy rbspy
-          rm -rf target/x86_64-unknown-freebsd/release/deps/rbspy-*
-          cross test --release --no-run --target x86_64-unknown-freebsd
+
+          mkdir -p fbsd-tests
+          cross test --release --no-run --target x86_64-unknown-freebsd --message-format=json-render-diagnostics \
+            | jq -r 'select(.reason == "compiler-artifact" and .profile.test and .executable != null) | .executable' \
+            | sed 's|^/target/|target/|' \
+            | xargs -I{} cp {} fbsd-tests/
+          ls -l fbsd-tests
+          test -n "$(ls fbsd-tests)"
 
       - name: Launch Firecracker VM
         uses: acj/freebsd-firecracker-action@v0.13.0
@@ -253,12 +260,8 @@ jobs:
             include_path="$(mktemp)"
             cat <<EOF > $include_path
             rbspy
-            target
-            target/x86_64-unknown-freebsd
-            target/x86_64-unknown-freebsd/release
-            target/x86_64-unknown-freebsd/release/rbspy
-            target/x86_64-unknown-freebsd/release/deps
-            target/x86_64-unknown-freebsd/release/deps/rbspy-*
+            fbsd-tests
+            fbsd-tests/*
             ci
             ci/ruby-programs
             ci/ruby-programs/infinite_on_cpu.rb
@@ -293,12 +296,18 @@ jobs:
 
             skip_tests="--skip core::ruby_spy::tests --skip sampler::tests"
             failed=0
-            for testbin in $(find target/x86_64-unknown-freebsd/release/deps -type f -perm -u+x ! -name "*.d" -print); do
+            ran=0
+            for testbin in fbsd-tests/*; do
+              ran=$((ran + 1))
               if ! $testbin $skip_tests; then
                 failed=1
               fi
             done
 
+            if [ $ran -eq 0 ]; then
+              echo "No test binaries found"
+              exit 1
+            fi
             if [ $failed -ne 0 ]; then
               exit 1
             fi
