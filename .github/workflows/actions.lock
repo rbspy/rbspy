@@ -27,7 +27,7 @@ workflows:
         - 'docker/login-action@v4.7.0'
         - 'docker/setup-buildx-action@v4.4.1'
         - 'docker/setup-qemu-action@v4.4.0'
-        - 'ms-jpq/sync-dockerhub-readme@0c8d5cd2a45de29ab6d890d78ee19a332be3503e'
+        - 'ms-jpq/sync-dockerhub-readme@df5121ab3314dc86fd36863eb111ab986fc6c612'
     '.github/workflows/ruby-bindings.yml':
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
@@ -104,9 +104,9 @@ dependencies:
         commit: 'sha1-b725eda525362e7cf34af9a7243cac1e3f01a7ec'
         owner_id: 1940490
         repo_id: 260749683
-    'ms-jpq/sync-dockerhub-readme@0c8d5cd2a45de29ab6d890d78ee19a332be3503e':
+    'ms-jpq/sync-dockerhub-readme@df5121ab3314dc86fd36863eb111ab986fc6c612':
         ref: 'whale'
-        commit: 'sha1-0c8d5cd2a45de29ab6d890d78ee19a332be3503e'
+        commit: 'sha1-df5121ab3314dc86fd36863eb111ab986fc6c612'
         owner_id: 50598611
         repo_id: 273760783
     'ruby/setup-ruby@v1.336.0':
