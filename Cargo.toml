@@ -43,7 +43,6 @@ serde_derive = "1.0.229"
 serde_json = "1.0.154"
 spytools = "0.5.0"
 terminal_size = "0.4.3"
-tempfile = "3.23.0"
 thiserror = "2.0.19"
 
 [target.'cfg(unix)'.dependencies]
@@ -59,6 +58,7 @@ winapi = { version = "0.3.9", features = ["handleapi", "timeapi", "wow64apiset"]
 byteorder = "1.4.3"
 rbspy-testdata = "0.3.2"
 rstest = "0.28.0"
+tempfile = "3.23.0"
 
 [profile.release]
 lto = true
