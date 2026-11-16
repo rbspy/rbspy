@@ -36,7 +36,9 @@ jobs:
       RUST_BACKTRACE: 1
     steps:
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
       - name: Install Ruby
         uses: ruby/setup-ruby@v1.338.0
         with:

@@ -27,7 +27,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
       - name: Install Rust toolchain target
         run: |
           rustup target add ${{ matrix.target }}
@@ -67,7 +69,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
       - name: Install Ruby
         uses: ruby/setup-ruby@v1.338.0
         with:

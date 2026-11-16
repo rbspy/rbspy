@@ -15,7 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
       - name: publish ruby-structs crate
         continue-on-error: true
         run: |
@@ -28,7 +30,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
       - name: publish rbspy crate
         run: |
           cargo login ${{ secrets.CARGO_TOKEN }}
