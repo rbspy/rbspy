@@ -46,7 +46,7 @@ terminal_size = "0.4.3"
 thiserror = "2.0.19"
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.31.3", features = ["user"] }
+nix = { version = "0.32.0", features = ["user"] }
 
 [target.'cfg(target_os="macos")'.dependencies]
 libproc = "0.15.0"
