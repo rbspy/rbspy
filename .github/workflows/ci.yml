@@ -64,17 +64,17 @@ jobs:
             run-tests: 'true'
             target: aarch64-unknown-linux-gnu
           - build: macos-intel
-            os: macos-15-intel
+            os: macos-26-intel
             ruby-version: 4.0.0
             run-tests: 'true'
             target: x86_64-apple-darwin
           - build: macos-aarch64
-            os: macos-15
+            os: macos-26
             ruby-version: 4.0.0
             run-tests: 'true'
             target: aarch64-apple-darwin
           - build: windows
-            os: windows-2022
+            os: windows-2025
             ruby-version: 3.4.8
             run-tests: 'true'
             target: x86_64-pc-windows-msvc
