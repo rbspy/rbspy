@@ -1,7 +1,6 @@
 extern crate anyhow;
 #[cfg(test)]
 extern crate byteorder;
-extern crate chrono;
 extern crate clap;
 extern crate ctrlc;
 extern crate env_logger;

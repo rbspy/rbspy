@@ -1,6 +1,5 @@
 use anyhow::format_err;
 use anyhow::{Context, Error, Result};
-use chrono::prelude::*;
 use clap::{arg, ArgMatches};
 use rand::{distr::Alphanumeric, RngExt};
 use rbspy::recorder;
@@ -558,7 +557,12 @@ fn output_filename(maybe_filename: Option<&str>, extension: &str) -> Result<Path
                 .take(10)
                 .map(char::from)
                 .collect();
-            let filename = format!("{}-{}.{}", Utc::now().format("%Y-%m-%d"), s, extension);
+            let filename = format!(
+                "{}-{}.{}",
+                jiff::Timestamp::now().strftime("%Y-%m-%d"),
+                s,
+                extension
+            );
             let dirs = match directories::ProjectDirs::from("", "", "rbspy") {
                 Some(dirs) => dirs,
                 None => {

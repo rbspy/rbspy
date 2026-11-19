@@ -21,13 +21,13 @@ members = [
 
 [dependencies]
 anyhow = "1.0.104"
-chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
 clap = { version = "4.6.4", features = ["derive"] }
 ctrlc = "3.5.0"
 directories = "6.0.0"
 env_logger = "0.11.11"
 inferno = "0.12.8"
 flate2 = "1.1.8"
+jiff = { version = "1.0.1", default-features = false, features = ["std"] }
 lazy_static = "1.5.1"
 libc = "0.2.191"
 log = "0.4.33"
