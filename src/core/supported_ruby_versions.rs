@@ -718,6 +718,12 @@ pub fn get(v: &str) -> Result<RubyVersion> {
             get_stack_trace_fn: super::ruby_version::ruby_3_3_13::get_stack_trace,
             is_maybe_thread_fn: super::ruby_version::ruby_3_3_13::is_maybe_thread,
         }),
+        "3.3.14" => Ok(RubyVersion {
+            semver_version: Version::new(3, 3, 14),
+            get_execution_context_fn: super::ruby_version::ruby_3_3_14::get_execution_context,
+            get_stack_trace_fn: super::ruby_version::ruby_3_3_14::get_stack_trace,
+            is_maybe_thread_fn: super::ruby_version::ruby_3_3_14::is_maybe_thread,
+        }),
         "3.4.0" => Ok(RubyVersion {
             semver_version: Version::new(3, 4, 0),
             get_execution_context_fn: super::ruby_version::ruby_3_4_0::get_execution_context,
@@ -796,6 +802,12 @@ pub fn get(v: &str) -> Result<RubyVersion> {
             get_stack_trace_fn: super::ruby_version::ruby_3_4_12::get_stack_trace,
             is_maybe_thread_fn: super::ruby_version::ruby_3_4_12::is_maybe_thread,
         }),
+        "3.4.13" => Ok(RubyVersion {
+            semver_version: Version::new(3, 4, 13),
+            get_execution_context_fn: super::ruby_version::ruby_3_4_13::get_execution_context,
+            get_stack_trace_fn: super::ruby_version::ruby_3_4_13::get_stack_trace,
+            is_maybe_thread_fn: super::ruby_version::ruby_3_4_13::is_maybe_thread,
+        }),
         "4.0.0" => Ok(RubyVersion {
             semver_version: Version::new(4, 0, 0),
             get_execution_context_fn: super::ruby_version::ruby_4_0_0::get_execution_context,
@@ -855,6 +867,12 @@ pub fn get(v: &str) -> Result<RubyVersion> {
             get_execution_context_fn: super::ruby_version::ruby_4_0_9::get_execution_context,
             get_stack_trace_fn: super::ruby_version::ruby_4_0_9::get_stack_trace,
             is_maybe_thread_fn: super::ruby_version::ruby_4_0_9::is_maybe_thread,
+        }),
+        "4.0.10" => Ok(RubyVersion {
+            semver_version: Version::new(4, 0, 10),
+            get_execution_context_fn: super::ruby_version::ruby_4_0_10::get_execution_context,
+            get_stack_trace_fn: super::ruby_version::ruby_4_0_10::get_stack_trace,
+            is_maybe_thread_fn: super::ruby_version::ruby_4_0_10::is_maybe_thread,
         }),
         _ => Err(format_err!("rbspy doesn't support Ruby {} yet. If this is a new patch-level version of Ruby, you can try using `--force-version` with the previous version number.", v)),
     }
