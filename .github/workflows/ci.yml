@@ -261,7 +261,7 @@ jobs:
           test -n "$(ls fbsd-tests)"
 
       - name: Launch Firecracker VM
-        uses: acj/freebsd-firecracker-action@v0.13.0
+        uses: acj/freebsd-firecracker-action@v0.13.1
         with:
           verbose: false
           pre-run: |

@@ -4,7 +4,7 @@
 version: 'v0.0.3'
 workflows:
     '.github/workflows/ci.yml':
-        - 'acj/freebsd-firecracker-action@v0.13.0'
+        - 'acj/freebsd-firecracker-action@v0.13.1'
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
         - 'actions/download-artifact@v8.0.2'
@@ -27,7 +27,7 @@ workflows:
         - 'docker/login-action@v4.8.0'
         - 'docker/setup-buildx-action@v4.4.1'
         - 'docker/setup-qemu-action@v4.4.0'
-        - 'ms-jpq/sync-dockerhub-readme@df5121ab3314dc86fd36863eb111ab986fc6c612'
+        - 'ms-jpq/sync-dockerhub-readme@whale'
     '.github/workflows/ruby-bindings.yml':
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
@@ -47,9 +47,9 @@ workflows:
     '.github/workflows/verify-lockfile.yml':
         - 'actions/checkout@v7.0.1'
 dependencies:
-    'acj/freebsd-firecracker-action@v0.13.0':
-        ref: 'v0.13.0'
-        commit: 'sha1-ee77f05b7e0e9618b4c8134aa74b2c6d56779563'
+    'acj/freebsd-firecracker-action@v0.13.1':
+        ref: 'v0.13.1'
+        commit: 'sha1-301e9677ce206307d6458a5e6b0a88bec97fe227'
         owner_id: 27923
         repo_id: 739935368
         uses:
@@ -104,7 +104,7 @@ dependencies:
         commit: 'sha1-df2a88e9fe4098bad09cb42c3dec7187f15861fc'
         owner_id: 1940490
         repo_id: 260749683
-    'ms-jpq/sync-dockerhub-readme@df5121ab3314dc86fd36863eb111ab986fc6c612':
+    'ms-jpq/sync-dockerhub-readme@whale':
         ref: 'whale'
         commit: 'sha1-df5121ab3314dc86fd36863eb111ab986fc6c612'
         owner_id: 50598611

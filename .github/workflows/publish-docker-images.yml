@@ -116,7 +116,7 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag || github.event.release.tag_name }}
       - name: Sync README to Docker Hub
-        uses: ms-jpq/sync-dockerhub-readme@df5121ab3314dc86fd36863eb111ab986fc6c612 # whale branch
+        uses: ms-jpq/sync-dockerhub-readme@whale
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
