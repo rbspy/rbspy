@@ -664,7 +664,10 @@ macro_rules! get_stack_trace(
                     None
                 },
             };
-            if stack_field(&thread) as usize == 0 {
+            if stack_field(&thread) as usize == 0 || thread.cfp as usize == stack_base(&thread) as usize {
+                // No VM stack yet, or cfp still points at the dummy frame that
+                // rb_ec_initialize_vm_stack pushes. Because no Ruby frames exist yet, we report
+                // a C function instead of an error.
                 return Ok(Some(StackTrace {
                     pid: Some(pid),
                     trace: vec!(StackFrame::unknown_c_function()),
@@ -3642,6 +3645,82 @@ mod tests {
         let found =
             ruby_version::ruby_3_3_0::get_execution_context(0, vm_ptr_slot, &memory).unwrap();
         assert_eq!(ec_addr, found);
+    }
+
+    /// Lays out a minimal Ruby 4.0 VM whose main thread's cfp is `cfp_offset` bytes past the
+    /// stack base, which is the slot of the dummy frame pushed by rb_ec_initialize_vm_stack
+    fn fake_vm_4_0_0(cfp_offset: isize) -> (FakeMemory, usize) {
+        use bindings::ruby_4_0_0::{
+            rb_control_frame_t, rb_execution_context_struct, rb_thread_struct, VALUE,
+        };
+
+        const BASE: usize = 0x1000_0000;
+        let word = std::mem::size_of::<usize>();
+
+        let vm_ptr_slot = BASE;
+        let vm_addr = BASE + 0x1000;
+        let ractor_addr = BASE + 0x3000;
+        let thread_addr = BASE + 0x5000;
+        let ec_addr = BASE + 0x7000;
+        let stack_start = BASE + 0x9000;
+        let stack_words = 64;
+        let stack_base = stack_start + stack_words * std::mem::size_of::<VALUE>()
+            - std::mem::size_of::<rb_control_frame_t>();
+        let cfp = stack_base.checked_add_signed(cfp_offset).unwrap();
+
+        let mut memory = FakeMemory::new(BASE, 0xC000);
+        memory.write_word(vm_ptr_slot, vm_addr);
+        memory.write_word(vm_addr + 7 * word, thread_addr);
+        memory.write_word(ractor_addr + 54 * word, ec_addr);
+        for (offset, value) in [
+            (std::mem::offset_of!(rb_thread_struct, ractor), ractor_addr),
+            (std::mem::offset_of!(rb_thread_struct, vm), vm_addr),
+            (std::mem::offset_of!(rb_thread_struct, ec), ec_addr),
+        ] {
+            memory.write_word(thread_addr + offset, value);
+        }
+        for (offset, value) in [
+            (
+                std::mem::offset_of!(rb_execution_context_struct, vm_stack),
+                stack_start,
+            ),
+            (
+                std::mem::offset_of!(rb_execution_context_struct, vm_stack_size),
+                stack_words,
+            ),
+            (std::mem::offset_of!(rb_execution_context_struct, cfp), cfp),
+            (
+                std::mem::offset_of!(rb_execution_context_struct, thread_ptr),
+                thread_addr,
+            ),
+        ] {
+            memory.write_word(ec_addr + offset, value);
+        }
+        (memory, vm_ptr_slot)
+    }
+
+    #[test]
+    fn test_get_stack_trace_with_only_dummy_frame_4_0_0() {
+        // Between thread init and the first Ruby frame push (e.g. when the interpreter is
+        // booting up), cfp sits at the stack base and there are no Ruby frames to report
+        let (memory, vm_ptr_slot) = fake_vm_4_0_0(0);
+        let trace =
+            ruby_version::ruby_4_0_0::get_stack_trace(0, vm_ptr_slot, None, &memory, 0, false)
+                .unwrap()
+                .unwrap();
+        assert_eq!(vec![StackFrame::unknown_c_function()], trace.trace);
+    }
+
+    #[test]
+    fn test_get_stack_trace_with_cfp_past_stack_base_4_0_0() {
+        let (memory, vm_ptr_slot) = fake_vm_4_0_0(std::mem::size_of::<usize>() as isize);
+        let err =
+            ruby_version::ruby_4_0_0::get_stack_trace(0, vm_ptr_slot, None, &memory, 0, false)
+                .unwrap_err();
+        assert!(
+            format!("{err:#}").contains("out of sync"),
+            "unexpected error: {err:#}"
+        );
     }
 
     // The line table of `work` from https://github.com/rbspy/rbspy/issues/409
