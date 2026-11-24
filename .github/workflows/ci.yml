@@ -38,8 +38,6 @@ jobs:
   build:
     name: Build
     env:
-      CARGO: cargo
-      TARGET_FLAGS: --target ${{ matrix.target }}
       RUST_BACKTRACE: full
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
@@ -56,27 +54,22 @@ jobs:
           - build: linux-x86_64
             os: ubuntu-24.04
             ruby-version: 4.0.0
-            run-tests: 'true'
             target: x86_64-unknown-linux-gnu
           - build: linux-aarch64
             os: ubuntu-24.04-arm
             ruby-version: 4.0.0
-            run-tests: 'true'
             target: aarch64-unknown-linux-gnu
           - build: macos-intel
             os: macos-26-intel
             ruby-version: 4.0.0
-            run-tests: 'true'
             target: x86_64-apple-darwin
           - build: macos-aarch64
             os: macos-26
             ruby-version: 4.0.0
-            run-tests: 'true'
             target: aarch64-apple-darwin
           - build: windows
             os: windows-2025
             ruby-version: 3.4.8
-            run-tests: 'true'
             target: x86_64-pc-windows-msvc
     steps:
       - name: Checkout repository
@@ -89,22 +82,14 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-      - name: Install Rust toolchain target
-        run: |
-          rustup target add ${{ matrix.target }}
       - name: Cargo Cache
         uses: Swatinem/rust-cache@v2.9.3
         with:
           cache-on-failure: "true"
           key: "${{ matrix.os }}-${{ matrix.target }}"
           prefix-key: "20230109"
-      - name: Show command used for Cargo
-        run: |
-          echo "cargo command is: ${{ env.CARGO }}"
-          echo "target flag is: ${{ env.TARGET_FLAGS }}"
-
       - name: Build rbspy
-        run: ${{ env.CARGO }} build --release --locked --workspace --all-targets ${{ env.TARGET_FLAGS }}
+        run: cargo build --release --locked --workspace --all-targets --target ${{ matrix.target }}
 
       - name: Prepare binary for upload
         if: runner.os != 'windows'
@@ -130,18 +115,14 @@ jobs:
 
       - name: Run tests
         timeout-minutes: 5
-        run: ${{ env.CARGO }} test --release ${{ env.TARGET_FLAGS }}
-        if: runner.os == 'linux' && matrix.run-tests == 'true'
+        run: cargo test --release --target ${{ matrix.target }}
+        if: runner.os != 'macOS'
       - name: Run tests
         timeout-minutes: 5
-        run: sudo "PATH=$PATH" ${{ env.CARGO }} test --release ${{ env.TARGET_FLAGS }}
-        if: runner.os == 'macOS' && matrix.run-tests == 'true'
-      - name: Run tests
-        timeout-minutes: 5
-        run: ${{ env.CARGO }} test --release ${{ env.TARGET_FLAGS }}
-        if: runner.os == 'windows' && matrix.run-tests == 'true'
+        run: sudo "PATH=$PATH" cargo test --release --target ${{ matrix.target }}
+        if: runner.os == 'macOS'
       - name: Run rbspy with alternative mallocs
-        if: runner.os == 'linux' && matrix.run-tests == 'true'
+        if: runner.os == 'linux'
         run: |
           set -e
           sudo apt install -y libjemalloc2 libtcmalloc-minimal4
@@ -149,14 +130,14 @@ jobs:
           target/${{ matrix.target }}/release/rbspy record env LD_PRELOAD=/usr/lib/$os_triple/libjemalloc.so.2 ruby ci/ruby-programs/short_program.rb
           target/${{ matrix.target }}/release/rbspy record env LD_PRELOAD=/usr/lib/$os_triple/libtcmalloc_minimal.so.4 ruby ci/ruby-programs/short_program.rb
       - name: Profile puma under load (single mode)
-        if: runner.os != 'windows' && matrix.run-tests == 'true'
+        if: runner.os != 'windows'
         timeout-minutes: 5
         env:
           RBSPY: target/${{ matrix.target }}/release/rbspy
           USE_SUDO: '1'
         run: ci/test-puma.sh
       - name: Profile puma under load (cluster mode)
-        if: runner.os != 'windows' && matrix.run-tests == 'true'
+        if: runner.os != 'windows'
         timeout-minutes: 5
         env:
           RBSPY: target/${{ matrix.target }}/release/rbspy
