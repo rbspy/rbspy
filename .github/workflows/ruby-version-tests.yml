@@ -35,7 +35,7 @@ jobs:
           rustup target add ${{ matrix.target }}
       - name: Prepare test binary for upload
         run: |
-          test_binary_path=$(cargo test --release --locked --no-run --message-format=json 2>/dev/null | grep '"executable":' | tail -1 | jq '.executable' | tr -d '"')
+          test_binary_path=$(cargo test --release --locked --no-run --message-format=json-render-diagnostics | jq -r 'select(.reason == "compiler-artifact" and .profile.test and .target.kind == ["lib"] and .executable != null) | .executable')
           echo "Test binary path is $test_binary_path"
           cp $test_binary_path rbspy-test
       - name: Upload binaries
