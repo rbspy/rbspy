@@ -77,6 +77,9 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby_version }}
       - uses: actions/download-artifact@v8.0.2
+        with:
+          name: rbspy-test
+          path: test-bin
       - name: Run tests
         timeout-minutes: 5
         run: |
@@ -87,5 +90,5 @@ jobs:
           # TODO: This is just to put rbspy-testdata in the right place. Is there a leaner way?
           cargo fetch
 
-          chmod u+x ./rbspy-test/rbspy-test
-          ./rbspy-test/rbspy-test
+          chmod u+x ./test-bin/rbspy-test
+          ./test-bin/rbspy-test
