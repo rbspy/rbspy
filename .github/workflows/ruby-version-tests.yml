@@ -38,11 +38,19 @@ jobs:
           test_binary_path=$(cargo test --release --locked --no-run --message-format=json-render-diagnostics | jq -r 'select(.reason == "compiler-artifact" and .profile.test and .target.kind == ["lib"] and .executable != null) | .executable')
           echo "Test binary path is $test_binary_path"
           cp $test_binary_path rbspy-test
+      - name: Package test data
+        run: |
+          # rbspy-testdata locates its data files via an absolute path baked in at compile time
+          testdata_dir=$(cargo metadata --format-version 1 --locked | jq -r '.packages[] | select(.name == "rbspy-testdata") | .manifest_path | rtrimstr("/Cargo.toml")')
+          echo "Test data directory is $testdata_dir"
+          tar -czPf rbspy-testdata.tar.gz "$testdata_dir/data"
       - name: Upload binaries
         uses: actions/upload-artifact@v7.0.2
         with:
           name: rbspy-test
-          path: rbspy-test
+          path: |
+            rbspy-test
+            rbspy-testdata.tar.gz
 
   ruby-version-tests:
     runs-on: ubuntu-24.04
@@ -68,10 +76,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
       - name: Install Ruby
         uses: ruby/setup-ruby@v1.338.0
         with:
@@ -87,8 +91,7 @@ jobs:
 
           echo "Ruby version is $(ruby -v)"
 
-          # TODO: This is just to put rbspy-testdata in the right place. Is there a leaner way?
-          cargo fetch
+          tar -xzPf ./test-bin/rbspy-testdata.tar.gz
 
           chmod u+x ./test-bin/rbspy-test
           ./test-bin/rbspy-test
