@@ -40,7 +40,7 @@ jobs:
         with:
           toolchain: stable
       - name: Install Ruby
-        uses: ruby/setup-ruby@v1.338.0
+        uses: ruby/setup-ruby@v1.344.0
         with:
           ruby-version: "${{ inputs.system_ruby_version || 'ruby' }}"
           bundler-cache: false

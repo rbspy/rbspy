@@ -77,7 +77,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
       - name: Install Ruby
-        uses: ruby/setup-ruby@v1.338.0
+        uses: ruby/setup-ruby@v1.344.0
         with:
           ruby-version: ${{ matrix.ruby_version }}
       - uses: actions/download-artifact@v8.0.2
